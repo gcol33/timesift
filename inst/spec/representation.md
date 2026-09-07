@@ -601,6 +601,7 @@ is a method rather than a second constructor because R's own way to combine thin
 | `grain_contrasts()` | fits a mixed model over the whole ladder and reads Dunnett's comparisons off it, on lme4, lmerTest and emmeans. The Python twin would need a mixed-model fitter of its own or a scientific stack the wheel does not depend on, and nothing in the contract reads it. |
 | `simulate_records()` | generates a record with a planted grain, for the vignette and the recovery tests. The Python suite builds its records in its own fixtures. |
 | `plot()` on a ladder and on a selection | the wheel depends on numpy alone, and every number a plot draws is on the object it is called on. |
+| `elasticnet(s =)` | glmnet keeps the whole penalty path and `s` names the point on it to predict at. scikit-learn's cross-validated fits refit at the best penalty and keep only that one, so there is no path there to name a point of. Both sides otherwise fit the same model: one penalised regression per variable over every column and, by default, their squares, on a design standardised before it is penalised, with the mixing given by `alpha` and the penalty chosen by an inner cross-validation on the fitting units. |
 
 | in Python only | what it is |
 |---|---|

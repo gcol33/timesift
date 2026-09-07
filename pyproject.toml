@@ -16,7 +16,11 @@ dependencies = ["numpy>=1.24", "tzdata; platform_system == 'Windows'"]
 
 [project.optional-dependencies]
 torch = ["torch>=2.0"]
-sklearn = ["scikit-learn>=1.3"]
+# 1.8 is where `l1_ratios` alone selects the elastic net. Under the versions before it the
+# mixing is read only beside `penalty="elasticnet"` and is otherwise warned about and ignored,
+# so `alpha` would silently do nothing and the learner would fit an L2-only logistic. Branching
+# on the version would be two paths to keep true; the floor is one.
+sklearn = ["scikit-learn>=1.8"]
 test = ["pytest>=8.0"]
 
 [project.urls]

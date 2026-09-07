@@ -585,6 +585,11 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, weight_positives=T
     nothing about the model is decided outside the fold it is fitted in. The family is the
     response head's: logistic under a binary cross-entropy loss, linear under a squared-error
     one, and ``weight_positives`` is read under the first alone.
+
+    The design is standardised before it is penalised, as it is on the R side, so a column is
+    not penalised for the scale it was recorded on. The penalty itself is the one the inner
+    cross-validation refits at; where R takes a named point of the path through ``s``,
+    scikit-learn keeps only that one, so there is nothing to name here.
     """
     return Learner(name="elasticnet", fit=_elasticnet_fit, predict=_elasticnet_predict,
                    needs=("sklearn",), data=data, reads="tabular", multi="separate",
@@ -594,17 +599,25 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, weight_positives=T
 
 def _elasticnet_fit(x, y, alpha, n_inner, squares, weight_positives, seed, head, **_):
     from sklearn.linear_model import ElasticNetCV, LogisticRegressionCV
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
     family = _family(head)
     m = _design(x, squares)
 
+    # The penalty is one number over every column, so what it costs a column depends on that
+    # column's scale: unstandardised, the squares of hourly temperatures are penalised as if they
+    # were a different predictor from the readings themselves. Standardising is what glmnet does
+    # by default on the R side, and the scaler travels with the fit so new units are mapped
+    # through the centre and the spread the model was fitted at rather than through their own.
     def make(design, yj):
         if family == "binomial":
-            return LogisticRegressionCV(
+            return make_pipeline(StandardScaler(), LogisticRegressionCV(
                 Cs=10, cv=n_inner, solver="saga", l1_ratios=[alpha],
                 class_weight="balanced" if weight_positives else None,
-                max_iter=5000, random_state=seed).fit(design, yj)
-        return ElasticNetCV(l1_ratio=alpha, cv=n_inner, max_iter=5000,
-                            random_state=seed).fit(design, yj)
+                max_iter=5000, random_state=seed)).fit(design, yj)
+        return make_pipeline(StandardScaler(),
+                             ElasticNetCV(l1_ratio=alpha, cv=n_inner, max_iter=5000,
+                                          random_state=seed)).fit(design, yj)
 
     return dict(models=_fit_columns(m, y, make), squares=squares, n_col=m.shape[1],
                 family=family)

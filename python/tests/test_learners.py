@@ -9,7 +9,7 @@ import pytest
 
 from timesift.control import train_control
 from timesift.learners import (Learner, elasticnet, fit_learner, flatten, forest, stepwise,
-                               _apply_basis, _logistic, _poly_basis)
+                               _apply_basis, _design, _logistic, _poly_basis)
 from timesift.metrics import roc_auc
 from timesift.representation import grain_matrix
 from timesift.response import Response
@@ -137,6 +137,21 @@ def test_a_separated_or_unsettled_fit_is_refused_rather_than_returned():
     overlapping = np.array([-1.0, 1.0, -0.5, 0.5, -0.2, 0.7]).reshape(-1, 1)
     fit = _logistic(overlapping, y)
     assert fit is not None and np.isfinite(fit["aic"])
+
+
+@needs_sklearn
+def test_the_penalised_fit_uses_the_mixing_it_was_given_and_a_standardised_design():
+    x, y = planted(n_unit=30, days=28, seed=41)
+    for alpha in (0.2, 0.9):
+        model = fit_learner(elasticnet(alpha=alpha, n_inner=3), x, y).model
+        scaler, penalised = model["models"][0][0], model["models"][0][-1]
+        assert float(np.asarray(penalised.l1_ratio_).ravel()[0]) == alpha
+
+        # The scaler travels with the fit, so new units are mapped through the centre and the
+        # spread the model was fitted at rather than through their own.
+        design = scaler.transform(_design(x, model["squares"]))
+        assert np.allclose(design.mean(axis=0), 0, atol=1e-8)
+        assert np.allclose(design.std(axis=0), 1, atol=1e-8)
 
 
 @needs_sklearn
