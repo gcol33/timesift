@@ -98,6 +98,47 @@ test_that("forward selection stops at its budget and is non-monotone in a predic
   expect_true(all(p >= 0 & p <= 1))
 })
 
+test_that("a column holding one value is not offered to the forward search", {
+  withr::defer(.responses_reg$remove("constant_continuous_test"))
+  register_response("constant_continuous_test", list(
+    prepare = function(y) .as_response(y), activation = "identity",
+    loss = "squared_error", metric = "roc_auc",
+    cells = function(y, folds) scorable_cells(y > stats::median(y), folds)),
+    overwrite = TRUE)
+
+  sim <- sim_series(n_unit = 40L, days = 60L, seed = 37L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "month",
+                    stats = c("min", "mean", "max"))
+  # A channel every unit reads the same value on: what a sensor that never moved records, or a
+  # predictor that is constant over the units this fold holds.
+  flat <- x
+  flat[, , "min"] <- 7
+
+  binary <- sim_response(sim, n_var = 1L, seed = 38L)
+  level <- matrix(10 + 3 * scale(rowMeans(x[, , "mean"]))[, 1L], ncol = 1L,
+                  dimnames = list(dimnames(x)[[1L]], "height"))
+  for (arm in list(list(y = binary, response = "presence_absence"),
+                   list(y = level, response = "constant_continuous_test"))) {
+    fit <- fit_learner(stepwise(max_terms = 2L), flat, arm$y, response = arm$response)
+    chosen <- fit$model$models[[1L]]$columns
+    expect_gt(length(chosen), 0L)
+    expect_false(any(grepl("min", fit$model$columns[chosen], fixed = TRUE)), info = arm$response)
+    expect_equal(dim(stats::predict(fit, flat)), c(40L, 1L), info = arm$response)
+  }
+
+  expect_error(.poly_basis(rep(7, 20), 2L), "no polynomial basis")
+})
+
+test_that("the penalised learner reports what its fitter refuses instead of a constant", {
+  skip_if_not_installed("glmnet")
+  sim <- sim_series(n_unit = 40L, days = 60L, seed = 39L)
+  y <- sim_response(sim, n_var = 1L, seed = 40L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "month")
+  # One inner fold cannot be cross-validated over, and that is glmnet's to say. Swallowed, it
+  # would have come back as a constant predictor and been scored and stacked as a candidate.
+  expect_error(fit_learner(elasticnet(n_inner = 1L), x, y))
+})
+
 test_that("a forest fits, predicts and refuses a different representation", {
   skip_if_not_installed("ranger")
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 35L)

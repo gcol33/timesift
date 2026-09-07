@@ -54,11 +54,8 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
         set.seed(seeds[j])
         w <- if (weight_positives && family == "binomial") .imbalance_weights(yj)
              else rep(1, length(yj))
-        tryCatch(
-          glmnet::cv.glmnet(m, yj, family = family, alpha = alpha, weights = w,
-                            nfolds = n_inner, type.measure = "deviance"),
-          error = function(e) mean(yj)
-        )
+        glmnet::cv.glmnet(m, yj, family = family, alpha = alpha, weights = w,
+                          nfolds = n_inner, type.measure = "deviance")
       })
       list(models = models, squares = squares, s = s, columns = colnames(m))
     },
@@ -134,17 +131,24 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L) {
   chosen <- integer(0)
   bases <- list()
   best_aic <- stats::glm(y ~ 1, family = link)$aic
+  # A column holding one value has no polynomial basis to enter as, so it is not a candidate. It
+  # is the intercept the search already starts from, and offering it is what makes an orthogonal
+  # basis divide by a norm of zero.
+  offered <- which(vapply(seq_len(ncol(m)), function(j) length(unique(m[, j])) > 1L, logical(1L)))
   repeat {
     if (length(chosen) >= max_terms) {
       break
     }
     gains <- rep(NA_real_, ncol(m))
     fits <- vector("list", ncol(m))
-    for (j in setdiff(seq_len(ncol(m)), chosen)) {
+    for (j in setdiff(offered, chosen)) {
       b <- .poly_basis(m[, j], degree)
       d <- .design_frame(c(bases, list(b)))
-      fit <- tryCatch(stats::glm(y ~ ., data = d, family = link),
-                      error = function(e) NULL, warning = function(w) NULL)
+      # A candidate whose fit separates the response, or does not settle, is refused rather than
+      # admitted: those are the states the criterion cannot be read off, and admitting one would
+      # let the search prefer a column for having no answer. Anything the fitter raises as an
+      # error is a fault rather than a verdict on the candidate, and propagates.
+      fit <- tryCatch(stats::glm(y ~ ., data = d, family = link), warning = function(w) NULL)
       if (!is.null(fit) && is.finite(fit$aic)) {
         gains[j] <- fit$aic
         fits[[j]] <- list(fit = fit, basis = b)
@@ -176,7 +180,10 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L) {
 # An orthogonal polynomial basis, kept with the coefficients it was fitted beside so that new units
 # are mapped through the same basis rather than through one re-derived from themselves.
 .poly_basis <- function(v, degree) {
-  degree <- min(degree, max(1L, length(unique(v)) - 1L))
+  degree <- min(degree, length(unique(v)) - 1L)
+  if (degree < 1L) {
+    stop("a column holding one value has no polynomial basis to enter as.", call. = FALSE)
+  }
   b <- stats::poly(v, degree = degree)
   list(degree = degree, coefs = attr(b, "coefs"), values = b)
 }

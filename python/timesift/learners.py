@@ -690,9 +690,13 @@ def _forward_aic(m: np.ndarray, y: np.ndarray, max_terms: int, degree: int,
     bases: list[dict] = []
     current = None
     best_aic = glm(np.empty((len(y), 0)), y)["aic"]
+    # A column holding one value has no polynomial basis to enter as, so it is not a candidate. It
+    # is the intercept the search already starts from, and offering it is what makes an orthogonal
+    # basis divide by a norm of zero.
+    candidates = [j for j in range(m.shape[1]) if len(np.unique(m[:, j])) > 1]
     while len(chosen) < max_terms:
         offered = []
-        for j in range(m.shape[1]):
+        for j in candidates:
             if j in chosen:
                 continue
             basis = _poly_basis(m[:, j], degree)
@@ -781,7 +785,9 @@ def _mu(x: np.ndarray, beta: np.ndarray):
 # fitted beside so that new units are mapped through the same basis rather than through one
 # re-derived from themselves. It is the basis R's poly() builds, by the same recurrence.
 def _poly_basis(v: np.ndarray, degree: int) -> dict:
-    degree = min(degree, max(1, len(np.unique(v)) - 1))
+    degree = min(degree, len(np.unique(v)) - 1)
+    if degree < 1:
+        raise ValueError("a column holding one value has no polynomial basis to enter as")
     powers = [np.ones(len(v))]
     norm2 = [float(len(v))]
     alpha = []

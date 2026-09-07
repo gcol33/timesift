@@ -98,6 +98,38 @@ def test_a_degree_beyond_what_the_readings_distinguish_is_dropped():
     assert _poly_basis(np.array([1.0, 2.0, 3.0]), 5)["degree"] == 2
 
 
+def test_a_column_holding_one_value_is_not_offered_to_the_forward_search(temporary_response):
+    from dataclasses import replace
+
+    from timesift.response import as_response, scorable_cells
+    temporary_response("constant_continuous_test", dict(
+        prepare=as_response, activation="identity", loss="squared_error", metric="roc_auc",
+        cells=lambda y, folds: scorable_cells(y, folds)))
+
+    x, y = planted(seed=37)
+    # A channel every unit reads the same value on: what a sensor that never moved records, or a
+    # predictor that is constant over the units this fold holds.
+    values = np.concatenate([x.values, np.full((*x.values.shape[:2], 1), 7.0)], axis=2)
+    flat = replace(x, values=values, stats=(*x.stats, "flat"))
+    n_bin = x.values.shape[1]
+
+    level = x.values[:, :, 0].mean(axis=1)
+    level = 10 + 3 * (level - level.mean()) / level.std()
+    arms = [(y, "presence_absence"),
+            (Response(level.reshape(-1, 1), y.units, ("height",)), "constant_continuous_test")]
+    for response, name in arms:
+        fit = fit_learner(stepwise(max_terms=2), flat, response, response=name)
+        chosen = fit.model["models"][0]["columns"]
+        assert chosen, name
+        # flatten() lays the channels out one block of bins after another, so the constant one is
+        # every column from the last block on.
+        assert max(chosen) < n_bin * len(x.stats), name
+        assert fit.predict(flat).shape == (len(response.units), len(response.variables))
+
+    with pytest.raises(ValueError, match="no polynomial basis"):
+        _poly_basis(np.full(20, 7.0), 2)
+
+
 def test_a_separated_or_unsettled_fit_is_refused_rather_than_returned():
     y = np.array([0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
     separating = np.array([-3.0, -2.0, -1.0, 1.0, 2.0, 3.0]).reshape(-1, 1)
