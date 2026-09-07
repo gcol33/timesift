@@ -101,7 +101,8 @@ Every unit must reach every bin, and consecutive bins must be one bin apart on t
 calendar. A bin no unit reaches is never built, so a month missing from the whole record would
 otherwise pass as four adjacent monthly bins with one simply gone. Neither the \code{"native"} grain,
 whose bin is the reading itself, nor a supplied calendar, which declares its own bin lengths,
-is held to the second rule.
+is held to the second rule. \code{\link[=coverage]{coverage()}} lays the same binning out as a count of readings per
+unit and bin, which is where a refused record's gaps are read off.
 }
 
 \section{Partial bins}{

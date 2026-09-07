@@ -220,7 +220,36 @@ void check_full_grid(const std::vector<std::int32_t>& count, const std::vector<s
   if (empty == 0) return;
   throw Error(plural(empty, "(unit, bin) cell") + " hold no readings, first: unit " +
               label_of(req.unit_name, first % n_unit) + " at " + iso8601(bins[first / n_unit]) +
-              ". Every unit must span every bin; gaps are not padded.");
+              ". Every unit must span every bin; gaps are not padded. coverage() lists them.");
+}
+
+// The distinct bins of the record and the bin each reading falls in, whichever way the request
+// says the bins are made. A supplied calendar declares its bins, and the `native` grain is the
+// record unreduced, so in both the bin start is already in hand and the distinct ones are read off
+// it directly. Every other grain is a function of the slot an instant falls in.
+Grouping group(const Request& req) {
+  if (req.n == 0) throw Error("no readings to reduce.");
+  if (req.n_unit == 0) throw Error("no units to reduce.");
+  if (req.grain == Grain::custom && req.custom == nullptr) {
+    throw Error("a supplied calendar must give a bin start for every reading.");
+  }
+  return req.grain == Grain::custom ? group_by_search(req.custom, req.n)
+         : req.grain == Grain::native ? group_by_search(req.local, req.n)
+                                      : group_by_grain(req.local, req.n, req.grain, req.year_start);
+}
+
+// How many readings each unit has in each bin of a grouping.
+std::vector<std::int32_t> cell_counts(const Request& req, const Grouping& grid) {
+  const std::size_t n_unit = req.n_unit;
+  std::vector<std::int32_t> count(n_unit * grid.bins.size(), 0);
+  for (std::size_t i = 0; i < req.n; ++i) {
+    const std::int32_t u = req.unit[i];
+    if (u < 0 || static_cast<std::size_t>(u) >= n_unit) {
+      throw Error("a reading carries a unit index outside the units given.");
+    }
+    count[static_cast<std::size_t>(grid.bin_of[i]) * n_unit + static_cast<std::size_t>(u)] += 1;
+  }
+  return count;
 }
 
 // The bins have to tile the record. What the empty-cell guard cannot see is a bin the whole record
@@ -242,36 +271,53 @@ void check_contiguous(const std::vector<seconds>& bins, const Request& req) {
 
 }  // namespace
 
+Coverage coverage(const Request& req) {
+  const Grouping grid = group(req);
+  const std::vector<std::int32_t> held = cell_counts(req, grid);
+  const std::size_t n_unit = req.n_unit;
+
+  Coverage out;
+  if (req.grain == Grain::custom || req.grain == Grain::native) {
+    out.bin_start = grid.bins;
+    out.count = held;
+    return out;
+  }
+  // The calendar tiles the record from its first bin to its last, so a bin no unit reaches is a
+  // column of zeros in its place rather than a bin the grouping never built.
+  std::vector<std::size_t> column(grid.bins.size());
+  for (std::size_t k = 0; k < grid.bins.size(); ++k) {
+    if (k > 0) {
+      seconds next;
+      bin_nexts(&out.bin_start.back(), 1, req.grain, req.year_start, &next);
+      while (next < grid.bins[k]) {
+        out.bin_start.push_back(next);
+        bin_nexts(&next, 1, req.grain, req.year_start, &next);
+      }
+    }
+    out.bin_start.push_back(grid.bins[k]);
+    column[k] = out.bin_start.size() - 1;
+  }
+  out.count.assign(n_unit * out.bin_start.size(), 0);
+  for (std::size_t k = 0; k < grid.bins.size(); ++k) {
+    for (std::size_t u = 0; u < n_unit; ++u) {
+      out.count[column[k] * n_unit + u] = held[k * n_unit + u];
+    }
+  }
+  return out;
+}
+
 Result reduce(const Request& req) {
   const std::size_t n = req.n;
   const std::size_t n_unit = req.n_unit;
-  if (n == 0) throw Error("no readings to reduce.");
-  if (n_unit == 0) throw Error("no units to reduce.");
   if (req.stats.empty()) throw Error("no statistic to compute.");
-  if (req.grain == Grain::custom && req.custom == nullptr) {
-    throw Error("a supplied calendar must give a bin start for every reading.");
-  }
 
-  // A supplied calendar declares its bins, and the `native` grain is the record unreduced, so in
-  // both the bin start is already in hand and the distinct ones are read off it directly. Every
-  // other grain is a function of the slot an instant falls in.
-  const Grouping grid =
-      req.grain == Grain::custom ? group_by_search(req.custom, n)
-      : req.grain == Grain::native ? group_by_search(req.local, n)
-                                   : group_by_grain(req.local, n, req.grain, req.year_start);
+  const Grouping grid = group(req);
   const std::vector<seconds>& bins = grid.bins;
   const std::vector<std::int32_t>& bin_of = grid.bin_of;
   const std::size_t n_bin = bins.size();
   const std::size_t n_cell = n_unit * n_bin;
 
-  std::vector<std::int32_t> count(n_cell, 0);
-  for (std::size_t i = 0; i < n; ++i) {
-    const std::int32_t u = req.unit[i];
-    if (u < 0 || static_cast<std::size_t>(u) >= n_unit) {
-      throw Error("a reading carries a unit index outside the units given.");
-    }
-    count[static_cast<std::size_t>(bin_of[i]) * n_unit + static_cast<std::size_t>(u)] += 1;
-  }
+  std::vector<std::int32_t> count = cell_counts(req, grid);
   check_full_grid(count, bins, req);
 
   // A supplied calendar owns its own bin lengths, and the `native` grain's bin is the reading

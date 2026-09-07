@@ -203,6 +203,87 @@ def grain_matrix(data=None, id=None, time=None, value=None, *, grain="day", stat
     return _drop_partial(x) if partial == "drop" else x
 
 
+@dataclass(frozen=True)
+class Coverage:
+    """How many readings each unit has in each bin, over every bin the calendar tiles the record
+    with. ``count`` is ``[unit, bin]``; a unit that started late, stopped early or lost a month is
+    a row with zeros in it, and a bin the whole record skips is a column of zeros."""
+
+    count: np.ndarray
+    units: tuple[str, ...]
+    bins: tuple[str, ...]
+    grain: str
+    bin_start: np.ndarray
+
+    @property
+    def empty(self) -> np.ndarray:
+        """The ``[unit, bin]`` mask of cells holding no reading."""
+        return self.count == 0
+
+    def units_with_gaps(self) -> tuple[str, ...]:
+        """The units that do not reach every bin."""
+        return tuple(u for u, row in zip(self.units, self.empty) if row.any())
+
+    def bins_no_unit_reaches(self) -> tuple[str, ...]:
+        """The bins the whole record skips."""
+        return tuple(b for b, col in zip(self.bins, self.empty.T) if col.all())
+
+    def __repr__(self) -> str:  # pragma: no cover - display only
+        head = (f"<timesift coverage> {len(self.units)} units x {len(self.bins)} bins at the "
+                f"{self.grain} grain")
+        if not self.empty.any():
+            return head + "\nevery unit reaches every bin"
+        gaps = self.units_with_gaps()
+        lines = [head, f"{int(self.empty.sum())} empty (unit, bin) cells in {len(gaps)} units: "
+                 + ", ".join(gaps[:5]) + (", ..." if len(gaps) > 5 else "")]
+        skipped = self.bins_no_unit_reaches()
+        if skipped:
+            lines.append(f"{len(skipped)} bins no unit reaches: " + ", ".join(skipped[:5])
+                         + (", ..." if len(skipped) > 5 else ""))
+        return "\n".join(lines)
+
+
+def coverage(data=None, id=None, time=None, *, grain="day", year_start="09-01",
+             tz=None) -> Coverage:
+    """Which units reach which bins.
+
+    A representation needs every unit in every bin, and :func:`grain_matrix` refuses a record
+    where one is missing rather than pad it. This is the same binning laid out so the gaps can be
+    read: how many readings each unit has in each bin, over every bin the calendar tiles the
+    record with from the first bin any unit touches to the last. What to do about a gap is the
+    analyst's decision, and this is the table it is made on; nothing here fills a cell. ``grain``
+    and ``tz`` read as they do for :func:`grain_matrix`.
+    """
+    if not (callable(grain) or isinstance(grain, str)):
+        raise ValueError("`coverage()` reads one grain at a time")
+    unit, when, _ = _columns(data, id, time, None)
+    if not callable(grain):
+        _check_grains([grain])
+    ys = _parse_year_start(year_start)
+    zone = _zone(tz)
+
+    instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
+    units, unit_ix = np.unique(unit, return_inverse=True)
+    unit_ix = np.ascontiguousarray(unit_ix.astype(np.int32))
+    _check_readings(units, unit_ix, instant, when, None)
+    local = _naive_seconds(instant, zone)
+
+    supplied = None
+    if callable(grain):
+        given = np.asarray(grain(when), dtype="datetime64[s]")
+        if given.shape != when.shape:
+            raise ValueError("a grain function must return one bin start per reading")
+        supplied = _naive_seconds(np.ascontiguousarray(given.astype(np.int64)), zone)
+
+    name = "custom" if callable(grain) else grain
+    bin_start, count = _core.coverage(unit_ix, local, supplied, [str(u) for u in units], name,
+                                      ys[0], ys[1])
+    starts = _local_to_instant(bin_start, zone).astype("datetime64[s]")
+    return Coverage(count=count.reshape(len(bin_start), len(units)).T.copy(),
+                    units=tuple(str(u) for u in units), bins=tuple(_iso(b) for b in starts),
+                    grain=name, bin_start=starts)
+
+
 def _drop_partial(x: TimesiftMatrix) -> TimesiftMatrix:
     """Keeping or dropping a partial bin is the caller's choice, so the array is built over every
     bin the calendar produced and the unwanted ones are removed afterwards, which keeps one binning
@@ -425,15 +506,17 @@ def _sampling_step(instant: np.ndarray) -> int:
 # ---- checks ----------------------------------------------------------------------------------
 
 def _columns(data, id, time, value):
+    """The unit, instant and reading columns, the last ``None`` where no value column is read."""
     raw = list(data[id])
     if any(v is None or (isinstance(v, float) and v != v) for v in raw):
         raise ValueError("missing values in the readings. "
                          "Fill or drop them before building a representation.")
     unit = np.asarray([str(v) for v in raw])
     when = np.asarray(data[time], dtype="datetime64[s]")
-    reading = np.ascontiguousarray(np.asarray(data[value], dtype=np.float64))
-    if not (len(unit) == len(when) == len(reading)):
-        raise ValueError("the three columns must be the same length")
+    reading = None if value is None else \
+        np.ascontiguousarray(np.asarray(data[value], dtype=np.float64))
+    if len(unit) != len(when) or (reading is not None and len(reading) != len(unit)):
+        raise ValueError("the columns must be the same length")
     return unit, when, reading
 
 
@@ -483,7 +566,7 @@ def _check_readings(units, unit_ix, instant, when, reading):
     """The instants are the whole seconds the calendar is read at, so two readings a fraction of a
     second apart are the same reading twice here. Sorting by (unit, time) and looking at neighbours
     costs no string per reading, which on a record of tens of millions matters."""
-    if np.isnat(when).any() or np.isnan(reading).any():
+    if np.isnat(when).any() or (reading is not None and np.isnan(reading).any()):
         raise ValueError("missing values in the readings. "
                          "Fill or drop them before building a representation.")
     if len(instant) < 2:

@@ -42,7 +42,8 @@ representation for the new rows and combines them.
   representation is, before any record has been read. `build_representation` turns one into the
   array a learner is handed.
 - `grain_matrix`, `lookback_matrix`, `calendar_channels`, `bind_channels`, `feature_matrix`,
-  `timesift_set`: the arrays themselves, reachable without the fitting layer.
+  `timesift_set`: the arrays themselves, reachable without the fitting layer. `coverage` is the
+  count of readings per unit and bin, which is where a refused record's gaps are read off.
 - `cv`, `grouped_cv`, `fold_map`, `read_folds`, `scorable_cells`: the split, and which cells admit
   a score.
 - `elasticnet`, `stepwise`, `forest` (scikit-learn), `mlp`, `cnn`, `rescnn` (torch), and `Learner`

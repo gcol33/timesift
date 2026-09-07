@@ -242,3 +242,35 @@ def test_a_set_must_cover_the_same_units_at_every_grain():
         timesift_set({"week": whole.values})
     with pytest.raises(ValueError, match="non-empty"):
         timesift_set({})
+
+
+def test_coverage_lays_a_refused_records_gaps_out_as_zeros():
+    from timesift import coverage
+    d = hourly(hours=24 * 40)
+    t = np.asarray(d["time"], dtype="datetime64[s]")
+    unit = np.asarray(d["id"])
+    lost = (unit == "b") & (t >= np.datetime64("2021-09-06")) & (t < np.datetime64("2021-09-13"))
+    kept = {k: [v for v, keep in zip(d[k], ~lost) if keep] for k in d}
+    cov = coverage(kept, "id", "time", grain="week")
+    assert cov.count.shape == (2, 6)
+    assert cov.count[1].tolist() == [120, 0, 168, 168, 168, 168]
+    assert cov.count[0].tolist() == [120, 168, 168, 168, 168, 168]
+    assert cov.units_with_gaps() == ("b",)
+    assert cov.bins_no_unit_reaches() == ()
+    with pytest.raises(ValueError, match=r"coverage\(\) lists"):
+        grain_matrix(kept, "id", "time", "value", grain="week")
+
+    skipped = (t >= np.datetime64("2021-09-13")) & (t < np.datetime64("2021-09-20"))
+    kept = {k: [v for v, keep in zip(d[k], ~skipped) if keep] for k in d}
+    cov = coverage(kept, "id", "time", grain="week")
+    assert cov.count.shape == (2, 6)
+    assert (cov.count.sum(axis=0) == 0).tolist() == [False, False, True, False, False, False]
+    assert cov.bins[2] == "2021-09-13T00:00:00Z"
+    assert cov.bins_no_unit_reaches() == ("2021-09-13T00:00:00Z",)
+
+    full = coverage(d, "id", "time", grain="week")
+    assert not full.empty.any()
+    assert (full.count == grain_matrix(d, "id", "time", "value", grain="week").bin_n).all()
+    assert coverage(d, "id", "time", grain="native").count.shape == (2, 24 * 40)
+    with pytest.raises(ValueError, match="one grain at a time"):
+        coverage(d, "id", "time", grain=["day", "week"])

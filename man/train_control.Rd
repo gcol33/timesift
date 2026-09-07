@@ -21,7 +21,9 @@ train_control(
 \arguments{
 \item{epochs}{Epoch budget the cosine schedule anneals over.}
 
-\item{batch_size}{Targets per optimiser step.}
+\item{batch_size}{Most targets per optimiser step. The fitting targets are cut into as few
+batches of at most this many as they divide into, of as equal a length as they can be, so no
+batch is a remainder of one.}
 
 \item{learning_rate}{Learning rate.}
 
@@ -30,15 +32,19 @@ train_control(
 \item{early_stopping}{Epochs without an inner-validation improvement before training stops.}
 
 \item{val_frac}{Share of the fitting targets held back as an inner validation set, used for
-early stopping and for nothing else. It is never scored as a result.}
+early stopping and for nothing else. It is never scored as a result. The set is drawn from
+every fit alike, one target from each of as many equal-count strata of the response total as
+the set holds, so the fit on all targets that a run ends with also trains on the rest.}
 
-\item{device}{\code{"auto"} to take a graphics processor where there is one, or a device name such as
-\code{"cuda"} or \code{"cpu"}.}
+\item{device}{\code{"auto"} to take a graphics processor where there is one, NVIDIA's or Apple's, or
+a device name such as \code{"cuda"}, \code{"mps"} or \code{"cpu"}. A fitted encoder carries the setting
+rather than the device it resolved to, so a fit made on one machine predicts on another.}
 
 \item{seed}{Seed for initialisation, batching and the inner validation split.}
 
 \item{pos_weight_cap}{Ceiling on the per-response positive-class weight, which is the ratio of
-absences to presences among the fitting targets.}
+absences to presences among the fitting targets. At least one: a weight under one would
+weight presences down.}
 
 \item{swa}{Average the weights of the tail epochs instead of restoring the best single epoch.
 The schedule anneals to \code{swa_start} of the epoch budget and is then held flat while the

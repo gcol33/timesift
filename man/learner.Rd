@@ -21,7 +21,10 @@ learner(
 
 \item{fit}{A function of \verb{(x, y, ...)}, where \code{x} is a \verb{[unit, bin, channel]} array and \code{y} the
 response matrix for the same units, returning a fitted object. A \code{fit} that declares a
-\code{control} argument is handed the resolved \code{\link[=train_control]{train_control()}}.}
+\code{control} argument is handed the resolved \code{\link[=train_control]{train_control()}}, and one that declares a \code{head}
+argument is handed the registered response head, whose \code{loss} and \code{activation} say what it
+is fitting toward. The learners that ship read both from there and hold no response of their
+own.}
 
 \item{predict}{A function of \verb{(model, x)} returning a \verb{[unit, variable]} matrix of predictions
 for the units of \code{x}, in that order.}

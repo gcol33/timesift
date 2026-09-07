@@ -157,9 +157,16 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
 
 - **The response head and the metric are registered, not hard-coded.** Presence-absence with a
   joint multi-label head and TSS is the shipped default and the vignette, but adding an abundance
-  or phenology response is one registration, never a fork of the fitting code. Same for learners:
-  `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `stepwise()`, `forest()` and any user-supplied
-  fit/predict pair go through one interface.
+  or phenology response is one registration, never a fork of the fitting code. The head's `loss`
+  and `activation` are what every shipped learner fits toward: the encoders train under the loss
+  and predict through the activation, the per-response learners take the family the loss names,
+  and the combiner minimises the loss. A fit that declares a `head` argument is handed the head,
+  as one that declares `control` is handed the control; no learner holds a response of its own.
+  Same for learners: `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `stepwise()`, `forest()` and
+  any user-supplied fit/predict pair go through one interface.
+- **A fitted encoder is a plain object.** Its weights are arrays and its device is the setting,
+  not the resolved device; the network is rebuilt at prediction. `saveRDS()` and `pickle` round
+  trip a fit, and a fit made on one machine predicts on another.
 - **Architecture is the constructor's, training is `train_control()`'s.** A training setting is
   defaulted in exactly one place, a run gives one control to every neural learner, and a learner
   given its own control overrides that on the settings it names.

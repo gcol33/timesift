@@ -92,6 +92,16 @@ struct Result {
 // and for a bin shorter than a calendar day under a day-level statistic.
 Result reduce(const Request& req);
 
+// How many readings each unit has in each bin, over every bin the calendar tiles the record with.
+// It is what `reduce` refuses a gap on, laid out so the gaps can be read: a bin no unit reaches is
+// a column of zeros rather than a bin left out. `stats` and `value` are not read.
+struct Coverage {
+  std::vector<seconds> bin_start;   // every bin from the first to the last the record touches
+  std::vector<std::int32_t> count;  // [unit, bin], unit fastest
+};
+
+Coverage coverage(const Request& req);
+
 // The second reduction: a lookback anchored on each target, which no calendar expresses.
 // A target is a thing to predict, carrying the unit whose record it reads and the instant it is
 // anchored at, and the lookback is a fixed length of time ending a fixed lag before that instant.

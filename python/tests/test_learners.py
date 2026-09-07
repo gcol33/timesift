@@ -249,3 +249,45 @@ def test_the_basis_spans_the_polynomials_of_its_own_degree():
     # And a fourth power is not, so the degree is the degree asked for.
     fourth = v ** 4
     assert not np.allclose(z @ np.linalg.lstsq(z, fourth, rcond=None)[0], fourth, atol=1e-6)
+
+
+@needs_sklearn
+def test_the_per_response_learners_fit_the_family_the_response_heads_loss_names(temporary_response):
+    from timesift.response import as_response, scorable_cells
+    temporary_response("continuous_test", dict(
+        prepare=as_response, activation="identity", loss="squared_error", metric="roc_auc",
+        cells=lambda y, folds: scorable_cells(y, folds)))
+    x, y = planted(seed=91)
+    level = x.values[:, :, 0].mean(axis=1)
+    level = 10 + 3 * (level - level.mean()) / level.std()
+    yc = Response(level.reshape(-1, 1), y.units, ("height",))
+    for learner in (elasticnet(squares=False), forest(trees=100), stepwise(max_terms=1)):
+        fit = fit_learner(learner, x, yc, response="continuous_test")
+        p = fit.predict(x)
+        assert (p > 1).all(), learner.name
+        assert np.corrcoef(p[:, 0], level)[0, 1] > 0.8, learner.name
+        assert fit.model["family"] == "gaussian"
+
+    temporary_response("poisson_test", dict(
+        prepare=as_response, activation="exp", loss="poisson", metric="roc_auc",
+        cells=lambda y, folds: scorable_cells(y, folds)))
+    with pytest.raises(ValueError, match="no family for the 'poisson'"):
+        fit_learner(stepwise(), x, yc, response="poisson_test")
+
+
+def test_a_learners_fit_is_handed_the_head_only_where_it_declares_one():
+    x, y = planted(n_unit=10, days=14, seed=92)
+    seen = {}
+
+    def plain(x, y, **params):
+        seen.update(params)
+        return 1
+
+    def aware(x, y, head, **params):
+        return head["loss"]
+
+    constant = lambda model, x: np.full((x.values.shape[0], 1), 0.5)  # noqa: E731
+    fit_learner(Learner("plain", fit=plain, predict=constant), x, y.take_variables([0]))
+    assert "head" not in seen
+    fit = fit_learner(Learner("aware", fit=aware, predict=constant), x, y.take_variables([0]))
+    assert fit.model == "binary_cross_entropy"

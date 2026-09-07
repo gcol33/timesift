@@ -14,8 +14,11 @@ responses()
 
 \item{spec}{A list with elements \code{prepare(y)}, returning the numeric matrix a learner is fitted
 on; \code{activation}, the name of the output transform (\code{"sigmoid"} or \code{"identity"}); \code{loss}, the
-name of the training objective; \code{metric}, the default metric name; and \code{cells(y, folds)},
-returning the mask of scorable cells.}
+name of the training objective (\code{"binary_cross_entropy"} or \code{"squared_error"}); \code{metric}, the
+default metric name; and \code{cells(y, folds)}, returning the mask of scorable cells. Every
+learner that ships reads \code{loss} and \code{activation} from here: the encoders train under the loss
+and predict through the activation, and the learners fitting one model per response take the
+family the loss names, logistic or Gaussian. The combiner minimises the same loss.}
 
 \item{overwrite}{Replace an existing registration.}
 }

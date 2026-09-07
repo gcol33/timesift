@@ -505,6 +505,7 @@ call site.
 | the whole run | `timesift()`, from a table of targets and a table of series to a scored comparison |
 | what a representation is | `native()`, `grain()`, `multigrain()`, `lookback()`, and the sets `grains()` and `lookbacks()` |
 | the target-anchored array | `lookback_matrix()` |
+| which units reach which bins | `coverage()`, the count of readings per unit and bin over every bin the calendar tiles the record with, which is where a refused record's gaps are read off |
 | building one representation | `build_representation()` |
 | the penalised learner | `elasticnet()` |
 | the forward selector | `stepwise()` |
@@ -533,7 +534,22 @@ call site.
   function of `(y, p)`, and left unset it is the one the response head carries.
 - The encoders take `swa` and `swa_start`: the schedule anneals until the averaging begins and is
   then held flat, the averaged weights get their own pass to rebuild the batch-normalisation
-  statistics, and the default is off, so a default recipe is the same recipe on both sides.
+  statistics from a reset, and the default is off, so a default recipe is the same recipe on both
+  sides. `swa_start` is at least 0 and under 1, and `pos_weight_cap` is at least 1, on both.
+- The encoders standardise every channel by its own centre and sample standard deviation over
+  every unit and bin of the fitting units; the inner validation set is one unit from each of as
+  many equal-count strata of the response total as it holds; the fitting units are cut into as
+  few batches of at most `batch_size` rows as they divide into, of as equal a length as they can
+  be; the snapshot early stopping restores, and the running average `swa` keeps, are copies of
+  the weights and never the storage the optimiser updates.
+- A learner is fitted toward the registered response head and holds no response of its own: the
+  encoders train under the head's `loss` and predict through its `activation`, and the three
+  learners fitting one model per response take the family the loss names, logistic under
+  `binary_cross_entropy` and Gaussian under `squared_error`. A fit that declares a `head` argument
+  is handed the head, as one that declares `control` is handed the control.
+- A fitted encoder holds its weights as arrays and the device *setting* rather than the device it
+  resolved to, and rebuilds the network when it predicts, so a fit written with `saveRDS()` or
+  `pickle` predicts in a fresh session and on another machine.
 - `select_grain()` searches the candidates in the order the grains and the learners were declared
   in, so which candidate an exact tie on the inner score falls to does not depend on how the names
   sort.

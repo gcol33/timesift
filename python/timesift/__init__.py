@@ -27,9 +27,9 @@ from .registry import (get_learner, learners, metrics, register_learner, registe
                        register_response, responses)
 from .report import (candidate_table, ensemble_row, ensemble_weights, occlusion,
                      summary)
-from .representation import (DAY_LEVEL_STATS, GRAINS, STATS, TimesiftMatrix, TimesiftSet,
-                             bind_channels, calendar_channels, grain_matrix, lookback_matrix,
-                             timesift_set)
+from .representation import (DAY_LEVEL_STATS, GRAINS, STATS, Coverage, TimesiftMatrix,
+                             TimesiftSet, bind_channels, calendar_channels, coverage,
+                             grain_matrix, lookback_matrix, timesift_set)
 from .response import (PRESENCE_ABSENCE, Cells, Folds, Response, align_folds, as_response,
                        fold_map, scorable_cells)
 from .select import column_names, select_columns
@@ -60,12 +60,14 @@ register_learner("cnn", cnn)
 register_learner("rescnn", rescnn)
 
 __all__ = [
-    "CandidateFit", "Cells", "DAY_LEVEL_STATS", "EnsembleSpec", "Fit", "Folds", "GRAINS",
+    "CandidateFit", "Cells", "Coverage", "DAY_LEVEL_STATS", "EnsembleSpec", "Fit", "Folds",
+    "GRAINS",
     "Ladder", "Learner", "PRESENCE_ABSENCE", "Representation", "Resampling", "Response", "STATS",
     "Selection", "Sift", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
     "bind_channels", "build_representation", "calendar_channels", "candidate_table", "cnn",
-    "cohen_kappa", "column_names", "cv", "decision_threshold", "digest_array", "elasticnet",
+    "cohen_kappa", "column_names", "coverage", "cv", "decision_threshold", "digest_array",
+    "elasticnet",
     "ensemble", "ensemble_combine", "ensemble_fit", "ensemble_row", "ensemble_weights",
     "expand_sift", "feature_matrix", "fit_learner", "flatten", "fold_map", "forest",
     "get_learner", "grain",

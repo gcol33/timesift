@@ -42,8 +42,8 @@ class TrainControl:
             raise ValueError(f"`early_stopping` must be at least 1, got {self.early_stopping}")
         if not 0 <= self.val_frac < 1:
             raise ValueError(f"`val_frac` must be in [0, 1), got {self.val_frac}")
-        if not 0 < self.swa_start <= 1:
-            raise ValueError(f"`swa_start` must be in (0, 1], got {self.swa_start}")
+        if not 0 <= self.swa_start < 1:
+            raise ValueError(f"`swa_start` must be in [0, 1), got {self.swa_start}")
         if self.pos_weight_cap < 1:
             raise ValueError(f"`pos_weight_cap` must be at least 1, got {self.pos_weight_cap}")
 
@@ -69,12 +69,19 @@ def train_control(**settings) -> TrainControl:
 
     ``epochs``, ``batch_size``, ``learning_rate``, ``weight_decay``, ``early_stopping``,
     ``val_frac``, ``device`` and ``seed`` are the settings a run is described by. ``pos_weight_cap``
-    bounds the weight a rare response's presences are given against its absences, and ``swa`` with
-    ``swa_start`` average the weights over the tail of the schedule rather than keeping one epoch
-    out of it.
+    bounds the weight a rare response's presences are given against its absences, at least one,
+    and ``swa`` with ``swa_start`` average the weights over the tail of the schedule rather than
+    keeping one epoch out of it.
 
-    ``device`` is ``"auto"`` for the graphics processor where there is one, or the name of a device
-    to train on.
+    ``batch_size`` is the most targets an optimiser step reads: the fitting targets are cut into as
+    few batches of at most that many as they divide into, of as equal a length as they can be.
+    ``val_frac`` is held back from every fit alike, the fit on all targets a run ends with
+    included, one target from each of as many equal-count strata of the response total as the
+    set holds.
+
+    ``device`` is ``"auto"`` for the graphics processor where there is one, NVIDIA's or Apple's,
+    or the name of a device to train on. A fitted encoder carries the setting rather than the
+    device it resolved to, so a fit made on one machine predicts on another.
     """
     return TrainControl(**check_settings(settings))
 

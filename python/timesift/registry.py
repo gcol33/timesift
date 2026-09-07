@@ -35,6 +35,9 @@ class Registry:
     def has(self, name: str) -> bool:
         return name in self._entries
 
+    def remove(self, name: str) -> None:
+        self._entries.pop(name, None)
+
     def names(self) -> list[str]:
         # C collation, so a registry lists the same order on every machine and beside R's.
         return sorted(self._entries)
@@ -94,10 +97,14 @@ def register_response(name: str, spec: dict, overwrite: bool = False):
     """Register a response head: what the values being predicted are and where a score is defined.
 
     ``spec`` is a mapping with ``prepare(y)``, returning the response a learner is fitted on;
-    ``activation``, the name of the output transform; ``loss``, the name of the training
-    objective; ``metric``, the default metric name; and ``cells(y, folds)``, returning the mask of
-    scorable cells. Presence-absence with a joint multi-label head is what ships; an abundance or
-    phenology response is a registration rather than a second fitting path.
+    ``activation``, the name of the output transform (``"sigmoid"`` or ``"identity"``); ``loss``,
+    the name of the training objective (``"binary_cross_entropy"`` or ``"squared_error"``);
+    ``metric``, the default metric name; and ``cells(y, folds)``, returning the mask of scorable
+    cells. Presence-absence with a joint multi-label head is what ships; an abundance or
+    phenology response is a registration rather than a second fitting path. Every learner that
+    ships reads ``loss`` and ``activation`` from here: the encoders train under the loss and
+    predict through the activation, and the learners fitting one model per response take the
+    family the loss names, logistic or Gaussian. The combiner minimises the same loss.
     """
     missing = [f for f in RESPONSE_FIELDS if f not in spec]
     if missing:

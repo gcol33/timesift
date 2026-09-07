@@ -134,6 +134,7 @@ reference:
   contents:
   - grain_matrix
   - lookback_matrix
+  - coverage
   - timesift_set
   - calendar_channels
   - bind_channels
