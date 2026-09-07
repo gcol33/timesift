@@ -8,6 +8,7 @@ Fixtures are regenerated on the R side, deliberately, in their own commit, and o
 from __future__ import annotations
 
 import csv
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -78,6 +79,59 @@ def test_digest_matches_the_r_side(series, row):
     # ids differently is reported as that rather than as an unexplained hash mismatch.
     assert x.units[0] == row["first_unit"]
     assert x.units[-1] == row["last_unit"]
+    assert digest_array(x) == row["digest"]
+
+
+def zoned_rows():
+    """The digest rows read under a clock that is not UTC, which are the ones a column carrying a
+    zone of its own has to reproduce."""
+    return [r for r in read_digests() if r["tz"] != "UTC" and r["stat"] == "mean"]
+
+
+def aware_column(times, zone):
+    """The fixture's instants written as a zone-aware column, which is the shape a record arrives
+    in when it was read from a source that kept the clock it was recorded on."""
+    from zoneinfo import ZoneInfo
+    here = ZoneInfo(zone)
+    return [datetime.fromisoformat(t).replace(tzinfo=timezone.utc).astimezone(here)
+            for t in times]
+
+
+@pytest.mark.parametrize("row", zoned_rows(),
+                          ids=lambda r: f"{r['series']}-{r['grain']}-{r['tz'].replace('/', '_')}")
+def test_a_column_carrying_a_zone_names_the_calendar_and_reaches_the_same_digest(series, row):
+    # Reading the column as instants drops the clock it was written on, so a column in a zone was
+    # binned as UTC days however plainly it said otherwise. It names the calendar the `tz` argument
+    # names, and lands on the digest the R side wrote for that zone.
+    record = dict(series[row["series"]])
+    record["time"] = aware_column(record["time"], row["tz"])
+    x = grain_matrix(record, "id", "time", "value",
+                      grain=binning(row["series"], row["grain"]), stats=row["stat"].split("+"),
+                      year_start=row["year_start"], partial=row["partial"])
+    assert x.values.shape[1] == int(row["n_bin"])
+    assert digest_array(x) == row["digest"]
+
+
+def test_a_zone_on_the_column_and_a_different_one_beside_it_is_refused():
+    row = zoned_rows()[0]
+    record = dict(read_series(row["series"]))
+    record["time"] = aware_column(record["time"], row["tz"])
+    with pytest.raises(ValueError, match="binned by one calendar"):
+        grain_matrix(record, "id", "time", "value", grain="day", tz="America/Sao_Paulo")
+    # Naming the zone the column already carries is the same thing said twice, not a disagreement.
+    assert grain_matrix(record, "id", "time", "value", grain=binning(row["series"], row["grain"]),
+                        stats=row["stat"].split("+"), year_start=row["year_start"],
+                        partial=row["partial"], tz=row["tz"]) is not None
+
+
+def test_a_pandas_column_in_a_zone_bins_by_that_zone():
+    pd = pytest.importorskip("pandas")
+    row = zoned_rows()[0]
+    record = dict(read_series(row["series"]))
+    record["time"] = pd.Series(aware_column(record["time"], row["tz"]))
+    x = grain_matrix(record, "id", "time", "value",
+                      grain=binning(row["series"], row["grain"]), stats=row["stat"].split("+"),
+                      year_start=row["year_start"], partial=row["partial"])
     assert digest_array(x) == row["digest"]
 
 

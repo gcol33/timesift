@@ -78,6 +78,10 @@ read as UTC and binned by that zone's clock, which is what the R side does for a
 `tzone`. The same instants and the same zone give the same answer in both languages, and
 `digests.csv` carries zone rows that pin it.
 
+A time column that carries a zone of its own names the calendar the same way, so a `pandas` column
+in `Europe/Vienna` bins by Vienna days without being told to. Naming a different zone in `tz`
+beside one the column carries is an error rather than a silent choice between the two.
+
 ## The fold map crosses the language boundary; the fold builder does not
 
 `fold_map` draws on numpy's random stream and the R side draws on R's, so the same seed gives

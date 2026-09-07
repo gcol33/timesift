@@ -14,6 +14,7 @@ is the boundary: resolving the columns, resolving the zone, and putting the resu
 from __future__ import annotations
 
 import re
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
@@ -150,7 +151,9 @@ def grain_matrix(data=None, id=None, time=None, value=None, *, grain="day", stat
     expressed in that calendar, which is what a zone-free ``datetime64`` says and what the R side
     does for a series carried in UTC. Given a zone name, the instants are read as UTC and binned by
     that zone's clock, which is what the R side does for a series carrying a ``tzone``: the same
-    instants and the same zone give the same answer in both languages.
+    instants and the same zone give the same answer in both languages. A time column that carries
+    a zone of its own names the calendar the same way, so a zone-aware column bins by its own
+    clock without being told to; naming a different one in ``tz`` beside it is an error.
 
     ``partial`` says what becomes of a bin the record does not cover for its whole calendar span,
     which is what a record beginning or ending away from a bin boundary produces. ``"keep"``, the
@@ -159,7 +162,7 @@ def grain_matrix(data=None, id=None, time=None, value=None, *, grain="day", stat
     caller-supplied binning declares its own bins, so the package cannot know where the last one
     was meant to end and takes the record's end as its end.
     """
-    unit, when, reading = _columns(data, id, time, value)
+    unit, when, reading, carried = _columns(data, id, time, value)
     partial = _check_partial(partial)
 
     if not callable(grain) and not isinstance(grain, str):
@@ -173,7 +176,7 @@ def grain_matrix(data=None, id=None, time=None, value=None, *, grain="day", stat
 
     stats = _check_stats(stats, grain)
     ys = _parse_year_start(year_start)
-    zone = _zone(tz)
+    zone = _resolve_zone(tz, carried)
 
     instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
     units, unit_ix = np.unique(unit, return_inverse=True)
@@ -258,11 +261,11 @@ def coverage(data=None, id=None, time=None, *, grain="day", year_start="09-01",
     """
     if not (callable(grain) or isinstance(grain, str)):
         raise ValueError("`coverage()` reads one grain at a time")
-    unit, when, _ = _columns(data, id, time, None)
+    unit, when, _, carried = _columns(data, id, time, None)
     if not callable(grain):
         _check_grains([grain])
     ys = _parse_year_start(year_start)
-    zone = _zone(tz)
+    zone = _resolve_zone(tz, carried)
 
     instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
     units, unit_ix = np.unique(unit, return_inverse=True)
@@ -323,12 +326,12 @@ def lookback_matrix(data=None, id=None, time=None, value=None, at=None, span=Non
     ``tz`` names the calendar, as it does for :func:`grain_matrix`. The anchors are instants and
     are read as a clock in that same calendar, so one record is binned by one calendar.
     """
-    unit, when, reading = _columns(data, id, time, value)
+    unit, when, reading, carried = _columns(data, id, time, value)
     span = _parse_duration(span, "span")
     lag = _parse_duration(lag, "lag")
     bins = _check_bins(bins)
     stats = _check_stats(stats, "lookback")
-    zone = _zone(tz)
+    zone = _resolve_zone(tz, carried)
 
     instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
     units, unit_ix = np.unique(unit, return_inverse=True)
@@ -457,6 +460,45 @@ def bind_channels(*parts: TimesiftMatrix) -> TimesiftMatrix:
 
 # ---- the zone ---------------------------------------------------------------------------------
 
+def _column_zone(column):
+    """The zone a time column carries, or ``None`` where it carries none.
+
+    Reading the column as instants drops it: a zone-aware column becomes the UTC seconds it stands
+    for and nothing says which clock it was written on, so it is read off the column itself here or
+    it is not read at all.
+    """
+    for holder in (getattr(column, "dt", None), getattr(column, "dtype", None), column):
+        zone = getattr(holder, "tz", None)
+        if zone is not None:
+            return zone
+    if isinstance(column, (list, tuple)) and len(column):
+        return getattr(column[0], "tzinfo", None)
+    return None
+
+
+def _zone_key(zone):
+    """A zone as the name two of them are compared by. UTC is the calendar an instant already
+    reads as, so here it is the same thing as no zone at all."""
+    if zone is None:
+        return None
+    key = getattr(zone, "key", None) or str(zone)
+    return None if key in ("UTC", "GMT") else key
+
+
+def _resolve_zone(tz, carried):
+    """The calendar to bin by.
+
+    A time column that carries a zone names it, which is what makes a zone-aware column bin the
+    same way in both languages. ``tz`` beside one must agree with it: two zones are two answers,
+    and neither of them is the one to take without saying so.
+    """
+    given, held = _zone_key(tz), _zone_key(carried)
+    if given is not None and held is not None and given != held:
+        raise ValueError(f"the time column is written in {held} and `tz` names {given}. A record "
+                         f"is binned by one calendar; give one of the two.")
+    return _zone(carried) if held is not None else _zone(tz)
+
+
 def _zone(tz):
     """The zone lives at this boundary and nowhere else; the core bins a calendar with no zone in
     it. ``None``, and UTC, mean the instants already read as the calendar to bin by."""
@@ -508,18 +550,30 @@ def _sampling_step(instant: np.ndarray) -> int:
 # ---- checks ----------------------------------------------------------------------------------
 
 def _columns(data, id, time, value):
-    """The unit, instant and reading columns, the last ``None`` where no value column is read."""
+    """The unit, instant and reading columns, and the zone the time column was carrying.
+
+    ``reading`` is ``None`` where no value column is read. The instants come back as the UTC
+    seconds every path below here works in, which is what numpy makes of a column in any zone.
+    """
     raw = list(data[id])
     if any(v is None or (isinstance(v, float) and v != v) for v in raw):
         raise ValueError("missing values in the readings. "
                          "Fill or drop them before building a representation.")
     unit = np.asarray([str(v) for v in raw])
-    when = np.asarray(data[time], dtype="datetime64[s]")
+    column = data[time]
+    zone = _column_zone(column)
+    with warnings.catch_warnings():
+        # numpy warns that reading the column as instants keeps no zone, which is true of the
+        # array and is why the zone is taken off the column first. Having taken it, the warning
+        # is answered.
+        if zone is not None:
+            warnings.simplefilter("ignore", UserWarning)
+        when = np.asarray(column, dtype="datetime64[s]")
     reading = None if value is None else \
         np.ascontiguousarray(np.asarray(data[value], dtype=np.float64))
     if len(unit) != len(when) or (reading is not None and len(reading) != len(unit)):
         raise ValueError("the columns must be the same length")
-    return unit, when, reading
+    return unit, when, reading, zone
 
 
 def _check_grains(grain):

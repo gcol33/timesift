@@ -56,10 +56,12 @@ the night did, and a month is what the proleptic Gregorian calendar says.
 | | how the zone is named |
 |---|---|
 | R | the `tzone` attribute of the `POSIXct` column; unset means UTC |
-| Python | the `tz` argument; `None`, the default, means the instants already read as the calendar to bin by, which is what a zone-free `datetime64` says |
+| Python | the zone the time column carries, where it carries one, else the `tz` argument; `None` and no zone on the column mean the instants already read as the calendar to bin by, which is what a zone-free `datetime64` says |
 
 The same instants and the same zone give the same answer in both languages, and the fixtures pin
-that rather than leaving it assumed.
+that rather than leaving it assumed. On the Python side reading the column as instants drops the
+zone it was written on, so it is taken off the column before that; a `tz` naming a different zone
+beside one the column carries is an error, because two zones are two answers.
 
 Reading an instant as a clock is defined for every instant in every zone. The reverse is not: on
 the night a zone moves its clock forward a local time exists on no instant, and on the night it
