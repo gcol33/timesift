@@ -242,11 +242,11 @@ def _fit_candidate(learner, x, y, response, control) -> CandidateFit:
     """The learner declares whether one fitted model covers every response; where it does not, this
     is where the responses are taken one at a time, so the candidate emits one matrix either way.
     """
-    given = {} if control is None else {"control": control}
     if learner.multi == "joint":
-        parts = (fit_learner(learner, x, y, response=response, **given),)
+        parts = (fit_learner(learner, x, y, response=response, control=control),)
     else:
-        parts = tuple(fit_learner(learner, x, y.take_variables([j]), response=response, **given)
+        parts = tuple(fit_learner(learner, x, y.take_variables([j]), response=response,
+                                  control=control)
                       for j in range(len(y.variables)))
     return CandidateFit(learner=learner, fits=parts, variables=y.variables)
 

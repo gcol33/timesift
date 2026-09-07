@@ -82,13 +82,14 @@ class Fit:
         return p
 
 
-def fit_learner(learner, x: TimesiftMatrix, y, response: str = "presence_absence",
+def fit_learner(learner, x: TimesiftMatrix, y, response: str = "presence_absence", control=None,
                 **kwargs) -> Fit:
     """Fit one learner at one grain, under one registered response head.
 
     A ``fit`` that declares a ``head`` argument is handed the registered head, whose ``loss`` and
     ``activation`` say what it is fitting toward; the learners that ship read both from there and
-    hold no response of their own.
+    hold no response of their own. A ``fit`` that declares a ``control`` is handed the run's
+    training settings the same way.
     """
     from .registry import RESPONSES
     from .response import as_response
@@ -96,9 +97,22 @@ def fit_learner(learner, x: TimesiftMatrix, y, response: str = "presence_absence
     learner.require()
     head = RESPONSES.get(response)
     y = head["prepare"](as_response(y)).align(x.units)
-    given = {"head": head} if "head" in inspect.signature(learner.fit).parameters else {}
+    given = _declared(learner.fit, head=head, control=control)
     model = learner.fit(x, y.values, **{**learner.params, **kwargs, **given})
     return Fit(learner=learner, model=model, variables=y.variables, response=response)
+
+
+def _declared(fit, **given) -> dict:
+    """The arguments a fit is handed because it declares them by name.
+
+    A learner that trains under a control declares one, and the resolved control reaches it through
+    that argument and through nothing else; the response head reaches a fit the same way. A fit
+    that declares neither is called with neither, whatever the run carries, so a two-argument
+    ``fit(x, y)`` is a learner like any other rather than one that has to absorb keywords it never
+    asked for.
+    """
+    parameters = inspect.signature(fit).parameters
+    return {name: value for name, value in given.items() if name in parameters}
 
 
 # The family a learner fitting one model per response fits under is read off the response head's

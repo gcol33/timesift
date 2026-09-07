@@ -291,3 +291,22 @@ def test_a_learners_fit_is_handed_the_head_only_where_it_declares_one():
     assert "head" not in seen
     fit = fit_learner(Learner("aware", fit=aware, predict=constant), x, y.take_variables([0]))
     assert fit.model == "binary_cross_entropy"
+
+
+def test_a_learners_fit_is_handed_the_control_only_where_it_declares_one():
+    x, y = planted(n_unit=10, days=14, seed=94)
+    one = y.take_variables([0])
+    constant = lambda model, x: np.full((x.values.shape[0], 1), 0.5)  # noqa: E731
+
+    def two_arguments(x, y):
+        return "fitted"
+
+    def trained(x, y, control=None):
+        return control
+
+    control = train_control(epochs=2)
+    # A fit that declares neither is called with neither, whatever the run carries.
+    assert fit_learner(Learner("plain", fit=two_arguments, predict=constant), x, one,
+                       control=control).model == "fitted"
+    assert fit_learner(Learner("trained", fit=trained, predict=constant), x, one,
+                       control=control).model is control

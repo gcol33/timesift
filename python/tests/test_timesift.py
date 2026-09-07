@@ -279,6 +279,18 @@ def test_the_ensemble_is_fitted_on_the_out_of_fold_predictions_and_predicts_thro
     assert fit.predict(later, series(plots=PLOTS[:4])).shape == (4, 3)
 
 
+def test_a_learner_that_declares_no_control_is_not_handed_the_runs():
+    from timesift.control import train_control
+
+    def two_arguments(x, y):
+        return dict(beta=np.zeros((2, 3)))
+
+    plain = Learner(name="plain", fit=two_arguments, predict=_predict, reads="tabular",
+                    multi="joint")
+    fit = fitted(models=[plain], sift=grains("week"), control=train_control(epochs=2))
+    assert set(fit.oof) == {f"plain{SEPARATOR}week"}
+
+
 def test_the_combiner_minimises_the_loss_of_the_head_the_run_was_fitted_under(temporary_response,
                                                                               monkeypatch):
     from timesift import stack as stack_module
