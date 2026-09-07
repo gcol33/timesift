@@ -12,27 +12,12 @@ suppressWarnings(suppressMessages({
   library(timesift)
 }))
 
-.bench_args <- function() {
-  raw <- commandArgs(trailingOnly = TRUE)
-  out <- list(cell = NA_character_, reps = NA_character_, out = NA_character_, force = FALSE,
-              list = FALSE, pkg = NA_character_, scale = "full")
-  for (a in raw) {
-    if (a == "--list") out$list <- TRUE
-    else if (a == "--force") out$force <- TRUE
-    else if (grepl("^--[a-z]+=", a)) {
-      key <- sub("^--([a-z]+)=.*$", "\\1", a)
-      out[[key]] <- sub("^--[a-z]+=", "", a)
-    } else {
-      stop("unrecognised argument: ", a, call. = FALSE)
-    }
-  }
-  out
-}
-
-opt <- .bench_args()
 here <- grep("^--file=", commandArgs(FALSE), value = TRUE)
 here <- if (length(here)) dirname(normalizePath(sub("^--file=", "", here[1L]))) else getwd()
 source(file.path(here, "design.R"))
+
+opt <- bench_args(list(cell = NA_character_, reps = NA_character_, out = NA_character_,
+                       force = FALSE, list = FALSE, pkg = NA_character_, scale = "full"))
 bench_scale(opt$scale)
 pkg_dir <- if (is.na(opt$pkg)) dirname(dirname(here)) else opt$pkg
 
@@ -56,79 +41,6 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 candidates <- bench_candidates(cell$block)
 learner <- bench_learner(cell$block)
 
-# Bind the deployment sample's chunks along the unit axis. The chunks share a design and a reading
-# grid, so their bins are identical; that is asserted rather than assumed, and everything else about
-# the representation comes from grain_matrix().
-.bench_bind <- function(parts) {
-  first <- parts[[1L]]
-  for (p in parts[-1L]) {
-    stopifnot(identical(dimnames(p)[[2L]], dimnames(first)[[2L]]),
-              identical(dimnames(p)[[3L]], dimnames(first)[[3L]]),
-              identical(attr(p, "bin_start"), attr(first, "bin_start")))
-  }
-  d <- dim(first)
-  n <- vapply(parts, function(p) dim(p)[1L], integer(1L))
-  out <- array(NA_real_, dim = c(sum(n), d[2L], d[3L]),
-               dimnames = list(unlist(lapply(parts, function(p) dimnames(p)[[1L]])),
-                               dimnames(first)[[2L]], dimnames(first)[[3L]]))
-  at <- 0L
-  for (p in parts) {
-    out[at + seq_len(dim(p)[1L]), , ] <- p
-    at <- at + dim(p)[1L]
-  }
-  for (a in c("grain", "stats", "year_start", "bin_start", "bin_end", "bin_partial")) {
-    attr(out, a) <- attr(first, a)
-  }
-  attr(out, "bin_n") <- do.call(rbind, lapply(parts, function(p) attr(p, "bin_n")))
-  class(out) <- c("timesift_matrix", "array")
-  out
-}
-
-.bench_simulate <- function(cell, n, seed, draw) {
-  simulate_records(n = n, mechanism = cell$mechanism, variables = BENCH$variables,
-                   prevalence = BENCH$prevalence, auc = BENCH$auc, days = BENCH$days,
-                   step_hours = BENCH$step_hours, year_start = BENCH$year_start,
-                   seed = seed, draw = draw)
-}
-
-# The deployment sample is drawn fresh for every replicate, from the same design, and its
-# representation is built one chunk of units at a time so peak memory is set by the chunk rather
-# than by its size.
-.bench_deployment <- function(cell, stamp, candidates) {
-  sizes <- rep(BENCH$deploy_chunk, BENCH$n_deploy %/% BENCH$deploy_chunk)
-  rest <- BENCH$n_deploy %% BENCH$deploy_chunk
-  if (rest) sizes <- c(sizes, rest)
-  parts <- vector("list", length(sizes))
-  ys <- vector("list", length(sizes))
-  for (i in seq_along(sizes)) {
-    sim <- .bench_simulate(cell, sizes[i], stamp$design_seed, stamp$deploy_draw * 100L + i)
-    parts[[i]] <- unclass(bench_representation(sim$readings, candidates))
-    ys[[i]] <- sim$y
-  }
-  set <- timesift_set(stats::setNames(
-    lapply(candidates$candidate, function(cc) .bench_bind(lapply(parts, `[[`, cc))),
-    candidates$candidate))
-  list(set = set, y = do.call(rbind, ys))
-}
-
-# Every arm is scored the same way a ladder is: the metric per variable, then the mean over
-# variables, so a deployment number and a reported number are the same quantity.
-.bench_deploy_score <- function(fit, x, y, metric) {
-  p <- stats::predict(fit, x)
-  score <- timesift:::.metrics_reg$get(metric)
-  vapply(colnames(y), function(v) score(y[rownames(p), v], p[, v]), numeric(1L))
-}
-
-.bench_row <- function(stamp, arm, candidate, outer_fold, metric, quantity, value) {
-  data.frame(stamp[c("scale", "cell_id", "block", "mechanism", "n_unit", "inner", "outer",
-                     "replicate",
-                     "design_seed", "draw", "deploy_draw", "true_grain", "n_candidate",
-                     "candidate_digest", "learner_digest", "pkg_version", "pkg_commit",
-                     "pkg_dirty", "r_version", "platform", "device")],
-             sel_metric = stamp$metric,
-             arm = arm, candidate = candidate, outer_fold = outer_fold, metric = metric,
-             quantity = quantity, value = value, stringsAsFactors = FALSE)
-}
 
 bench_replicate <- function(cell, replicate, candidates, learner, pkg_dir) {
   stamp <- bench_stamp(cell, replicate, candidates, pkg_dir, learner)

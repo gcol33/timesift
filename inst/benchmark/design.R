@@ -1,6 +1,7 @@
-# The benchmark's design: the constants every cell shares, the candidate sets, the cell table and
-# the identity stamp each replicate is written with. Sourced by run.R and by anything reading the
-# results, so a cell is defined in one place and no launcher carries its own copy.
+# The benchmark's design: the constants every cell shares, the candidate sets, the cell table, the
+# identity stamp each replicate is written with, and the simulate-represent-deploy machinery every
+# replicate runs. Sourced by run.R and by anything reading the results, so a cell is defined in one
+# place and no launcher carries its own copy.
 
 BENCH <- list(
   scale        = "full",
@@ -20,6 +21,10 @@ BENCH <- list(
   deploy_chunk = 750L,
   deploy_draw  = 100000L,
   mechanisms   = c("none", "event", "season", "lag"),
+  # The labels a results directory can carry for a block, mapped to the block they name. A cell is
+  # read by the label its own file declares, so either label reaches one learner and one candidate
+  # set.
+  block_alias  = c(glmnet = "elasticnet"),
   design_seed  = c(none = 101L, event = 102L, season = 103L, lag = 104L),
   true_grain   = c(none = NA_character_, event = "day", season = "season", lag = "week"),
   # The grains whose bins tile the generating grain exactly, so the driver is still an exact
@@ -30,9 +35,15 @@ BENCH <- list(
                       season = c("halfday", "day", "month", "season"))
 )
 
+bench_block <- function(block) {
+  alias <- BENCH$block_alias[block]
+  if (is.na(alias)) block else unname(alias)
+}
+
 # A candidate is a (grain, summary) pair. The penalised block searches both summaries, the neural
 # block the grain mean alone, which is what the sizing in the plan assumes.
 bench_candidates <- function(block) {
+  block <- bench_block(block)
   summaries <- if (block == "elasticnet") list(mean = "mean", mmm = c("min", "mean", "max"))
                else list(mean = "mean")
   out <- expand.grid(stat = names(summaries), grain = BENCH$grains,
@@ -61,6 +72,22 @@ bench_cells <- function() {
   out[c("cell_id", "block", "mechanism", "n_unit", "inner", "replicates")]
 }
 
+# Every launcher takes `--key=value`, and a key whose default is `FALSE` may also be given bare as
+# a flag. A script declares what it accepts by the defaults it passes, and anything else stops the
+# run rather than being carried silently into it.
+bench_args <- function(defaults) {
+  out <- defaults
+  for (a in commandArgs(trailingOnly = TRUE)) {
+    key <- sub("^--([a-z_]+)(=.*)?$", "\\1", a)
+    if (!grepl("^--[a-z_]+(=|$)", a) || !key %in% names(defaults)) {
+      stop("unrecognised argument: ", a, "\naccepted: ",
+           paste0("--", names(defaults), collapse = ", "), call. = FALSE)
+    }
+    out[[key]] <- if (grepl("=", a, fixed = TRUE)) sub("^--[a-z_]+=", "", a) else TRUE
+  }
+  out
+}
+
 # The smoke scale is a different scale, not a smaller run of the same one: it shrinks the design and
 # it renames every cell, so its rows land in their own directory and cannot be read as the design
 # the paper reports.
@@ -81,7 +108,7 @@ bench_scale <- function(scale) {
 }
 
 bench_learner <- function(block) {
-  switch(block,
+  switch(bench_block(block),
          elasticnet = timesift::elasticnet(squares = BENCH$elasticnet_squares,
                                            n_inner = BENCH$elasticnet_n_inner),
          cnn = timesift::cnn(epochs = BENCH$cnn_epochs,
@@ -164,4 +191,81 @@ bench_assert_candidates <- function(selection, stamp) {
   writeBin(charToRaw(text), con)
   close(con)
   substr(unname(tools::md5sum(f)), 1L, 12L)
+}
+
+# Bind the deployment sample's chunks along the unit axis. The chunks share a design and a reading
+# grid, so their bins are identical; that is asserted rather than assumed, and everything else about
+# the representation comes from grain_matrix().
+.bench_bind <- function(parts) {
+  first <- parts[[1L]]
+  for (p in parts[-1L]) {
+    stopifnot(identical(dimnames(p)[[2L]], dimnames(first)[[2L]]),
+              identical(dimnames(p)[[3L]], dimnames(first)[[3L]]),
+              identical(attr(p, "bin_start"), attr(first, "bin_start")))
+  }
+  d <- dim(first)
+  n <- vapply(parts, function(p) dim(p)[1L], integer(1L))
+  out <- array(NA_real_, dim = c(sum(n), d[2L], d[3L]),
+               dimnames = list(unlist(lapply(parts, function(p) dimnames(p)[[1L]])),
+                               dimnames(first)[[2L]], dimnames(first)[[3L]]))
+  at <- 0L
+  for (p in parts) {
+    out[at + seq_len(dim(p)[1L]), , ] <- p
+    at <- at + dim(p)[1L]
+  }
+  for (a in c("grain", "stats", "year_start", "bin_start", "bin_end", "bin_partial")) {
+    attr(out, a) <- attr(first, a)
+  }
+  attr(out, "bin_n") <- do.call(rbind, lapply(parts, function(p) attr(p, "bin_n")))
+  class(out) <- c("timesift_matrix", "array")
+  out
+}
+
+.bench_simulate <- function(cell, n, seed, draw) {
+  simulate_records(n = n, mechanism = cell$mechanism, variables = BENCH$variables,
+                   prevalence = BENCH$prevalence, auc = BENCH$auc, days = BENCH$days,
+                   step_hours = BENCH$step_hours, year_start = BENCH$year_start,
+                   seed = seed, draw = draw)
+}
+
+# The deployment sample is drawn fresh for every replicate, from the same design, and its
+# representation is built one chunk of units at a time so peak memory is set by the chunk rather
+# than by its size.
+.bench_deployment <- function(cell, stamp, candidates) {
+  sizes <- rep(BENCH$deploy_chunk, BENCH$n_deploy %/% BENCH$deploy_chunk)
+  rest <- BENCH$n_deploy %% BENCH$deploy_chunk
+  if (rest) sizes <- c(sizes, rest)
+  parts <- vector("list", length(sizes))
+  ys <- vector("list", length(sizes))
+  for (i in seq_along(sizes)) {
+    sim <- .bench_simulate(cell, sizes[i], stamp$design_seed, stamp$deploy_draw * 100L + i)
+    parts[[i]] <- unclass(bench_representation(sim$readings, candidates))
+    ys[[i]] <- sim$y
+  }
+  set <- timesift_set(stats::setNames(
+    lapply(candidates$candidate, function(cc) .bench_bind(lapply(parts, `[[`, cc))),
+    candidates$candidate))
+  list(set = set, y = do.call(rbind, ys))
+}
+
+# Every arm is scored the same way a ladder is: the metric per variable, then the mean over
+# variables, so a deployment number and a reported number are the same quantity. Several metrics
+# read one set of predictions, so the deployment sample is predicted once whatever is asked of it.
+.bench_deploy_score <- function(fit, x, y, metrics) {
+  p <- stats::predict(fit, x)
+  vapply(metrics, function(m) {
+    score <- timesift:::.metrics_reg$get(m)
+    mean(vapply(colnames(y), function(v) score(y[rownames(p), v], p[, v]), numeric(1L)))
+  }, numeric(1L))
+}
+
+.bench_row <- function(stamp, arm, candidate, outer_fold, metric, quantity, value) {
+  data.frame(stamp[c("scale", "cell_id", "block", "mechanism", "n_unit", "inner", "outer",
+                     "replicate",
+                     "design_seed", "draw", "deploy_draw", "true_grain", "n_candidate",
+                     "candidate_digest", "learner_digest", "pkg_version", "pkg_commit",
+                     "pkg_dirty", "r_version", "platform", "device")],
+             sel_metric = stamp$metric,
+             arm = arm, candidate = candidate, outer_fold = outer_fold, metric = metric,
+             quantity = quantity, value = value, stringsAsFactors = FALSE)
 }
