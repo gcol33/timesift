@@ -304,7 +304,8 @@ def fitted_object(oof, y, cells, folds, multi=None, method="stack", extra=None):
     stack = ensemble_fit(oof, y, cells, folds, ensemble(method=method), scores) if method \
         else None
     return SimpleNamespace(
-        y=y, folds=folds, cells=cells, metric="tss", oof=oof, scores=scores, stack=stack,
+        y=y, folds=folds, cells=cells, metric="tss", scorer=tss, response="presence_absence",
+        oof=oof, scores=scores, stack=stack,
         weights=None if stack is None else stack.weights,
         candidates=dict(candidate=names,
                         learner=[n.split(" / ")[0] for n in names],

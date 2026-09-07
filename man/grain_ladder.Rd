@@ -31,7 +31,9 @@ of \code{\link[=fold_map]{fold_map()}} when not given.}
 
 \item{response}{Name of the registered response head.}
 
-\item{metric}{Name of the registered metric, or \code{NULL} for the response's own.}
+\item{metric}{Name of a registered metric, or a function of \verb{(y, p)}, or \code{NULL} for the
+response head's own. Whichever it is, it travels with the fit and is what every later
+rescoring reads; a function is reported as \verb{<function>}.}
 
 \item{keep_fits}{Keep every per-fold fitted model, which is what lets \code{\link[=occlusion]{occlusion()}} read a
 fitted model without refitting it.}

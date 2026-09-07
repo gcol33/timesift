@@ -48,6 +48,25 @@ RESPONSES = Registry("response")
 METRICS = Registry("metric")
 
 
+def resolve_metric(metric, default: str | None = None):
+    """The function that scores and the name a report prints, from either way a metric is given.
+
+    A metric reaches a run as a registered name or as a function of ``(y, p)``, and everything
+    that rescores afterwards -- the ensemble row of a report, an occlusion profile -- needs the
+    function rather than a name to look up again. Both travel with the fit. A function has no name
+    to print, and reads as ``<function>`` on both sides rather than as whatever the language calls
+    an anonymous one.
+    """
+    if metric is None:
+        metric = default
+    if callable(metric):
+        return metric, "<function>"
+    if not isinstance(metric, str):
+        raise TypeError("`metric` is the name of a registered metric or a function of (y, p), "
+                        f"got {type(metric).__name__}")
+    return METRICS.get(metric), metric
+
+
 def register_learner(name: str, constructor: Callable, overwrite: bool = False):
     """Make a learner available by name. The learners that ship are registered the same way.
 

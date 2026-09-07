@@ -328,6 +328,36 @@ def test_the_summary_reads_the_fit_and_lists_what_could_not_be_paired():
     assert "ensemble" in text
 
 
+def test_a_metric_given_as_a_function_scores_the_run_and_everything_that_rescores_it():
+    from timesift.metrics import tss
+    from timesift.selection import select_grain
+    from timesift.representation import grain_matrix
+    from timesift.response import Response
+
+    settings = dict(models=[learner("a"), learner("b")], sift=grains("day", "week"),
+                    ensemble=True)
+    fit = fitted(metric=lambda y, p: tss(y, p), **settings)
+    by_name = fitted(metric="tss", **settings)
+
+    # The function is what scores, so every number is the registered metric's; only the name
+    # differs, and it is a name rather than whatever this language calls an anonymous function.
+    np.testing.assert_array_equal(fit.scores["score"], by_name.scores["score"])
+    assert fit.metric == "<function>"
+    assert fit.stack is not None
+    assert repr(fit).splitlines() == [line.replace(", tss", ", <function>")
+                                      for line in repr(by_name).splitlines()]
+
+    # The selection reports the estimate under every registered metric, so its own has to be one.
+    t = targets()
+    x = grain_matrix(series(), "plot", "when", "temp", grain="week")
+    y = Response(np.column_stack([t["sp_a"], t["sp_b"]]).astype(float), tuple(t["plot"]),
+                 ("sp_a", "sp_b"))
+    with pytest.raises(TypeError, match="has to be registered"):
+        select_grain(x, y, [learner("a")], metric=tss)
+    with pytest.raises(TypeError, match="name of a registered metric or a function"):
+        fitted(metric=3)
+
+
 def repeated_targets() -> dict:
     plots = [p for p in PLOTS[:6] for _ in (0, 1)]
     visit = [START + np.timedelta64(d * 86400, "s") for d in (20, 40) for _ in range(6)]

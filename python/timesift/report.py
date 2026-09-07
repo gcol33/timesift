@@ -10,7 +10,6 @@ import numpy as np
 
 from .ladder import Ladder, score_arm, scored_cells, table_columns, variable_means
 from .occlusion import ladder_occlusion, occlusion_profile
-from .registry import METRICS
 from .response import align_folds, as_response
 from .stack import ensemble_combine
 
@@ -85,7 +84,7 @@ def ensemble_row(fit) -> dict | None:
         return None
     y = as_response(_field(fit, "y"))
     f = align_folds(_field(fit, "folds"), y.units)
-    score = METRICS.get(str(_field(fit, "metric")))
+    score = _field(fit, "scorer")
     rows = score_arm("ensemble", "ensemble", y, ensemble_combine(stack, _field(fit, "oof")), f,
                      np.unique(f), _field(fit, "cells"), score)
     per = variable_means(*scored_cells(dict(candidate=rows["learner"], variable=rows["variable"],
@@ -118,7 +117,8 @@ def _run_occlusion(fit, candidate: str, over: str = "bin", substitute: str = "pe
     m = _representation(fit, candidate)
     return occlusion_profile(_kept_fits(fit, candidate), m, _field(fit, "y"),
                              _field(fit, "folds"), over=over, substitute=substitute,
-                             metric=str(_field(fit, "metric")) if metric is None else metric,
+                             metric=_field(fit, "scorer") if metric is None else metric,
+                             response=_field(fit, "response"),
                              permutations=permutations, seed=seed)
 
 

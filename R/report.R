@@ -175,7 +175,7 @@ occlusion.timesift <- function(x, candidate, over = c("bin", "channel"), ...) {
   combined <- ensemble_combine(fit$stack, fit$oof)
   f <- .as_folds(fit$folds, rownames(fit$y))
   rows <- .score_arm("ensemble", "ensemble", fit$y, combined, f, sort(unique(f)), fit$cells,
-                     .metrics_reg$get(fit$metric))
+                     fit$scorer)
   per <- .arm_means(rows)
   if (!nrow(per)) NA_real_ else mean(per$score)
 }
@@ -213,5 +213,5 @@ occlusion.timesift <- function(x, candidate, over = c("bin", "channel"), ...) {
   structure(out, class = c("timesift_ladder", "data.frame"),
             predictions = stats::setNames(list(fit$oof[[candidate]]), arm),
             cells = fit$cells, folds = fit$folds, fits = fits,
-            metric = fit$metric, response = fit$response)
+            metric = fit$metric, scorer = fit$scorer, response = fit$response)
 }

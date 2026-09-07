@@ -15,7 +15,7 @@ score_predictions(y, p, folds, cells = NULL, metric = "tss")
 
 \item{cells}{A \code{\link[=scorable_cells]{scorable_cells()}} mask. Computed from \code{y} and \code{folds} when left unset.}
 
-\item{metric}{Name of the registered metric to read the cells by.}
+\item{metric}{Name of a registered metric to read the cells by, or a function of \verb{(y, p)}.}
 }
 \value{
 A data frame of one row per variable and fold, carrying the score and whether the cell

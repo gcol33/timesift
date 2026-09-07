@@ -18,7 +18,7 @@ occlusion(x, ...)
   arm,
   over = c("bin", "channel"),
   substitute = c("permute", "fold_mean", "unit_mean"),
-  metric = "roc_auc",
+  metric = NULL,
   permutations = 20L,
   seed = 1L,
   ...
@@ -43,9 +43,11 @@ occlusion(x, ...)
 \item{substitute}{What a held-back part is replaced by: \code{"permute"}, \code{"fold_mean"} or
 \code{"unit_mean"}.}
 
-\item{metric}{Name of the registered metric the rescoring is read by. The area under the ROC
-curve responds to every reordering of the units, where a maximum over thresholds frequently
-does not move at all, which is why it is the default here and not for the ladder.}
+\item{metric}{Name of the registered metric the rescoring is read by, or a function of
+\verb{(y, p)}. Left unset it is the one the fit was scored under, so a weight is a fall in the
+number \code{\link[=summary]{summary()}} reports rather than in a second one. \code{"roc_auc"} is usually the steadier
+reading over many rescorings: it responds to every reordering of the units, where a maximum
+over thresholds frequently does not move at all.}
 
 \item{permutations}{Draws averaged over, for \code{substitute = "permute"}.}
 

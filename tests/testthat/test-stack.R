@@ -226,7 +226,8 @@ run_fixture <- function(keep_fits = TRUE, stack = TRUE) {
     scores = scores, oof = oof, representations = x,
     stack = if (stack) ensemble_fit(oof, y, cells, folds, ensemble(), scores) else NULL,
     models = models, fits = fits, folds = folds, cells = cells, y = y,
-    metric = attr(lad, "metric"), response = attr(lad, "response"),
+    metric = attr(lad, "metric"), scorer = attr(lad, "scorer"),
+    response = attr(lad, "response"),
     spec = NULL, call = NULL)
   out$weights <- if (stack) out$stack$weights else NULL
   structure(out, class = "timesift", ladder = lad, x = x)

@@ -166,7 +166,8 @@ def test_the_paired_contrast_matches_the_value_the_fixtures_pin():
     ladder = Ladder(grain=np.asarray(["week"] * len(variable)),
                     learner=np.asarray(["a"] * len(cells) + ["b"] * len(cells)),
                     variable=variable, fold=fold, score=score, scorable=~np.isnan(score),
-                    predictions={}, cells=None, folds=None, metric="tss", fits={})
+                    predictions={}, cells=None, folds=None, metric="tss", scorer=None,
+                    response="presence_absence", fits={})
     got = paired_contrast(ladder, "week|a", "week|b")
 
     for quantity, value in expected.items():

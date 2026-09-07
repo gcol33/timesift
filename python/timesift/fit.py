@@ -18,7 +18,7 @@ import numpy as np
 
 from .ladder import score_arm
 from .learners import Fit, fit_learner
-from .registry import METRICS, RESPONSES, get_learner
+from .registry import RESPONSES, get_learner, resolve_metric
 from .representation import TimesiftMatrix
 from .response import Folds, Response
 from .select import column_names, select_columns
@@ -88,6 +88,7 @@ class Timesift:
     cells: object
     y: Response
     metric: str
+    scorer: object
     response: str
     spec: TimesiftSpec
     fits: dict = field(default_factory=dict)
@@ -156,8 +157,7 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
     y_mat = head["prepare"](_response(targets, spec, labels))
     folds = resolve_folds(resampling, y_mat, targets, spec).align(labels)
     cells = head["cells"](y_mat, folds)
-    score = metric if callable(metric) else METRICS.get(metric or head["metric"])
-    metric_name = _metric_name(metric, head)
+    score, metric_name = resolve_metric(metric, head["metric"])
     # Refused here rather than after the fitting, because a contradiction between the run's head
     # and the combiner's is not worth a grid of fits to find out about.
     ensemble = run_ensemble(ensemble, response)
@@ -213,7 +213,7 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
     return Timesift(candidates=_candidate_table(pairs, representations), scores=scores, oof=oof,
                     representations=representations, sift=Sift(used), stack=stack, weights=weights,
                     models=fitted, folds=folds, cells=cells, y=y_mat, metric=metric_name,
-                    response=response, spec=spec, fits=fits, control=control)
+                    scorer=score, response=response, spec=spec, fits=fits, control=control)
 
 
 # ---- the fitting loop ---------------------------------------------------------------------------
@@ -423,7 +423,3 @@ def _response(targets, spec, labels) -> Response:
     return Response(values=np.column_stack(columns), units=labels, variables=tuple(spec.y))
 
 
-def _metric_name(metric, head) -> str:
-    if metric is None:
-        return head["metric"]
-    return metric if isinstance(metric, str) else getattr(metric, "__name__", "metric")

@@ -32,7 +32,7 @@
 #' @param inner Number of inner folds the selection is made on, or a function of the outer training
 #'   response returning a fold map for those units.
 #' @param response Name of the registered response head.
-#' @param metric Name of the registered metric the selection is made on, or `NULL` for the
+#' @param metric Name of a registered metric the selection is made on, or `NULL` for the
 #'   response's own. The estimate is reported under every registered metric whichever this is.
 #' @param compare A [grain_ladder()] result on the same units, response and outer fold map, whose
 #'   arms the selected procedure is contrasted against cell by cell. `NULL` for no contrast.
@@ -81,6 +81,13 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
   }
   f <- .as_folds(folds, units)
   cells <- spec$cells(y, stats::setNames(f, units))
+  # The estimate is reported under every registered metric, and one selected on has to be a row
+  # of that table, so this is the one door a function of (y, p) does not go through.
+  if (is.function(metric)) {
+    stop("`select_grain()` reports the estimate under every registered metric, so the one it ",
+         "selects on has to be registered. register_metric() takes a function of (y, p).",
+         call. = FALSE)
+  }
   metric <- metric %||% spec$metric
   score <- .metrics_reg$get(metric)
   learners <- .learner_list(learners)
@@ -139,7 +146,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
   scores <- structure(scores, class = c("timesift_ladder", "data.frame"),
                       predictions = stats::setNames(list(p), .selected_arm),
                       cells = cells, folds = stats::setNames(f, units),
-                      metric = metric, response = response)
+                      metric = metric, scorer = score, response = response)
 
   out <- list(
     selected = selected,

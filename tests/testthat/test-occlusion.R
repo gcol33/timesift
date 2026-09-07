@@ -59,6 +59,39 @@ test_that("every substitute runs and reports the same parts", {
   expect_true(all(vapply(parts, function(p) all(is.finite(p$weight)), logical(1L))))
 })
 
+test_that("the profile is read by the metric the fit was scored under", {
+  skip_if_not_installed("glmnet")
+  sim <- planted_series(n_unit = 40L, seed = 64L)
+  y <- matrix(stats::rbinom(length(sim$warmth) * 2L, 1L,
+                            stats::plogis(3 * c(sim$warmth, -sim$warmth))),
+              ncol = 2L, dimnames = list(sim$units, c("sp1", "sp2")))
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "month")
+  folds <- fold_map(y, v = 3L, seed = 6L)
+  lad <- suppressWarnings(grain_ladder(x, y, elasticnet(), folds = folds, metric = "tss",
+                                        keep_fits = TRUE, verbose = FALSE))
+
+  # The ladder was scored by TSS, so a weight is a fall in TSS unless another metric is named.
+  under_tss <- occlusion(lad, x, y, "month|elasticnet", permutations = 3L, seed = 4L)
+  expect_identical(attr(under_tss, "metric"), "tss")
+  named <- occlusion(lad, x, y, "month|elasticnet", metric = "tss", permutations = 3L, seed = 4L)
+  expect_equal(under_tss$weight, named$weight)
+
+  under_auc <- occlusion(lad, x, y, "month|elasticnet", metric = "roc_auc",
+                         permutations = 3L, seed = 4L)
+  expect_identical(attr(under_auc, "metric"), "roc_auc")
+  expect_false(isTRUE(all.equal(under_tss$weight, under_auc$weight)))
+
+  # A run reaches the same profile through its own door, under its own metric.
+  run <- suppressWarnings(timesift(
+    data.frame(plot = sim$units, y, stringsAsFactors = FALSE), sim$readings,
+    y = c("sp1", "sp2"), id = plot, time = t, x = temp, models = elasticnet(),
+    sift = grains("month"), resampling = folds, metric = "tss", ensemble = FALSE,
+    keep_fits = TRUE, verbose = FALSE))
+  through_run <- occlusion(run, "elasticnet / month", permutations = 3L, seed = 4L)
+  expect_identical(attr(through_run, "metric"), "tss")
+  expect_equal(through_run$weight, under_tss$weight)
+})
+
 test_that("holding a channel back asks what the statistic carries", {
   skip_if_not_installed("glmnet")
   sim <- planted_series(n_unit = 40L, seed = 63L)

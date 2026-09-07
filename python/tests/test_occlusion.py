@@ -52,6 +52,46 @@ def test_the_bin_a_signal_was_planted_in_is_the_bin_the_profile_weights():
     assert np.nanmax(mean_weight) > 2 * np.nanmedian(mean_weight)
 
 
+def test_the_profile_is_read_by_the_metric_the_fit_was_scored_under():
+    if importlib.util.find_spec("sklearn") is None:
+        pytest.skip("scikit-learn is not installed")
+    readings, y, _ = planted(n_unit=40, seed=64)
+    x = grain_matrix(readings, "id", "time", "value", grain="month")
+    lad = grain_ladder(x, y, "elasticnet", folds=fold_map(y, v=3, seed=6), metric="tss",
+                       keep_fits=True, verbose=False)
+
+    # The ladder was scored by TSS, so a weight is a fall in TSS unless another metric is named.
+    under_tss = ladder_occlusion(lad, x, y, "month|elasticnet", permutations=3, seed=4)
+    named = ladder_occlusion(lad, x, y, "month|elasticnet", metric="tss", permutations=3, seed=4)
+    assert np.allclose(under_tss["weight"], named["weight"], equal_nan=True)
+
+    under_auc = ladder_occlusion(lad, x, y, "month|elasticnet", metric="roc_auc",
+                                 permutations=3, seed=4)
+    assert not np.allclose(under_tss["weight"], under_auc["weight"], equal_nan=True)
+
+
+def test_a_head_that_is_not_presence_absence_can_be_occluded(temporary_response):
+    from timesift.learners import fit_learner
+    from timesift.response import as_response, scorable_cells
+    temporary_response("continuous_occlusion_test", dict(
+        prepare=as_response, activation="identity", loss="squared_error", metric="roc_auc",
+        cells=lambda y, folds: scorable_cells(
+            Response((y.values > np.median(y.values)).astype(float), y.units, y.variables),
+            folds)))
+
+    readings, binary, _ = planted(n_unit=30, seed=65)
+    x = grain_matrix(readings, "id", "time", "value", grain="month")
+    level = x.values[:, :, 0].mean(axis=1)
+    y = Response(np.column_stack([level, -level]), binary.units, ("height", "depth"))
+
+    folds = fold_map(binary, v=3, seed=6)
+    lad = grain_ladder(x, y, "stepwise", folds=folds, response="continuous_occlusion_test",
+                       keep_fits=True, verbose=False)
+    out = ladder_occlusion(lad, x, y, "month|stepwise", permutations=2, seed=4)
+    assert out["variable"] == ["height", "depth"]
+    assert np.isfinite(out["weight"]).any()
+
+
 def test_holding_a_channel_back_asks_what_the_statistic_carries():
     if importlib.util.find_spec("sklearn") is None:
         pytest.skip("scikit-learn is not installed")

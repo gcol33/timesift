@@ -61,8 +61,8 @@ test_that("a fit carries every element the layers above it read", {
   fit <- run_toy(toy_case())
   expect_s3_class(fit, "timesift")
   expect_named(fit, c("candidates", "scores", "oof", "representations", "stack", "weights",
-                      "models", "fits", "folds", "cells", "y", "metric", "response", "spec",
-                      "call"))
+                      "models", "fits", "folds", "cells", "y", "metric", "scorer", "response",
+                      "spec", "call"))
   expect_equal(sort(names(fit$oof)), c("toy / month", "toy / week"))
   expect_equal(names(fit$representations), c("week", "month"))
   expect_s3_class(fit$representations, "timesift_set")
@@ -70,7 +70,39 @@ test_that("a fit carries every element the layers above it read", {
   expect_s3_class(fit$folds, "timesift_folds")
   expect_s3_class(fit$cells, "timesift_cells")
   expect_equal(fit$metric, "tss")
+  expect_identical(fit$scorer, tss)
   expect_null(fit$stack)
+})
+
+test_that("a metric given as a function scores the run and everything that rescores it", {
+  case <- toy_case()
+  mine <- function(y, p) tss(y, p)
+  fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+                  models = list(toy(), toy("toy2")), sift = grains("week", "month"),
+                  resampling = cv(v = 3L), metric = mine, verbose = FALSE)
+  by_name <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+                      models = list(toy(), toy("toy2")), sift = grains("week", "month"),
+                      resampling = cv(v = 3L), metric = "tss", verbose = FALSE)
+
+  # The function is what scores, so every number is the registered metric's; only the name differs.
+  expect_equal(fit$scores, by_name$scores)
+  expect_identical(fit$metric, "<function>")
+  expect_false(is.null(fit$stack))
+
+  # The ensemble row is scored with the function the fit carries, not by looking a name up again.
+  expect_equal(summary(fit)$mean, summary(by_name)$mean)
+  expect_output(print(fit), "<function>", fixed = TRUE)
+
+  # The selection reports the estimate under every registered metric, so its own has to be one.
+  y <- as.matrix(case$targets[, c("sp1", "sp2")])
+  rownames(y) <- case$targets$plot
+  expect_error(select_grain(grain_matrix(case$series, plot, t, temp, grain = "week"),
+                            y, list(toy()), metric = mine),
+               "has to be registered")
+  expect_error(timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+                        models = list(toy()), sift = grains("week"), resampling = cv(v = 3L),
+                        metric = 3L, verbose = FALSE),
+               "name of a registered metric or a function")
 })
 
 test_that("the candidate table names the representation, the learner and the array", {

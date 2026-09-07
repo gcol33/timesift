@@ -15,7 +15,9 @@
 #' @param folds A fold map from [fold_map()], or any named integer vector. Built with the defaults
 #'   of [fold_map()] when not given.
 #' @param response Name of the registered response head.
-#' @param metric Name of the registered metric, or `NULL` for the response's own.
+#' @param metric Name of a registered metric, or a function of `(y, p)`, or `NULL` for the
+#'   response head's own. Whichever it is, it travels with the fit and is what every later
+#'   rescoring reads; a function is reported as `<function>`.
 #' @param keep_fits Keep every per-fold fitted model, which is what lets [occlusion()] read a
 #'   fitted model without refitting it.
 #' @param verbose Report each arm and each fold as it runs.
@@ -52,7 +54,8 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
   }
   f <- .as_folds(folds, units)
   cells <- spec$cells(y, stats::setNames(f, units))
-  score <- .metrics_reg$get(metric %||% spec$metric)
+  metric <- .as_metric(metric, spec$metric)
+  score <- metric$fn
   learners <- .learner_list(learners)
 
   levels <- sort(unique(f))
@@ -82,7 +85,7 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
   structure(out, class = c("timesift_ladder", "data.frame"),
             predictions = preds, cells = cells, folds = stats::setNames(f, units),
             fits = if (keep_fits) fits else NULL,
-            metric = metric %||% spec$metric, response = response)
+            metric = metric$name, scorer = score, response = response)
 }
 
 # One arm's cells, scored. The label is a representation, which a calendar grain is one kind of,
@@ -121,7 +124,7 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
 #' @param p Held-out predictions for the same units and variables.
 #' @param folds A [fold_map()] result, or one fold per unit.
 #' @param cells A [scorable_cells()] mask. Computed from `y` and `folds` when left unset.
-#' @param metric Name of the registered metric to read the cells by.
+#' @param metric Name of a registered metric to read the cells by, or a function of `(y, p)`.
 #'
 #' @return A data frame of one row per variable and fold, carrying the score and whether the cell
 #'   was scorable.
@@ -141,7 +144,7 @@ score_predictions <- function(y, p, folds, cells = NULL, metric = "tss") {
   if (is.null(cells)) {
     cells <- scorable_cells(y, stats::setNames(f, rownames(y)))
   }
-  .score_cells(y, p, f, sort(unique(f)), cells, .metrics_reg$get(metric))
+  .score_cells(y, p, f, sort(unique(f)), cells, .as_metric(metric)$fn)
 }
 
 # A ladder's levels are calendar grains, and `grain` is the column paired_contrast(),

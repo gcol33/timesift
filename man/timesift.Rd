@@ -57,7 +57,9 @@ representation, or a list of them. Defaults to \code{grains("auto")}.}
 
 \item{response}{Name of the registered response head.}
 
-\item{metric}{Name of the registered metric, or \code{NULL} for the response's own.}
+\item{metric}{Name of a registered metric, or a function of \verb{(y, p)}, or \code{NULL} for the
+response head's own. Whichever it is, it travels with the fit and is what every later
+rescoring reads; a function is reported as \verb{<function>}.}
 
 \item{control}{\code{\link[=train_control]{train_control()}}, the training settings every neural learner reads.}
 

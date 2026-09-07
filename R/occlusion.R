@@ -24,9 +24,11 @@
 #' @param over `"bin"` to hold each bin back in turn, `"channel"` for each channel.
 #' @param substitute What a held-back part is replaced by: `"permute"`, `"fold_mean"` or
 #'   `"unit_mean"`.
-#' @param metric Name of the registered metric the rescoring is read by. The area under the ROC
-#'   curve responds to every reordering of the units, where a maximum over thresholds frequently
-#'   does not move at all, which is why it is the default here and not for the ladder.
+#' @param metric Name of the registered metric the rescoring is read by, or a function of
+#'   `(y, p)`. Left unset it is the one the fit was scored under, so a weight is a fall in the
+#'   number [summary()] reports rather than in a second one. `"roc_auc"` is usually the steadier
+#'   reading over many rescorings: it responds to every reordering of the units, where a maximum
+#'   over thresholds frequently does not move at all.
 #' @param permutations Draws averaged over, for `substitute = "permute"`.
 #' @param seed Random seed.
 #'
@@ -63,7 +65,7 @@ occlusion.default <- function(x, ...) {
 #' @export
 occlusion.timesift_ladder <- function(x, data, y, arm, over = c("bin", "channel"),
                                      substitute = c("permute", "fold_mean", "unit_mean"),
-                                     metric = "roc_auc", permutations = 20L, seed = 1L,
+                                     metric = NULL, permutations = 20L, seed = 1L,
                                      ...) {
   ladder <- x
   x <- data
@@ -86,7 +88,11 @@ occlusion.timesift_ladder <- function(x, data, y, arm, over = c("bin", "channel"
   y <- .align_response(.responses_reg$get(attr(ladder, "response"))$prepare(y), units)
   f <- .as_folds(attr(ladder, "folds"), units)
   cells <- attr(ladder, "cells")
-  score <- .metrics_reg$get(metric)
+  # Left unset the profile is read by the metric the fit was scored under, so a weight is a fall
+  # in the number the summary reports rather than in a second one.
+  metric <- if (is.null(metric)) list(fn = attr(ladder, "scorer"), name = attr(ladder, "metric"))
+            else .as_metric(metric)
+  score <- metric$fn
 
   parts <- if (over == "bin") seq_len(dim(m)[2L]) else seq_len(dim(m)[3L])
   labels <- if (over == "bin") dimnames(m)[[2L]] else dimnames(m)[[3L]]
@@ -130,7 +136,7 @@ occlusion.timesift_ladder <- function(x, data, y, arm, over = c("bin", "channel"
   agg$part <- as.character(agg$part)
   rownames(agg) <- NULL
   structure(agg, class = c("timesift_occlusion", "data.frame"), arm = label, over = over,
-            substitute = substitute, metric = metric)
+            substitute = substitute, metric = metric$name)
 }
 
 .occlude <- function(m, test, train, i, over, substitute) {

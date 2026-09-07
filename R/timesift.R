@@ -26,7 +26,9 @@
 #' @param ensemble `TRUE` for the default stack, `FALSE` for none, or an [ensemble()] spec.
 #' @param resampling [cv()], [grouped_cv()], a fold vector, or a [fold_map()] result.
 #' @param response Name of the registered response head.
-#' @param metric Name of the registered metric, or `NULL` for the response's own.
+#' @param metric Name of a registered metric, or a function of `(y, p)`, or `NULL` for the
+#'   response head's own. Whichever it is, it travels with the fit and is what every later
+#'   rescoring reads; a function is reported as `<function>`.
 #' @param control [train_control()], the training settings every neural learner reads.
 #' @param keep_fits Keep every per-fold fitted candidate beside the refits.
 #' @param verbose Report each candidate as it runs.
@@ -174,7 +176,8 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
   folds <- .as_fold_map(resampling, y_matrix, targets, tf)
   f <- .as_folds(folds, tf$label)
   cells <- head$cells(y_matrix, folds)
-  score <- .metrics_reg$get(metric %||% head$metric)
+  metric <- .as_metric(metric, head$metric)
+  score <- metric$fn
   levels <- sort(unique(f))
 
   oof <- list()
@@ -218,7 +221,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
                  stack = stack, weights = stack$weights, models = models_out,
                  fits = if (keep_fits) fits else NULL,
                  folds = folds, cells = cells, y = y_matrix,
-                 metric = metric %||% head$metric, response = response, spec = spec,
+                 metric = metric$name, scorer = score, response = response, spec = spec,
                  call = call),
             class = "timesift")
 }

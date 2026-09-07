@@ -66,6 +66,23 @@ register_metric <- function(name, fn, overwrite = FALSE) {
 #' @export
 metrics <- function() .metrics_reg$names()
 
+# A metric reaches a run either as a registered name or as a function of (y, p), and everything
+# that rescores afterwards -- the ensemble row of a report, an occlusion profile -- needs the
+# function rather than a name to look up again. Both travel with the fit: the function is what
+# scores, the name is what the report prints. A function has no name to print, and reads as
+# `<function>` on both sides rather than as whatever the language calls an anonymous one.
+.as_metric <- function(metric, default = NULL) {
+  metric <- metric %||% default
+  if (is.function(metric)) {
+    return(list(fn = metric, name = "<function>"))
+  }
+  if (!is.character(metric) || length(metric) != 1L) {
+    stop("`metric` is the name of a registered metric or a function of (y, p), got ",
+         class(metric)[1L], ".", call. = FALSE)
+  }
+  list(fn = .metrics_reg$get(metric), name = metric)
+}
+
 #' Register a response head
 #'
 #' A response head says what the values being predicted are, how they reach a learner, and which

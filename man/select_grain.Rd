@@ -37,7 +37,7 @@ response returning a fold map for those units.}
 
 \item{response}{Name of the registered response head.}
 
-\item{metric}{Name of the registered metric the selection is made on, or \code{NULL} for the
+\item{metric}{Name of a registered metric the selection is made on, or \code{NULL} for the
 response's own. The estimate is reported under every registered metric whichever this is.}
 
 \item{compare}{A \code{\link[=grain_ladder]{grain_ladder()}} result on the same units, response and outer fold map, whose

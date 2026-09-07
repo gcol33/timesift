@@ -6,7 +6,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from .registry import METRICS
+from .registry import RESPONSES, resolve_metric
 from .representation import TimesiftMatrix
 from .response import Response, align_folds, as_response
 
@@ -32,7 +32,7 @@ def feature_matrix(m, units=None, features=None, label: str = "features") -> Tim
 
 
 def ladder_occlusion(ladder, x, y: Response, arm: str, over: str = "bin",
-                  substitute: str = "permute", metric: str = "roc_auc",
+                  substitute: str = "permute", metric=None,
                   permutations: int = 20, seed: int = 1):
     """Hold one bin of the record back at a time and record the fall in score as its weight.
 
@@ -58,12 +58,16 @@ def ladder_occlusion(ladder, x, y: Response, arm: str, over: str = "bin",
             if key.startswith(prefix)}
     if not fits:
         raise KeyError(f'this ladder kept no fits for the arm "{grain}|{learner}"')
+    # Left unset the profile is read by the metric the fit was scored under, so a weight is a fall
+    # in the number the summary reports rather than in a second one.
     return occlusion_profile(fits, m, y, ladder.folds, over=over, substitute=substitute,
-                             metric=metric, permutations=permutations, seed=seed)
+                             metric=ladder.scorer if metric is None else metric,
+                             response=ladder.response, permutations=permutations, seed=seed)
 
 
 def occlusion_profile(fits: dict, m: TimesiftMatrix, y, folds, over: str = "bin",
-                      substitute: str = "permute", metric: str = "roc_auc",
+                      substitute: str = "permute", metric="roc_auc",
+                      response: str = "presence_absence",
                       permutations: int = 20, seed: int = 1):
     """The occlusion itself: one fitted model per fold, read on the units that model held out.
 
@@ -75,9 +79,11 @@ def occlusion_profile(fits: dict, m: TimesiftMatrix, y, folds, over: str = "bin"
     if substitute not in ("permute", "fold_mean", "unit_mean"):
         raise ValueError(f"unknown substitute {substitute!r}")
 
-    y = as_response(y).align(m.units).check_presence_absence()
+    # The response reaches its own head's prepare, as it does everywhere else, so a head that is
+    # not presence-absence can be occluded too.
+    y = RESPONSES.get(response)["prepare"](as_response(y)).align(m.units)
     f = align_folds(folds, m.units)
-    score = metric if callable(metric) else METRICS.get(metric)
+    score = resolve_metric(metric)[0]
 
     n_parts = m.values.shape[1] if over == "bin" else m.values.shape[2]
     labels = m.bins if over == "bin" else m.stats

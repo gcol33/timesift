@@ -545,7 +545,16 @@ call site.
 - A setting given at fit time overrides the one the learner carries, and a setting the learner does
   not have is refused rather than ignored.
 - The response head and the metric are registry entries. `metric` takes a registered name or a
-  function of `(y, p)`, and left unset it is the one the response head carries.
+  function of `(y, p)`, and left unset it is the one the response head carries. Both travel with
+  the fit: the function is what scores, and the name is what the report prints. A function has no
+  name to print and reads as `<function>` on both sides rather than as whatever each language
+  calls an anonymous one. `select_grain()` is the one door that takes a name only, because it
+  reports the estimate under every registered metric and the one it selects on has to be a row of
+  that table.
+- An occlusion profile left without a `metric` is read by the one the fit was scored under, so a
+  weight is a fall in the number the summary reports rather than in a second one. It reaches the
+  response through the head the fit was made under, as everything else does, so a head that is
+  not presence-absence is occluded like any other.
 - The encoders take `swa` and `swa_start`: the schedule anneals until the averaging begins and is
   then held flat, the averaged weights get their own pass to rebuild the batch-normalisation
   statistics from a reset, and the default is off, so a default recipe is the same recipe on both
@@ -605,7 +614,7 @@ is a method rather than a second constructor because R's own way to combine thin
 
 | in Python only | what it is |
 |---|---|
-| `flatten`, `align_folds`, `as_response`, `get_learner`, `cohen_kappa` | the helpers R keeps unexported, as `.flatten()`, `.as_folds()`, `.as_response()`, `.as_learner()` and `.kappa_table()`. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
+| `flatten`, `align_folds`, `as_response`, `get_learner`, `resolve_metric`, `cohen_kappa` | the helpers R keeps unexported, as `.flatten()`, `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()` and `.kappa_table()`. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
 
 Models are the one thing neither side promises. A fit in torch and a fit in libtorch cannot be
 byte-identical, and the encoders match module for module rather than number for number.

@@ -9,7 +9,7 @@ import numpy as np
 from ._stats import norm_ppf, wilcoxon_p
 from .learners import fit_learner
 from .metrics import tss
-from .registry import METRICS, RESPONSES, get_learner
+from .registry import RESPONSES, get_learner, resolve_metric
 from .representation import timesift_set
 from .response import (Folds, Response, align_folds, as_response, fold_map,
                        scorable_cells)
@@ -34,6 +34,8 @@ class Ladder:
     cells: object
     folds: Folds
     metric: str
+    scorer: object
+    response: str
     fits: dict
 
     def arm(self, name: str):
@@ -87,7 +89,7 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
         folds = fold_map(y)
     f = align_folds(folds, units)
     cells = spec["cells"](y, Folds(fold=f, units=units))
-    score = metric if callable(metric) else METRICS.get(metric or spec["metric"])
+    score, metric_name = resolve_metric(metric, spec["metric"])
     learners = learner_dict(learners)
     levels = np.unique(f)
 
@@ -124,8 +126,8 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
     return ladder_from_rows(dict(grain=grain, learner=learner, variable=variable, fold=fold,
                                  score=value, scorable=ok),
                             predictions=predictions, cells=cells,
-                            folds=Folds(fold=f, units=units), metric=metric or spec["metric"],
-                            fits=fits)
+                            folds=Folds(fold=f, units=units), metric=metric_name, scorer=score,
+                            response=response, fits=fits)
 
 
 def score_arm(grain, learner, y: Response, p: np.ndarray, f: np.ndarray, levels,
@@ -162,17 +164,19 @@ def score_predictions(y, p, folds, cells=None, metric: str = "tss") -> dict:
     f = align_folds(folds, y.units)
     if cells is None:
         cells = scorable_cells(y, f)
-    rows = score_arm(None, None, y, np.asarray(p), f, np.unique(f), cells, METRICS.get(metric))
+    rows = score_arm(None, None, y, np.asarray(p), f, np.unique(f), cells,
+                     resolve_metric(metric)[0])
     return {k: v for k, v in rows.items() if k not in ("grain", "learner")}
 
 
 def ladder_from_rows(rows: dict, predictions: dict, cells, folds: Folds, metric: str,
-                     fits: dict) -> Ladder:
+                     fits: dict, scorer=None, response: str = "presence_absence") -> Ladder:
+    scorer = resolve_metric(metric)[0] if scorer is None else scorer
     return Ladder(grain=np.asarray(rows["grain"]), learner=np.asarray(rows["learner"]),
                   variable=np.asarray(rows["variable"]), fold=np.asarray(rows["fold"]),
                   score=np.asarray(rows["score"], dtype=float),
                   scorable=np.asarray(rows["scorable"]), predictions=predictions, cells=cells,
-                  folds=folds, metric=metric, fits=fits)
+                  folds=folds, metric=metric, scorer=scorer, response=response, fits=fits)
 
 
 def concat_ladders(a: Ladder, b: Ladder) -> Ladder:
@@ -187,7 +191,7 @@ def concat_ladders(a: Ladder, b: Ladder) -> Ladder:
         score=np.concatenate([a.score, b.score]),
         scorable=np.concatenate([a.scorable, b.scorable]),
         predictions={**a.predictions, **b.predictions}, cells=a.cells, folds=a.folds,
-        metric=a.metric, fits={})
+        metric=a.metric, scorer=a.scorer, response=a.response, fits={})
 
 
 def variable_means(group, variable, value) -> dict:

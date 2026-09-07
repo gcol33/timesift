@@ -78,6 +78,12 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
         folds = fold_map(y)
     f = align_folds(folds, units)
     cells = spec["cells"](y, Folds(fold=f, units=units))
+    # The estimate is reported under every registered metric, and one selected on has to be a row
+    # of that table, so this is the one door a function of (y, p) does not go through.
+    if callable(metric):
+        raise TypeError("select_grain() reports the estimate under every registered metric, so "
+                        "the one it selects on has to be registered. register_metric() takes a "
+                        "function of (y, p).")
     metric = metric or spec["metric"]
     score = METRICS.get(metric)
     split = _inner_splitter(inner)
@@ -131,10 +137,10 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
     scores = ladder_from_rows(
         score_arm(SELECTED, SELECTED, y, p, f, levels, cells, score),
         predictions={SELECTED_ARM: p}, cells=cells, folds=Folds(fold=f, units=units),
-        metric=metric, fits={})
+        metric=metric, scorer=score, response=response, fits={})
 
     return Selection(selected=chosen,
-                     estimate=_nested_estimate(y, p, f, levels, cells),
+                     estimate=_nested_estimate(y, p, f, levels, cells, response),
                      contrast=_selection_contrast(scores, compare),
                      candidates=candidates, scores=scores, inner=inner_rows,
                      metric=metric, response=response)
@@ -183,12 +189,13 @@ def _inner_splitter(inner):
 
 # Every registered metric reads the same held-out predictions, so the estimate is reported under
 # all of them and the choice of selection metric does not decide what may be quoted.
-def _nested_estimate(y, p, f, levels, cells) -> list[dict]:
+def _nested_estimate(y, p, f, levels, cells, response) -> list[dict]:
     out = []
     for name in metrics():
         rows = ladder_from_rows(
             score_arm(SELECTED, SELECTED, y, p, f, levels, cells, METRICS.get(name)),
-            predictions={}, cells=cells, folds=Folds(fold=f, units=y.units), metric=name, fits={})
+            predictions={}, cells=cells, folds=Folds(fold=f, units=y.units), metric=name,
+            scorer=METRICS.get(name), response=response, fits={})
         by_variable = list(per_variable(rows).values())
         level, se = mean_se(by_variable)
         out.append(dict(metric=name, score=level, se=se, n_variable=len(by_variable)))
