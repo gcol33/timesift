@@ -341,8 +341,10 @@ def _static_block(targets, spec, labels) -> TimesiftMatrix:
 
 
 def _with_static(m: TimesiftMatrix, targets, spec) -> TimesiftMatrix:
-    """Columns of the target table are carried as channels held constant over the bins, so a
-    convolution and a penalised regression are handed them the same way."""
+    """Columns of the target table are carried as channels held constant over the bins, which is
+    the constant an encoder reads beside the readings. Which channels those are is recorded, so
+    that a learner reading the bins as a block of features takes one predictor from each of them
+    rather than one per bin."""
     if not spec.static:
         return m
     block = _static_values(targets, spec)
@@ -357,7 +359,7 @@ def _with_static(m: TimesiftMatrix, targets, spec) -> TimesiftMatrix:
                          f"representation already carries")
     extra = np.repeat(block[:, None, :], m.values.shape[1], axis=1)
     return replace(m, values=np.ascontiguousarray(np.concatenate([m.values, extra], axis=2)),
-                   stats=names)
+                   stats=names, static=tuple(m.static) + tuple(spec.static))
 
 
 def _static_values(targets, spec) -> np.ndarray:

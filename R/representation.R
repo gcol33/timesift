@@ -443,8 +443,9 @@ build_representation <- function(rep, series, targets, spec) {
 }
 
 # A static predictor is one number per target and the array is one number per target, bin and
-# channel, so it enters as a channel that does not move across the bins. On a block of features
-# that is one column each; on a sequence it is the constant an encoder reads beside the readings.
+# channel, so it enters as a channel that does not move across the bins: the constant an encoder
+# reads beside the readings. Which channels those are is recorded, because a learner reading the
+# bins as a block of features wants one predictor from each of them rather than one per bin.
 .append_static <- function(x, static) {
   if (!ncol(static)) {
     return(x)
@@ -461,5 +462,6 @@ build_representation <- function(rep, series, targets, spec) {
   for (a in setdiff(names(attributes(x)), names(attributes(out)))) {
     attr(out, a) <- attr(x, a)
   }
+  attr(out, "static") <- c(attr(x, "static"), colnames(static))
   out
 }

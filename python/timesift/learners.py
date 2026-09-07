@@ -116,9 +116,19 @@ def _family(head) -> str:
 
 
 def flatten(x: TimesiftMatrix) -> np.ndarray:
-    """``[unit, bin, channel]`` to ``[unit, bin * channel]`` in the array's own order."""
+    """``[unit, bin, channel]`` to ``[unit, bin * channel]`` in the array's own order.
+
+    A channel that holds the same number in every bin carries no bin of its own and is one
+    predictor, read once: repeating it would put the same column in front of a penalised fit as
+    often as the grain has bins, and give it that many chances of being drawn by a forest or
+    picked by a forward search.
+    """
     n_u = x.values.shape[0]
-    return x.values.reshape(n_u, -1, order="F")
+    if not x.static:
+        return x.values.reshape(n_u, -1, order="F")
+    constant = np.array([s in set(x.static) for s in x.stats])
+    moving = x.values[:, :, ~constant].reshape(n_u, -1, order="F")
+    return np.ascontiguousarray(np.concatenate([moving, x.values[:, 0, constant]], axis=1))
 
 
 # ---- the encoders ----------------------------------------------------------------------------

@@ -542,6 +542,10 @@ call site.
   few batches of at most `batch_size` rows as they divide into, of as equal a length as they can
   be; the snapshot early stopping restores, and the running average `swa` keeps, are copies of
   the weights and never the storage the optimiser updates.
+- A `static` column enters the array as a channel holding the same number in every bin, which is
+  the constant an encoder reads beside the readings. Flattening the bins into a block of features
+  reads such a channel once, so a static predictor is one column of the design however many bins
+  the grain has.
 - A learner is fitted toward the registered response head and holds no response of its own: the
   encoders train under the head's `loss` and predict through its `activation`, and the three
   learners fitting one model per response take the family the loss names, logistic under

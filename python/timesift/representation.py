@@ -40,7 +40,8 @@ class TimesiftMatrix:
 
     A row is a unit where the calendar did the binning and a target where a lookback did, since a
     unit carrying several targets cannot name a row on its own. ``span`` and ``lag`` are set by a
-    lookback alone, and are what rebuilding one for new targets reads.
+    lookback alone, and are what rebuilding one for new targets reads. ``static`` names the
+    channels holding the same number in every bin, which :func:`flatten` reads once each.
     """
 
     values: np.ndarray
@@ -55,6 +56,7 @@ class TimesiftMatrix:
     bin_partial: np.ndarray = field(repr=False)
     span: int | None = None
     lag: int | None = None
+    static: tuple[str, ...] = ()
 
     @property
     def shape(self) -> tuple[int, int, int]:

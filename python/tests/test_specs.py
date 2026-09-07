@@ -183,6 +183,16 @@ def test_static_columns_are_carried_as_channels_held_constant_over_the_bins():
         np.asarray(targets()["elevation"])[:, None], m.values.shape[1], axis=1))
 
 
+def test_a_static_column_is_one_predictor_of_the_flattened_design_not_one_per_bin():
+    for rep in (grain("week"), multigrain(grains=("week", "month")), native()):
+        m = build_representation(rep, series(), targets(), spec(static=("elevation",)))
+        bare = build_representation(rep, series(), targets(), spec())
+        design = flatten(m)
+        assert design.shape[1] == flatten(bare).shape[1] + 1
+        assert design[:, :-1] == pytest.approx(flatten(bare))
+        assert design[:, -1] == pytest.approx(np.asarray(targets()["elevation"], dtype=float))
+
+
 def test_a_static_column_that_is_not_a_number_is_refused_by_name():
     t = targets()
     t["soil"] = ["loam", "sand", "loam", "sand"]

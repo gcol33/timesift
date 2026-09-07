@@ -308,14 +308,25 @@ print.timesift_models <- function(x, ...) {
 }
 
 # Flatten [unit, bin, channel] to [unit, bin * channel] in the array's own order, so the column
-# names say which bin and which channel every predictor came from.
+# names say which bin and which channel every predictor came from. A channel that holds the same
+# number in every bin carries no bin of its own and is one predictor, read once: repeating it
+# would put the same column in front of a penalised fit as often as the grain has bins, and give
+# it that many chances of being drawn by a forest or picked by a forward search.
 .flatten <- function(x) {
   d <- dim(x)
-  out <- matrix(as.numeric(x), nrow = d[1L], ncol = d[2L] * d[3L])
+  channels <- dimnames(x)[[3L]]
+  constant <- channels %in% (attr(x, "static") %||% character(0))
+  moving <- unclass(x)[, , !constant, drop = FALSE]
+  out <- matrix(as.numeric(moving), nrow = d[1L], ncol = d[2L] * sum(!constant))
   dimnames(out) <- list(dimnames(x)[[1L]],
-                        paste(rep(dimnames(x)[[3L]], each = d[2L]),
-                              rep(dimnames(x)[[2L]], times = d[3L]), sep = "@"))
-  out
+                        paste(rep(channels[!constant], each = d[2L]),
+                              rep(dimnames(x)[[2L]], times = sum(!constant)), sep = "@"))
+  if (!any(constant)) {
+    return(out)
+  }
+  once <- matrix(as.numeric(unclass(x)[, 1L, constant, drop = FALSE]), nrow = d[1L],
+                 dimnames = list(dimnames(x)[[1L]], channels[constant]))
+  cbind(out, once)
 }
 
 # The family a learner fitting one model per response fits under is read off the response head's

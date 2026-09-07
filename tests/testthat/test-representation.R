@@ -132,6 +132,22 @@ test_that("static columns enter as channels that do not move across the bins", {
   expect_equal(unname(x[, 1L, "elevation"]), targets$elevation[order(targets$plot)])
 })
 
+test_that("a static column is one predictor of the flattened design, not one per bin", {
+  sim <- sim_series(n_unit = 5L, days = 60L)
+  targets <- rep_targets(sim$units)
+  spec <- rep_spec(static = "elevation")
+  for (rep in list(grain("week"), multigrain(c("week", "month")), native())) {
+    x <- build_representation(rep, sim$readings, targets, spec)
+    m <- .flatten(x)
+    expect_equal(sum(colnames(m) == "elevation"), 1L)
+    expect_equal(ncol(m), dim(x)[2L] * (dim(x)[3L] - 1L) + 1L)
+    expect_equal(unname(m[, "elevation"]), targets$elevation[order(targets$plot)])
+    # Every reading keeps its own column, and the static one is the last of them.
+    expect_equal(colnames(m)[-ncol(m)], colnames(.flatten(build_representation(
+      rep, sim$readings, targets, rep_spec()))))
+  }
+})
+
 test_that("a lookback keeps its span once static channels are beside it", {
   sim <- sim_series(n_unit = 3L, days = 120L)
   targets <- data.frame(plot = sim$units, elevation = c(1000, 2000, 3000),
