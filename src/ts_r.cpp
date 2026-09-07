@@ -169,6 +169,7 @@ cpp11::list ts_reduce_lookbacks_(cpp11::integers unit, cpp11::doubles value, cpp
   req.unit = unit_index.data();
   req.value = reading.data();
   req.local = naive.data();
+  req.unit_name = unit_ptr.empty() ? nullptr : unit_ptr.data();
   req.n = n;
   req.n_unit = units.size();
   req.target_unit = holder.data();

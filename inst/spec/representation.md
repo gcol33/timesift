@@ -15,7 +15,12 @@ A long table of readings with three columns of interest:
 
 Requirements, each checked and each an error rather than a warning:
 
-- No missing `id`, `time` or `value`.
+- No missing `id` or `time`.
+- Every `value` is a finite number. A missing one propagates through a sum and is skipped by a
+  comparison, so a bin's mean and its minimum would disagree about which readings were in it, and
+  an infinity makes the mean of a bin holding both signs a not-a-number. The reading columns are
+  read by the shared core, so this is one guard rather than one per language, and its message names
+  the unit and the instant of the first reading it refuses.
 - No duplicate `(id, time)` pair.
 - Every id spans the same set of bins once binned. A record that stops early is not silently
   padded; it is reported with the ids and the bins concerned.
@@ -441,6 +446,13 @@ The digest is defined byte-exactly, because a scheme that varies by platform pin
 
 The line ending is LF on every platform. R's `writeLines()` emits CRLF on Windows, so the bytes
 are written explicitly; a digest generated on Windows and checked on Linux must agree.
+
+The array has to be finite, and an array holding an infinity or a missing value is refused rather
+than digested. `%.12f` writes an infinity as `Inf` in R and as `inf` in Python, and R tells `NA`
+apart from `NaN` where Python has one spelling for both, so any pinned rendering would either
+compare the language or conflate two values R keeps distinct. Nothing built here reaches that case:
+a reading that is not a finite number is refused where the record is read, which is the guard
+below.
 
 Twelve places is far below any difference that could change a fitted model and far above the
 noise from the two languages accumulating a mean in different orders. Should a combination ever

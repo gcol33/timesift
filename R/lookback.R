@@ -105,7 +105,7 @@ lookback_matrix <- function(data,
   if (is.null(tz) || !nzchar(tz)) tz <- "UTC"
 
   instant <- floor(as.numeric(when))
-  .check_readings(unit, when, instant, reading, id_col, time_col, value_col)
+  .check_readings(unit, when, instant, id_col, time_col)
   local <- .naive_seconds(instant, tz, time_col)
 
   units <- sort(unique(unit), method = "radix")

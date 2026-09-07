@@ -43,7 +43,7 @@ coverage <- function(data, id, time, grain = "day", year_start = "09-01") {
   tz <- attr(when, "tzone")
   if (is.null(tz) || !nzchar(tz)) tz <- "UTC"
   instant <- floor(as.numeric(when))
-  .check_readings(unit, when, instant, NULL, id_col, time_col, NULL)
+  .check_readings(unit, when, instant, id_col, time_col)
   local <- .naive_seconds(instant, tz, time_col)
 
   units <- sort(unique(unit), method = "radix")

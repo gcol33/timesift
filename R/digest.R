@@ -11,6 +11,12 @@
 #' explicitly because `writeLines()` emits CRLF on Windows, which would make a digest depend on
 #' the machine that produced it.
 #'
+#' The array has to be finite. `%.12f` writes an infinity as `Inf` here and as `inf` in Python, and
+#' R tells a missing value apart from a not-a-number where Python has one spelling for both, so a
+#' digest over such an array would say something about the language rather than about the
+#' representation. A representation never holds one: a reading that is not a finite number is
+#' refused where the record is read.
+#'
 #' @param x A [grain_matrix()] result, or any numeric array.
 #'
 #' @return The digest, a single string of 32 hexadecimal characters.
@@ -20,7 +26,14 @@
 #'
 #' @export
 digest_array <- function(x) {
-  body <- paste0(paste(sprintf("%.12f", as.numeric(x)), collapse = "\n"), "\n")
+  v <- as.numeric(x)
+  if (!all(is.finite(v))) {
+    stop(sum(!is.finite(v)), " of ", length(v), " values are not finite. A digest is defined for ",
+         "a finite array: the two languages spell an infinity and a missing value differently, so ",
+         "a digest over one would compare the language rather than the representation.",
+         call. = FALSE)
+  }
+  body <- paste0(paste(sprintf("%.12f", v), collapse = "\n"), "\n")
   f <- tempfile()
   on.exit(unlink(f), add = TRUE)
   con <- file(f, open = "wb")

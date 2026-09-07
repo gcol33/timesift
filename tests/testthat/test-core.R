@@ -171,3 +171,29 @@ test_that("readings a fraction of a second apart are the same reading twice", {
   expect_error(grain_matrix(d, id, t, v, grain = "native", stats = "mean"),
                "duplicated \\(unit, time\\) pair")
 })
+
+test_that("a reading that is not a finite number is refused, and named", {
+  t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 8)
+  d <- data.frame(id = rep(c("p1", "p2"), each = length(t)), t = rep(t, 2),
+                  v = rnorm(2 * length(t)))
+  at <- data.frame(id = c("p1", "p2"), time = rep(max(t), 2))
+
+  for (hole in list(NA_real_, NaN, Inf, -Inf)) {
+    bad <- d
+    bad$v[30L] <- hole
+    expect_error(grain_matrix(bad, id, t, v, grain = "day"),
+                 "1 reading is not a finite number, first: unit p1 at 2021-09-02T05:00:00")
+    expect_error(lookback_matrix(bad, id, t, v, at = at, span = "2 days"),
+                 "1 reading is not a finite number, first: unit p1 at 2021-09-02T05:00:00")
+  }
+
+  two <- d
+  two$v[c(30L, 31L)] <- Inf
+  expect_error(grain_matrix(two, id, t, v, grain = "day"), "2 readings are not a finite number")
+
+  # coverage() reads how many readings a unit has in each bin and never their values, so it is
+  # not the guard's business.
+  bad <- d
+  bad$v[30L] <- NA_real_
+  expect_identical(sum(coverage(bad, id, t, grain = "day")), nrow(d))
+})

@@ -110,6 +110,7 @@ struct LookbackRequest {
   const std::int32_t* unit = nullptr;         // series unit index, one per reading
   const double* value = nullptr;              // one per reading
   const seconds* local = nullptr;             // naive local seconds, one per reading
+  const char* const* unit_name = nullptr;     // n_unit names, for the guards; may be null
   std::size_t n = 0;
   std::size_t n_unit = 0;
   const std::int32_t* target_unit = nullptr;  // unit index, one per target

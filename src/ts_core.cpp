@@ -34,6 +34,28 @@ std::string plural(std::size_t n, const char* word) {
   return std::to_string(n) + " " + word + (n == 1 ? "" : "s");
 }
 
+// A reading has to be a finite number, and this is the one place that is said. A missing one
+// propagates through a sum and is skipped by a comparison, so a bin's mean and its minimum would
+// disagree about which readings were in it; an infinity makes the mean of a bin holding both signs
+// a NaN. Neither has a value to put in front of a model, and neither has one spelling across the
+// languages the digest is read in.
+void check_finite(const double* value, std::size_t n, const std::int32_t* unit,
+                  const char* const* unit_name, const seconds* local) {
+  std::size_t bad = 0;
+  std::size_t first = 0;
+  for (std::size_t i = 0; i < n; ++i) {
+    if (std::isfinite(value[i])) continue;
+    if (bad == 0) first = i;
+    ++bad;
+  }
+  if (bad == 0) return;
+  throw Error(plural(bad, "reading") + (bad == 1 ? " is" : " are") +
+              " not a finite number, first: unit " +
+              label_of(unit_name, static_cast<std::size_t>(unit[first])) + " at " +
+              iso8601(local[first]) +
+              ". Fill or drop them before building a representation.");
+}
+
 // Which of the three per-day quantities the requested statistics need. A day-level statistic
 // reduces each calendar day first and reduces again over the days of a bin; nothing else reads a
 // day at all.
@@ -317,7 +339,9 @@ Result reduce(const Request& req) {
   const std::size_t n_bin = bins.size();
   const std::size_t n_cell = n_unit * n_bin;
 
+  // cell_counts is what checks a reading's unit index, so the readings can be named from here on.
   std::vector<std::int32_t> count = cell_counts(req, grid);
+  check_finite(req.value, n, req.unit, req.unit_name, req.local);
   check_full_grid(count, bins, req);
 
   // A supplied calendar owns its own bin lengths, and the `native` grain's bin is the reading
@@ -474,6 +498,7 @@ LookbackResult reduce_lookbacks(const LookbackRequest& req) {
       throw Error("a target carries a unit index outside the units given.");
     }
   }
+  check_finite(req.value, n, req.unit, req.unit_name, req.local);
 
   // A day-level statistic is a state a calendar day was in, so it is defined only where each day
   // lies whole inside one bin. The lookback's bins are a fixed length from a fixed instant rather

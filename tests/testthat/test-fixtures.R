@@ -101,6 +101,13 @@ test_that("the digest is the LF-terminated twelve-place form and nothing else", 
   unlink(f)
 })
 
+test_that("a digest is refused over an array that is not finite", {
+  expect_error(digest_array(array(c(1, Inf), dim = c(2L, 1L, 1L))), "not finite")
+  expect_error(digest_array(array(c(1, -Inf), dim = c(2L, 1L, 1L))), "not finite")
+  expect_error(digest_array(array(c(1, NaN), dim = c(2L, 1L, 1L))), "not finite")
+  expect_error(digest_array(array(c(1, NA_real_), dim = c(2L, 1L, 1L))), "1 of 2")
+})
+
 test_that("the row order is C collation and not the session's", {
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")

@@ -181,7 +181,7 @@ def grain_matrix(data=None, id=None, time=None, value=None, *, grain="day", stat
     instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
     units, unit_ix = np.unique(unit, return_inverse=True)
     unit_ix = np.ascontiguousarray(unit_ix.astype(np.int32))
-    _check_readings(units, unit_ix, instant, when, reading)
+    _check_readings(units, unit_ix, instant, when)
     local = _naive_seconds(instant, zone)
 
     supplied = None
@@ -270,7 +270,7 @@ def coverage(data=None, id=None, time=None, *, grain="day", year_start="09-01",
     instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
     units, unit_ix = np.unique(unit, return_inverse=True)
     unit_ix = np.ascontiguousarray(unit_ix.astype(np.int32))
-    _check_readings(units, unit_ix, instant, when, None)
+    _check_readings(units, unit_ix, instant, when)
     local = _naive_seconds(instant, zone)
 
     supplied = None
@@ -336,7 +336,7 @@ def lookback_matrix(data=None, id=None, time=None, value=None, at=None, span=Non
     instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
     units, unit_ix = np.unique(unit, return_inverse=True)
     unit_ix = np.ascontiguousarray(unit_ix.astype(np.int32))
-    _check_readings(units, unit_ix, instant, when, reading)
+    _check_readings(units, unit_ix, instant, when)
     local = _naive_seconds(instant, zone)
 
     target_unit, anchor, labels = _targets(at, units, zone)
@@ -618,11 +618,15 @@ def _parse_year_start(year_start: str):
     return month, day
 
 
-def _check_readings(units, unit_ix, instant, when, reading):
+def _check_readings(units, unit_ix, instant, when):
     """The instants are the whole seconds the calendar is read at, so two readings a fraction of a
     second apart are the same reading twice here. Sorting by (unit, time) and looking at neighbours
-    costs no string per reading, which on a record of tens of millions matters."""
-    if np.isnat(when).any() or (reading is not None and np.isnan(reading).any()):
+    costs no string per reading, which on a record of tens of millions matters.
+
+    A reading's own value is not read here: whether it is a number a bin can hold is the core's
+    guard, raised once for both languages.
+    """
+    if np.isnat(when).any():
         raise ValueError("missing values in the readings. "
                          "Fill or drop them before building a representation.")
     if len(instant) < 2:

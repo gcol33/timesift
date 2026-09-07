@@ -126,6 +126,7 @@ NB_MODULE(_core, m) {
           req.unit = unit.data();
           req.value = value.data();
           req.local = local.data();
+          req.unit_name = units.empty() ? nullptr : units.data();
           req.n = value.size();
           req.n_unit = unit_names.size();
           req.target_unit = target_unit.data();

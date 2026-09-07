@@ -7,7 +7,7 @@ import pytest
 
 from oracle import oracle_grain_matrix
 from timesift import _core
-from timesift.representation import grain_matrix
+from timesift.representation import coverage, grain_matrix, lookback_matrix
 
 SCHEMES = [["min", "mean", "max"],
            ["mean_daily_min", "mean", "mean_daily_max"],
@@ -176,3 +176,34 @@ def test_readings_a_fraction_of_a_second_apart_are_the_same_reading_twice():
             "v": [1.0, 2.0, 3.0]}
     with pytest.raises(ValueError, match=r"duplicated \(unit, time\) pairs"):
         grain_matrix(data, "id", "t", "v", grain="native", stats="mean")
+
+
+def test_a_reading_that_is_not_a_finite_number_is_refused_and_named():
+    when = np.arange(np.datetime64("2021-09-01", "s"),
+                     np.datetime64("2021-09-09", "s"),
+                     np.timedelta64(1, "h")).astype("datetime64[s]")
+    rng = np.random.default_rng(0)
+    base = {"id": np.repeat(np.asarray(["p1", "p2"]), len(when)),
+            "t": np.tile(when, 2),
+            "v": rng.normal(size=2 * len(when))}
+    at = {"id": ["p1", "p2"], "time": [when[-1], when[-1]]}
+
+    for hole in (np.nan, np.inf, -np.inf):
+        data = dict(base, v=base["v"].copy())
+        data["v"][29] = hole
+        for call in (lambda d: grain_matrix(d, "id", "t", "v", grain="day"),
+                     lambda d: lookback_matrix(d, "id", "t", "v", at=at, span="2 days")):
+            with pytest.raises(ValueError, match="1 reading is not a finite number, "
+                                                 "first: unit p1 at 2021-09-02T05:00:00"):
+                call(data)
+
+    two = dict(base, v=base["v"].copy())
+    two["v"][[29, 30]] = np.inf
+    with pytest.raises(ValueError, match="2 readings are not a finite number"):
+        grain_matrix(two, "id", "t", "v", grain="day")
+
+    # coverage() reads how many readings a unit has in each bin and never their values, so it is
+    # not the guard's business.
+    data = dict(base, v=base["v"].copy())
+    data["v"][29] = np.nan
+    assert int(coverage(data, "id", "t", grain="day").count.sum()) == len(base["v"])

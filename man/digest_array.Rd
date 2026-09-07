@@ -24,6 +24,12 @@ formatted to twelve decimal places, joined with a line feed and terminated with 
 UTF-8 bytes of that are hashed. The line ending is a line feed on every platform. It is written
 explicitly because \code{writeLines()} emits CRLF on Windows, which would make a digest depend on
 the machine that produced it.
+
+The array has to be finite. \verb{\%.12f} writes an infinity as \code{Inf} here and as \code{inf} in Python, and
+R tells a missing value apart from a not-a-number where Python has one spelling for both, so a
+digest over such an array would say something about the language rather than about the
+representation. A representation never holds one: a reading that is not a finite number is
+refused where the record is read.
 }
 \examples{
 digest_array(array(c(1, -0.5), dim = c(2L, 1L, 1L)))

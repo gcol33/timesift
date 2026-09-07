@@ -154,7 +154,7 @@ grain_matrix <- function(data,
   # The zone is resolved here and nowhere below it: the core bins a calendar with no zone in it, so
   # a day there is 86400 seconds of local time whatever the night did.
   instant <- floor(as.numeric(when))
-  .check_readings(unit, when, instant, reading, id_col, time_col, value_col)
+  .check_readings(unit, when, instant, id_col, time_col)
   local <- .naive_seconds(instant, tz, time_col)
 
   # C collation, never the session's, so the row order of the representation is the same on
@@ -305,9 +305,12 @@ print.timesift_matrix <- function(x, ...) {
   list(month = parts[1L], day = parts[2L])
 }
 
-.check_readings <- function(unit, when, instant, reading, id_col, time_col, value_col) {
-  holes <- c(anyNA(unit), anyNA(when), !is.null(reading) && anyNA(reading))
-  missing <- c(id_col, time_col, value_col)[holes]
+# The readings the core cannot see for itself: it is handed unit indices and whole seconds, so a
+# hole in the id or the time column has already become something else by the time it gets there. A
+# reading's own value is the core's guard, raised once for both languages.
+.check_readings <- function(unit, when, instant, id_col, time_col) {
+  holes <- c(anyNA(unit), anyNA(when))
+  missing <- c(id_col, time_col)[holes]
   if (length(missing)) {
     stop("missing values in ", paste(sprintf("`%s`", missing), collapse = " and "),
          ". Fill or drop them before building a representation.", call. = FALSE)

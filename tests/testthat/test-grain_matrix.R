@@ -160,6 +160,10 @@ test_that("the representation refuses input it cannot reduce honestly", {
 
   na <- d
   na$temp[3] <- NA
+  expect_error(grain_matrix(na, plot, t, temp, grain = "day"), "not a finite number")
+
+  na <- d
+  na$plot[3] <- NA
   expect_error(grain_matrix(na, plot, t, temp, grain = "day"), "missing values")
 
   expect_error(grain_matrix(d, plot, t, temp, grain = "native", stats = "cold_day"),

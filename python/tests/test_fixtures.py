@@ -169,6 +169,14 @@ def test_the_digest_is_the_lf_terminated_twelve_place_form_and_nothing_else():
     assert digest_array(values) == expected
 
 
+def test_a_digest_is_refused_over_an_array_that_is_not_finite():
+    for bad in (np.inf, -np.inf, np.nan):
+        with pytest.raises(ValueError, match="not finite"):
+            digest_array(np.array([1.0, bad]).reshape(2, 1, 1))
+    with pytest.raises(ValueError, match="1 of 2"):
+        digest_array(np.array([1.0, np.nan]).reshape(2, 1, 1))
+
+
 def test_the_traversal_is_unit_fastest_then_bin_then_channel():
     values = np.arange(2 * 3 * 2, dtype=float).reshape(2, 3, 2)
     flat = values.flatten(order="F")
