@@ -259,6 +259,29 @@ bench_assert_candidates <- function(selection, stamp) {
   }, numeric(1L))
 }
 
+# Reading the rows back. A quantity is picked by the three things that identify it and returned in
+# replicate order, so two quantities of the same cell can be differenced replicate by replicate
+# rather than as two means; the margin is the Monte Carlo one the replicate count buys.
+bench_pick <- function(d, arm, quantity, metric = BENCH$metric) {
+  keep <- d$arm == arm & d$quantity == quantity
+  if (!is.na(metric)) {
+    keep <- keep & !is.na(d$metric) & d$metric == metric
+  }
+  d[keep, , drop = FALSE]
+}
+
+bench_by_replicate <- function(d, arm, quantity, metric = BENCH$metric) {
+  picked <- bench_pick(d, arm, quantity, metric)
+  stats::setNames(picked$value[order(picked$replicate)], sort(picked$replicate))
+}
+
+bench_margin <- function(v) 1.96 * stats::sd(v) / sqrt(length(v))
+
+bench_proportion <- function(hit) {
+  p <- mean(hit)
+  c(p = p, mc = 1.96 * sqrt(p * (1 - p) / length(hit)))
+}
+
 .bench_row <- function(stamp, arm, candidate, outer_fold, metric, quantity, value) {
   data.frame(stamp[c("scale", "cell_id", "block", "mechanism", "n_unit", "inner", "outer",
                      "replicate",
