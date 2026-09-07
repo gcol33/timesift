@@ -174,3 +174,21 @@ test_that("a grouping written against the targets follows them into their fittin
   f <- .as_fold_map(grouped_cv(group, v = 3L), y, targets, tf)
   expect_true(all(tapply(unclass(f), group[order], function(v) length(unique(v))) == 1L))
 })
+
+test_that("a split written against the targets follows them into their fitting order", {
+  y <- sim_response(sim_series(n_unit = 12L, days = 2L))
+  order <- rev(seq_len(nrow(y)))
+  tf <- list(label = rownames(y)[order], order = order)
+  targets <- data.frame(plot = rownames(y), stringsAsFactors = FALSE)
+
+  given <- rep(1:3, length.out = 12L)
+  by_row <- .as_fold_map(given, y, targets, tf)
+  expect_equal(as.integer(by_row), given[order])
+  expect_equal(names(by_row), tf$label)
+
+  # The same split written with its units on it is joined on them, and lands on the same folds.
+  named <- stats::setNames(given, rownames(y))
+  expect_equal(unclass(.as_fold_map(named, y, targets, tf)), unclass(by_row))
+  as_table <- data.frame(plot = rownames(y), fold = given, stringsAsFactors = FALSE)
+  expect_equal(unclass(.as_fold_map(as_table, y, targets, tf)), unclass(by_row))
+})

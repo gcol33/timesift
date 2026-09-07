@@ -139,9 +139,19 @@ print.timesift_resampling <- function(x, ...) {
     return(fold_map(y, v = resampling$v, seed = resampling$seed, strata = resampling$strata,
                     group = .resampling_group(resampling, targets, tf)))
   }
-  f <- .as_folds(resampling, tf$label)
+  f <- .as_folds(.against_targets(resampling, tf), tf$label)
   structure(stats::setNames(f, tf$label), v = length(unique(f)), seed = NA,
             strata = NA_integer_, grouped = FALSE, class = "timesift_folds")
+}
+
+# A split without names was written against the targets as the caller passed them, and the targets
+# have since been put in the order every array and the response carry, so it is read back into that
+# order here. A named vector or a two-column table carries its own key and is joined on it.
+.against_targets <- function(folds, tf) {
+  if (is.data.frame(folds) || !is.null(names(folds)) || length(folds) != length(tf$order)) {
+    return(folds)
+  }
+  folds[tf$order]
 }
 
 # The grouping is a column of the targets or a vector the caller wrote against them, and the

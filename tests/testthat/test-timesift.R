@@ -275,6 +275,16 @@ test_that("the resampling arrives as a spec, a fold vector or a fold map", {
                          function(v) length(unique(v))) == 1L))
 })
 
+test_that("a split without names is read against the targets as they were given", {
+  case <- toy_case(n_unit = 15L, days = 40L)
+  reversed <- case$targets[rev(seq_len(nrow(case$targets))), , drop = FALSE]
+  given <- rep(1:3, length.out = 15L)
+  fit <- timesift(reversed, case$series, y = starts_with("sp"), id = plot, time = t,
+                  models = list(toy()), sift = grains("week"), ensemble = FALSE,
+                  resampling = given, control = NULL, verbose = FALSE)
+  expect_equal(as.integer(fit$folds[reversed$plot]), given)
+})
+
 test_that("an ensemble is fitted on the out-of-fold predictions and predicts through the refits", {
   case <- toy_case(n_unit = 30L, days = 90L)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
