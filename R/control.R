@@ -10,17 +10,23 @@
 #' 200 epochs and takes every other setting from the control the run was given.
 #'
 #' @param epochs Epoch budget the cosine schedule anneals over.
-#' @param batch_size Targets per optimiser step.
+#' @param batch_size Most targets per optimiser step. The fitting targets are cut into as few
+#'   batches of at most this many as they divide into, of as equal a length as they can be, so no
+#'   batch is a remainder of one.
 #' @param learning_rate Learning rate.
 #' @param weight_decay AdamW weight decay.
 #' @param early_stopping Epochs without an inner-validation improvement before training stops.
 #' @param val_frac Share of the fitting targets held back as an inner validation set, used for
-#'   early stopping and for nothing else. It is never scored as a result.
-#' @param device `"auto"` to take a graphics processor where there is one, or a device name such as
-#'   `"cuda"` or `"cpu"`.
+#'   early stopping and for nothing else. It is never scored as a result. The set is drawn from
+#'   every fit alike, one target from each of as many equal-count strata of the response total as
+#'   the set holds, so the fit on all targets that a run ends with also trains on the rest.
+#' @param device `"auto"` to take a graphics processor where there is one, NVIDIA's or Apple's, or
+#'   a device name such as `"cuda"`, `"mps"` or `"cpu"`. A fitted encoder carries the setting
+#'   rather than the device it resolved to, so a fit made on one machine predicts on another.
 #' @param seed Seed for initialisation, batching and the inner validation split.
 #' @param pos_weight_cap Ceiling on the per-response positive-class weight, which is the ratio of
-#'   absences to presences among the fitting targets.
+#'   absences to presences among the fitting targets. At least one: a weight under one would
+#'   weight presences down.
 #' @param swa Average the weights of the tail epochs instead of restoring the best single epoch.
 #'   The schedule anneals to `swa_start` of the epoch budget and is then held flat while the
 #'   remaining epochs' weights are averaged, and the batch-normalisation statistics are recomputed
@@ -51,12 +57,17 @@ train_control <- function(epochs = 60L, batch_size = 64L, learning_rate = 1e-3,
 }
 
 .check_control <- function(settings) {
-  positive <- c("epochs", "batch_size", "learning_rate", "pos_weight_cap")
+  positive <- c("epochs", "batch_size", "learning_rate")
   for (nm in positive) {
     if (length(settings[[nm]]) != 1L || is.na(settings[[nm]]) || settings[[nm]] <= 0) {
       stop("`", nm, "` is a single positive number, got ",
            paste(format(settings[[nm]]), collapse = ", "), ".", call. = FALSE)
     }
+  }
+  if (length(settings$pos_weight_cap) != 1L || is.na(settings$pos_weight_cap) ||
+      settings$pos_weight_cap < 1) {
+    stop("`pos_weight_cap` is a single number of at least 1, got ",
+         paste(format(settings$pos_weight_cap), collapse = ", "), ".", call. = FALSE)
   }
   for (nm in c("val_frac", "swa_start")) {
     if (length(settings[[nm]]) != 1L || is.na(settings[[nm]]) ||
@@ -146,5 +157,12 @@ print.timesift_control <- function(x, ...) {
   if (!identical(device, "auto")) {
     return(device)
   }
-  if (.torch()$cuda_is_available()) "cuda" else "cpu"
+  torch <- .torch()
+  if (torch$cuda_is_available()) {
+    "cuda"
+  } else if (torch$backends_mps_is_available()) {
+    "mps"
+  } else {
+    "cpu"
+  }
 }

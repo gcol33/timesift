@@ -60,7 +60,8 @@
 #' calendar. A bin no unit reaches is never built, so a month missing from the whole record would
 #' otherwise pass as four adjacent monthly bins with one simply gone. Neither the `"native"` grain,
 #' whose bin is the reading itself, nor a supplied calendar, which declares its own bin lengths,
-#' is held to the second rule.
+#' is held to the second rule. [coverage()] lays the same binning out as a count of readings per
+#' unit and bin, which is where a refused record's gaps are read off.
 #'
 #' @section Partial bins:
 #' A bin is partial when the record does not cover its whole calendar span. Which bins those are
@@ -305,7 +306,8 @@ print.timesift_matrix <- function(x, ...) {
 }
 
 .check_readings <- function(unit, when, instant, reading, id_col, time_col, value_col) {
-  missing <- c(id_col, time_col, value_col)[c(anyNA(unit), anyNA(when), anyNA(reading))]
+  holes <- c(anyNA(unit), anyNA(when), !is.null(reading) && anyNA(reading))
+  missing <- c(id_col, time_col, value_col)[holes]
   if (length(missing)) {
     stop("missing values in ", paste(sprintf("`%s`", missing), collapse = " and "),
          ". Fill or drop them before building a representation.", call. = FALSE)

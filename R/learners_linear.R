@@ -1,9 +1,13 @@
-#' Penalised logistic regression on the flattened representation
+#' Penalised regression on the flattened representation
 #'
 #' One elastic net per variable, over every bin-by-channel column of the representation and, by
 #' default, their squares. There is no discrete selection step: the penalty path uses every column
 #' and shrinks, and the penalty itself is chosen by an inner cross-validation on the fitting units,
 #' so nothing about the model is decided outside the fold it is fitted in.
+#'
+#' The family is the response head's: a binary cross-entropy loss fits a logistic model and a
+#' squared-error loss a linear one, so the learner is the same under a presence-absence head and
+#' under a continuous one.
 #'
 #' This is the aggregate-feature side of the comparison the package was built for, and it is the
 #' fair opponent for a network: a per-fold discrete selector pays selection variance a network
@@ -17,7 +21,8 @@
 #'   second-order polynomial term would.
 #' @param s Which penalty of the inner path to predict at.
 #' @param weight_positives Weight presences by the ratio of absences to presences among the
-#'   fitting units, so a rare variable is not fitted away.
+#'   fitting units, so a rare variable is not fitted away. Read under a presence-absence head
+#'   only.
 #' @param seed Seed for the inner cross-validation's fold draw, which is random and would otherwise
 #'   make the fit irreproducible.
 #'
@@ -35,19 +40,22 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
     needs = "glmnet",
     params = list(alpha = alpha, n_inner = n_inner, squares = squares, s = s,
                   weight_positives = weight_positives, seed = seed),
-    fit = function(x, y, alpha, n_inner, squares, s, weight_positives, seed, ...) {
+    fit = function(x, y, alpha, n_inner, squares, s, weight_positives, seed, head, ...) {
+      family <- .head_family(head)
       m <- .design(x, squares)
       old <- .seed_state()
       on.exit(.restore_seed(old), add = TRUE)
-      set.seed(seed)
+      seeds <- .variable_seeds(seed, y)
       models <- lapply(seq_len(ncol(y)), function(j) {
         yj <- y[, j]
         if (length(unique(yj)) < 2L) {
           return(mean(yj))
         }
-        w <- if (weight_positives) .imbalance_weights(yj) else rep(1, length(yj))
+        set.seed(seeds[j])
+        w <- if (weight_positives && family == "binomial") .imbalance_weights(yj)
+             else rep(1, length(yj))
         tryCatch(
-          glmnet::cv.glmnet(m, yj, family = "binomial", alpha = alpha, weights = w,
+          glmnet::cv.glmnet(m, yj, family = family, alpha = alpha, weights = w,
                             nfolds = n_inner, type.measure = "deviance"),
           error = function(e) mean(yj)
         )
@@ -70,10 +78,11 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
 
 #' Forward selection by AIC on the flattened representation
 #'
-#' One logistic regression per variable, its predictors chosen by forward selection over every
+#' One generalised linear model per variable, its predictors chosen by forward selection over every
 #' bin-by-channel column, admitting a column while it lowers AIC and stopping at a fixed budget.
 #' Each candidate enters as an orthogonal polynomial, so a term can be non-monotone in the reading
-#' the way a niche optimum is.
+#' the way a niche optimum is. The family is the response head's: logistic under a binary
+#' cross-entropy loss, Gaussian under a squared-error one.
 #'
 #' Selection happens inside whichever units the learner is handed, so under [grain_ladder()] it is
 #' redone in every fold. That is the footing the other learners are fitted on. Reported beside a
@@ -95,10 +104,13 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L) {
     name = "stepwise",
     data = data, reads = "tabular", multi = "separate",
     params = list(max_terms = max_terms, degree = degree),
-    fit = function(x, y, max_terms, degree, ...) {
+    fit = function(x, y, max_terms, degree, head, ...) {
+      family <- .head_family(head)
       m <- .flatten(x)
-      models <- lapply(seq_len(ncol(y)), function(j) .forward_aic(m, y[, j], max_terms, degree))
-      list(models = models, columns = colnames(m), degree = degree)
+      models <- lapply(seq_len(ncol(y)), function(j) {
+        .forward_aic(m, y[, j], max_terms, degree, family)
+      })
+      list(models = models, columns = colnames(m), degree = degree, family = family)
     },
     predict = function(model, x) {
       m <- .flatten(x)
@@ -114,13 +126,14 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L) {
 
 # Forward selection by AIC, one column admitted at a time. The polynomial basis is stored with the
 # fit rather than rebuilt, because an orthogonal basis refitted on new units is a different basis.
-.forward_aic <- function(m, y, max_terms, degree) {
+.forward_aic <- function(m, y, max_terms, degree, family) {
   if (length(unique(y)) < 2L) {
     return(list(constant = mean(y)))
   }
+  link <- .glm_family(family)
   chosen <- integer(0)
   bases <- list()
-  best_aic <- stats::glm(y ~ 1, family = stats::binomial())$aic
+  best_aic <- stats::glm(y ~ 1, family = link)$aic
   repeat {
     if (length(chosen) >= max_terms) {
       break
@@ -130,7 +143,7 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L) {
     for (j in setdiff(seq_len(ncol(m)), chosen)) {
       b <- .poly_basis(m[, j], degree)
       d <- .design_frame(c(bases, list(b)))
-      fit <- tryCatch(stats::glm(y ~ ., data = d, family = stats::binomial()),
+      fit <- tryCatch(stats::glm(y ~ ., data = d, family = link),
                       error = function(e) NULL, warning = function(w) NULL)
       if (!is.null(fit) && is.finite(fit$aic)) {
         gains[j] <- fit$aic

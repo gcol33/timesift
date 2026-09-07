@@ -1,3 +1,16 @@
+# timesift 0.1.1
+
+A response is fitted under a seed of its own, taken from its name. A learner that covers the
+responses one at a time is handed one column per call, so a seed spent from one shared stream made
+a response's fit depend on which responses were fitted before it, and a seed read off the column's
+position inside its own call gave every response the same one. Either way the model of a response
+depended on how the columns were batched, and `elasticnet()` and `forest()` both did. They no
+longer do: fitting a response alone, or beside others, or in a different order, gives the same
+model, which `tests/testthat/test-variable-seeds.R` holds to.
+
+This changes the numbers `elasticnet()` and `forest()` produce. `stepwise()` spends no randomness
+and the neural learners cover the responses jointly, so neither moves.
+
 # timesift 0.1.0
 
 `timesift()` is the whole entry point. A table of targets, a table of time-stamped series belonging

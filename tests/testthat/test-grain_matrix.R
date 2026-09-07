@@ -323,3 +323,36 @@ test_that("channels are joined in the order they are given", {
   other <- grain_matrix(d, plot, t, temp, grain = "month")
   expect_error(bind_channels(x, other), "different units or bins")
 })
+
+test_that("coverage lays a refused record's gaps out as zeros, unit by unit and bin by bin", {
+  d <- hourly_series(hours = 24 * 40)
+  # Unit b loses the calendar week beginning Monday 6 September; the record still spans it.
+  lost <- d$plot == "b" & d$t >= as.POSIXct("2021-09-06", tz = "UTC") &
+    d$t < as.POSIXct("2021-09-13", tz = "UTC")
+  cov <- coverage(d[!lost, ], plot, t, grain = "week")
+  expect_s3_class(cov, "timesift_coverage")
+  expect_equal(dim(cov), c(2L, 6L))
+  expect_equal(unname(unclass(cov)["b", ]), c(120L, 0L, 168L, 168L, 168L, 168L))
+  expect_equal(unname(unclass(cov)["a", ]), c(120L, 168L, 168L, 168L, 168L, 168L))
+  expect_equal(attr(cov, "grain"), "week")
+  expect_output(print(cov), "1 empty (unit, bin) cell in 1 unit: b", fixed = TRUE)
+  expect_error(grain_matrix(d[!lost, ], plot, t, temp, grain = "week"), "coverage() lists", fixed = TRUE)
+
+  # A week no unit reaches is not a bin the reduction would build, so coverage builds it: a
+  # column of zeros where the calendar says the week was.
+  skipped <- d$t >= as.POSIXct("2021-09-13", tz = "UTC") & d$t < as.POSIXct("2021-09-20", tz = "UTC")
+  cov <- coverage(d[!skipped, ], plot, t, grain = "week")
+  expect_equal(dim(cov), c(2L, 6L))
+  expect_equal(unname(colSums(unclass(cov)) == 0L), c(FALSE, FALSE, TRUE, FALSE, FALSE, FALSE))
+  expect_equal(colnames(cov)[3L], "2021-09-13T00:00:00Z")
+  expect_output(print(cov), "1 bin no unit reaches: 2021-09-13T00:00:00Z")
+  expect_error(grain_matrix(d[!skipped, ], plot, t, temp, grain = "week"), "not contiguous")
+
+  # A full record is full, and agrees with what the reduction counted.
+  full <- coverage(d, plot, t, grain = "week")
+  expect_output(print(full), "every unit reaches every bin")
+  expect_equal(unclass(full), attr(grain_matrix(d, plot, t, temp, grain = "week"), "bin_n"),
+               ignore_attr = TRUE)
+  expect_equal(dim(coverage(d, plot, t, grain = "native")), c(2L, 24L * 40L))
+  expect_error(coverage(d, plot, t, grain = c("day", "week")), "one grain at a time")
+})

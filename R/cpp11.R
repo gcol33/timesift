@@ -4,6 +4,10 @@ ts_reduce_ <- function(unit, value, when, local, custom, unit_names, grain, year
   .Call(`_timesift_ts_reduce_`, unit, value, when, local, custom, unit_names, grain, year_month, year_day, stats, sampling_step)
 }
 
+ts_coverage_ <- function(unit, local, custom, unit_names, grain, year_month, year_day) {
+  .Call(`_timesift_ts_coverage_`, unit, local, custom, unit_names, grain, year_month, year_day)
+}
+
 ts_reduce_lookbacks_ <- function(unit, value, local, unit_names, target_unit, target_at, target_names, span, lag, bins, stats) {
   .Call(`_timesift_ts_reduce_lookbacks_`, unit, value, local, unit_names, target_unit, target_at, target_names, span, lag, bins, stats)
 }

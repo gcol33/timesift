@@ -219,3 +219,49 @@ test_that("predicting a single unit returns one row and not one column", {
     expect_identical(rownames(p), dimnames(x)[[1L]][1L])
   }
 })
+
+test_that("the per-response learners fit the family the response head's loss names", {
+  skip_if_not_installed("glmnet")
+  skip_if_not_installed("ranger")
+  withr::defer(.responses_reg$remove("continuous_test"))
+  register_response("continuous_test", list(
+    prepare = function(y) .as_response(y), activation = "identity",
+    loss = "squared_error", metric = "roc_auc",
+    cells = function(y, folds) scorable_cells(y > stats::median(y), folds)),
+    overwrite = TRUE)
+  sim <- sim_series(n_unit = 40L, days = 60L, seed = 91L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
+  level <- 10 + 3 * scale(rowMeans(x[, , 1L]))[, 1L]
+  y <- matrix(level, ncol = 1L, dimnames = list(dimnames(x)[[1L]], "height"))
+  for (l in list(elasticnet(squares = FALSE), forest(trees = 100L), stepwise(max_terms = 1L))) {
+    fit <- fit_learner(l, x, y, response = "continuous_test")
+    p <- stats::predict(fit, x)
+    expect_true(all(p > 1), info = l$name)
+    expect_gt(stats::cor(p[, 1L], y[, 1L]), 0.8, label = l$name)
+  }
+  expect_equal(fit_learner(forest(trees = 20L), x, y, response = "continuous_test")$model$family,
+               "gaussian")
+  expect_equal(fit_learner(stepwise(max_terms = 1L), x, y, response = "continuous_test")$model$family,
+               "gaussian")
+
+  withr::defer(.responses_reg$remove("poisson_test"))
+  register_response("poisson_test", list(
+    prepare = function(y) .as_response(y), activation = "exp", loss = "poisson",
+    metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)),
+    overwrite = TRUE)
+  expect_error(fit_learner(stepwise(), x, y, response = "poisson_test"), "no family for the poisson")
+})
+
+test_that("a learner's fit is handed the head only where it declares one", {
+  seen <- NULL
+  plain <- learner("plain", fit = function(x, y, ...) { seen <<- names(list(...)); 1 },
+                   predict = function(model, x) matrix(0.5, nrow = dim(x)[1L], ncol = 1L))
+  sim <- sim_series(n_unit = 10L, days = 20L, seed = 92L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
+  y <- sim_response(sim, n_var = 1L, seed = 93L)
+  fit_learner(plain, x, y)
+  expect_false("head" %in% seen)
+  aware <- learner("aware", fit = function(x, y, head, ...) head$loss,
+                   predict = function(model, x) matrix(0.5, nrow = dim(x)[1L], ncol = 1L))
+  expect_equal(fit_learner(aware, x, y)$model, "binary_cross_entropy")
+})

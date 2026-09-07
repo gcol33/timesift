@@ -1,13 +1,15 @@
 #' Random forest on the flattened representation
 #'
-#' One probability forest per response, over every bin-by-channel column of the representation.
-#' Trees split on one column at a time and pay nothing for columns that carry nothing, so a forest
-#' reads a wide tabular representation without a penalty path and without a selection step, and it
-#' finds an interaction between two bins that a linear model would need the product term for.
+#' One forest per response, over every bin-by-channel column of the representation: a probability
+#' forest under a presence-absence head and a regression forest under a head with a squared-error
+#' loss. Trees split on one column at a time and pay nothing for columns that carry nothing, so a
+#' forest reads a wide tabular representation without a penalty path and without a selection step,
+#' and it finds an interaction between two bins that a linear model would need the product term
+#' for.
 #'
-#' Presences are up-weighted in the bootstrap draw by the ratio of absences to presences among the
-#' fitting targets, the same weighting the penalised fit uses, so a rare response is not fitted away
-#' by either of them for a reason the other does not share.
+#' Under a presence-absence head, presences are up-weighted in the bootstrap draw by the ratio of
+#' absences to presences among the fitting targets, the same weighting the penalised fit uses, so a
+#' rare response is not fitted away by either of them for a reason the other does not share.
 #'
 #' @inheritParams elasticnet
 #' @param trees Trees in the forest.
@@ -29,20 +31,27 @@ forest <- function(data = NULL, trees = 500L, mtry = NULL, min_node = 1L, seed =
     needs = "ranger",
     params = list(trees = as.integer(trees), mtry = mtry, min_node = as.integer(min_node),
                   seed = as.integer(seed)),
-    fit = function(x, y, trees, mtry, min_node, seed, ...) {
+    fit = function(x, y, trees, mtry, min_node, seed, head, ...) {
+      family <- .head_family(head)
       m <- .flatten(x)
       try_columns <- if (is.null(mtry)) max(1L, floor(sqrt(ncol(m)))) else as.integer(mtry)
+      seeds <- .variable_seeds(seed, y)
       models <- lapply(seq_len(ncol(y)), function(j) {
         yj <- y[, j]
         if (length(unique(yj)) < 2L) {
           return(mean(yj))
         }
-        ranger::ranger(x = m, y = factor(yj, levels = c(0, 1)), num.trees = trees,
-                       mtry = try_columns, min.node.size = min_node, probability = TRUE,
-                       case.weights = .imbalance_weights(yj), num.threads = 1L,
-                       seed = seed + j)
+        if (family == "binomial") {
+          ranger::ranger(x = m, y = factor(yj, levels = c(0, 1)), num.trees = trees,
+                         mtry = try_columns, min.node.size = min_node, probability = TRUE,
+                         case.weights = .imbalance_weights(yj), num.threads = 1L,
+                         seed = seeds[j])
+        } else {
+          ranger::ranger(x = m, y = yj, num.trees = trees, mtry = try_columns,
+                         min.node.size = min_node, num.threads = 1L, seed = seeds[j])
+        }
       })
-      list(models = models, columns = colnames(m))
+      list(models = models, columns = colnames(m), family = family)
     },
     predict = function(model, x) {
       m <- .flatten(x)
@@ -52,10 +61,10 @@ forest <- function(data = NULL, trees = 500L, mtry = NULL, min_node = 1L, seed =
       }
       .as_predictions(vapply(model$models, function(f) {
         if (is.numeric(f)) {
-          rep(f, nrow(m))
-        } else {
-          as.numeric(stats::predict(f, data = m, num.threads = 1L)$predictions[, "1"])
+          return(rep(f, nrow(m)))
         }
+        p <- stats::predict(f, data = m, num.threads = 1L)$predictions
+        as.numeric(if (model$family == "binomial") p[, "1"] else p)
       }, numeric(nrow(m))), nrow(m))
     }
   )

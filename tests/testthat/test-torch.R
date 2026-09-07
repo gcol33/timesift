@@ -46,14 +46,130 @@ test_that("the stack still runs where the record is one bin per year", {
   }
 })
 
-test_that("standardisation is computed on the units the learner was handed", {
+test_that("standardisation is per channel and computed on the units the learner was handed", {
   skip_if_no_torch()
   f <- torch_fixture(n_unit = 24L, days = 60L)
   half <- seq_len(12L)
   fit <- fit_learner(cnn(epochs = 2L), .subset_units(f$x, half),
                      f$y[half, , drop = FALSE])
-  expect_equal(fit$model$scaler$centre[1L], mean(as.numeric(f$x[half, , ])))
-  expect_false(isTRUE(all.equal(fit$model$scaler$centre[1L], mean(as.numeric(f$x)))))
+  expect_equal(unname(fit$model$scaler$centre),
+               vapply(1:3, function(k) mean(f$x[half, , k]), numeric(1L)))
+  expect_equal(unname(fit$model$scaler$scale),
+               vapply(1:3, function(k) stats::sd(f$x[half, , k]), numeric(1L)))
+  expect_false(isTRUE(all.equal(fit$model$scaler$centre[[1L]], mean(f$x[, , 1L]))))
+})
+
+test_that("a static predictor appended as a channel is put on the readings' footing", {
+  skip_if_no_torch()
+  f <- torch_fixture(n_unit = 24L, days = 60L)
+  elevation <- matrix(2000 + 500 * seq_len(24L), ncol = 1L,
+                      dimnames = list(dimnames(f$x)[[1L]], "elevation"))
+  x <- .append_static(f$x, elevation)
+  fit <- fit_learner(cnn(epochs = 2L), x, f$y)
+  # Standardising every channel by one global scale would crush the readings to a constant
+  # beside metres of elevation; per channel, the readings keep their spread.
+  scaled <- .scale_channels(.to_nchw(x), fit$model$scaler)
+  expect_gt(stats::sd(scaled[, 1L, ]), 0.5)
+  expect_equal(unname(fit$model$scaler$centre[[4L]]), mean(elevation))
+  expect_true(all(is.finite(stats::predict(fit, x))))
+})
+
+test_that("a snapshot of the weights is a copy and not the storage the optimiser updates", {
+  skip_if_no_torch()
+  torch <- .torch()
+  net <- torch$nn_linear(3L, 1L)
+  before <- .snapshot(net)
+  opt <- torch$optim_adamw(net$parameters, lr = 0.1)
+  for (i in 1:3) {
+    opt$zero_grad()
+    net(torch$torch_randn(8L, 3L))$pow(2)$mean()$backward()
+    opt$step()
+  }
+  expect_false(isTRUE(all.equal(as.numeric(before$weight), as.numeric(net$weight))))
+  net$load_state_dict(before)
+  expect_equal(as.numeric(net$weight), as.numeric(before$weight))
+})
+
+test_that("early stopping restores the best epoch rather than the last one", {
+  skip_if_no_torch()
+  f <- torch_fixture(n_unit = 30L, days = 60L)
+  # One epoch is fitted, and then the same first epoch followed by more under a learning rate this
+  # large, stopping after one epoch without improvement. The weights the second fit restores are
+  # either epoch one's, which is the first fit, or a later epoch's that did better on the inner
+  # validation loss; the last epoch's, which is what a snapshot aliasing the live weights hands
+  # back, would be worse.
+  one <- fit_learner(mlp(epochs = 1L, learning_rate = 0.5, seed = 2L, val_frac = 0.3), f$x, f$y)
+  stopped <- fit_learner(mlp(epochs = 12L, early_stopping = 1L, learning_rate = 0.5, seed = 2L,
+                             val_frac = 0.3), f$x, f$y)
+  set.seed(2L)
+  val <- .validation_split(f$y, 0.3)
+  fit_idx <- setdiff(seq_len(nrow(f$y)), val)
+  pos <- colSums(f$y[fit_idx, ])
+  w <- pmin(pmax(ifelse(pos > 0, (length(fit_idx) - pos) / pmax(pos, 1), 1), 1), 50)
+  loss <- function(fit) {
+    p <- pmin(pmax(stats::predict(fit, f$x)[val, , drop = FALSE], 1e-6), 1 - 1e-6)
+    yv <- f$y[val, , drop = FALSE]
+    -mean(sweep(yv * log(p), 2L, w, "*") + (1 - yv) * log(1 - p))
+  }
+  expect_lte(loss(stopped), loss(one) * (1 + 1e-5))
+})
+
+test_that("a fitted encoder survives saveRDS() and predicts the same after readRDS()", {
+  skip_if_no_torch()
+  f <- torch_fixture(n_unit = 24L, days = 60L)
+  fit <- fit_learner(rescnn(epochs = 2L, channels = c(8L, 16L)), f$x, f$y)
+  p <- stats::predict(fit, f$x)
+  path <- tempfile(fileext = ".rds")
+  on.exit(unlink(path), add = TRUE)
+  saveRDS(fit, path)
+  back <- readRDS(path)
+  expect_equal(stats::predict(back, f$x), p)
+  expect_true(all(vapply(back$model$state, function(e) is.numeric(e$values), logical(1L))))
+})
+
+test_that("the encoders train under the loss the response head names", {
+  skip_if_no_torch()
+  f <- torch_fixture(n_unit = 40L, days = 60L)
+  withr::defer(.responses_reg$remove("continuous_test"))
+  register_response("continuous_test", list(
+    prepare = function(y) .as_response(y), activation = "identity",
+    loss = "squared_error", metric = "roc_auc",
+    cells = function(y, folds) scorable_cells(y > stats::median(y), folds)),
+    overwrite = TRUE)
+  level <- 3 * scale(rowMeans(f$x[, , "mean"]))[, 1L]
+  y <- matrix(level, ncol = 1L, dimnames = list(dimnames(f$x)[[1L]], "height"))
+  fit <- fit_learner(mlp(epochs = 80L, learning_rate = 0.01, seed = 3L, val_frac = 0), f$x, y,
+                     response = "continuous_test")
+  p <- stats::predict(fit, f$x)
+  expect_equal(fit$model$activation, "identity")
+  expect_true(any(abs(p) > 1))
+  expect_gt(stats::cor(p[, 1L], y[, 1L]), 0.8)
+})
+
+test_that("a loss the encoders do not know is refused by name", {
+  skip_if_no_torch()
+  f <- torch_fixture(n_unit = 20L, days = 40L)
+  withr::defer(.responses_reg$remove("poisson_test"))
+  register_response("poisson_test", list(
+    prepare = function(y) .as_response(y), activation = "exp", loss = "poisson",
+    metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)),
+    overwrite = TRUE)
+  expect_error(fit_learner(cnn(epochs = 1L), f$x, f$y, response = "poisson_test"),
+               "do not train under the poisson loss")
+})
+
+test_that("the averaged weights' batch-norm statistics are the plain mean over the pass", {
+  skip_if_no_torch()
+  torch <- .torch()
+  net <- torch$nn_sequential(torch$nn_batch_norm1d(2L))
+  xt <- torch$torch_randn(20L, 2L, 5L) * 4 + 7
+  # Leave stale statistics behind, as the last epoch of training does.
+  net$train()
+  net(xt[1:10, , ] * 0 - 100)
+  .refresh_batchnorm(torch, net, xt, seq_len(20L), 5L, "cpu")
+  expect_equal(as.numeric(net[[1L]]$running_mean),
+               as.numeric(xt$mean(dim = c(1L, 3L))), tolerance = 1e-5)
+  expect_equal(net[[1L]]$momentum, 0.1)
 })
 
 test_that("an encoder refuses a representation it was not fitted on", {
@@ -104,10 +220,13 @@ test_that("a setting the learner does not have is refused rather than ignored", 
 test_that("the run's control trains the encoder and the encoder's own control overrides it", {
   skip_if_no_torch()
   f <- torch_fixture(n_unit = 20L, days = 40L)
-  run <- train_control(epochs = 6L, batch_size = 8L)
+  # No inner validation, so the six-epoch fit is the sixth epoch and not whichever epoch of the
+  # six an inner split happened to prefer, which on twenty units can be the first.
+  run <- train_control(epochs = 6L, batch_size = 8L, val_frac = 0)
   # The learner names one setting, so that one moves and batch_size still comes from the run.
   own <- fit_learner(cnn(epochs = 1L), f$x, f$y, control = run)
-  short <- fit_learner(cnn(), f$x, f$y, control = train_control(epochs = 1L, batch_size = 8L))
+  short <- fit_learner(cnn(), f$x, f$y,
+                       control = train_control(epochs = 1L, batch_size = 8L, val_frac = 0))
   long <- fit_learner(cnn(), f$x, f$y, control = run)
   expect_equal(stats::predict(own, f$x), stats::predict(short, f$x))
   expect_false(isTRUE(all.equal(stats::predict(own, f$x), stats::predict(long, f$x))))
@@ -125,16 +244,41 @@ test_that("a learner with no training settings of its own is never handed a cont
 
 test_that("the device is resolved once, from the control", {
   skip_if_no_torch()
-  expect_true(.torch_device("auto") %in% c("cuda", "cpu"))
+  expect_true(.torch_device("auto") %in% c("cuda", "mps", "cpu"))
   expect_equal(.torch_device("cpu"), "cpu")
   expect_equal(train_control()$device, "auto")
 })
 
+test_that("the inner validation set is drawn from every level of the response", {
+  set.seed(1)
+  y <- cbind(c(rep(1, 6), rep(0, 54)), 0)
+  for (i in 1:20) {
+    val <- .validation_split(y, 1 / 6)
+    expect_length(val, 10L)
+    # Six presences among sixty units and ten validation units: the last of the ten strata is
+    # the six presences alone, so every draw carries exactly one presence into the validation
+    # set, where a plain draw of ten would miss them all about a third of the time.
+    expect_equal(sum(y[val, 1L]), 1)
+  }
+  expect_length(.validation_split(y, 0), 0L)
+  expect_length(.validation_split(y[1:2, , drop = FALSE], 0.5), 0L)
+})
+
+test_that("the control ranges are the ones the Python side checks", {
+  expect_error(train_control(pos_weight_cap = 0.5), "at least 1")
+  expect_error(train_control(swa_start = 1), "under 1")
+  expect_equal(train_control(swa_start = 0)$swa_start, 0)
+})
+
 test_that("no training batch holds one row, which batch normalisation cannot standardise", {
   for (n in c(17L, 20L, 33L, 65L)) {
-    expect_true(all(lengths(.batches(seq_len(n), 8L, shuffle = FALSE)) > 1L))
+    sizes <- lengths(.batches(seq_len(n), 8L, shuffle = FALSE))
+    expect_true(all(sizes > 1L & sizes <= 8L))
   }
   expect_equal(sort(unlist(.batches(seq_len(17L), 8L, shuffle = FALSE), use.names = FALSE)), 1:17)
+  # Three rows under a batch size of two would cut into two and one; they stay one batch.
+  expect_equal(lengths(.batches(1:3, 2L, shuffle = FALSE), use.names = FALSE), 3L)
+  expect_equal(lengths(.batches(1:65, 64L, shuffle = FALSE), use.names = FALSE), c(33L, 32L))
   skip_if_no_torch()
   # Twenty units and a fifteenth held back leaves seventeen to fit on, which fixed-length batches
   # of eight would cut into eight, eight and one.

@@ -22,7 +22,17 @@
 #'
 #' The three constructors carry architecture. How that architecture is trained is
 #' [train_control()], which the run supplies; a setting named in `...` here overrides the run's
-#' control for this learner alone.
+#' control for this learner alone. What the head is trained toward is the response head's: its
+#' `loss` is the training objective and its `activation` the output transform, so a head registered
+#' with a squared-error loss and an identity activation trains the same encoders on a continuous
+#' response.
+#'
+#' Every channel is standardised by its own centre and scale, computed over every unit and bin of
+#' the fitting units, so a static predictor appended as a channel sits on the same footing as a
+#' reading whatever its units are.
+#'
+#' A fitted encoder holds its weights as plain arrays and rebuilds the network when it predicts, so
+#' a fit saved with [saveRDS()] predicts after [readRDS()] in a fresh session.
 #'
 #' @inheritParams elasticnet
 #' @param channels Channel width of each stage.
@@ -71,7 +81,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 }
 
 # One learner factory for every encoder: the architecture is a module constructor and nothing else,
-# so the training recipe, the standardiser, the class weighting and the early stopping have one
+# so the training recipe, the standardiser, the objective and the early stopping have one
 # definition and cannot drift between architectures.
 .torch_learner <- function(name, module_fn, data, reads, arch, control) {
   learner(
@@ -79,7 +89,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
     data = data, reads = reads, multi = "joint", control = control,
     needs = "torch",
     params = arch,
-    fit = function(x, y, control, ...) {
+    fit = function(x, y, control, head, ...) {
       given <- list(...)
       unknown <- setdiff(names(given), c(names(arch), .control_names()))
       if (length(unknown)) {
@@ -91,21 +101,59 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
                  .resolve_control(control,
                                   .given_control(given[intersect(names(given),
                                                                  .control_names())],
-                                                 paste("the", name, "learner"))))
+                                                 paste("the", name, "learner"))),
+                 head)
     },
     predict = function(model, x) .torch_predict(model, x)
   )
 }
 
+# ---- the objective -------------------------------------------------------------------------
+
+# The response head names its loss and its activation, and the trainer looks both up here. A loss
+# is built once per fit from the fitting responses, which is where the positive-class weight of the
+# binary objective comes from; an activation is applied at prediction and nowhere else.
+.torch_losses <- list(
+  binary_cross_entropy = function(torch, y_fit, cfg, device) {
+    pos <- colSums(y_fit)
+    neg <- nrow(y_fit) - pos
+    w <- pmin(pmax(ifelse(pos > 0, neg / pmax(pos, 1), 1), 1), cfg$pos_weight_cap)
+    pw <- torch$torch_tensor(w, dtype = torch$torch_float())$to(device = device)
+    function(out, target) {
+      torch$nnf_binary_cross_entropy_with_logits(out, target, pos_weight = pw)
+    }
+  },
+  squared_error = function(torch, y_fit, cfg, device) {
+    function(out, target) torch$nnf_mse_loss(out, target)
+  }
+)
+
+.torch_activations <- list(
+  sigmoid = function(torch, out) torch$torch_sigmoid(out),
+  identity = function(torch, out) out
+)
+
+.torch_objective <- function(head) {
+  if (!is.character(head$loss) || !head$loss %in% names(.torch_losses)) {
+    stop("the encoders do not train under the ", .describe(head$loss), " loss. They know ",
+         paste(names(.torch_losses), collapse = " and "), ".", call. = FALSE)
+  }
+  if (!is.character(head$activation) || !head$activation %in% names(.torch_activations)) {
+    stop("the encoders have no ", .describe(head$activation), " activation. They know ",
+         paste(names(.torch_activations), collapse = " and "), ".", call. = FALSE)
+  }
+  list(loss = .torch_losses[[head$loss]], activation = head$activation)
+}
+
 # ---- the training recipe -------------------------------------------------------------------
 
-.torch_fit <- function(x, y, module_fn, arch, cfg) {
+.torch_fit <- function(x, y, module_fn, arch, cfg, head) {
   torch <- .torch()
   device <- .torch_device(cfg$device)
+  objective <- .torch_objective(head)
 
-  m <- .to_nchw(x)
-  scaler <- .scaler(matrix(as.numeric(m), nrow = dim(m)[1L]), per_column = FALSE)
-  m <- (m - scaler$centre[1L]) / scaler$scale[1L]
+  scaler <- .channel_scaler(x)
+  m <- .scale_channels(.to_nchw(x), scaler)
 
   n <- dim(m)[1L]
   old <- .seed_state()
@@ -113,19 +161,15 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   set.seed(cfg$seed)
   torch$torch_manual_seed(cfg$seed)
 
-  n_val <- max(1L, round(cfg$val_frac * n))
-  val <- if (cfg$val_frac > 0 && n - n_val >= 2L) sample.int(n, n_val) else integer(0)
+  val <- .validation_split(y, cfg$val_frac)
   fit_idx <- setdiff(seq_len(n), val)
 
   xt <- torch$torch_tensor(m, dtype = torch$torch_float())$to(device = device)
   yt <- torch$torch_tensor(y, dtype = torch$torch_float())$to(device = device)
+  loss_fn <- objective$loss(torch, y[fit_idx, , drop = FALSE], cfg, device)
 
-  pos <- colSums(y[fit_idx, , drop = FALSE])
-  neg <- length(fit_idx) - pos
-  w <- pmin(pmax(ifelse(pos > 0, neg / pmax(pos, 1), 1), 1), cfg$pos_weight_cap)
-  pw <- torch$torch_tensor(w, dtype = torch$torch_float())$to(device = device)
-
-  net <- module_fn(in_ch = dim(m)[2L], in_len = dim(m)[3L], n_out = ncol(y), arch = arch)
+  shape <- c(dim(m)[2L], dim(m)[3L], ncol(y))
+  net <- .torch_build(module_fn, shape, arch)
   net$to(device = device)
   opt <- torch$optim_adamw(net$parameters, lr = cfg$learning_rate,
                            weight_decay = cfg$weight_decay)
@@ -140,8 +184,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
     for (b in .batches(fit_idx, cfg$batch_size, shuffle = TRUE)) {
       idx <- .index(torch, b, device)
       opt$zero_grad()
-      loss <- torch$nnf_binary_cross_entropy_with_logits(
-        net(xt[idx, , ]), yt[idx, ], pos_weight = pw)
+      loss <- loss_fn(net(xt[idx, , ]), yt[idx, ])
       loss$backward()
       opt$step()
     }
@@ -154,9 +197,9 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
     if (!length(val)) {
       next
     }
-    vloss <- .torch_loss(torch, net, xt, yt, val, pw, cfg$batch_size, device)
+    vloss <- .torch_loss(torch, net, loss_fn, xt, yt, val, cfg$batch_size, device)
     if (vloss < best$loss - 1e-4) {
-      best <- list(loss = vloss, state = lapply(net$state_dict(), function(p) p$detach()$cpu()))
+      best <- list(loss = vloss, state = .snapshot(net))
       bad <- 0L
     } else {
       bad <- bad + 1L
@@ -174,8 +217,12 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
     net$to(device = device)
   }
   net$eval()
-  structure(list(net = net, scaler = scaler, device = device, channels = dimnames(x)[[3L]],
-                 bins = dim(x)[2L], batch_size = cfg$batch_size),
+  # The weights leave here as plain arrays rather than as a live network, so the fit is an R object
+  # through and through: it serialises, it copies and it predicts in a session that has never seen
+  # the network that produced it.
+  structure(list(module_fn = module_fn, arch = arch, shape = shape, state = .state_arrays(net),
+                 scaler = scaler, device = cfg$device, activation = objective$activation,
+                 channels = dimnames(x)[[3L]], bins = dim(x)[2L], batch_size = cfg$batch_size),
             class = "timesift_torch")
 }
 
@@ -185,37 +232,62 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
     stop("the representation predicted on has different channels or bins from the fitted one.",
          call. = FALSE)
   }
-  m <- (.to_nchw(x) - model$scaler$centre[1L]) / model$scaler$scale[1L]
-  xt <- torch$torch_tensor(m, dtype = torch$torch_float())$to(device = model$device)
+  device <- .torch_device(model$device)
+  net <- .torch_restore(torch, model, device)
+  activation <- .torch_activations[[model$activation]]
+  m <- .scale_channels(.to_nchw(x), model$scaler)
+  xt <- torch$torch_tensor(m, dtype = torch$torch_float())$to(device = device)
   out <- vector("list", 0L)
   torch$with_no_grad({
     for (b in .batches(seq_len(dim(m)[1L]), model$batch_size, shuffle = FALSE)) {
-      idx <- .index(torch, b, model$device)
-      out[[length(out) + 1L]] <- as.matrix(
-        torch$torch_sigmoid(model$net(xt[idx, , ]))$to(device = "cpu"))
+      idx <- .index(torch, b, device)
+      out[[length(out) + 1L]] <- as.matrix(activation(torch, net(xt[idx, , ]))$to(device = "cpu"))
     }
   })
   do.call(rbind, out)
 }
 
-.torch_loss <- function(torch, net, xt, yt, idx_all, pw, batch_size, device) {
+.torch_loss <- function(torch, net, loss_fn, xt, yt, idx_all, batch_size, device) {
   net$eval()
   total <- 0
   torch$with_no_grad({
     for (b in .batches(idx_all, batch_size, shuffle = FALSE)) {
       idx <- .index(torch, b, device)
-      total <- total + as.numeric(torch$nnf_binary_cross_entropy_with_logits(
-        net(xt[idx, , ]), yt[idx, ], pos_weight = pw)$to(device = "cpu")) * length(b)
+      total <- total + as.numeric(loss_fn(net(xt[idx, , ]), yt[idx, ])$to(device = "cpu")) *
+        length(b)
     }
   })
   total / length(idx_all)
+}
+
+# The inner validation set, one unit drawn from each of `n_val` equal-count strata of the response
+# total, so the split carries every level of the response in proportion. A plain random draw from
+# a rare response can leave the fitting units with no presence to learn from, and the validation
+# loss it early-stops on is then read off nothing.
+.validation_split <- function(y, val_frac) {
+  n <- nrow(y)
+  n_val <- max(1L, as.integer(round(val_frac * n)))
+  if (val_frac <= 0 || n - n_val < 2L) {
+    return(integer(0))
+  }
+  ranked <- order(rowSums(y), sample.int(n), method = "radix")
+  stratum <- ceiling(seq_len(n) * n_val / n)
+  sort(vapply(split(ranked, stratum), function(members) {
+    if (length(members) == 1L) members else sample(members, 1L)
+  }, integer(1L)), method = "radix")
+}
+
+# A copy of the weights as they stand. Detaching a tensor on the CPU returns the storage the
+# optimiser goes on updating, so without the clone a snapshot would follow the live weights.
+.snapshot <- function(net) {
+  lapply(net$state_dict(), function(p) p$detach()$cpu()$clone())
 }
 
 # A running mean of the weights over the tail epochs. Averaging flattens the minimum the optimiser
 # settled in, which is a lever on generalisation orthogonal to the architecture and to averaging
 # several fitted models at prediction time.
 .accumulate <- function(net, average) {
-  state <- lapply(net$state_dict(), function(p) p$detach()$cpu())
+  state <- .snapshot(net)
   if (average$n == 0L) {
     return(list(state = state, n = 1L))
   }
@@ -233,27 +305,46 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 }
 
 # Batch normalisation carries running statistics that belong to the weights that produced them, so
-# an average of weights needs its own pass over the fitting units before it predicts anything.
+# an average of weights needs its own pass over the fitting units before it predicts anything. The
+# statistics are reset and recomputed as the plain mean over the batches of that pass, weighting
+# the k-th batch by 1/k, rather than folded into whatever the last epoch left behind.
 .refresh_batchnorm <- function(torch, net, xt, fit_idx, batch_size, device) {
+  norms <- Filter(function(mod) inherits(mod, "nn_batch_norm_"), net$modules)
+  if (!length(norms)) {
+    return(invisible(net))
+  }
+  momentum <- lapply(norms, function(mod) mod$momentum)
+  for (mod in norms) {
+    mod$reset_running_stats()
+  }
   net$train()
   torch$with_no_grad({
+    k <- 0L
     for (b in .batches(fit_idx, batch_size, shuffle = FALSE)) {
+      k <- k + 1L
+      for (mod in norms) {
+        mod$momentum <- 1 / k
+      }
       net(xt[.index(torch, b, device), , ])
     }
   })
+  for (i in seq_along(norms)) {
+    norms[[i]]$momentum <- momentum[[i]]
+  }
   invisible(net)
 }
 
-# As many batches as `size` divides the rows into, of as equal a length as they can be, which is
-# what NumPy's array_split gives the Python side. Cutting fixed-length batches instead leaves a
-# remainder, and a remainder of one row has no variance for batch normalisation to standardise by:
-# the layer's running statistics take a NaN and every prediction after it is NaN.
+# As few batches of at most `size` rows as the rows divide into, of as equal a length as they can
+# be, which is what NumPy's array_split gives the Python side. Cutting fixed-length batches instead
+# leaves a remainder, and a remainder of one row has no variance for batch normalisation to
+# standardise by: the layer's running statistics take a NaN and every prediction after it is NaN.
+# Fewer than two rows per batch is refused for the same reason, so a handful of rows is one batch.
 .batches <- function(idx, size, shuffle) {
   if (shuffle) {
     idx <- sample(idx)
   }
   n <- length(idx)
-  k <- max(1L, n %/% size)
+  k <- max(1L, min(as.integer(ceiling(n / size)), n %/% 2L))
   rest <- n %% k
   split(idx, rep(seq_len(k), rep(n %/% k, k) + c(rep(1L, rest), rep(0L, k - rest))))
 }
@@ -267,11 +358,52 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   aperm(array(as.numeric(x), dim = dim(x)), c(1L, 3L, 2L))
 }
 
+# One centre and one scale per channel, over every unit and bin of the units handed in.
+.channel_scaler <- function(x) {
+  .scaler(matrix(as.numeric(x), ncol = dim(x)[3L]), per_column = TRUE)
+}
+
+.scale_channels <- function(m, scaler) {
+  sweep(sweep(m, 2L, scaler$centre, "-"), 2L, scaler$scale, "/")
+}
+
 .torch <- function() {
   if (!requireNamespace("torch", quietly = TRUE)) {
     stop("this learner needs torch. Install it with install.packages(\"torch\").", call. = FALSE)
   }
   asNamespace("torch")
+}
+
+# ---- the weights as arrays -----------------------------------------------------------------
+
+.torch_build <- function(module_fn, shape, arch) {
+  module_fn(in_ch = shape[1L], in_len = shape[2L], n_out = shape[3L], arch = arch)
+}
+
+.state_arrays <- function(net) {
+  torch <- .torch()
+  lapply(net$state_dict(), function(p) {
+    p <- p$detach()$cpu()
+    floating <- p$dtype == torch$torch_float()
+    list(values = as.array(p), shape = as.integer(p$shape), floating = floating)
+  })
+}
+
+.state_tensors <- function(torch, state) {
+  lapply(state, function(entry) {
+    torch$torch_tensor(entry$values,
+                       dtype = if (entry$floating) torch$torch_float() else torch$torch_long())$
+      reshape(entry$shape)
+  })
+}
+
+# The network a fitted encoder is, built from its architecture and loaded with its weights.
+.torch_restore <- function(torch, model, device) {
+  net <- .torch_build(model$module_fn, model$shape, model$arch)
+  net$load_state_dict(.state_tensors(torch, model$state))
+  net$to(device = device)
+  net$eval()
+  net
 }
 
 # ---- the encoders --------------------------------------------------------------------------

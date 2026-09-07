@@ -17,7 +17,10 @@
 #' @param name Name the learner is reported under.
 #' @param fit A function of `(x, y, ...)`, where `x` is a `[unit, bin, channel]` array and `y` the
 #'   response matrix for the same units, returning a fitted object. A `fit` that declares a
-#'   `control` argument is handed the resolved [train_control()].
+#'   `control` argument is handed the resolved [train_control()], and one that declares a `head`
+#'   argument is handed the registered response head, whose `loss` and `activation` say what it
+#'   is fitting toward. The learners that ship read both from there and hold no response of their
+#'   own.
 #' @param predict A function of `(model, x)` returning a `[unit, variable]` matrix of predictions
 #'   for the units of `x`, in that order.
 #' @param data A representation the learner is pinned to, or `NULL` to run across every
@@ -165,14 +168,38 @@ fit_learner <- function(learner, x, y, response = "presence_absence", control = 
   args <- c(list(x = x, y = y), carried, given)
   # A learner that trains under a control declares one; the resolved control reaches it through
   # that argument and through nothing else, so a learner with no training settings never sees one.
-  if ("control" %in% names(formals(learner$fit))) {
+  # The response head reaches a fit the same way, so what a learner fits toward is the
+  # registration and never a second copy of it inside the learner.
+  declared <- names(formals(learner$fit))
+  if ("control" %in% declared) {
     args$control <- .resolve_control(control, learner$control)
+  }
+  if ("head" %in% declared) {
+    args$head <- spec
   }
   model <- do.call(learner$fit, args)
   structure(list(learner = learner, model = model, response = response,
                  variables = colnames(y), grain = attr(x, "grain"),
                  stats = attr(x, "stats")),
             class = "timesift_fit")
+}
+
+# A response's own randomness starts from a seed of its own, so the model of one response is the
+# same model whether it was fitted on its own or beside others, and in whatever order. The offset
+# is taken from the response's name rather than from its position, because a learner that covers
+# the responses one at a time is handed a single column and cannot see where it sat.
+.variable_seeds <- function(seed, y) {
+  labels <- colnames(y)
+  offsets <- if (is.null(labels)) seq_len(ncol(y)) else vapply(labels, .name_offset, integer(1L))
+  as.integer(seed) + as.integer(offsets)
+}
+
+.name_offset <- function(name) {
+  code <- 0L
+  for (b in utf8ToInt(name)) {
+    code <- (code * 31L + b) %% 104729L
+  }
+  code
 }
 
 #' @param object A `timesift_fit`.
@@ -291,10 +318,28 @@ print.timesift_models <- function(x, ...) {
   out
 }
 
-# Scaling belongs to the fold it is computed on. A per-column scaler is what a linear model wants;
-# a single scalar over every channel and bin is what a sequence encoder wants, because it puts the
-# readings on a workable scale while preserving the differences between units that carry the
-# signal. Both are computed on the fitting units alone.
+# The family a learner fitting one model per response fits under is read off the response head's
+# loss, so a head registered with a squared-error loss reaches the same learners as a
+# presence-absence one and each fits the model that loss names.
+.head_family <- function(head) {
+  families <- c(binary_cross_entropy = "binomial", squared_error = "gaussian")
+  if (!is.character(head$loss) || !head$loss %in% names(families)) {
+    stop("a learner fitting one model per response has no family for the ",
+         .describe(head$loss), " loss. It knows ", paste(names(families), collapse = " and "),
+         ".", call. = FALSE)
+  }
+  families[[head$loss]]
+}
+
+.glm_family <- function(family) {
+  switch(family, binomial = stats::binomial(), gaussian = stats::gaussian())
+}
+
+# Scaling belongs to the fold it is computed on. A per-column scaler is what a linear model wants
+# over the bin-by-channel columns; the same scaler over the channels, each read across every unit
+# and bin, is what a sequence encoder wants, because it puts every channel on a workable scale
+# while preserving the differences between units and between bins that carry the signal. Both are
+# computed on the fitting units alone.
 .scaler <- function(m, per_column = TRUE) {
   if (per_column) {
     centre <- colMeans(m)
