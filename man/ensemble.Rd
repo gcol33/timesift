@@ -8,7 +8,7 @@ ensemble(
   method = c("stack", "mean", "median", "weighted"),
   scope = c("all", "learners", "representations"),
   metric = NULL,
-  response = "presence_absence"
+  response = NULL
 )
 }
 \arguments{
@@ -19,7 +19,10 @@ ensemble(
 \item{metric}{Name of the registered metric the eligibility and the \code{"weighted"} weights are
 read by, or \code{NULL} for the score the run already carries.}
 
-\item{response}{Name of the registered response head whose loss \code{"stack"} minimises.}
+\item{response}{Name of the registered response head whose loss \code{"stack"} minimises, or \code{NULL}
+for the head the run was fitted under. Naming a head the run does not fit toward is an error
+rather than an override, and \code{\link[=ensemble_fit]{ensemble_fit()}} called on its own reads \code{NULL} as
+\code{"presence_absence"}.}
 }
 \value{
 A \code{timesift_ensemble}.

@@ -19,8 +19,8 @@ from timesift.report import candidate_table, ensemble_weights, occlusion, summar
 from timesift.representation import grain_matrix
 from timesift.response import Response, align_folds, fold_map, scorable_cells
 from timesift.stack import (EnsembleSpec, Stack, as_ensemble, candidate_means, ensemble,
-                            ensemble_combine, ensemble_fit, in_scope, simplex_weights,
-                            stack_loss)
+                            ensemble_combine, ensemble_fit, in_scope, run_ensemble,
+                            simplex_weights, stack_loss)
 
 DEVIANCE = stack_loss("presence_absence")
 
@@ -269,7 +269,7 @@ def test_a_scope_holds_one_axis_and_varies_the_other():
 
 
 def test_what_an_ensemble_may_be_asked_for():
-    assert as_ensemble(True) == EnsembleSpec("stack", "all", None, "presence_absence")
+    assert as_ensemble(True) == EnsembleSpec("stack", "all", None, None)
     assert as_ensemble(False) is None
     assert as_ensemble(None) is None
     assert as_ensemble("median").method == "median"
@@ -280,6 +280,19 @@ def test_what_an_ensemble_may_be_asked_for():
         ensemble(scope="everything")
     with pytest.raises(TypeError, match="method name"):
         as_ensemble(3)
+
+
+def test_the_head_a_run_combines_under_is_the_head_it_was_fitted_under(temporary_response):
+    temporary_response("gauss_test", dict(
+        prepare=lambda r: r, activation="identity", loss="squared_error", metric="roc_auc",
+        cells=lambda r, folds: scorable_cells(r, folds)))
+    # Left unnamed the spec takes the run's head; naming the same one is not a contradiction.
+    assert run_ensemble(True, "gauss_test").response == "gauss_test"
+    assert run_ensemble(ensemble(), "gauss_test").response == "gauss_test"
+    assert run_ensemble(ensemble(response="gauss_test"), "gauss_test").response == "gauss_test"
+    assert run_ensemble(False, "gauss_test") is None
+    with pytest.raises(ValueError, match="names another"):
+        run_ensemble(ensemble(response="presence_absence"), "gauss_test")
 
 
 # ---- what a fitted object says ----------------------------------------------------------------

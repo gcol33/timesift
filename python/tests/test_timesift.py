@@ -279,6 +279,35 @@ def test_the_ensemble_is_fitted_on_the_out_of_fold_predictions_and_predicts_thro
     assert fit.predict(later, series(plots=PLOTS[:4])).shape == (4, 3)
 
 
+def test_the_combiner_minimises_the_loss_of_the_head_the_run_was_fitted_under(temporary_response,
+                                                                              monkeypatch):
+    from timesift import stack as stack_module
+    from timesift.response import scorable_cells
+    from timesift.stack import ensemble
+    temporary_response("gauss_test", dict(
+        prepare=lambda r: r, activation="identity", loss="squared_error", metric="roc_auc",
+        cells=lambda r, folds: scorable_cells(r, folds)))
+    seen = []
+    minimised = stack_module.stack_loss
+
+    def record(name):
+        seen.append(name)
+        return minimised(name)
+
+    monkeypatch.setattr(stack_module, "stack_loss", record)
+    two = [learner("a"), learner("b", multi="joint")]
+
+    fitted(models=two, ensemble=True, response="gauss_test")
+    assert seen == ["gauss_test"]
+    fitted(models=two, ensemble=True)
+    assert seen[-1] == "presence_absence"
+    # Naming the run's own head is the same thing said twice, and is not a contradiction.
+    fitted(models=two, ensemble=ensemble(response="gauss_test"), response="gauss_test")
+    assert seen[-1] == "gauss_test"
+    with pytest.raises(ValueError, match="names another"):
+        fitted(models=two, ensemble=ensemble(response="presence_absence"), response="gauss_test")
+
+
 def test_the_summary_reads_the_fit_and_lists_what_could_not_be_paired():
     fit = fitted(sift=grains("native", "day", "week"), ensemble=True)
     text = repr(fit)

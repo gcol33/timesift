@@ -21,7 +21,10 @@
 #' @param scope Which candidates are eligible.
 #' @param metric Name of the registered metric the eligibility and the `"weighted"` weights are
 #'   read by, or `NULL` for the score the run already carries.
-#' @param response Name of the registered response head whose loss `"stack"` minimises.
+#' @param response Name of the registered response head whose loss `"stack"` minimises, or `NULL`
+#'   for the head the run was fitted under. Naming a head the run does not fit toward is an error
+#'   rather than an override, and [ensemble_fit()] called on its own reads `NULL` as
+#'   `"presence_absence"`.
 #'
 #' @return A `timesift_ensemble`.
 #'
@@ -32,13 +35,15 @@
 #' @export
 ensemble <- function(method = c("stack", "mean", "median", "weighted"),
                      scope = c("all", "learners", "representations"), metric = NULL,
-                     response = "presence_absence") {
+                     response = NULL) {
   method <- match.arg(method)
   scope <- match.arg(scope)
   if (!is.null(metric)) {
     .metrics_reg$get(metric)
   }
-  .responses_reg$get(response)
+  if (!is.null(response)) {
+    .responses_reg$get(response)
+  }
   structure(list(method = method, scope = scope, metric = metric, response = response),
             class = "timesift_ensemble")
 }
@@ -46,8 +51,26 @@ ensemble <- function(method = c("stack", "mean", "median", "weighted"),
 #' @export
 print.timesift_ensemble <- function(x, ...) {
   cat("<timesift ensemble>", x$method, "over the", x$scope, "candidates\n")
-  cat("response:", x$response, "; metric:", x$metric %||% "the run's own", "\n")
+  cat("response:", x$response %||% "the run's own", "; metric:", x$metric %||% "the run's own",
+      "\n")
   invisible(x)
+}
+
+# The run was fitted toward one response head and the combiner minimises that head's loss, so the
+# run's response is what reaches the spec. A spec naming another head is a contradiction rather
+# than an override: it would stack an abundance run under a presence-absence loss.
+.run_ensemble <- function(spec, response) {
+  spec <- .as_ensemble(spec)
+  if (is.null(spec$response)) {
+    spec$response <- response
+    return(spec)
+  }
+  if (!identical(spec$response, response)) {
+    stop("the run fits the ", response, " response and `ensemble(response = \"", spec$response,
+         "\")` names another. The combiner minimises the loss of the head the run was fitted ",
+         "under.", call. = FALSE)
+  }
+  spec
 }
 
 .as_ensemble <- function(spec) {
@@ -90,7 +113,10 @@ print.timesift_ensemble <- function(x, ...) {
 #'
 #' @export
 ensemble_fit <- function(oof, y, cells, folds, spec = ensemble(), scores = NULL) {
+  # Fitted from a run, the spec arrives carrying the run's head; fitted on its own, there is no
+  # run to read one off and the shipped default is the one the package defaults to everywhere.
   spec <- .as_ensemble(spec)
+  spec$response <- spec$response %||% "presence_absence"
   y <- .as_response(y)
   oof <- .check_oof(oof, y)
   mean_score <- .member_scores(oof, y, cells, folds, spec, scores,

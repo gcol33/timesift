@@ -563,6 +563,9 @@ call site.
 - A candidate is reported as `learner / representation`, and every candidate emits an out-of-fold
   prediction for every scorable cell over the same folds. The combiner is handed those predictions,
   the response, the mask and the fold map, and never a model.
+- The combiner minimises the loss of the head the run was fitted under. `ensemble()` left without
+  a `response` takes the run's, and one naming a different head is refused before anything is
+  fitted; `ensemble_fit()` called on its own reads an unnamed head as `presence_absence`.
 
 ### The same thing, shaped differently
 

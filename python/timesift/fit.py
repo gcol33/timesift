@@ -22,11 +22,11 @@ from .registry import METRICS, RESPONSES, get_learner
 from .representation import TimesiftMatrix
 from .response import Folds, Response
 from .select import column_names, select_columns
-from .specs import (Representation, Sift, TimesiftSpec, as_sift, build_representation, expand_sift,
-                    grains, resolve_folds, target_labels)
 # A candidate is named for the learner and the representation it pairs, and the ensemble reads the
 # pair back out of that name, so the two share one separator rather than agreeing on one.
-from .stack import SEPARATOR
+from .stack import SEPARATOR, run_ensemble
+from .specs import (Representation, Sift, TimesiftSpec, as_sift, build_representation, expand_sift,
+                    grains, resolve_folds, target_labels)
 
 __all__ = ["CandidateFit", "Timesift", "timesift"]
 
@@ -158,6 +158,9 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
     cells = head["cells"](y_mat, folds)
     score = metric if callable(metric) else METRICS.get(metric or head["metric"])
     metric_name = _metric_name(metric, head)
+    # Refused here rather than after the fitting, because a contradiction between the run's head
+    # and the combiner's is not worth a grid of fits to find out about.
+    ensemble = run_ensemble(ensemble, response)
 
     members = _members(sift, series, spec)
     learners = [get_learner(m) for m in (models if models is not None else _default_models())]
@@ -248,10 +251,9 @@ def _fit_candidate(learner, x, y, response, control) -> CandidateFit:
     return CandidateFit(learner=learner, fits=parts, variables=y.variables)
 
 
-def _combine(ensemble, oof, y, cells, folds, scores, verbose):
+def _combine(spec, oof, y, cells, folds, scores, verbose):
     """Fit the combiner on the out-of-fold predictions and nothing else."""
-    from .stack import as_ensemble, ensemble_fit
-    spec = as_ensemble(ensemble)
+    from .stack import ensemble_fit
     if spec is None or len(oof) < 2:
         return None, None
     if verbose:

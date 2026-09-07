@@ -285,6 +285,29 @@ test_that("a split without names is read against the targets as they were given"
   expect_equal(as.integer(fit$folds[reversed$plot]), given)
 })
 
+test_that("the combiner minimises the loss of the head the run was fitted under", {
+  withr::defer(.responses_reg$remove("gauss_test"))
+  register_response("gauss_test", list(
+    prepare = function(y) .as_response(y), activation = "identity", loss = "squared_error",
+    metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)), overwrite = TRUE)
+  case <- toy_case(n_unit = 24L, days = 60L)
+  run <- function(...) {
+    timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+             models = list(a = toy(), b = toy(multi = "separate")), sift = grains("week"),
+             resampling = cv(v = 3L), control = NULL, verbose = FALSE, ...)
+  }
+
+  fit <- run(response = "gauss_test")
+  expect_equal(fit$stack$response, "gauss_test")
+  expect_equal(fit$stack$loss, "squared_error")
+  expect_equal(run()$stack$loss, "binary_cross_entropy")
+  # Naming the run's own head is the same thing said twice, and is not a contradiction.
+  expect_equal(run(response = "gauss_test",
+                   ensemble = ensemble(response = "gauss_test"))$stack$loss, "squared_error")
+  expect_error(run(response = "gauss_test", ensemble = ensemble(response = "presence_absence")),
+               "names another")
+})
+
 test_that("an ensemble is fitted on the out-of-fold predictions and predicts through the refits", {
   case <- toy_case(n_unit = 30L, days = 90L)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,

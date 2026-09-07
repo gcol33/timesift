@@ -142,6 +142,11 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 
   head <- .responses_reg$get(response)
   y_matrix <- head$prepare(.response_block(targets, tf, y_cols))
+  # Refused here rather than after the fitting, because a contradiction between the run's head and
+  # the combiner's is not worth a grid of fits to find out about.
+  if (!isFALSE(ensemble)) {
+    ensemble <- .run_ensemble(ensemble, response)
+  }
 
   learners <- .learner_list(models %||% list(elasticnet()))
   for (ln in names(learners)) .learner_contract(learners[[ln]], ln)
@@ -205,8 +210,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
       }
     } else {
       stack <- ensemble_fit(oof = oof, y = y_matrix, cells = cells, folds = folds,
-                            spec = if (isTRUE(ensemble)) ensemble() else ensemble,
-                            scores = scores)
+                            spec = ensemble, scores = scores)
     }
   }
 

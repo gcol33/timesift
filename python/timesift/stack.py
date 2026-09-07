@@ -7,7 +7,7 @@ a cell the candidate that carries it was fitted on.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -17,7 +17,7 @@ from .response import align_folds, as_response
 
 __all__ = ["CLAMP", "EnsembleSpec", "METHODS", "SCOPES", "STACK_LOSSES", "Stack", "as_ensemble",
            "candidate_means", "ensemble", "ensemble_combine", "ensemble_fit", "in_scope",
-           "simplex_weights", "stack_loss"]
+           "run_ensemble", "simplex_weights", "stack_loss"]
 
 METHODS = ("stack", "mean", "median", "weighted")
 SCOPES = ("all", "learners", "representations")
@@ -56,7 +56,7 @@ class EnsembleSpec:
     method: str = "stack"
     scope: str = "all"
     metric: object = None
-    response: str = "presence_absence"
+    response: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,7 +74,7 @@ class Stack:
 
 
 def ensemble(method: str = "stack", scope: str = "all", metric=None,
-             response: str = "presence_absence") -> EnsembleSpec:
+             response: str | None = None) -> EnsembleSpec:
     """Ask for an ensemble of the candidates a fit produced.
 
     ``stack`` fits non-negative weights summing to one on the out-of-fold predictions, ``mean`` and
@@ -82,7 +82,10 @@ def ensemble(method: str = "stack", scope: str = "all", metric=None,
     rescaled to sum to one. ``scope`` is which candidates are eligible: every one of them, only the
     several learners sharing the best candidate's representation, or only its learner across the
     representations. ``metric`` names the metric the ensemble is reported in, or ``None`` for the
-    fit's own, and ``response`` is the registered head whose loss the weights minimise.
+    fit's own, and ``response`` is the registered head whose loss the weights minimise, or ``None``
+    for the head the run was fitted under. Naming a head the run does not fit toward is an error
+    rather than an override, and :func:`ensemble_fit` called on its own reads ``None`` as
+    ``"presence_absence"``.
     """
     if method not in METHODS:
         raise ValueError(f"`method` is one of {', '.join(METHODS)}, got {method!r}")
@@ -90,8 +93,26 @@ def ensemble(method: str = "stack", scope: str = "all", metric=None,
         raise ValueError(f"`scope` is one of {', '.join(SCOPES)}, got {scope!r}")
     if metric is not None:
         METRICS.get(metric)
-    RESPONSES.get(response)
+    if response is not None:
+        RESPONSES.get(response)
     return EnsembleSpec(method=method, scope=scope, metric=metric, response=response)
+
+
+def run_ensemble(spec, response: str) -> EnsembleSpec | None:
+    """The spec a run combines under.
+
+    The run was fitted toward one response head and the combiner minimises that head's loss, so
+    the run's response is what reaches the spec. A spec naming another head is a contradiction
+    rather than an override: it would stack an abundance run under a presence-absence loss.
+    """
+    spec = as_ensemble(spec)
+    if spec is None or spec.response == response:
+        return spec
+    if spec.response is None:
+        return replace(spec, response=response)
+    raise ValueError(f"the run fits the {response} response and ensemble(response="
+                     f"{spec.response!r}) names another. The combiner minimises the loss of the "
+                     f"head the run was fitted under.")
 
 
 def as_ensemble(x) -> EnsembleSpec | None:
@@ -130,6 +151,10 @@ def ensemble_fit(oof: dict, y, cells, folds, spec=None, scores=None) -> Stack:
     spec = as_ensemble(ensemble() if spec is None else spec)
     if spec is None:
         raise ValueError("`spec` asks for no ensemble, so there is nothing to fit")
+    # Fitted from a run, the spec arrives carrying the run's head; fitted on its own, there is no
+    # run to read one off and the shipped default is the one the package defaults to everywhere.
+    if spec.response is None:
+        spec = replace(spec, response="presence_absence")
     y = as_response(y)
     members = in_scope(tuple(oof), spec.scope, scores)
     if len(members) < 2:
