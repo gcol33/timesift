@@ -381,3 +381,36 @@ def test_a_learners_fit_is_handed_the_control_only_where_it_declares_one():
                        control=control).model == "fitted"
     assert fit_learner(Learner("trained", fit=trained, predict=constant), x, one,
                        control=control).model is control
+
+def test_a_calendar_grain_fit_refuses_a_record_from_another_period_naming_the_bin():
+    # Same number of weekly bins, six months later: read by position, week 1 of March would be
+    # week 1 of September. The check is one, on the fit, so every learner is held to it.
+    from timesift.representation import lookback_matrix
+    x, y = planted(n_unit=12, days=42)
+
+    def record(start):
+        t = np.datetime64(start, "s") + np.arange(24 * 42) * np.timedelta64(1, "h")
+        return {"id": [u for u in y.units for _ in range(len(t))], "time": list(t) * len(y.units),
+                "value": list(np.zeros(len(t) * len(y.units)))}
+
+    readings = record("2022-03-01T00:00:00")
+    shifted = grain_matrix(readings, "id", "time", "value", grain="week")
+    assert shifted.values.shape[:2] == x.values.shape[:2]
+    toy = Learner(name="toy", fit=lambda x, y, **_: y.mean(axis=0),
+                  predict=lambda model, x: np.tile(model, (x.values.shape[0], 1)))
+    fit = fit_learner(toy, x, y)
+    with pytest.raises(ValueError, match="bin 1 is 2022-02-28T00:00:00Z here"):
+        fit.predict(shifted)
+    with pytest.raises(ValueError, match="channels min here and mean in the fit"):
+        fit.predict(grain_matrix(readings, "id", "time", "value", grain="week", stats="min"))
+    # A lookback's bins are relative to each target, so another period predicts.
+    at = {"id": list(y.units), "at": [np.datetime64("2021-10-01T00:00:00", "s")] * len(y.units)}
+    at_later = {"id": list(y.units),
+                "at": [np.datetime64("2022-04-01T00:00:00", "s")] * len(y.units)}
+    w = lookback_matrix(record("2021-09-01T00:00:00"), "id", "time", "value", at=at,
+                        span="14 days", bins=2)
+    w_later = lookback_matrix(readings, "id", "time", "value", at=at_later, span="14 days",
+                              bins=2)
+    # A lookback names its rows by the targets' own positions.
+    yw = Response(y.values, w.units, y.variables)
+    assert fit_learner(toy, w, yw).predict(w_later).shape == (12, 2)

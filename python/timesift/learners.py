@@ -72,24 +72,50 @@ class Learner:
 
 @dataclass
 class Fit:
-    """A fitted learner and the variables it was fitted on."""
+    """A fitted learner, the variables it was fitted on, and the bins and channels of the
+    representation it was made on.
+
+    A representation asked to predict is checked against those once, before any learner sees it:
+    a calendar grain's bins are named by their starts, so a record from another period is refused
+    by the first bin that differs rather than read by position.
+    """
 
     learner: Learner
     model: object
     variables: tuple[str, ...]
     response: str = "presence_absence"
+    bins: tuple[str, ...] = ()
+    channels: tuple[str, ...] = ()
 
     def predict(self, x: TimesiftMatrix) -> np.ndarray:
         """Predictions for a representation, as a `[unit, variable]` matrix."""
+        self._check_same_representation(x)
         p = np.asarray(self.learner.predict(self.model, x), dtype=np.float64)
         if p.shape[0] != x.values.shape[0]:
             raise ValueError(f"the learner returned {p.shape[0]} rows for "
                              f"{x.values.shape[0]} units")
         return p
 
+    def _check_same_representation(self, x: TimesiftMatrix) -> None:
+        head = "the representation predicted on has different channels or bins from the fitted one: "
+        channels, bins = tuple(x.stats), tuple(x.bins)
+        if channels != tuple(self.channels):
+            raise ValueError(head + f"channels {', '.join(channels)} here and "
+                             f"{', '.join(self.channels)} in the fit.")
+        if len(bins) != len(self.bins):
+            raise ValueError(head + f"{len(bins)} bin{'s' if len(bins) != 1 else ''} here and "
+                             f"{len(self.bins)} bin{'s' if len(self.bins) != 1 else ''} in the "
+                             "fit.")
+        for i, (here, fitted) in enumerate(zip(bins, self.bins)):
+            if here != fitted:
+                raise ValueError(head + f"bin {i + 1} is {here} here and {fitted} in the fit. A "
+                                 "calendar grain is read by its bins' instants, so a fit "
+                                 "predicts a record over the same period; a lookback reads a "
+                                 "span relative to each target and predicts any period.")
+
 
 def fit_learner(learner, x: TimesiftMatrix, y, response: str = "presence_absence", control=None,
-                **kwargs) -> Fit:
+                group=None, **kwargs) -> Fit:
     """Fit one learner at one grain, under one registered response head.
 
     A ``fit`` that declares a ``head`` argument is handed the registered head, whose ``loss`` and
@@ -103,9 +129,14 @@ def fit_learner(learner, x: TimesiftMatrix, y, response: str = "presence_absence
     learner.require()
     head = RESPONSES.get(response)
     y = head["prepare"](as_response(y)).align(x.units)
-    given = _declared(learner.fit, head=head, control=control, variables=y.variables)
+    if group is not None and len(group) != x.values.shape[0]:
+        raise ValueError(f"`group` must have one value per unit, got {len(group)} for "
+                         f"{x.values.shape[0]}")
+    given = _declared(learner.fit, head=head, control=control, variables=y.variables,
+                      group=None if group is None else tuple(str(g) for g in group))
     model = learner.fit(x, y.values, **{**learner.params, **kwargs, **given})
-    return Fit(learner=learner, model=model, variables=y.variables, response=response)
+    return Fit(learner=learner, model=model, variables=y.variables, response=response,
+               bins=tuple(x.bins), channels=tuple(x.stats))
 
 
 def _declared(fit, **given) -> dict:
@@ -113,7 +144,9 @@ def _declared(fit, **given) -> dict:
 
     A learner that trains under a control declares one, and the resolved control reaches it through
     that argument and through nothing else; the response head reaches a fit the same way, and so
-    do the names of the response's variables. A fit that declares none is called with none,
+    do the names of the response's variables and the grouping the outer fold map keeps whole, one
+    value per unit or ``None``, by which a fit draws any split of its own. A fit that declares
+    none is called with none,
     whatever the run carries, so a two-argument ``fit(x, y)`` is a learner like any other rather
     than one that has to absorb keywords it never asked for.
     """
@@ -280,7 +313,7 @@ class _TorchFitter:
     name: str
     arch: dict
 
-    def __call__(self, x, y, *, head, control=None, **passed):
+    def __call__(self, x, y, *, head, control=None, group=None, **passed):
         unknown = set(passed) - set(self.arch) - set(CONTROL_SETTINGS)
         if unknown:
             raise TypeError(f"the {self.name} learner has no setting called "
@@ -289,7 +322,7 @@ class _TorchFitter:
                           {**self.arch, **{k: v for k, v in passed.items() if k in self.arch}},
                           as_control(control).override(
                               {k: v for k, v in passed.items() if k in CONTROL_SETTINGS}),
-                          head)
+                          head, group)
 
 
 def _resolve_device(name):
@@ -336,7 +369,7 @@ def _objective(head):
 
 # ---- the training recipe ---------------------------------------------------------------------
 
-def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head):
+def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head, group=None):
     torch = _torch()
     device = _resolve_device(cfg.device)
     make_loss, activation = _objective(head)
@@ -348,7 +381,7 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head):
     torch.manual_seed(cfg.seed)
     rng = np.random.default_rng(cfg.seed)
     n = m.shape[0]
-    val = _validation_split(y, cfg.val_frac, rng)
+    val = _validation_split(y, cfg.val_frac, rng, group)
     fit_idx = np.setdiff1d(np.arange(n), val)
 
     xt = torch.tensor(m, dtype=torch.float32, device=device)
@@ -424,20 +457,29 @@ def _torch_loss(net, loss_fn, xt, yt, idx_all, batch_size, device) -> float:
     return total / len(idx_all)
 
 
-def _validation_split(y: np.ndarray, val_frac: float, rng) -> np.ndarray:
+def _validation_split(y: np.ndarray, val_frac: float, rng, group=None) -> np.ndarray:
     """The inner validation set, one unit drawn from each of ``n_val`` equal-count strata of the
     response total, so the split carries every level of the response in proportion.
 
     A plain random draw from a rare response can leave the fitting units with no presence to
-    learn from, and the validation loss it early-stops on is then read off nothing.
+    learn from, and the validation loss it early-stops on is then read off nothing. Under a
+    grouping the draw is over the groups, each carrying the mean of its rows' totals, and the rows
+    of a drawn group are held out together: a unit the outer folds kept whole is not split across
+    the fit and the loss it stops on.
     """
-    n = y.shape[0]
+    if group is None:
+        key = np.arange(y.shape[0])
+    else:
+        _, key = np.unique(np.asarray([str(g) for g in group]), return_inverse=True)
+    n = int(key.max()) + 1
     n_val = max(1, int(round(val_frac * n)))
     if val_frac <= 0 or n - n_val < 2:
         return np.empty(0, dtype=int)
-    ranked = np.lexsort((rng.permutation(n), y.sum(axis=1)))
+    total = np.asarray([y[key == k].sum(axis=1).mean() for k in range(n)])
+    ranked = np.lexsort((rng.permutation(n), total))
     stratum = np.ceil(np.arange(1, n + 1) * n_val / n).astype(int)
-    return np.sort(np.array([rng.choice(ranked[stratum == s]) for s in range(1, n_val + 1)]))
+    drawn = np.array([rng.choice(ranked[stratum == s]) for s in range(1, n_val + 1)])
+    return np.flatnonzero(np.isin(key, drawn))
 
 
 def _snapshot(net) -> dict:
@@ -508,9 +550,6 @@ def _channel_scaler(m: np.ndarray):
 
 def _torch_predict(model, x: TimesiftMatrix) -> np.ndarray:
     torch = _torch()
-    if tuple(x.stats) != tuple(model["channels"]) or x.values.shape[1] != model["bins"]:
-        raise ValueError("the representation predicted on has different channels or bins from "
-                         "the fitted one")
     device = _resolve_device(model["device"])
     net = _torch_restore(torch, model, device)
     activation = TORCH_ACTIVATIONS[model["activation"]]
@@ -568,6 +607,18 @@ def rescnn(data=None, channels=(32, 64, 128, 256), blocks_per_stage=2, kernel=7,
 # matrix is put back together, so the difference between them is the model and nothing else. A
 # response with one outcome among the fitting units has no model to fit and is predicted its own
 # share, which is the level a fitted model would collapse to.
+def _inner_folds(y: np.ndarray, v: int, seed: int, group=None) -> list:
+    """Inner folds for a fit that chooses a setting by cross-validation inside itself, as the
+    (train, test) pairs scikit-learn takes: a plain deal under the fit's own seed, over the groups
+    where the outer map carries a grouping."""
+    from .response import Response, fold_map
+    units = tuple(str(i) for i in range(y.shape[0]))
+    fold = fold_map(Response(np.asarray(y, dtype=np.float64), units,
+                             tuple(f"v{j}" for j in range(y.shape[1]))),
+                    v=v, seed=seed, strata=1, group=None if group is None else list(group)).fold
+    return [(np.flatnonzero(fold != k), np.flatnonzero(fold == k)) for k in np.unique(fold)]
+
+
 def _fit_columns(m: np.ndarray, y: np.ndarray, make, seeds) -> list:
     out = []
     for j in range(y.shape[1]):
@@ -590,15 +641,7 @@ def _name_offset(name: str) -> int:
     return code
 
 
-def _same_columns(m: np.ndarray, n_col: int) -> np.ndarray:
-    if m.shape[1] != n_col:
-        raise ValueError("the representation predicted on has different channels or bins "
-                         "from the fitted one")
-    return m
-
-
 def _predict_columns(models: list, m: np.ndarray, n_col: int, family: str) -> np.ndarray:
-    _same_columns(m, n_col)
     return np.column_stack([
         np.full(m.shape[0], f) if isinstance(f, float)
         else f.predict_proba(m)[:, 1] if family == "binomial" else f.predict(m)
@@ -631,7 +674,8 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, weight_positives=T
                                weight_positives=weight_positives, seed=seed))
 
 
-def _elasticnet_fit(x, y, alpha, n_inner, squares, weight_positives, seed, head, variables, **_):
+def _elasticnet_fit(x, y, alpha, n_inner, squares, weight_positives, seed, head, variables,
+                    group=None, **_):
     from sklearn.linear_model import ElasticNetCV, LogisticRegressionCV
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
@@ -643,14 +687,17 @@ def _elasticnet_fit(x, y, alpha, n_inner, squares, weight_positives, seed, head,
     # were a different predictor from the readings themselves. Standardising is what glmnet does
     # by default on the R side, and the scaler travels with the fit so new units are mapped
     # through the centre and the spread the model was fitted at rather than through their own.
+    # The inner folds are dealt here rather than by scikit-learn, so a grouping the outer folds
+    # keep whole stays whole where the penalty is chosen.
     def make(design, yj, seed_j):
+        cv = _inner_folds(y, n_inner, seed_j, group)
         if family == "binomial":
             return make_pipeline(StandardScaler(), LogisticRegressionCV(
-                Cs=10, cv=n_inner, solver="saga", l1_ratios=[alpha],
+                Cs=10, cv=cv, solver="saga", l1_ratios=[alpha],
                 class_weight="balanced" if weight_positives else None,
                 max_iter=5000, random_state=seed_j)).fit(design, yj)
         return make_pipeline(StandardScaler(),
-                             ElasticNetCV(l1_ratio=alpha, cv=n_inner, max_iter=5000,
+                             ElasticNetCV(l1_ratio=alpha, cv=cv, max_iter=5000,
                                           random_state=seed_j)).fit(design, yj)
 
     return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables)),
@@ -722,7 +769,7 @@ def _stepwise_fit(x, y, max_terms, degree, head, **_):
 
 
 def _stepwise_predict(model, x):
-    m = _same_columns(flatten(x), model["n_col"])
+    m = flatten(x)
     return np.column_stack([_predict_forward(f, m, model["family"]) for f in model["models"]])
 
 

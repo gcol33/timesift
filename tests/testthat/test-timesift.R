@@ -496,3 +496,38 @@ test_that("a design under which no cell is scorable stops before anything is fit
   case$targets$sp2 <- 0
   expect_error(run_toy(case), "no \\(response, fold\\) cell is scorable")
 })
+
+test_that("a grouped run hands every fit the grouping of the units it is fitted on", {
+  case <- toy_case(n_unit = 8L, days = 150L)
+  case$targets <- case$targets[rep(1:8, each = 2L), ]
+  rownames(case$targets) <- NULL
+  case$targets$when <- as.POSIXct(rep(c("2021-11-01", "2021-12-01"), 8L), tz = "UTC")
+  seen <- list()
+  recorder <- learner(
+    "recorder", reads = "tabular", multi = "joint",
+    fit = function(x, y, group = NULL, ...) {
+      seen[[length(seen) + 1L]] <<- list(units = dimnames(x)[[1L]], group = group)
+      colMeans(y)
+    },
+    predict = function(model, x) matrix(model, nrow = dim(x)[1L], ncol = length(model),
+                                        byrow = TRUE))
+  fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+                  target_time = when, models = list(recorder), sift = lookbacks("30 days"),
+                  ensemble = FALSE, resampling = grouped_cv("plot", v = 4L), control = NULL,
+                  verbose = FALSE)
+  # Four fold fits and the refit on every target, each handed one group value per unit it was
+  # fitted on, and the group is the plot the row belongs to.
+  expect_length(seen, 5L)
+  for (s in seen) {
+    expect_length(s$group, length(s$units))
+    expect_equal(s$group, as.character(case$targets$plot[as.integer(s$units)]))
+  }
+  # A plain run hands NULL, so a fit that draws no split of its own is not told about one.
+  seen <- list()
+  plain <- toy_case(n_unit = 12L, days = 40L)
+  timesift(plain$targets, plain$series, y = starts_with("sp"), id = plot, time = t,
+           models = list(recorder), sift = grains("week"), ensemble = FALSE,
+           resampling = cv(v = 3L), control = NULL, verbose = FALSE)
+  expect_length(seen, 4L)
+  expect_true(all(vapply(seen, function(s) is.null(s$group), logical(1L))))
+})

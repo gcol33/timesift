@@ -362,3 +362,24 @@ def test_a_fold_map_prints_every_level_it_holds():
                                           units=tuple(str(i) for i in range(12)),
                                           variables=("y",)), None, spec()))
     assert "0: 4" in text and "1: 4" in text and "2: 4" in text
+
+def test_a_fold_map_carries_its_grouping_and_the_inner_folds_a_fit_draws_keep_it_whole():
+    from timesift.learners import _inner_folds
+    from timesift.selection import _inner_splitter
+    values = np.random.default_rng(7).integers(0, 2, size=(24, 2)).astype(float)
+    y = Response(values=values, units=tuple(f"u{i:02d}" for i in range(24)),
+                 variables=("a", "b"))
+    group = [f"s{i:02d}" for i in range(8) for _ in range(3)]
+    f = fold_map(y, v=4, group=group)
+    assert f.group == tuple(group)
+    assert fold_map(y, v=4).group is None
+    # Read back in another row order, the grouping follows the units.
+    assert f.align(tuple(reversed(y.units))).group == tuple(reversed(group))
+    for train, test in _inner_folds(values, 3, 5, group):
+        assert not ({group[i] for i in train} & {group[i] for i in test})
+    split = _inner_splitter(3, group)
+    train = np.arange(18)
+    inner = split(y.take_units(train), 2, train)
+    for g in set(group[:18]):
+        rows = [i for i in range(18) if group[i] == g]
+        assert len({int(inner.fold[i]) for i in rows}) == 1

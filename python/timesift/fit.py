@@ -176,7 +176,7 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
         if verbose:
             print(f"fitting {name}")
         p, per_fold = out_of_fold(m, y_mat, folds.fold, levels, learner, response, control,
-                                  keep_fits)
+                                  keep_fits, group=folds.group)
         for k, fold_fit in per_fold.items():
             fits[f"{name}|{k}"] = fold_fit
         oof[name] = p
@@ -185,7 +185,7 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
         for column in ("variable", "fold", "score", "scorable"):
             table[column].extend(rows[column])
         fitted[name] = fit_learner(learner, m, y_mat, response=response,
-                                   control=control)
+                                   control=control, group=folds.group)
 
     scores = {"candidate": np.asarray(table["candidate"]),
               "variable": np.asarray(table["variable"]),

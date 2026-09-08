@@ -286,3 +286,15 @@ def test_a_fitted_encoder_names_its_module_builder_rather_than_carrying_it():
     # package no longer carries says so rather than loading its weights into another architecture.
     with pytest.raises(ValueError, match="gru"):
         _torch_module("gru")
+
+def test_the_inner_validation_set_keeps_a_grouping_whole_as_the_outer_folds_do():
+    from timesift.learners import _validation_split
+    rng = np.random.default_rng(3)
+    y = np.column_stack([rng.binomial(1, 0.3, 40), rng.binomial(1, 0.5, 40)]).astype(float)
+    group = [f"g{i:02d}" for i in range(20) for _ in (0, 1)]
+    for _ in range(10):
+        val = _validation_split(y, 0.25, rng, group)
+        # Five of twenty groups, so ten rows, and never one row of a group without the other.
+        assert len(val) == 10
+        drawn = [group[i] for i in val]
+        assert all(drawn.count(g) == 2 for g in set(drawn))

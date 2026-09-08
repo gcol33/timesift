@@ -55,10 +55,6 @@ forest <- function(data = NULL, trees = 500L, mtry = NULL, min_node = 1L, seed =
     },
     predict = function(model, x) {
       m <- .flatten(x)
-      if (!identical(colnames(m), model$columns)) {
-        stop("the representation predicted on has different channels or bins from the fitted one.",
-             call. = FALSE)
-      }
       .as_predictions(vapply(model$models, function(f) {
         if (is.numeric(f)) {
           return(rep(f, nrow(m)))

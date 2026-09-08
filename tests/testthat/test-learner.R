@@ -389,3 +389,28 @@ test_that("the penalised learner refuses a design of one column rather than surf
   y <- sim_response(sim, n_var = 2L, seed = 62L)
   expect_error(fit_learner(elasticnet(squares = FALSE), x, y), "at least two columns")
 })
+
+test_that("a calendar-grain fit refuses a record from another period, naming the bin", {
+  # Same number of weekly bins, six months later: read by position, week 1 of March would be
+  # week 1 of September. The check is one, on the fit, so every learner is held to it.
+  sim <- sim_series(n_unit = 12L, days = 42L, seed = 41L)
+  later <- sim_series(n_unit = 12L, days = 42L, seed = 41L, from = "2022-03-01")
+  y <- sim_response(sim, n_var = 2L, seed = 42L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
+  shifted <- grain_matrix(later$readings, plot, t, temp, grain = "week")
+  expect_equal(dim(shifted), dim(x))
+  toy <- learner("toy", fit = function(x, y, ...) colMeans(y),
+                 predict = function(model, x) matrix(model, nrow = dim(x)[1L], ncol = length(model),
+                                                     byrow = TRUE))
+  fit <- fit_learner(toy, x, y)
+  expect_error(stats::predict(fit, shifted), "bin 1 is 2022-02-28T00:00:00Z here")
+  # A lookback's bins are relative to each target, so another period predicts.
+  at <- data.frame(id = sim$units, at = as.POSIXct("2021-10-01", tz = "UTC"),
+                   row.names = sim$units)
+  at_later <- data.frame(id = later$units, at = as.POSIXct("2022-04-01", tz = "UTC"),
+                         row.names = later$units)
+  w <- lookback_matrix(sim$readings, plot, t, temp, at = at, span = "14 days", bins = 2L)
+  w_later <- lookback_matrix(later$readings, plot, t, temp, at = at_later, span = "14 days",
+                             bins = 2L)
+  expect_equal(dim(stats::predict(fit_learner(toy, w, y), w_later)), c(12L, 2L))
+})

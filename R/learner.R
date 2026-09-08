@@ -22,7 +22,9 @@
 #'   `control` argument is handed the resolved [train_control()], and one that declares a `head`
 #'   argument is handed the registered response head, whose `loss` and `activation` say what it
 #'   is fitting toward. The learners that ship read both from there and hold no response of their
-#'   own.
+#'   own. One that declares a `group` argument is handed the grouping the outer fold map keeps
+#'   whole, one value per unit of `x` or `NULL`, so a split it draws inside the fit keeps the
+#'   same groups whole.
 #' @param predict A function of `(model, x)` returning a `[unit, variable]` matrix of predictions
 #'   for the units of `x`, in that order.
 #' @param data A representation the learner is pinned to, or `NULL` to run across every
@@ -149,6 +151,9 @@ learners <- function() .learners_reg$names()
 #' @param response Name of the registered response head. `"presence_absence"` ships.
 #' @param control The run's [train_control()]. The learner's own control overrides it on the
 #'   settings that control names, and a setting given in `...` overrides both.
+#' @param group One value per unit of `x` naming the group it belongs to, or `NULL`. A learner
+#'   whose `fit` declares `group` draws its inner splits by it. Under [grouped_cv()] the run
+#'   hands every fit the grouping its fold map carries.
 #' @param ... Passed to the learner's `fit`.
 #'
 #' @return A `timesift_fit`, which [stats::predict()] takes a new representation.
@@ -165,7 +170,8 @@ learners <- function() .learners_reg$names()
 #' dim(stats::predict(fit, x))
 #'
 #' @export
-fit_learner <- function(learner, x, y, response = "presence_absence", control = NULL, ...) {
+fit_learner <- function(learner, x, y, response = "presence_absence", control = NULL,
+                        group = NULL, ...) {
   learner <- .as_learner(learner)
   .require_packages(learner)
   .check_matrix(x)
@@ -187,11 +193,50 @@ fit_learner <- function(learner, x, y, response = "presence_absence", control = 
   if ("head" %in% declared) {
     args$head <- spec
   }
+  if ("group" %in% declared) {
+    if (!is.null(group) && length(group) != dim(x)[1L]) {
+      stop("`group` must have one value per unit, got ", length(group), " for ", dim(x)[1L],
+           ".", call. = FALSE)
+    }
+    args["group"] <- list(if (is.null(group)) NULL else as.character(group))
+  }
   model <- do.call(learner$fit, args)
+  # The bins and the channels the fit was made on travel with it, and a representation asked to
+  # predict is checked against them once, before any learner sees it: a calendar grain's bins are
+  # named by their starts, so a record from another period is refused by the first bin that
+  # differs rather than read by position.
   structure(list(learner = .learner_ref(learner), model = model, response = response,
                  variables = colnames(y), grain = attr(x, "grain"),
-                 stats = attr(x, "stats")),
+                 stats = attr(x, "stats"), bins = dimnames(x)[[2L]],
+                 channels = dimnames(x)[[3L]]),
             class = "timesift_fit")
+}
+
+# What a fit was made on and what it is asked to predict have to be one representation: the
+# same channels, and the same bins in the same order.
+.check_same_representation <- function(object, newdata) {
+  channels <- dimnames(newdata)[[3L]]
+  if (!identical(channels, object$channels)) {
+    stop("the representation predicted on has different channels or bins from the fitted one: ",
+         "channels ", paste(channels, collapse = ", "), " here and ",
+         paste(object$channels, collapse = ", "), " in the fit.", call. = FALSE)
+  }
+  bins <- dimnames(newdata)[[2L]]
+  if (length(bins) != length(object$bins)) {
+    stop("the representation predicted on has different channels or bins from the fitted one: ",
+         .plural(length(bins), "bin"), " here and ", .plural(length(object$bins), "bin"),
+         " in the fit.", call. = FALSE)
+  }
+  differs <- which(bins != object$bins)
+  if (length(differs)) {
+    i <- differs[1L]
+    stop("the representation predicted on has different channels or bins from the fitted one: ",
+         "bin ", i, " is ", bins[i], " here and ", object$bins[i], " in the fit. A calendar ",
+         "grain is read by its bins' instants, so a fit predicts a record over the same period; ",
+         "a lookback reads a span relative to each target and predicts any period.",
+         call. = FALSE)
+  }
+  invisible(TRUE)
 }
 
 # A fit refers to its learner rather than carrying it whole. R writes a closure's body out with the
@@ -260,6 +305,7 @@ fit_learner <- function(learner, x, y, response = "presence_absence", control = 
 #' @rdname fit_learner
 #' @export
 predict.timesift_fit <- function(object, newdata, ...) {
+  .check_same_representation(object, newdata)
   p <- .as_learner(object$learner)$predict(object$model, newdata)
   p <- as.matrix(p)
   if (nrow(p) != dim(newdata)[1L]) {
@@ -402,6 +448,12 @@ print.timesift_models <- function(x, ...) {
          ".", call. = FALSE)
   }
   families[[head$loss]]
+}
+
+# Inner folds for a fit that chooses a setting by cross-validation inside itself: a plain deal
+# under the fit's own seed, over the groups where the outer map carries a grouping.
+.inner_folds <- function(y, v, seed, group = NULL) {
+  as.integer(fold_map(y, v = v, seed = seed, strata = 1L, group = group))
 }
 
 .glm_family <- function(family) {

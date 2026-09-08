@@ -90,7 +90,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
     data = data, reads = reads, multi = "joint", control = control,
     needs = "torch",
     params = arch,
-    fit = function(x, y, control, head, ...) {
+    fit = function(x, y, control, head, group = NULL, ...) {
       given <- list(...)
       unknown <- setdiff(names(given), c(names(arch), .control_names()))
       if (length(unknown)) {
@@ -103,7 +103,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
                                   .given_control(given[intersect(names(given),
                                                                  .control_names())],
                                                  paste("the", name, "learner"))),
-                 head)
+                 head, group)
     },
     predict = function(model, x) .torch_predict(model, x)
   )
@@ -148,7 +148,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
 # ---- the training recipe -------------------------------------------------------------------
 
-.torch_fit <- function(x, y, module, arch, cfg, head) {
+.torch_fit <- function(x, y, module, arch, cfg, head, group = NULL) {
   torch <- .torch()
   device <- .torch_device(cfg$device)
   objective <- .torch_objective(head)
@@ -166,7 +166,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   set.seed(cfg$seed)
   torch$torch_manual_seed(cfg$seed)
 
-  val <- .validation_split(y, cfg$val_frac)
+  val <- .validation_split(y, cfg$val_frac, group)
   fit_idx <- setdiff(seq_len(n), val)
 
   xt <- torch$torch_tensor(m, dtype = torch$torch_float())$to(device = device)
@@ -233,10 +233,6 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
 .torch_predict <- function(model, x) {
   torch <- .torch()
-  if (!identical(dimnames(x)[[3L]], model$channels) || dim(x)[2L] != model$bins) {
-    stop("the representation predicted on has different channels or bins from the fitted one.",
-         call. = FALSE)
-  }
   device <- .torch_device(model$device)
   net <- .torch_restore(torch, model, device)
   activation <- .torch_activations[[model$activation]]
@@ -268,18 +264,23 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 # The inner validation set, one unit drawn from each of `n_val` equal-count strata of the response
 # total, so the split carries every level of the response in proportion. A plain random draw from
 # a rare response can leave the fitting units with no presence to learn from, and the validation
-# loss it early-stops on is then read off nothing.
-.validation_split <- function(y, val_frac) {
-  n <- nrow(y)
+# loss it early-stops on is then read off nothing. Under a grouping the draw is over the groups,
+# each carrying the mean of its rows' totals, and the rows of a drawn group are held out together:
+# a unit the outer folds kept whole is not split across the fit and the loss it stops on.
+.validation_split <- function(y, val_frac, group = NULL) {
+  key <- if (is.null(group)) seq_len(nrow(y)) else match(group, unique(group))
+  n <- max(key)
   n_val <- max(1L, as.integer(round(val_frac * n)))
   if (val_frac <= 0 || n - n_val < 2L) {
     return(integer(0))
   }
-  ranked <- order(rowSums(y), sample.int(n), method = "radix")
+  total <- as.numeric(tapply(rowSums(y), key, mean))
+  ranked <- order(total, sample.int(n), method = "radix")
   stratum <- ceiling(seq_len(n) * n_val / n)
-  sort(vapply(split(ranked, stratum), function(members) {
+  drawn <- vapply(split(ranked, stratum), function(members) {
     if (length(members) == 1L) members else sample(members, 1L)
-  }, integer(1L)), method = "radix")
+  }, integer(1L))
+  sort(which(key %in% drawn), method = "radix")
 }
 
 # A copy of the weights as they stand. Detaching a tensor on the CPU returns the storage the

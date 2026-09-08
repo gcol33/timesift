@@ -154,6 +154,24 @@
   without a line there fails the suite. Python exports `resolve_metric` beside `get_learner`, as
   the contract had said it did.
 
+## Fitting under a grouping
+
+* A fit is checked once, on the `timesift_fit`, against the bins and the channels it was made
+  on, before any learner sees the representation it is asked to predict. A calendar grain's bins
+  are named by their instants, so a record from another period with the same number of bins is
+  refused by the first bin that differs rather than read by position, as `cnn()` fitted on
+  September to November used to read March to May. A lookback's bins are relative to each target
+  and predict any period. The check that each learner carried is gone; every learner, including
+  one of your own, is held to this one. On both sides.
+* The grouping an outer fold map keeps whole reaches every split drawn inside a fit. A
+  [fold_map()] built with `group` carries it, a `fit` that declares a `group` argument is handed
+  the grouping of the units it is fitted on, and the encoders' inner validation set, the elastic
+  net's inner folds and `select_grain()`'s inner map are all dealt by it. Under `grouped_cv()`
+  with `target_time` a unit kept whole across the outer folds used to be split across the inner
+  ones, so the epoch and the penalty were chosen on rows the fit had already seen a near-copy
+  of. On both sides. The elastic net deals its own inner folds now, through `fold_map()`, rather
+  than leaving the draw to `cv.glmnet()` or to scikit-learn.
+
 ## Fixes
 
 * `fold_map()` deals with one round-robin counter that runs on from each stratum into the next,

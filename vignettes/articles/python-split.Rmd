@@ -167,7 +167,7 @@ Error unless every value is 0 or 1 and none is missing.
 ## `Folds`
 
 ```python
-Folds(fold, units, grouped)
+Folds(fold, units, grouped, group)
 ```
 
 Which fold each unit is held out in, named by unit.
@@ -180,6 +180,7 @@ Attributes:
 - `fold` - np.ndarray
 - `units` - tuple[str, ...]
 - `grouped` - bool
+- `group` - tuple[str, ...] | None
 
 ### `v`
 

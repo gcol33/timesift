@@ -90,8 +90,9 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
     y = spec["prepare"](as_response(y)).align(units)
     if folds is None:
         folds = fold_map(y)
-    f = align_folds(folds, units)
-    cells = spec["cells"](y, Folds(fold=f, units=units))
+    folds = Folds.coerce(folds, units).align(units)
+    f = folds.fold
+    cells = spec["cells"](y, folds)
     score, metric_name = resolve_metric(metric, spec["metric"])
     learners = learner_dict(learners)
     levels = np.unique(f)
@@ -103,7 +104,8 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
             arm = f"{w}|{name}"
             if verbose:
                 print(f"fitting {name} at the {w} grain")
-            p, per_fold = out_of_fold(m, y, f, levels, ln, response, control, keep_fits)
+            p, per_fold = out_of_fold(m, y, f, levels, ln, response, control, keep_fits,
+                                      group=folds.group)
             for k, fit in per_fold.items():
                 fits[f"{arm}|{k}"] = fit
             predictions[arm] = p
@@ -120,7 +122,7 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
 
 
 def out_of_fold(m, y: Response, f: np.ndarray, levels, learner, response: str, control=None,
-                keep_fits: bool = False):
+                keep_fits: bool = False, group=None):
     """One candidate over every fold, into the out-of-fold matrix the layers above read.
 
     The one fold loop of the package: a run, a ladder and the inner search of a selection all fit
@@ -134,11 +136,16 @@ def out_of_fold(m, y: Response, f: np.ndarray, levels, learner, response: str, c
         train = np.flatnonzero(f != k)
         held = m.take_units(np.flatnonzero(f == k))
         fit = fit_learner(learner, m.take_units(train), y.take_units(train), response=response,
-                          control=control)
+                          control=control, group=_group_of(group, train))
         place(p, y, held.units, fit.variables, fit.predict(held))
         if keep_fits:
             fits[int(k)] = fit
     return p, fits
+
+
+def _group_of(group, rows):
+    """The grouping of the rows a fit is handed, or ``None`` where the map carries none."""
+    return None if group is None else tuple(group[i] for i in rows)
 
 
 def place(p: np.ndarray, y: Response, units, variables, predicted: np.ndarray) -> np.ndarray:

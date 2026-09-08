@@ -5,7 +5,15 @@
 \alias{predict.timesift_fit}
 \title{Fit one learner at one grain}
 \usage{
-fit_learner(learner, x, y, response = "presence_absence", control = NULL, ...)
+fit_learner(
+  learner,
+  x,
+  y,
+  response = "presence_absence",
+  control = NULL,
+  group = NULL,
+  ...
+)
 
 \method{predict}{timesift_fit}(object, newdata, ...)
 }
@@ -20,6 +28,10 @@ fit_learner(learner, x, y, response = "presence_absence", control = NULL, ...)
 
 \item{control}{The run's \code{\link[=train_control]{train_control()}}. The learner's own control overrides it on the
 settings that control names, and a setting given in \code{...} overrides both.}
+
+\item{group}{One value per unit of \code{x} naming the group it belongs to, or \code{NULL}. A learner
+whose \code{fit} declares \code{group} draws its inner splits by it. Under \code{\link[=grouped_cv]{grouped_cv()}} the run
+hands every fit the grouping its fold map carries.}
 
 \item{...}{Passed to the learner's \code{fit}.}
 

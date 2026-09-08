@@ -317,6 +317,7 @@ fit_learner(
     y,
     response: str = 'presence_absence',
     control=None,
+    group=None,
     **kwargs,
 )
 ```
@@ -421,10 +422,15 @@ The across-variable mean of the per-variable score, one row per arm.
 ## `Fit`
 
 ```python
-Fit(learner, model, variables, response)
+Fit(learner, model, variables, response, bins, channels)
 ```
 
-A fitted learner and the variables it was fitted on.
+A fitted learner, the variables it was fitted on, and the bins and channels of the
+representation it was made on.
+
+A representation asked to predict is checked against those once, before any learner sees it:
+a calendar grain's bins are named by their starts, so a record from another period is refused
+by the first bin that differs rather than read by position.
 
 Attributes:
 
@@ -432,6 +438,8 @@ Attributes:
 - `model` - object
 - `variables` - tuple[str, ...]
 - `response` - str
+- `bins` - tuple[str, ...]
+- `channels` - tuple[str, ...]
 
 ### `predict()`
 

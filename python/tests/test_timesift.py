@@ -434,3 +434,27 @@ def test_models_takes_one_learner_as_well_as_a_list_of_them():
     assert list(one.oof) == [f"alone{SEPARATOR}day"]
     listed = fitted(models=[learner("alone")], sift=grains("day"))
     assert np.allclose(one.oof[f"alone{SEPARATOR}day"], listed.oof[f"alone{SEPARATOR}day"])
+
+def test_a_grouped_run_hands_every_fit_the_grouping_of_the_units_it_is_fitted_on():
+    seen = []
+
+    def fit(x, y, group=None, **_):
+        seen.append((x.units, group))
+        return y.mean(axis=0)
+
+    recorder = Learner(name="recorder", fit=fit,
+                       predict=lambda model, x: np.tile(model, (x.values.shape[0], 1)),
+                       reads="tabular", multi="joint")
+    t = repeated_targets()
+    timesift(t, series(), y="sp_*", id="plot", time="when", target_time="visit",
+             models=[recorder], sift=lookbacks("10 days"),
+             resampling=grouped_cv("plot", v=3, seed=2), ensemble=False, verbose=False)
+    # Three fold fits and the refit on every target, each handed one group value per unit it
+    # was fitted on, and the group is the plot the row belongs to.
+    assert len(seen) == 4
+    for units, group in seen:
+        assert group is not None and len(group) == len(units)
+        assert list(group) == [t["plot"][int(u) - 1] for u in units]
+    seen.clear()
+    fitted(models=[recorder])
+    assert all(group is None for _, group in seen)

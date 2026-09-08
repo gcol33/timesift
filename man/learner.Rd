@@ -24,7 +24,9 @@ response matrix for the same units, returning a fitted object. A \code{fit} that
 \code{control} argument is handed the resolved \code{\link[=train_control]{train_control()}}, and one that declares a \code{head}
 argument is handed the registered response head, whose \code{loss} and \code{activation} say what it
 is fitting toward. The learners that ship read both from there and hold no response of their
-own.}
+own. One that declares a \code{group} argument is handed the grouping the outer fold map keeps
+whole, one value per unit of \code{x} or \code{NULL}, so a split it draws inside the fit keeps the
+same groups whole.}
 
 \item{predict}{A function of \verb{(model, x)} returning a \verb{[unit, variable]} matrix of predictions
 for the units of \code{x}, in that order.}

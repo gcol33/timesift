@@ -106,10 +106,13 @@ class Folds:
     fold: np.ndarray
     units: tuple[str, ...]
     grouped: bool = False
+    group: tuple[str, ...] | None = None
 
     def __post_init__(self):
         if len(self.fold) != len(self.units):
             raise ValueError(f"{len(self.fold)} folds for {len(self.units)} units")
+        if self.group is not None and len(self.group) != len(self.units):
+            raise ValueError(f"{len(self.group)} group values for {len(self.units)} units")
 
     @property
     def v(self) -> int:
@@ -143,8 +146,9 @@ class Folds:
         if missing:
             raise ValueError(f"{len(missing)} unit{'s have' if len(missing) > 1 else ' has'} "
                              f"no row in the fold map, first: {missing[0]}")
-        return Folds(fold=self.fold[[position[u] for u in units]], units=units,
-                     grouped=self.grouped)
+        order = [position[u] for u in units]
+        return Folds(fold=self.fold[order], units=units, grouped=self.grouped,
+                     group=None if self.group is None else tuple(self.group[i] for i in order))
 
     def as_dict(self) -> dict:
         """The map as unit to fold."""
@@ -189,8 +193,11 @@ def fold_map(y: Response, v: int = 10, seed: int = 1, strata: int = 5, by=None,
         raise ValueError(f"`group` must have one value per unit, got {len(key)} for {n}")
     names, index = np.unique(key, return_inverse=True)
     per_group = np.asarray([value[index == k].mean() for k in range(len(names))])
+    # The grouping travels with the map, so every split drawn inside a fold, the encoders'
+    # validation set and the penalised fit's inner folds, keeps whole what the outer folds kept
+    # whole.
     return Folds(fold=_deal(per_group, v, seed, strata, "groups")[index], units=y.units,
-                 grouped=True)
+                 grouped=True, group=tuple(key.tolist()))
 
 
 def _deal(value: np.ndarray, v: int, seed: int, strata: int, what: str) -> np.ndarray:

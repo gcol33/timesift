@@ -34,7 +34,8 @@ takes. Named alongside the grains they form the candidate set.}
 defaults of \code{\link[=fold_map]{fold_map()}} when not given.}
 
 \item{inner}{Number of inner folds the selection is made on, or a function of the outer training
-response returning a fold map for those units.}
+response returning a fold map for those units. A count deals the inner folds by the grouping
+the outer fold map carries, so what \code{\link[=grouped_cv]{grouped_cv()}} kept whole outside stays whole inside.}
 
 \item{response}{Name of the registered response head.}
 

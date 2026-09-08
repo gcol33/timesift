@@ -175,6 +175,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 
   folds <- .as_fold_map(resampling, y_matrix, targets, tf)
   f <- .as_folds(folds, tf$label)
+  group <- .fold_group(folds, tf$label)
   cells <- head$cells(y_matrix, folds)
   if (!any(cells$scorable)) {
     stop("no (response, fold) cell is scorable under this fold map, so no candidate can be ",
@@ -199,7 +200,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
               " representation")
     }
     run <- .fit_candidate(learner, x_array, y_matrix, f, levels, response, control, keep_fits,
-                          verbose)
+                          verbose, group = group)
     oof[[cand]] <- run$oof
     scores[[cand]] <- .candidate_scores(cand, fitted$representation[i], fitted$learner[i],
                                         y_matrix, run$oof, f, levels, cells, score)
@@ -207,7 +208,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
       fits[[cand]] <- run$fits
     }
     models_out[[cand]] <- fit_learner(learner, x_array, y_matrix, response = response,
-                                      control = control)
+                                      control = control, group = group)
   }
   scores <- do.call(rbind, scores)
   rownames(scores) <- NULL
@@ -471,7 +472,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 # One candidate, over every fold, into the out-of-fold matrix the layers above read. Nothing above
 # this loop knows whether the learner covered the responses jointly or one at a time.
 .fit_candidate <- function(learner, x, y, f, levels, response, control, keep_fits,
-                           verbose = FALSE) {
+                           verbose = FALSE, group = NULL) {
   p <- matrix(NA_real_, nrow = nrow(y), ncol = ncol(y), dimnames = dimnames(y))
   fits <- list()
   for (k in levels) {
@@ -479,7 +480,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
     train <- which(f != k)
     test <- which(f == k)
     fit <- fit_learner(learner, .subset_units(x, train), y[train, , drop = FALSE],
-                       response = response, control = control)
+                       response = response, control = control, group = group[train])
     held_out <- stats::predict(fit, .subset_units(x, test))
     if (verbose) {
       message(sprintf("  fold %s of %d, %.0f s", k, length(levels),

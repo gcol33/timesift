@@ -78,8 +78,23 @@ fold_map <- function(y, v = 10L, seed = 1L, strata = 5L, by = NULL, group = NULL
     dealt[idx[sample.int(length(idx))]] <- labels[(dealt_so_far + seq_along(idx) - 1L) %% v + 1L]
     dealt_so_far <- dealt_so_far + length(idx)
   }
+  # The grouping travels with the map, so every split drawn inside a fold, the encoders'
+  # validation set and the penalised fit's inner folds, keeps whole what the outer folds kept
+  # whole.
   structure(stats::setNames(dealt[key], rownames(y)), v = as.integer(v), seed = seed,
-            strata = as.integer(strata), grouped = !is.null(group), class = "timesift_folds")
+            strata = as.integer(strata), grouped = !is.null(group),
+            group = if (is.null(group)) NULL else as.character(group),
+            class = "timesift_folds")
+}
+
+# The grouping a fold map carries, in the row order of `units`, or NULL where it carries none.
+.fold_group <- function(folds, units) {
+  # attr() partial-matches, and "group" is a prefix of "grouped".
+  group <- attr(folds, "group", exact = TRUE)
+  if (is.null(group)) {
+    return(NULL)
+  }
+  stats::setNames(group, names(folds))[units]
 }
 
 #' How the folds are drawn
@@ -157,7 +172,9 @@ print.timesift_resampling <- function(x, ...) {
   if (inherits(resampling, "timesift_folds")) {
     return(structure(stats::setNames(f, tf$label), v = attr(resampling, "v"),
                      seed = attr(resampling, "seed"), strata = attr(resampling, "strata"),
-                     grouped = isTRUE(attr(resampling, "grouped")), class = "timesift_folds"))
+                     grouped = isTRUE(attr(resampling, "grouped")),
+                     group = unname(.fold_group(resampling, tf$label)),
+                     class = "timesift_folds"))
   }
   structure(stats::setNames(f, tf$label), v = length(unique(f)), seed = NA,
             strata = NA_integer_, grouped = FALSE, class = "timesift_folds")

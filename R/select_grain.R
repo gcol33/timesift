@@ -30,7 +30,8 @@
 #' @param folds The outer fold map, from [fold_map()] or any named integer vector. Built with the
 #'   defaults of [fold_map()] when not given.
 #' @param inner Number of inner folds the selection is made on, or a function of the outer training
-#'   response returning a fold map for those units.
+#'   response returning a fold map for those units. A count deals the inner folds by the grouping
+#'   the outer fold map carries, so what [grouped_cv()] kept whole outside stays whole inside.
 #' @param response Name of the registered response head.
 #' @param metric Name of a registered metric the selection is made on, or `NULL` for the
 #'   response's own. The estimate is reported under every registered metric whichever this is.
@@ -94,7 +95,8 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
   metric <- metric %||% spec$metric
   score <- .metrics_reg$get(metric)
   learners <- .learner_list(learners)
-  inner_split <- .inner_splitter(inner)
+  group <- .fold_group(folds, units)
+  inner_split <- .inner_splitter(inner, group)
   .check_compare(compare, metric)
   candidates <- expand.grid(grain = names(set), learner = names(learners),
                             KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
@@ -117,7 +119,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     # The selector sees the outer training units and nothing else: the inner map is drawn on them,
     # and the representation it searches over is cut to them before any fitting happens.
     lad <- grain_ladder(.subset_set(set, train), y_train, learners,
-                         folds = inner_split(y_train, seed + i), response = response,
+                         folds = inner_split(y_train, seed + i, train), response = response,
                          metric = metric, control = control, verbose = FALSE)
     grid <- .join_candidates(candidates, summary(lad), k)
     if (all(!is.finite(grid$score))) {
@@ -130,7 +132,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     # the ones its chosen candidate would have made rather than a second fitting path's.
     fit <- fit_learner(learners[[grid$learner[won]]],
                        .subset_units(set[[grid$grain[won]]], train), y_train,
-                       response = response, control = control)
+                       response = response, control = control, group = group[train])
     held_out <- stats::predict(fit, .subset_units(set[[grid$grain[won]]], test))
     p[rownames(held_out), colnames(held_out)] <- held_out
 
@@ -316,11 +318,11 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
   candidates
 }
 
-# The inner map is drawn on the outer training units alone, either by fold_map() at a given count or
-# by a splitter of the caller's own.
-.inner_splitter <- function(inner) {
+# The inner map is drawn on the outer training units alone, either by fold_map() at a given count,
+# dealing by the grouping the outer map carries, or by a splitter of the caller's own.
+.inner_splitter <- function(inner, group = NULL) {
   if (is.function(inner)) {
-    return(function(y_train, seed) inner(y_train))
+    return(function(y_train, seed, train) inner(y_train))
   }
   if (!is.numeric(inner) || length(inner) != 1L || is.na(inner) || inner < 2L ||
         inner != trunc(inner)) {
@@ -328,7 +330,10 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
          paste(deparse(inner), collapse = ""), ".", call. = FALSE)
   }
   inner <- as.integer(inner)
-  function(y_train, seed) fold_map(y_train, v = inner, seed = seed)
+  function(y_train, seed, train) {
+    fold_map(y_train, v = inner, seed = seed, strata = if (is.null(group)) 5L else 1L,
+             group = group[train])
+  }
 }
 
 .subset_set <- function(set, idx) {

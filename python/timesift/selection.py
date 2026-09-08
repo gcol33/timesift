@@ -79,6 +79,7 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
     y = spec["prepare"](as_response(y)).align(units)
     if folds is None:
         folds = fold_map(y)
+    folds = Folds.coerce(folds, units).align(units)
     f = align_folds(folds, units)
     cells = spec["cells"](y, Folds(fold=f, units=units))
     # The estimate is reported under every registered metric, and one selected on has to be a row
@@ -89,7 +90,7 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
                         "function of (y, p).")
     metric = metric or spec["metric"]
     score = METRICS.get(metric)
-    split = _inner_splitter(inner)
+    split = _inner_splitter(inner, folds.group)
     _check_compare(compare, metric)
     # The candidate set keeps the order its grains and its learners were declared in, so which
     # candidate an exact tie on the inner score falls to does not depend on how the names sort.
@@ -112,8 +113,8 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
         # The selector sees the outer training units and nothing else: the inner map is drawn on
         # them, and the representation it searches over is cut to them before any fitting happens.
         lad = grain_ladder(_subset(grains, train), y_train, learners,
-                            folds=split(y_train, seed + i), response=response, metric=metric,
-                            control=control, verbose=False)
+                            folds=split(y_train, seed + i, train), response=response,
+                            metric=metric, control=control, verbose=False)
         grid = _join_candidates(candidates, lad.summary(), int(k))
         if not any(np.isfinite(g["score"]) for g in grid):
             raise ValueError(f"no candidate scored inside the training data of fold {k}. Widen "
@@ -121,7 +122,9 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
         won = _first_best(grid)
 
         fit = fit_learner(learners[won["learner"]], grains[won["grain"]].take_units(train),
-                          y_train, response=response, control=control)
+                          y_train, response=response, control=control,
+                          group=None if folds.group is None
+                          else tuple(folds.group[i] for i in train))
         held = grains[won["grain"]].take_units(test)
         place(p, y, held.units, fit.variables, fit.predict(held))
 
@@ -174,15 +177,22 @@ def _first_best(grid: list[dict]) -> dict:
     return best
 
 
-def _inner_splitter(inner):
+def _inner_splitter(inner, group=None):
     """The inner map is drawn on the outer training units alone, either by ``fold_map`` at a given
-    count or by a splitter of the caller's own."""
+    count, dealing by the grouping the outer map carries, or by a splitter of the caller's own."""
     if callable(inner):
-        return lambda y_train, seed: inner(y_train)
+        return lambda y_train, seed, train: inner(y_train)
     if not isinstance(inner, (int, np.integer)) or isinstance(inner, bool) or int(inner) < 2:
         raise ValueError("`inner` is a number of folds of at least 2, or a function of the "
                          f"training response, got {inner!r}")
-    return lambda y_train, seed: fold_map(y_train, v=int(inner), seed=seed)
+
+    def split(y_train, seed, train):
+        if group is None:
+            return fold_map(y_train, v=int(inner), seed=seed)
+        return fold_map(y_train, v=int(inner), seed=seed, strata=1,
+                        group=[group[i] for i in train])
+
+    return split
 
 
 # Every registered metric reads the same held-out predictions, so the estimate is reported under

@@ -312,3 +312,15 @@ test_that("a patience of Inf trains the whole budget", {
   expect_true(ctrl$early_stopping >= .Machine$integer.max)
   expect_error(train_control(early_stopping = -Inf), "at least one")
 })
+
+test_that("the inner validation set keeps a grouping whole, as the outer folds do", {
+  set.seed(3)
+  y <- cbind(rbinom(40, 1, 0.3), rbinom(40, 1, 0.5))
+  group <- rep(sprintf("g%02d", 1:20), each = 2L)
+  for (i in 1:10) {
+    val <- .validation_split(y, 0.25, group)
+    # Five of twenty groups, so ten rows, and never one row of a group without the other.
+    expect_length(val, 10L)
+    expect_true(all(table(group[val]) == 2L))
+  }
+})

@@ -224,3 +224,23 @@ test_that("a fold map holding one fold is refused, and a caller's map keeps what
   expect_equal(attr(kept, "v"), 4L)
   expect_equal(as.integer(kept), as.integer(grouped))
 })
+
+test_that("a fold map carries its grouping, and the inner folds a fit draws keep it whole", {
+  y <- sim_response(sim_series(n_unit = 24L, days = 2L))
+  group <- rep(sprintf("s%02d", 1:8), each = 3L)
+  f <- fold_map(y, v = 4L, group = group)
+  expect_equal(attr(f, "group", exact = TRUE), group)
+  expect_null(attr(fold_map(y, v = 4L), "group", exact = TRUE))
+  # Read back in another row order, the grouping follows the units.
+  shuffled <- rev(rownames(y))
+  expect_equal(unname(.fold_group(f, shuffled)), rev(group))
+  inner <- .inner_folds(y, 3L, 5L, group)
+  expect_true(all(tapply(inner, group, function(v) length(unique(v))) == 1L))
+  expect_setequal(unique(inner), 1:3)
+  # The selection's inner splitter deals the outer training units by the same grouping.
+  split <- .inner_splitter(3L, group)
+  train <- 1:18
+  inner_map <- split(y[train, , drop = FALSE], 2L, train)
+  expect_true(all(tapply(as.integer(inner_map), group[train],
+                         function(v) length(unique(v))) == 1L))
+})

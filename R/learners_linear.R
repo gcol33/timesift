@@ -40,7 +40,8 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
     needs = "glmnet",
     params = list(alpha = alpha, n_inner = n_inner, squares = squares, s = s,
                   weight_positives = weight_positives, seed = seed),
-    fit = function(x, y, alpha, n_inner, squares, s, weight_positives, seed, head, ...) {
+    fit = function(x, y, alpha, n_inner, squares, s, weight_positives, seed, head, group = NULL,
+                   ...) {
       family <- .head_family(head)
       m <- .design(x, squares)
       if (ncol(m) < 2L) {
@@ -59,17 +60,16 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
         set.seed(seeds[j])
         w <- if (weight_positives && family == "binomial") .imbalance_weights(yj)
              else rep(1, length(yj))
+        # The inner folds are dealt here rather than by cv.glmnet, so a grouping the outer folds
+        # keep whole stays whole where the penalty is chosen.
         glmnet::cv.glmnet(m, yj, family = family, alpha = alpha, weights = w,
-                          nfolds = n_inner, type.measure = "deviance")
+                          foldid = .inner_folds(y, n_inner, seeds[j], group),
+                          type.measure = "deviance")
       })
       list(models = models, squares = squares, s = s, columns = colnames(m))
     },
     predict = function(model, x) {
       m <- .design(x, model$squares)
-      if (!identical(colnames(m), model$columns)) {
-        stop("the representation predicted on has different channels or bins from the fitted one.",
-             call. = FALSE)
-      }
       .as_predictions(vapply(model$models, function(f) {
         if (is.numeric(f)) rep(f, nrow(m))
         else as.numeric(stats::predict(f, m, s = model$s, type = "response"))
@@ -116,10 +116,6 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L) {
     },
     predict = function(model, x) {
       m <- .flatten(x)
-      if (!identical(colnames(m), model$columns)) {
-        stop("the representation predicted on has different channels or bins from the fitted one.",
-             call. = FALSE)
-      }
       .as_predictions(vapply(model$models, function(f) .predict_forward(f, m), numeric(nrow(m))),
                       nrow(m))
     }

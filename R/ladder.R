@@ -57,6 +57,7 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
     folds <- fold_map(y)
   }
   f <- .as_folds(folds, units)
+  group <- .fold_group(folds, units)
   cells <- spec$cells(y, stats::setNames(f, units))
   metric <- .as_metric(metric, spec$metric)
   score <- metric$fn
@@ -76,7 +77,7 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
       # way whichever door it came in by, and the ladder and a whole run cannot drift apart on
       # what a declared field means.
       run <- .fit_candidate(learners[[ln]], set[[w]], y, f, levels, response, control = control,
-                            keep_fits = keep_fits, verbose = verbose)
+                            keep_fits = keep_fits, verbose = verbose, group = group)
       preds[[arm]] <- run$oof
       for (k in names(run$fits)) {
         fits[[paste(arm, k, sep = "|")]] <- run$fits[[k]]
