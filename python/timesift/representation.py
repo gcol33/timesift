@@ -613,8 +613,13 @@ def _columns(data, id, time, value):
     return unit, when, reading, zone
 
 
+def _check_grain(g) -> str:
+    """One grain name. The set of them is the one below, so a name is refused in one place."""
+    return _check_grains([g])[0]
+
+
 def _check_grains(grain):
-    grain = list(grain)
+    grain = [str(g) for g in grain]
     bad = [w for w in grain if w not in GRAINS]
     if bad:
         raise ValueError(f"unknown grain: {', '.join(bad)}. Available: {', '.join(GRAINS)}")

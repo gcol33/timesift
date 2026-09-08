@@ -608,6 +608,11 @@ call site.
 - `grain_ladder()` and `select_grain()` take a `control` as a run does, and hand it to every
   learner that declares one. A selection hands the same one to the inner search and to the refit.
 - Held-out predictions are placed by unit and by variable, never by position.
+- A learner is handed the whole response matrix and returns one column per response, whether it
+  declares `joint` or `separate`. `multi` is what the learner says it does with that matrix and
+  what a report says of the candidate; a learner fitting one model per response does that inside
+  its own fit, so the block of predictors is built once for the fit rather than once for every
+  response of it.
 - A prediction that is not a number on a scorable cell is refused where it is scored, naming the
   arm, the cell and how many there are, rather than scored as the `NA` a one-class cell gives. The
   combiner is fitted on every scorable cell and refuses to drop one for the same reason.

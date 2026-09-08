@@ -16,8 +16,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .ladder import score_arm
-from .learners import Fit, fit_learner
+from .ladder import out_of_fold, score_arm
+from .learners import fit_learner
 from .registry import RESPONSES, get_learner, resolve_metric
 from .representation import TimesiftMatrix
 from .response import Folds, Response
@@ -28,43 +28,13 @@ from .stack import SEPARATOR, run_ensemble
 from .specs import (Representation, Sift, TimesiftSpec, _needs_target_time, as_sift,
                     build_representation, expand_sift, grains, resolve_folds, target_labels)
 
-__all__ = ["CandidateFit", "Timesift", "timesift"]
+__all__ = ["Timesift", "timesift"]
 
 # The one grain a tabular learner cannot be handed: it gives a column per reading rather than a
 # reduction, which is the whole reason a sequence learner is the one that reads it.
 UNREDUCED = "native"
 
 SCORE_COLUMNS = ("candidate", "variable", "fold", "score", "scorable")
-
-
-@dataclass
-class CandidateFit:
-    """One candidate's fitted models, whichever way its learner covers the responses.
-
-    A joint learner is one model over the whole response matrix and a separate one is a model per
-    response; either way this predicts the same ``[target, response]`` matrix, in the response
-    order the candidate was fitted on.
-    """
-
-    learner: object
-    fits: tuple[Fit, ...]
-    variables: tuple[str, ...]
-
-    def predict(self, x: TimesiftMatrix) -> np.ndarray:
-        """One ``[row, response]`` matrix, whatever the candidate is made of.
-
-        A joint learner contributes one fit covering every response and a separate one contributes
-        a fit per response; the columns are assembled by name either way, so nothing above a
-        candidate can tell which it was.
-        """
-        columns = [v for f in self.fits for v in f.variables]
-        p = np.concatenate([f.predict(x) for f in self.fits], axis=1)
-        position = {v: j for j, v in enumerate(columns)}
-        missing = [v for v in self.variables if v not in position]
-        if missing:
-            raise ValueError(f"the {self.learner.name} learner returned no column for "
-                             f"{missing[0]}")
-        return p[:, [position[v] for v in self.variables]]
 
 
 @dataclass
@@ -195,14 +165,17 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
         learner, m = pair["learner"], representations[label]
         if verbose:
             print(f"fitting {name}")
-        p = _out_of_fold(m, y_mat, folds, levels, learner, response, control, name, fits,
-                         keep_fits)
+        p, per_fold = out_of_fold(m, y_mat, folds.fold, levels, learner, response, control,
+                                  keep_fits)
+        for k, fold_fit in per_fold.items():
+            fits[f"{name}|{k}"] = fold_fit
         oof[name] = p
         rows = score_arm(label, name, y_mat, p, folds.fold, levels, cells, score)
         table["candidate"].extend(rows["learner"])
         for column in ("variable", "fold", "score", "scorable"):
             table[column].extend(rows[column])
-        fitted[name] = _fit_candidate(learner, m, y_mat, response, control)
+        fitted[name] = fit_learner(learner, m, y_mat, response=response,
+                                   control=control)
 
     scores = {"candidate": np.asarray(table["candidate"]),
               "variable": np.asarray(table["variable"]),
@@ -215,41 +188,6 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
                     representations=representations, sift=Sift(used), stack=stack, weights=weights,
                     models=fitted, folds=folds, cells=cells, y=y_mat, metric=metric_name,
                     scorer=score, response=response, spec=spec, fits=fits, control=control)
-
-
-# ---- the fitting loop ---------------------------------------------------------------------------
-
-def _out_of_fold(m, y, folds, levels, learner, response, control, name, fits,
-                 keep_fits) -> np.ndarray:
-    p = np.full(y.values.shape, np.nan)
-    row = {u: i for i, u in enumerate(y.units)}
-    column = {v: j for j, v in enumerate(y.variables)}
-    for k in levels:
-        train = np.flatnonzero(folds.fold != k)
-        held = m.take_units(np.flatnonzero(folds.fold == k))
-        fit = _fit_candidate(learner, m.take_units(train), y.take_units(train), response, control)
-        predicted = fit.predict(held)
-        # Keyed on both axes rather than positional: a learner returning its responses in another
-        # order would otherwise scramble which prediction belongs to which one, silently.
-        for a, u in enumerate(held.units):
-            for b, v in enumerate(fit.variables):
-                p[row[u], column[v]] = predicted[a, b]
-        if keep_fits:
-            fits[f"{name}|{int(k)}"] = fit
-    return p
-
-
-def _fit_candidate(learner, x, y, response, control) -> CandidateFit:
-    """The learner declares whether one fitted model covers every response; where it does not, this
-    is where the responses are taken one at a time, so the candidate emits one matrix either way.
-    """
-    if learner.multi == "joint":
-        parts = (fit_learner(learner, x, y, response=response, control=control),)
-    else:
-        parts = tuple(fit_learner(learner, x, y.take_variables([j]), response=response,
-                                  control=control)
-                      for j in range(len(y.variables)))
-    return CandidateFit(learner=learner, fits=parts, variables=y.variables)
 
 
 def _combine(spec, oof, y, cells, folds, scores, verbose):

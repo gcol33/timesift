@@ -200,7 +200,8 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
     if (keep_fits) {
       fits[[cand]] <- run$fits
     }
-    models_out[[cand]] <- .fit_candidate_once(learner, x_array, y_matrix, response, control)
+    models_out[[cand]] <- fit_learner(learner, x_array, y_matrix, response = response,
+                                      control = control)
   }
   scores <- do.call(rbind, scores)
   rownames(scores) <- NULL
@@ -285,7 +286,8 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 }
 
 # A learner declares what it can be handed and whether one fitted model covers every response.
-# Both decide how the fitting layer calls it, so neither has a default to fall back on.
+# `reads` decides what the fitting layer may pair it with and `multi` is what a report says of the
+# candidate, so neither has a default to fall back on.
 .learner_contract <- function(learner, label) {
   if (!isTRUE(learner$reads %in% c("tabular", "sequence"))) {
     stop("the ", label, " learner does not declare `reads`, which is \"tabular\" or \"sequence\".",
@@ -470,8 +472,8 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
     started <- Sys.time()
     train <- which(f != k)
     test <- which(f == k)
-    fit <- .fit_candidate_once(learner, .subset_units(x, train), y[train, , drop = FALSE],
-                               response, control)
+    fit <- fit_learner(learner, .subset_units(x, train), y[train, , drop = FALSE],
+                       response = response, control = control)
     held_out <- stats::predict(fit, .subset_units(x, test))
     if (verbose) {
       message(sprintf("  fold %s of %d, %.0f s", k, length(levels),
@@ -483,39 +485,6 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
     }
   }
   list(oof = p, fits = if (keep_fits) fits else NULL)
-}
-
-# A learner that covers the responses jointly is handed the matrix; one that does not is fitted
-# once per column and the columns are put back together here. Either way one candidate is one
-# fitted object emitting one [target, response] matrix.
-.fit_candidate_once <- function(learner, x, y, response, control) {
-  columns <- if (identical(learner$multi, "separate")) {
-    as.list(seq_len(ncol(y)))
-  } else {
-    list(seq_len(ncol(y)))
-  }
-  fits <- lapply(columns, function(j) {
-    fit_learner(learner, x, y[, j, drop = FALSE], response = response, control = control)
-  })
-  structure(list(fits = fits, learner = .learner_ref(learner), variables = colnames(y),
-                 response = response, multi = learner$multi),
-            class = "timesift_candidate")
-}
-
-#' @export
-predict.timesift_candidate <- function(object, newdata, ...) {
-  parts <- lapply(object$fits, function(f) stats::predict(f, newdata))
-  out <- do.call(cbind, parts)
-  out[, object$variables, drop = FALSE]
-}
-
-#' @export
-print.timesift_candidate <- function(x, ...) {
-  cat("<timesift candidate>", x$learner$name, "on",
-      .plural(length(x$variables), "response"), "\n")
-  cat("fitted  :", .plural(length(x$fits), "model"),
-      if (identical(x$multi, "separate")) "(one per response)" else "(one over all)", "\n")
-  invisible(x)
 }
 
 .candidate_scores <- function(candidate, representation, learner, y, p, f, levels, cells, score) {

@@ -26,6 +26,17 @@
 
 ## Fitting
 
+* A learner is handed the whole response matrix whether it declares `joint` or `separate`, and
+  the three that fit one model per response already did that inside their own fit. The fitting
+  layer was splitting the responses as well, so the flattened block of predictors was rebuilt once
+  for every response: on the published grid, 101 copies of a 47 MB matrix per fold and per arm.
+  `multi` is now what the learner says it does with the matrix and what a report says of the
+  candidate. The wrapper that reassembled the columns is gone from both sides, and with it the
+  Python `CandidateFit`.
+* One fold loop on the Python side, which the run, the ladder and the inner search of a selection
+  all call, in place of three copies; one `_check_bins` and one `_check_grain`; and one baseline
+  prediction per fold in the occlusion, which was rebuilding an encoder from its arrays once per
+  response.
 * A fit refers to the code that made it rather than carrying a copy of it. R writes a closure's
   body out beside the closure, so `saveRDS()` on a fit copied every function that produced it and a
   fit read back after an upgrade rebuilt the old encoder and loaded the new weights into it. A

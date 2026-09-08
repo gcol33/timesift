@@ -8,8 +8,10 @@
 #' A learner declares what it can be handed and how it covers several responses. `reads` is
 #' `"tabular"` where the bins reach it as a block of predictors and `"sequence"` where their order
 #' in time is what it reads, and `multi` is `"joint"` where one fitted model covers every response
-#' and `"separate"` where one is fitted per response. Either way a candidate emits one
-#' `[target, response]` matrix, so nothing above the learner layer has to know which it was.
+#' and `"separate"` where the learner fits one per response. Either way it is handed the whole
+#' response matrix and returns one column per response, so nothing above the learner layer has to
+#' know which it was, and the block of predictors is built once for the fit rather than once for
+#' every response of it.
 #'
 #' `data` pins a learner to one representation. Left `NULL` the learner runs across every
 #' representation of the run.
@@ -26,8 +28,9 @@
 #' @param data A representation the learner is pinned to, or `NULL` to run across every
 #'   representation of the run.
 #' @param reads `"tabular"` or `"sequence"`.
-#' @param multi `"separate"` where one model is fitted per response, `"joint"` where one model
-#'   covers them all.
+#' @param multi `"separate"` where the learner fits one model per response, `"joint"` where one
+#'   model covers them all. It is handed the whole response matrix either way; this is what the
+#'   learner says it does with it, and what a report says of the candidate.
 #' @param control A [train_control()] for this learner alone. The settings it names override the
 #'   control the run was given; everything else is taken from that one.
 #' @param needs Packages the learner requires. A learner that cannot run says so at once rather
@@ -260,6 +263,12 @@ predict.timesift_fit <- function(object, newdata, ...) {
   if (nrow(p) != dim(newdata)[1L]) {
     stop("the learner returned ", nrow(p), " rows for ", dim(newdata)[1L], " units.",
          call. = FALSE)
+  }
+  if (ncol(p) != length(object$variables)) {
+    stop("the ", object$learner$name, " learner returned ", ncol(p), " columns for ",
+         .plural(length(object$variables), "response"),
+         ". A learner is handed the whole response matrix and returns one column per response, ",
+         "in the order it was handed them.", call. = FALSE)
   }
   dimnames(p) <- list(dimnames(newdata)[[1L]], object$variables)
   p

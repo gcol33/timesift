@@ -104,13 +104,34 @@ def test_the_response_and_the_folds_are_in_the_targets_own_row_order():
 
 
 def test_a_separate_learner_and_a_joint_one_emit_the_same_shaped_matrix():
+    """Both are handed the whole response matrix and both emit one column per response.
+
+    A learner that fits one model per response does that inside its own fit, so the block of
+    predictors is built once for the fit rather than once for every response of it.
+    """
     fit = fitted(models=[learner("apart", multi="separate"), learner("together", multi="joint")])
     apart = fit.models[f"apart{SEPARATOR}day"]
     together = fit.models[f"together{SEPARATOR}day"]
-    assert len(apart.fits) == 3 and len(together.fits) == 1
     assert apart.variables == together.variables == ("sp_a", "sp_b", "sp_c")
     assert apart.predict(fit.representations["day"]).shape == (12, 3)
     assert together.predict(fit.representations["day"]).shape == (12, 3)
+
+
+def test_the_predictor_block_is_built_once_for_a_fit_rather_than_once_per_response():
+    seen = []
+
+    def fit(x, y, **_):
+        seen.append(x.values.shape)
+        return dict(rate=y.mean(axis=0))
+
+    counting = Learner(name="counting", multi="separate", fit=fit,
+                       predict=lambda model, x: np.tile(model["rate"], (x.values.shape[0], 1)))
+    run = fitted(models=[counting], sift=grains("day"))
+    # Three folds and the refit on all targets, whatever the number of responses. Fitting per
+    # response inside the layer instead would build the flattened block once for every one of
+    # them, which on the published grid is 101 copies of a 47 MB matrix per fold and per arm.
+    assert len(seen) == 4
+    assert len(run.y.variables) > 1
 
 
 def test_the_models_kept_per_fold_are_keyed_by_candidate_and_fold():
@@ -124,8 +145,8 @@ def test_the_control_reaches_the_learner():
 
     control = train_control(epochs=3)
     fit = fitted(control=control)
-    assert fit.models[f"stub{SEPARATOR}day"].fits[0].model["control"] is control
-    assert fitted().models[f"stub{SEPARATOR}day"].fits[0].model["control"] is None
+    assert fit.models[f"stub{SEPARATOR}day"].model["control"] is control
+    assert fitted().models[f"stub{SEPARATOR}day"].model["control"] is None
 
 
 # ---- the rules the entry point enforces ----------------------------------------------------------

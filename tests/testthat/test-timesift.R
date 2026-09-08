@@ -137,7 +137,7 @@ test_that("the scores are one row per candidate, variable and fold", {
   expect_true(all(is.na(fit$scores$score) | fit$scores$scorable))
 })
 
-test_that("a separate learner is fitted once per response and emits one matrix", {
+test_that("a learner is handed the whole response matrix however it covers the responses", {
   case <- toy_case()
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
                   models = list(one = toy(multi = "separate"), all = toy(multi = "joint")),
@@ -145,12 +145,32 @@ test_that("a separate learner is fitted once per response and emits one matrix",
                   control = NULL, verbose = FALSE, keep_fits = TRUE)
   separate <- fit$fits[["one / week"]][["1"]]
   joint <- fit$fits[["all / week"]][["1"]]
-  expect_length(separate$fits, ncol(fit$y))
-  expect_length(joint$fits, 1L)
-  expect_equal(separate$fits[[1L]]$model$responses, 1L)
-  expect_equal(joint$fits[[1L]]$model$responses, ncol(fit$y))
+  expect_equal(separate$model$responses, ncol(fit$y))
+  expect_equal(joint$model$responses, ncol(fit$y))
+  expect_equal(separate$variables, colnames(fit$y))
   expect_equal(dim(fit$oof[["one / week"]]), dim(fit$oof[["all / week"]]))
   expect_equal(colnames(fit$oof[["one / week"]]), colnames(fit$y))
+})
+
+test_that("the predictor block is built once for a fit rather than once per response", {
+  case <- toy_case()
+  seen <- new.env(parent = emptyenv())
+  seen$n <- 0L
+  counting <- learner(
+    "counting", multi = "separate",
+    fit = function(x, y, ...) {
+      seen$n <- seen$n + 1L
+      list(rate = colMeans(y))
+    },
+    predict = function(model, x) outer(rep(1, dim(x)[1L]), model$rate))
+  fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+                  models = counting, sift = grains("week"), ensemble = FALSE,
+                  resampling = cv(v = 3L), control = NULL, verbose = FALSE)
+  # Three folds and the refit on all targets, whatever the number of responses. Fitting per
+  # response inside the layer instead would build the flattened block once for every one of them,
+  # which on the published grid is 101 copies of a 47 MB matrix per fold and per arm.
+  expect_equal(seen$n, 4L)
+  expect_true(ncol(fit$y) > 1L)
 })
 
 test_that("a pair no learner can read is skipped, named, and reported as not applicable", {

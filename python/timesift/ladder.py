@@ -15,8 +15,8 @@ from .response import (Folds, Response, align_folds, as_response, fold_map,
                        scorable_cells)
 
 __all__ = ["Ladder", "concat_ladders", "grain_ladder", "implied_skill", "ladder_from_rows",
-           "learner_dict", "mean_se", "paired_contrast", "per_variable", "score_arm",
-           "score_predictions",
+           "learner_dict", "mean_se", "out_of_fold", "paired_contrast", "per_variable", "place",
+           "score_arm", "score_predictions",
            "scored_cells", "table_columns", "tss_inflation", "variable_means"]
 
 
@@ -103,23 +103,9 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
             arm = f"{w}|{name}"
             if verbose:
                 print(f"fitting {name} at the {w} grain")
-            p = np.full(y.values.shape, np.nan)
-            column = {v: j for j, v in enumerate(y.variables)}
-            row = {u: i for i, u in enumerate(units)}
-            for k in levels:
-                train = np.flatnonzero(f != k)
-                held = m.take_units(np.flatnonzero(f == k))
-                fit = fit_learner(ln, m.take_units(train), y.take_units(train),
-                                  response=response, control=control)
-                predicted = fit.predict(held)
-                # Keyed on both axes rather than positional: a learner returning its variables in
-                # another order would otherwise scramble which prediction belongs to which one,
-                # silently.
-                for a, u in enumerate(held.units):
-                    for b, v in enumerate(fit.variables):
-                        p[row[u], column[v]] = predicted[a, b]
-                if keep_fits:
-                    fits[f"{arm}|{k}"] = fit
+            p, per_fold = out_of_fold(m, y, f, levels, ln, response, control, keep_fits)
+            for k, fit in per_fold.items():
+                fits[f"{arm}|{k}"] = fit
             predictions[arm] = p
             scored = score_arm(w, name, y, p, f, levels, cells, score)
             for key, into in (("grain", grain), ("learner", learner), ("variable", variable),
@@ -131,6 +117,42 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
                             predictions=predictions, cells=cells,
                             folds=Folds(fold=f, units=units), metric=metric_name, scorer=score,
                             response=response, fits=fits)
+
+
+def out_of_fold(m, y: Response, f: np.ndarray, levels, learner, response: str, control=None,
+                keep_fits: bool = False):
+    """One candidate over every fold, into the out-of-fold matrix the layers above read.
+
+    The one fold loop of the package: a run, a ladder and the inner search of a selection all fit
+    on the training units of a fold and predict its held-out ones, so they do it here rather than
+    each carrying a copy. Nothing here knows whether the learner covers the responses jointly or
+    one at a time; it is handed the whole response matrix either way.
+    """
+    p = np.full(y.values.shape, np.nan)
+    fits = {}
+    for k in levels:
+        train = np.flatnonzero(f != k)
+        held = m.take_units(np.flatnonzero(f == k))
+        fit = fit_learner(learner, m.take_units(train), y.take_units(train), response=response,
+                          control=control)
+        place(p, y, held.units, fit.variables, fit.predict(held))
+        if keep_fits:
+            fits[int(k)] = fit
+    return p, fits
+
+
+def place(p: np.ndarray, y: Response, units, variables, predicted: np.ndarray) -> np.ndarray:
+    """Write a block of predictions into the out-of-fold matrix, keyed on both axes.
+
+    Keyed rather than positional: a learner returning its responses in another order would
+    otherwise scramble which prediction belongs to which one, silently.
+    """
+    row = {u: i for i, u in enumerate(y.units)}
+    column = {v: j for j, v in enumerate(y.variables)}
+    for a, u in enumerate(units):
+        for b, v in enumerate(variables):
+            p[row[u], column[v]] = predicted[a, b]
+    return p
 
 
 def score_arm(grain, learner, y: Response, p: np.ndarray, f: np.ndarray, levels,

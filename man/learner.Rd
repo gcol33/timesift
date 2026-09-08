@@ -34,8 +34,9 @@ representation of the run.}
 
 \item{reads}{\code{"tabular"} or \code{"sequence"}.}
 
-\item{multi}{\code{"separate"} where one model is fitted per response, \code{"joint"} where one model
-covers them all.}
+\item{multi}{\code{"separate"} where the learner fits one model per response, \code{"joint"} where one
+model covers them all. It is handed the whole response matrix either way; this is what the
+learner says it does with it, and what a report says of the candidate.}
 
 \item{control}{A \code{\link[=train_control]{train_control()}} for this learner alone. The settings it names override the
 control the run was given; everything else is taken from that one.}
@@ -58,8 +59,10 @@ scoring.
 A learner declares what it can be handed and how it covers several responses. \code{reads} is
 \code{"tabular"} where the bins reach it as a block of predictors and \code{"sequence"} where their order
 in time is what it reads, and \code{multi} is \code{"joint"} where one fitted model covers every response
-and \code{"separate"} where one is fitted per response. Either way a candidate emits one
-\verb{[target, response]} matrix, so nothing above the learner layer has to know which it was.
+and \code{"separate"} where the learner fits one per response. Either way it is handed the whole
+response matrix and returns one column per response, so nothing above the learner layer has to
+know which it was, and the block of predictors is built once for the fit rather than once for
+every response of it.
 
 \code{data} pins a learner to one representation. Left \code{NULL} the learner runs across every
 representation of the run.

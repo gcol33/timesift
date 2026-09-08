@@ -18,9 +18,9 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from .learners import flatten
-from .representation import (DAY_LEVEL_STATS, GRAINS, TimesiftMatrix, _check_stats,
-                             _parse_year_start, _unit_names, bind_channels, grain_matrix,
-                             lookback_matrix)
+from .representation import (DAY_LEVEL_STATS, GRAINS, TimesiftMatrix, _check_bins, _check_grain,
+                             _check_stats, _parse_year_start, _unit_names, bind_channels,
+                             grain_matrix, lookback_matrix)
 from .response import Folds, fold_map
 from .select import column_names, select_columns
 
@@ -445,18 +445,6 @@ def _stats(stats, grain) -> tuple[str, ...]:
 def _year_start(year_start: str) -> str:
     _parse_year_start(year_start)
     return year_start
-
-
-def _check_grain(g) -> str:
-    if g not in GRAINS:
-        raise ValueError(f"unknown grain: {g}. Available: {', '.join(GRAINS)}")
-    return str(g)
-
-
-def _check_bins(bins) -> int:
-    if isinstance(bins, bool) or not isinstance(bins, (int, np.integer)) or int(bins) < 1:
-        raise ValueError("`bins` must be a positive whole number")
-    return int(bins)
 
 
 def _whole(x, arg) -> int:

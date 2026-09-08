@@ -56,7 +56,8 @@ test_that("a unit is never fitted on and scored in the same fold", {
   )
   f <- ladder_fixture()
   invisible(grain_ladder(f$x, f$y, spy, folds = f$folds, verbose = FALSE))
-  # One model is fitted and predicted from per response, so the two records run in step.
+  # One fit and one prediction per grain and fold, whatever the number of responses, so the two
+  # records run in step.
   expect_equal(length(seen$fitted), length(seen$tested))
   expect_gt(length(seen$fitted), 0L)
   for (i in seq_along(seen$fitted)) {

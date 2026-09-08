@@ -17,7 +17,7 @@ from .artifacts import (read_cells, read_folds, read_response, write_cells,
                         write_folds, write_response)
 from .control import TrainControl, train_control
 from .digest import digest_array
-from .fit import CandidateFit, Timesift, timesift
+from .fit import Timesift, timesift
 from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
 from .learners import (Fit, Learner, cnn, elasticnet, fit_learner, flatten, forest, mlp,
@@ -64,7 +64,7 @@ register_learner("cnn", cnn)
 register_learner("rescnn", rescnn)
 
 __all__ = [
-    "CandidateFit", "Cells", "Coverage", "DAY_LEVEL_STATS", "EnsembleSpec", "Fit", "Folds",
+    "Cells", "Coverage", "DAY_LEVEL_STATS", "EnsembleSpec", "Fit", "Folds",
     "GRAINS",
     "Ladder", "Learner", "PRESENCE_ABSENCE", "Representation", "Resampling", "Response", "STATS",
     "Selection", "Sift", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",

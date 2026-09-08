@@ -98,7 +98,10 @@ def occlusion_profile(fits: dict, m: TimesiftMatrix, y, folds, over: str = "bin"
         test = np.flatnonzero(f == k)
         train = np.flatnonzero(f != k)
         sub = m.take_units(test)
-        base = np.asarray([score(y.values[test, j], fit.predict(sub)[:, j])
+        # The baseline is one prediction for the fold, not one per variable: the model reads the
+        # whole block and an encoder would otherwise be rebuilt from its arrays once per response.
+        full = fit.predict(sub)
+        base = np.asarray([score(y.values[test, j], full[:, j])
                            for j in range(len(y.variables))])
         for i in range(n_parts):
             draws = permutations if substitute == "permute" else 1

@@ -11,8 +11,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .ladder import (Ladder, concat_ladders, ladder_from_rows, learner_dict, mean_se,
-                     paired_contrast, per_variable, score_arm, grain_ladder)
+from .ladder import (Ladder, concat_ladders, grain_ladder, ladder_from_rows, learner_dict,
+                     mean_se, paired_contrast, per_variable, place, score_arm)
 from .learners import fit_learner
 from .registry import METRICS, RESPONSES, metrics
 from .representation import TimesiftSet, timesift_set
@@ -101,8 +101,6 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
 
     levels = np.unique(f)
     p = np.full(y.values.shape, np.nan)
-    row = {u: i for i, u in enumerate(units)}
-    column = {v: j for j, v in enumerate(y.variables)}
     chosen: list[dict] = []
     inner_rows: list[dict] = []
 
@@ -125,10 +123,7 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
         fit = fit_learner(learners[won["learner"]], grains[won["grain"]].take_units(train),
                           y_train, response=response, control=control)
         held = grains[won["grain"]].take_units(test)
-        predicted = fit.predict(held)
-        for a, unit in enumerate(held.units):
-            for b, variable in enumerate(fit.variables):
-                p[row[unit], column[variable]] = predicted[a, b]
+        place(p, y, held.units, fit.variables, fit.predict(held))
 
         chosen.append(dict(fold=int(k), grain=won["grain"], learner=won["learner"],
                            inner_score=won["score"], n_train=len(train), n_test=len(test)))

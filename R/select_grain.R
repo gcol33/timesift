@@ -128,9 +128,9 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
 
     # The refit is the inner ladder's own fitting path, so the procedure's held-out predictions are
     # the ones its chosen candidate would have made rather than a second fitting path's.
-    fit <- .fit_candidate_once(learners[[grid$learner[won]]],
-                               .subset_units(set[[grid$grain[won]]], train), y_train,
-                               response = response, control = control)
+    fit <- fit_learner(learners[[grid$learner[won]]],
+                       .subset_units(set[[grid$grain[won]]], train), y_train,
+                       response = response, control = control)
     held_out <- stats::predict(fit, .subset_units(set[[grid$grain[won]]], test))
     p[rownames(held_out), colnames(held_out)] <- held_out
 
