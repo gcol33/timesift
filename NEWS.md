@@ -259,6 +259,12 @@
   codemetar and regenerated at a release. `DESCRIPTION` declares `Language: en-GB`, and
   `inst/WORDLIST` holds the proper nouns and API names the spell check would otherwise flag, so
   `spelling::spell_check_package()` runs clean.
+* The committed site is held to its sources. `build_site.R` writes a digest over everything the
+  site is rendered from into `docs/site-digest.txt`, and the `site` workflow recomputes it from
+  the checkout on every push, so a push that changes the reference, the news or an article
+  without rebuilding the site fails there rather than serving last week's pages under this
+  week's sources. The site stays built locally, because the build post-processes its figures in
+  a way a plain build in CI would not.
 * The Python floor is 3.11. The `sklearn` extra pins the scikit-learn release where the mixing
   parameter alone selects the elastic net, and that release has no build for 3.10, so the 3.10
   job had failed at install on every push. The `test` extra carries pandas, so the suite runs

@@ -46,11 +46,11 @@ A
 
 ## Details
 
-Under a presence-absence head, presences are up-weighted in the
-bootstrap draw by the ratio of absences to presences among the fitting
-targets, the same weighting the penalised fit uses, so a rare response
-is not fitted away by either of them for a reason the other does not
-share.
+The case weights are the response head's,
+[`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
+under presence-absence, and weight the bootstrap draw: a rare response
+is not fitted away here for a reason the other learners do not share,
+because every learner that ships reads the same weights.
 
 ## Examples
 

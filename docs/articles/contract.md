@@ -40,14 +40,18 @@ Requirements, each checked and each an error rather than a warning:
   concerned.
 
 Ordering of the input rows carries no meaning, exactly and not
-approximately: both reductions walk the record by unit and then by
-instant rather than in the order the caller wrote it, so a record and
-any permutation of its rows reduce to the same bytes and reach the same
-digest. Addition is not associative, and a reduction that accumulated in
-the caller’s order would move in its last bits under a permutation that
-changed nothing about the record. A record already in that order is the
-common case and pays the scan that establishes it. The output is ordered
-by sorted unique id and by bin start.
+approximately: both reductions walk the record by unit, then by the
+local clock, then by the instant, rather than in the order the caller
+wrote it, so a record and any permutation of its rows reduce to the same
+bytes and reach the same digest. Addition is not associative, and a
+reduction that accumulated in the caller’s order would move in its last
+bits under a permutation that changed nothing about the record. The
+instant is the third key because two readings can share a local second,
+on the night a zone sets its clock back, and an order that left them
+tied would leave their sum to whatever the sort did with the tie. A
+record already in that order is the common case and pays the scan that
+establishes it. The output is ordered by sorted unique id and by bin
+start.
 
 ## Ordering identifiers
 
@@ -97,7 +101,15 @@ languages, and the fixtures pin that rather than leaving it assumed. On
 the Python side reading the column as instants drops the zone it was
 written on, so it is taken off the column before that; a `tz` naming a
 different zone beside one the column carries is an error, because two
-zones are two answers.
+zones are two answers. A zone name the database does not know is an
+error on both sides, never a warning and a calendar in UTC.
+
+The `native` grain is the one grain not read on that clock. Its bin is
+the reading itself, and a reading is its instant: the two readings of
+the hour a zone repeats when it sets its clock back share a local second
+and are two bins, not one bin holding two readings, so the record read
+at `native` is the same array whichever zone it is carried in, and its
+bin starts are the instants themselves.
 
 Reading an instant as a clock is defined for every instant in every
 zone. The reverse is not: on the night a zone moves its clock forward a
@@ -219,12 +231,13 @@ act on single readings, and the difference is the point: an extreme day
 is a state the site was in, an extreme reading can be one hour, and an
 average daily extreme is the exposure a typical day of the bin brought.
 
-Two orderings follow from the definitions and are asserted:
-`min <= mean_daily_min <= mean <= mean_daily_max <= max` and
-`min <= cold_day <= mean <= warm_day <= max`. The two day-level pairs
-are not ordered against each other, and a bin whose days differ widely
-in level is where they part: a bin of one day at 0 and one at 10 has
-`cold_day` 0 and `mean_daily_min` 5.
+Two orderings follow from the definitions, and both test suites assert
+them on every bin of every grain, on the core’s output and on the
+oracle’s alike: `min <= mean_daily_min <= mean <= mean_daily_max <= max`
+and `min <= cold_day <= mean <= warm_day <= max`. The two day-level
+pairs are not ordered against each other, and a bin whose days differ
+widely in level is where they part: a bin of one day at 0 and one at 10
+has `cold_day` 0 and `mean_daily_min` 5.
 
 At the `day` grain `cold_day`, `warm_day` and `mean` coincide by
 construction, as do `mean_daily_min` with `min` and `mean_daily_max`
@@ -259,7 +272,12 @@ first boundary, where R’s
 NumPy’s `searchsorted() - 1` gives -1: the first silently shortens the
 result, and the second silently wraps to the last boundary. Either put
 the first boundary at or before the record’s first reading, as the
-fixtures do, or handle the readings below it explicitly.
+fixtures do, or handle the readings below it explicitly. A reading the
+function returns no bin start for, an `NA` in R or a `NaT` in Python, is
+refused before the bins are read, naming how many there are and the unit
+and instant of the first: below the boundary a missing time is not
+distinguishable from one at the beginning of time, and the bin it would
+open there would hold the reading its real bin then lacks.
 
 Two things have to hold of what the function returns, and both are
 checked before its bins are read as bins, naming the first reading that
@@ -370,6 +388,17 @@ is a fixed length rather than a calendar step: comparing two targets’
 representations means each read the same amount of record, and a
 February or a leap year takes that away. Where the calendar is what
 matters, a grain is the reduction that follows it.
+
+The length is measured on the local clock, as everything below the zone
+boundary is. In a zone that moves its clock, a lookback of one day
+ending at a local midnight holds the whole local day before it, which is
+25 hours of record on the night the clock is set back and 23 on the
+night it is set forward; a lookback that spans neither night holds 24.
+That is what keeps a calendar day whole inside a bin for the four
+day-level statistics, which a length fixed in instants could not: a
+day-level lookback anchored within `span` after a transition would then
+have to be refused. The difference is one hour twice a year, against the
+whole day a February differs by.
 
 | unit                | seconds  |
 |---------------------|----------|
@@ -563,10 +592,11 @@ naming the series and the calendar that breaks it beside the substring
 of the message both implementations must raise. The calendars are named
 rather than written out, so both suites build the same function: `late`
 gives every reading the midnight after it,
-`(floor(t / 86400) + 1) * 86400`, and `alternate` sends consecutive
-readings to two bins an hour apart,
-`t0 + 3600 * (((t - t0) / 3600) mod 2)` with `t0` the record’s first
-reading.
+`(floor(t / 86400) + 1) * 86400`; `alternate` sends consecutive readings
+to two bins an hour apart, `t0 + 3600 * (((t - t0) / 3600) mod 2)` with
+`t0` the record’s first reading; and `missing` bins by the calendar day
+but returns no bin start, `NA` or `NaT`, for the reading exactly one day
+after the record’s first.
 
 The lookback reads the same series and three files of its own.
 `lookback_targets.csv` holds the anchors, in named sets rather than one
@@ -699,27 +729,45 @@ the difference is recorded here rather than found at a call site.
 |----|----|
 | the whole run | [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md), from a table of targets and a table of series to a scored comparison |
 | what a representation is | [`native()`](https://gillescolling.com/timesift/reference/native.md), [`grain()`](https://gillescolling.com/timesift/reference/native.md), [`multigrain()`](https://gillescolling.com/timesift/reference/native.md), [`lookback()`](https://gillescolling.com/timesift/reference/native.md), and the sets [`grains()`](https://gillescolling.com/timesift/reference/grains.md) and [`lookbacks()`](https://gillescolling.com/timesift/reference/grains.md) |
+| coercing to a set of representations | [`as_sift()`](https://gillescolling.com/timesift/reference/grains.md), from a representation, a list of them or a vector of grain names |
+| the calendar-binned array | [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md) |
 | the target-anchored array | [`lookback_matrix()`](https://gillescolling.com/timesift/reference/lookback_matrix.md) |
+| an already-reduced feature table | [`feature_matrix()`](https://gillescolling.com/timesift/reference/feature_matrix.md), a one-channel array with no time axis, so a published set of aggregates can be an arm beside a grain |
 | which units reach which bins | [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md), the count of readings per unit and bin over every bin the calendar tiles the record with, which is where a refused record’s gaps are read off |
 | building one representation | [`build_representation()`](https://gillescolling.com/timesift/reference/build_representation.md) |
+| a channel added to an array | [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md), and [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md) for the sine and cosine of each bin’s position in the year |
 | the penalised learner | [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md) |
 | the forward selector | [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md) |
 | the forest | [`forest()`](https://gillescolling.com/timesift/reference/forest.md) |
 | the encoders | [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md) |
 | how an encoder is trained | [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md) |
+| fitting one learner on one representation | [`fit_learner()`](https://gillescolling.com/timesift/reference/fit_learner.md) |
 | the resampling | [`cv()`](https://gillescolling.com/timesift/reference/cv.md) and [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md) |
+| the fold map and the mask | [`fold_map()`](https://gillescolling.com/timesift/reference/fold_map.md) and [`scorable_cells()`](https://gillescolling.com/timesift/reference/scorable_cells.md) |
+| fitting across a set of grains | [`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md), and [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md) for the nested selection |
 | the combiner | [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md), [`ensemble_fit()`](https://gillescolling.com/timesift/reference/ensemble_fit.md), [`ensemble_combine()`](https://gillescolling.com/timesift/reference/ensemble_combine.md) and [`ensemble_weights()`](https://gillescolling.com/timesift/reference/ensemble_weights.md) |
 | scoring held-out predictions | [`score_predictions()`](https://gillescolling.com/timesift/reference/score_predictions.md), on the cells the mask allows |
+| the metrics | [`tss()`](https://gillescolling.com/timesift/reference/tss.md), [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md) and [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md), with [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md) and [`model_agreement()`](https://gillescolling.com/timesift/reference/kappa_score.md) beside them |
+| two arms on matched cells | [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md) |
+| the inflation of a self-selected threshold | [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md), and [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.md) for the level it implies |
 | a set of representations | [`timesift_set()`](https://gillescolling.com/timesift/reference/timesift_set.md), which reads as a mapping of grain name to representation |
 | folds of the inner cross-validation | `n_inner` |
+| the three artifacts | [`write_folds()`](https://gillescolling.com/timesift/reference/artifacts.md) and [`read_folds()`](https://gillescolling.com/timesift/reference/artifacts.md), [`write_response()`](https://gillescolling.com/timesift/reference/artifacts.md) and [`read_response()`](https://gillescolling.com/timesift/reference/artifacts.md), [`write_cells()`](https://gillescolling.com/timesift/reference/artifacts.md) and [`read_cells()`](https://gillescolling.com/timesift/reference/artifacts.md) |
 | the digest | [`digest_array()`](https://gillescolling.com/timesift/reference/digest_array.md), exported |
 | the three registries | [`register_learner()`](https://gillescolling.com/timesift/reference/register_learner.md) and [`learners()`](https://gillescolling.com/timesift/reference/register_learner.md), [`register_metric()`](https://gillescolling.com/timesift/reference/register_metric.md) and [`metrics()`](https://gillescolling.com/timesift/reference/register_metric.md), [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) and [`responses()`](https://gillescolling.com/timesift/reference/register_response.md) |
+| what a rare response weighs | [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md), the case weights the shipped presence-absence head carries as its weights function and every learner that ships reads through the head |
 
 ### The same call does the same thing
 
 - Naming one grain returns the representation and naming two or more
   returns a set, whether the one is named as a string or as a sequence
   of one.
+- A guard above the core names what it refuses the same way: a missing
+  identifier or instant names its column, a duplicated reading and a
+  supplied calendar returning no bin start name the unit and the instant
+  in UTC to the second, and the noun agrees with the count. `bins` given
+  as a whole number in floating point is that whole number, as R reads
+  `3` and Python reads `3.0`.
 - A representation refuses a statistic its grain has no definition for,
   and a `year_start` that is not a month and a day, when it is
   constructed rather than when it is built. `"auto"` is the whole set
@@ -740,8 +788,24 @@ the difference is recorded here rather than found at a call site.
   The two languages draw different maps from the same seed, so where
   both must see one split, write it and read it back as the section
   above describes.
+- [`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md)
+  and
+  [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+  take a `control` as a run does, and hand it to every learner that
+  declares one. A selection hands the same one to the inner search and
+  to the refit.
 - Held-out predictions are placed by unit and by variable, never by
   position.
+- A learner is handed the whole response matrix and returns one column
+  per response, whether it declares `joint` or `separate`. `multi` is
+  what the learner says it does with that matrix and what a report says
+  of the candidate; a learner fitting one model per response does that
+  inside its own fit, so the block of predictors is built once for the
+  fit rather than once for every response of it.
+- A prediction that is not a number on a scorable cell is refused where
+  it is scored, naming the arm, the cell and how many there are, rather
+  than scored as the `NA` a one-class cell gives. The combiner is fitted
+  on every scorable cell and refuses to drop one for the same reason.
 - A setting given at fit time overrides the one the learner carries, and
   a setting the learner does not have is refused rather than ignored.
 - The response head and the metric are registry entries. `metric` takes
@@ -763,8 +827,20 @@ the difference is recorded here rather than found at a call site.
   the averaging begins and is then held flat, the averaged weights get
   their own pass to rebuild the batch-normalisation statistics from a
   reset, and the default is off, so a default recipe is the same recipe
-  on both sides. `swa_start` is at least 0 and under 1, and
-  `pos_weight_cap` is at least 1, on both.
+  on both sides. `swa_start` is at least 0 and under 1 on both.
+- What a rare response weighs is the response head’s and not a training
+  setting. The head’s weights function returns one case weight per cell
+  of the response, and the encoders, the penalised fit, the forest and
+  the forward search all fit under it: the encoders as an elementwise
+  weight on the loss, the penalised fit and the forward search as case
+  weights, and the forest as the probability a unit is drawn into a
+  tree’s bootstrap, which is what ranger’s case weights are and what the
+  Python side’s forest does with its own draw, because scikit-learn’s
+  forest grows the same pure-leaved tree under any sample weight. The
+  shipped presence-absence head weights each presence by the ratio of
+  absences to presences among the fitting units, capped at 50, and each
+  absence by one; a head without a weights function fits unweighted. On
+  both sides.
 - The encoders standardise every channel by its own centre and sample
   standard deviation over every unit and bin of the fitting units; the
   inner validation set is one unit from each of as many equal-count
@@ -790,10 +866,24 @@ the difference is recorded here rather than found at a call site.
   it predicts, so a fit written with
   [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) or `pickle`
   predicts in a fresh session and on another machine.
+- A fit refers to the code that made it rather than carrying a copy of
+  it: an encoder stores the name of its module builder, and a fit stores
+  the name and the settings of its learner wherever the registry can
+  rebuild it. A fit read back therefore predicts through the code the
+  package holds now, and one naming a builder or a learner the session
+  does not carry says so by name. A learner defined outside any registry
+  has no name to be rebuilt from and travels whole.
 - [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
   searches the candidates in the order the grains and the learners were
   declared in, so which candidate an exact tie on the inner score falls
   to does not depend on how the names sort.
+- `models` takes one learner, a set or list of them, or the name of a
+  registered one, and `learners` on a ladder takes the same three forms.
+- Predicting rebuilds each member’s representation for the new targets
+  from the settings its own arm was built with, so a new target frame
+  has to carry the identifier, the anchor and the static columns the fit
+  was made with, and is refused by name where it does not. It carries no
+  response column, because a target being predicted has none.
 - A learner left without a `data =` runs across every representation of
   the run, and one given a representation there runs at that one alone.
   A pairing the learner cannot read is skipped and reported by name
@@ -813,17 +903,25 @@ the difference is recorded here rather than found at a call site.
 
 | concept | in R | in Python |
 |----|----|----|
+| a learner of your own | [`learner()`](https://gillescolling.com/timesift/reference/learner.md), a constructor taking the fit and the predict | `Learner`, the dataclass, built directly with the same fields |
 | a learner’s own training settings | a `control` field holding a partly specified [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md) | its `params`, beside the architecture |
 | the occlusion profile | [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md), an S3 generic with methods on a run and on a ladder | [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md), one function taking either |
+| the report on a run | [`summary()`](https://rdrr.io/r/base/summary.html), a method on the base generic, printing the candidates and the ensemble | [`summary()`](https://rdrr.io/r/base/summary.html), one function returning the text, with `candidate_table()` and `ensemble_row()` for the two tables it prints |
+| predicting new targets | [`predict()`](https://rdrr.io/r/stats/predict.html), a method on the base generic | `.predict()`, a method on the fit |
 | a set of learners, or of representations | [`c()`](https://rdrr.io/r/base/c.html), an S3 method on each spec class | a `list`, and `+` between two of them |
 
-All three are shapes rather than behaviours: a setting given to a
+All of these are shapes rather than behaviours: a setting given to a
 learner beats the run’s control on both sides, the profile is one
 implementation on both sides, and a set is the same set.
 [`c()`](https://rdrr.io/r/base/c.html) is a method rather than a second
 constructor because R’s own way to combine things of one kind is
 [`c()`](https://rdrr.io/r/base/c.html); a Python list already
 concatenates, so nothing is added there.
+[`summary()`](https://rdrr.io/r/base/summary.html) and
+[`predict()`](https://rdrr.io/r/stats/predict.html) are methods in R
+because R has the generics to add them to, and Python’s
+[`summary()`](https://rdrr.io/r/base/summary.html) is a function because
+it has none.
 
 ### Present in one language only
 
@@ -832,11 +930,14 @@ concatenates, so nothing is added there.
 | [`grain_contrasts()`](https://gillescolling.com/timesift/reference/grain_contrasts.md) | fits a mixed model over the whole ladder and reads Dunnett’s comparisons off it, on lme4, lmerTest and emmeans. The Python twin would need a mixed-model fitter of its own or a scientific stack the wheel does not depend on, and nothing in the contract reads it. |
 | [`simulate_records()`](https://gillescolling.com/timesift/reference/simulate_records.md) | generates a record with a planted grain, for the vignette and the recovery tests. The Python suite builds its records in its own fixtures. |
 | [`plot()`](https://rdrr.io/r/graphics/plot.default.html) on a ladder and on a selection | the wheel depends on numpy alone, and every number a plot draws is on the object it is called on. |
+| [`starts_with()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`ends_with()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`contains()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`matches()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`all_of()`](https://tidyselect.r-lib.org/reference/all_of.html), [`any_of()`](https://tidyselect.r-lib.org/reference/all_of.html), [`everything()`](https://tidyselect.r-lib.org/reference/everything.html) and [`where()`](https://tidyselect.r-lib.org/reference/where.html) | tidyselect’s verbs, re-exported so that `y = starts_with("sp_")` is written the way R writes a selection. Python has no non-standard evaluation, so a selection there is a name, a list of names, a glob such as `"sp_*"` or a predicate on the name, resolved by `select_columns()`. |
 | `elasticnet(s =)` | glmnet keeps the whole penalty path and `s` names the point on it to predict at. scikit-learn’s cross-validated fits refit at the best penalty and keep only that one, so there is no path there to name a point of. Both sides otherwise fit the same model: one penalised regression per variable over every column and, by default, their squares, on a design standardised before it is penalised, with the mixing given by `alpha` and the penalty chosen by an inner cross-validation on the fitting units. |
 
 | in Python only | what it is |
 |----|----|
-| `flatten`, `align_folds`, `as_response`, `get_learner`, `resolve_metric`, `cohen_kappa` | the helpers R keeps unexported, as `.flatten()`, `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()` and `.kappa_table()`. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
+| `flatten`, `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.flatten()`, `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
+| `Representation`, `Sift`, `Resampling`, `TimesiftSpec`, `Learner`, `TrainControl`, `TimesiftMatrix`, `TimesiftSet`, `Coverage`, `Response`, `Folds`, `Cells`, `Fit`, `Ladder`, `Selection`, `Timesift`, `Stack`, `EnsembleSpec` | the types. R attaches a class attribute to a list or an array and the constructor is the only door to it; a Python dataclass is the type itself, and a user annotating a function or building one by hand reaches it by name. |
+| `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `PRESENCE_ABSENCE` | the grain and statistic vocabularies as tuples, and the shipped head as the mapping [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through [`responses()`](https://gillescolling.com/timesift/reference/register_response.md) on both sides. |
 
 Models are the one thing neither side promises. A fit in torch and a fit
 in libtorch cannot be byte-identical, and the encoders match module for

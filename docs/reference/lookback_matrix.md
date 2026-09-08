@@ -75,9 +75,9 @@ lookback_matrix(
 
 A numeric array of shape `[target, bin, channel]`, of class
 `timesift_matrix`. Its rows are the rows of `at`, in `at`'s own order,
-named by `at`'s row names where it carries them and by position where it
-does not. Its bins are named by where each one opens relative to the
-anchor, oldest first, and its channels by the statistic. Attributes:
+named by `at`'s row names. Its bins are named by where each one opens
+relative to the anchor, oldest first, and its channels by the statistic.
+Attributes:
 
 - `grain`: `"lookback"`.
 
@@ -132,7 +132,12 @@ as
 [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
 takes it; a column with none is read as UTC. The anchors are instants
 and are read as a clock in that same calendar, whatever zone `at`
-carries, so one record is binned by one calendar.
+carries, so one record is binned by one calendar. The span is measured
+on that clock: a lookback of one day ending at a local midnight holds
+the whole local day before it, which is 25 hours of record on the night
+a zone sets its clock back and 23 on the night it sets it forward. That
+is what keeps a calendar day whole inside a bin for the four day-level
+statistics; a length fixed in instants could not.
 
 ## See also
 

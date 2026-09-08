@@ -175,7 +175,7 @@ Error unless every value is 0 or 1 and none is missing.
 ## `Folds`
 
 ``` python
-Folds(fold, units, grouped)
+Folds(fold, units, grouped, group)
 ```
 
 Which fold each unit is held out in, named by unit.
@@ -189,6 +189,7 @@ Attributes:
 - `fold` - np.ndarray
 - `units` - tuple\[str, …\]
 - `grouped` - bool
+- `group` - tuple\[str, …\] \| None
 
 ### `v`
 
@@ -251,5 +252,25 @@ Whether one `(variable, fold)` cell admits a score.
 ## `PRESENCE_ABSENCE`
 
 ``` python
-PRESENCE_ABSENCE = dict(prepare=lambda y: as_response(y).check_presence_absence(), activation='sigmoid', loss='binary_cross_entropy', metric='tss', cells=lambda y, folds: scorable_cells(y, folds))
+PRESENCE_ABSENCE = dict(prepare=lambda y: as_response(y).check_presence_absence(), activation='sigmoid', loss='binary_cross_entropy', metric='tss', weights=positive_weights, cells=lambda y, folds: scorable_cells(y, folds))
 ```
+
+## `positive_weights()`
+
+``` python
+positive_weights(y, cap: float = 50.0)
+```
+
+Case weights that balance a rare response.
+
+The weight every learner that ships fits a presence-absence response
+under: each presence of a response weighs the ratio of absences to
+presences among the units handed in, capped, and each absence weighs
+one. A response with a presence in one target of a hundred is otherwise
+fitted away by any learner that minimises a mean loss.
+
+The weights are the response head’s: the shipped presence-absence head
+carries this function as its `weights`, and a head registered with
+`weights=lambda y: positive_weights(y, cap=20)` weights every learner by
+that cap instead. A head without `weights` is fitted unweighted. Returns
+a `[unit, variable]` array of case weights, one per cell of `y`.

@@ -6,7 +6,8 @@ while it lowers AIC and stopping at a fixed budget. Each candidate
 enters as an orthogonal polynomial, so a term can be non-monotone in the
 reading the way a niche optimum is. The family is the response head's:
 logistic under a binary cross-entropy loss, Gaussian under a
-squared-error one.
+squared-error one. So are the case weights, so a rare response weighs
+here what it weighs in every other learner.
 
 ## Usage
 

@@ -31,7 +31,10 @@ responses()
   from here: the encoders train under the loss and predict through the
   activation, and the learners fitting one model per response take the
   family the loss names, logistic or Gaussian. The combiner minimises
-  the same loss.
+  the same loss. An optional `weights(y)` returns a `[unit, variable]`
+  matrix of case weights every learner fits under; the shipped head's is
+  [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md),
+  and a head without one fits unweighted.
 
 - overwrite:
 

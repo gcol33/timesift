@@ -49,7 +49,10 @@ a second fitting path. Every learner that ships reads `loss` and
 `activation` from here: the encoders train under the loss and predict
 through the activation, and the learners fitting one model per response
 take the family the loss names, logistic or Gaussian. The combiner
-minimises the same loss.
+minimises the same loss. An optional `weights(y)` returns a
+`[unit, variable]` array of case weights every learner fits under; the
+shipped head’s is `timesift.response.positive_weights`, and a head
+without one fits unweighted.
 
 ## `learners()`
 
@@ -83,3 +86,19 @@ get_learner(learner)
 
 A `Learner`, whether it arrived as one or as the name of a registered
 one.
+
+## `resolve_metric()`
+
+``` python
+resolve_metric(metric, default: str | None = None)
+```
+
+The function that scores and the name a report prints, from either way a
+metric is given.
+
+A metric reaches a run as a registered name or as a function of
+`(y, p)`, and everything that rescores afterwards – the ensemble row of
+a report, an occlusion profile – needs the function rather than a name
+to look up again. Both travel with the fit. A function has no name to
+print, and reads as `<function>` on both sides rather than as whatever
+the language calls an anonymous one.

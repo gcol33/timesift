@@ -38,7 +38,10 @@ learner(
   and one that declares a `head` argument is handed the registered
   response head, whose `loss` and `activation` say what it is fitting
   toward. The learners that ship read both from there and hold no
-  response of their own.
+  response of their own. One that declares a `group` argument is handed
+  the grouping the outer fold map keeps whole, one value per unit of `x`
+  or `NULL`, so a split it draws inside the fit keeps the same groups
+  whole.
 
 - predict:
 
@@ -56,8 +59,10 @@ learner(
 
 - multi:
 
-  `"separate"` where one model is fitted per response, `"joint"` where
-  one model covers them all.
+  `"separate"` where the learner fits one model per response, `"joint"`
+  where one model covers them all. It is handed the whole response
+  matrix either way; this is what the learner says it does with it, and
+  what a report says of the candidate.
 
 - control:
 
@@ -85,9 +90,11 @@ A learner declares what it can be handed and how it covers several
 responses. `reads` is `"tabular"` where the bins reach it as a block of
 predictors and `"sequence"` where their order in time is what it reads,
 and `multi` is `"joint"` where one fitted model covers every response
-and `"separate"` where one is fitted per response. Either way a
-candidate emits one `[target, response]` matrix, so nothing above the
-learner layer has to know which it was.
+and `"separate"` where the learner fits one per response. Either way it
+is handed the whole response matrix and returns one column per response,
+so nothing above the learner layer has to know which it was, and the
+block of predictors is built once for the fit rather than once for every
+response of it.
 
 `data` pins a learner to one representation. Left `NULL` the learner
 runs across every representation of the run.

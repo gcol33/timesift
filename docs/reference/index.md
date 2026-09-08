@@ -33,7 +33,7 @@ compared across.
   : How a series becomes an array a learner reads
 - [`grains()`](https://gillescolling.com/timesift/reference/grains.md)
   [`lookbacks()`](https://gillescolling.com/timesift/reference/grains.md)
-  [`timesift_sift()`](https://gillescolling.com/timesift/reference/grains.md)
+  [`as_sift()`](https://gillescolling.com/timesift/reference/grains.md)
   : Several representations to run the same learners across
 - [`build_representation()`](https://gillescolling.com/timesift/reference/build_representation.md)
   : Build one representation for a set of targets
@@ -158,6 +158,8 @@ fitting code.
 - [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md)
   [`responses()`](https://gillescolling.com/timesift/reference/register_response.md)
   : Register a response head
+- [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
+  : Case weights that balance a rare response
 - [`register_metric()`](https://gillescolling.com/timesift/reference/register_metric.md)
   [`metrics()`](https://gillescolling.com/timesift/reference/register_metric.md)
   : Register a metric

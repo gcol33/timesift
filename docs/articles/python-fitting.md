@@ -117,7 +117,7 @@ of them.
 ## `TimesiftSpec`
 
 ``` python
-TimesiftSpec(y, x, id, time, target_time, static, tz, response, metric)
+TimesiftSpec(y, x, id, time, target_time, static, response, metric)
 ```
 
 How a fit was asked for: the columns each table plays, and the calendar
@@ -131,41 +131,8 @@ Attributes:
 - `time` - str \| None
 - `target_time` - str \| None
 - `static` - tuple\[str, …\]
-- `tz` - object
 - `response` - str
 - `metric` - object
-
-## `CandidateFit`
-
-``` python
-CandidateFit(learner, fits, variables)
-```
-
-One candidate’s fitted models, whichever way its learner covers the
-responses.
-
-A joint learner is one model over the whole response matrix and a
-separate one is a model per response; either way this predicts the same
-`[target, response]` matrix, in the response order the candidate was
-fitted on.
-
-Attributes:
-
-- `learner` - object
-- `fits` - tuple\[Fit, …\]
-- `variables` - tuple\[str, …\]
-
-### `predict()`
-
-``` python
-predict(self, x: TimesiftMatrix)
-```
-
-One `[row, response]` matrix, whatever the candidate is made of.
-
-A joint learner contributes one fit covering every response and a
-separate one contributes a fit per response; the columns are assembled
-by name either way, so nothing above a candidate can tell which it was.
 
 ## `n_targets()`
 
@@ -339,6 +306,7 @@ grain_ladder(
     folds=None,
     response: str = 'presence_absence',
     metric=None,
+    control=None,
     keep_fits: bool = False,
     verbose: bool = True,
 )
@@ -355,6 +323,10 @@ with `paired_contrast`.
 both languages must see the same splits, build it once and read it in
 the other with `read_folds`.
 
+`control` is the `train_control` every neural learner of the ladder
+trains under; a learner carrying settings of its own overrides it on the
+ones it names.
+
 ## `fit_learner()`
 
 ``` python
@@ -364,6 +336,7 @@ fit_learner(
     y,
     response: str = 'presence_absence',
     control=None,
+    group=None,
     **kwargs,
 )
 ```
@@ -388,6 +361,7 @@ select_grain(
     response: str = 'presence_absence',
     metric=None,
     compare: Ladder | None = None,
+    control=None,
     seed: int = 1,
     verbose: bool = True,
 )
@@ -411,6 +385,10 @@ quantity this function exists to keep out of a reported number.
 
 The cost is the ladder’s, multiplied by the number of inner folds:
 `v_outer * (v_inner * candidates + 1)` fits.
+
+`control` is the `train_control` every neural learner trains under, in
+the inner search and in the refit alike; a learner carrying settings of
+its own overrides it on the ones it names.
 
 ## `Ladder`
 
@@ -471,10 +449,16 @@ The across-variable mean of the per-variable score, one row per arm.
 ## `Fit`
 
 ``` python
-Fit(learner, model, variables, response)
+Fit(learner, model, variables, response, bins, channels)
 ```
 
-A fitted learner and the variables it was fitted on.
+A fitted learner, the variables it was fitted on, and the bins and
+channels of the representation it was made on.
+
+A representation asked to predict is checked against those once, before
+any learner sees it: a calendar grain’s bins are named by their starts,
+so a record from another period is refused by the first bin that differs
+rather than read by position.
 
 Attributes:
 
@@ -482,6 +466,8 @@ Attributes:
 - `model` - object
 - `variables` - tuple\[str, …\]
 - `response` - str
+- `bins` - tuple\[str, …\]
+- `channels` - tuple\[str, …\]
 
 ### `predict()`
 

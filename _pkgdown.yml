@@ -153,6 +153,7 @@ reference:
     The response head and the metric are registrations, never a fork of the fitting code.
   contents:
   - register_response
+  - positive_weights
   - register_metric
 - title: What crosses the boundary
   desc: |

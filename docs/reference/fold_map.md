@@ -59,7 +59,9 @@ model.
 
 Folds are balanced within strata: units are grouped into `strata`
 equal-count groups of the stratifying value, shuffled inside each group,
-and dealt round-robin, so each fold carries the same mix. With a
+and dealt round-robin by one counter that runs on from each stratum into
+the next, so each fold carries the same mix and the folds are equal in
+size to within one unit whatever `v` is, up to one unit per fold. With a
 multi-variable response the default stratifies on richness, the number
 of variables present at a unit, because one fold map has to serve every
 variable at once and cannot be stratified on any single one of them.

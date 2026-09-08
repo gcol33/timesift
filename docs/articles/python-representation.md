@@ -14,10 +14,12 @@ The record unreduced: one bin per reading.
 ## `grain()`
 
 ``` python
-grain(g: str, stats='mean', year_start='09-01')
+grain(g, stats='mean', year_start='09-01')
 ```
 
-One calendar grain.
+One calendar grain, named, or supplied as a function of the reading
+instants returning each reading’s bin start, which is reported as
+`custom`.
 
 ## `multigrain()`
 
@@ -76,7 +78,7 @@ Attributes:
 - `label` - str
 - `kind` - str
 - `stats` - tuple\[str, …\]
-- `grain` - str \| None
+- `grain` - object
 - `grains` - tuple\[str, …\] \| None
 - `span` - object
 - `lag` - object
@@ -118,7 +120,9 @@ to the coarsest.
 The count comes from the calendar in the core rather than from
 arithmetic here, so a grain is admitted on the same rule that will bin
 it. It is read off one reading per distinct instant, which carries the
-record’s whole span and its gaps at the cost of a single unit’s memory.
+record’s whole span and its gaps at the cost of a single unit’s memory,
+in the zone the time column carries, so a grain is counted on the clock
+it will be binned by.
 
 ## `build_representation()`
 
@@ -164,7 +168,10 @@ zone’s clock, which is what the R side does for a series carrying a
 both languages. A time column that carries a zone of its own names the
 calendar the same way, so a zone-aware column bins by its own clock
 without being told to; naming a different one in `tz` beside it is an
-error.
+error. The `"native"` grain is the one grain not read on that clock: its
+bin is the reading itself, so the two readings of an hour a zone repeats
+are two bins, and the record read at `"native"` is the same array
+whichever zone it is carried in.
 
 `partial` says what becomes of a bin the record does not cover for its
 whole calendar span, which is what a record beginning or ending away
@@ -216,7 +223,12 @@ length is a fixed length rather than a calendar step.
 
 `tz` names the calendar, as it does for `grain_matrix`. The anchors are
 instants and are read as a clock in that same calendar, so one record is
-binned by one calendar.
+binned by one calendar. The span is measured on that clock: a lookback
+of one day ending at a local midnight holds the whole local day before
+it, which is 25 hours of record on the night a zone sets its clock back
+and 23 on the night it sets it forward. That is what keeps a calendar
+day whole inside a bin for the four day-level statistics; a length fixed
+in instants could not.
 
 ## `coverage()`
 

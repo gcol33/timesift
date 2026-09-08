@@ -6,7 +6,7 @@ your own goes through.
 ## `elasticnet()`
 
 ``` python
-elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, weight_positives=True, seed=1)
+elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, seed=1)
 ```
 
 One penalised regression per variable, over every bin-by-channel column
@@ -16,8 +16,9 @@ cross-validation on the fitting units.
 There is no discrete selection step: the penalty path uses every column
 and shrinks, and nothing about the model is decided outside the fold it
 is fitted in. The family is the response head’s: logistic under a binary
-cross-entropy loss, linear under a squared-error one, and
-`weight_positives` is read under the first alone.
+cross-entropy loss, linear under a squared-error one, and so are the
+case weights, `timesift.response.positive_weights` under
+presence-absence, which every learner that ships fits under.
 
 The design is standardised before it is penalised, as it is on the R
 side, so a column is not penalised for the scale it was recorded on. The
@@ -147,10 +148,9 @@ replacing its default.
 
 `epochs`, `batch_size`, `learning_rate`, `weight_decay`,
 `early_stopping`, `val_frac`, `device` and `seed` are the settings a run
-is described by. `pos_weight_cap` bounds the weight a rare response’s
-presences are given against its absences, at least one, and `swa` with
-`swa_start` average the weights over the tail of the schedule rather
-than keeping one epoch out of it.
+is described by, and `swa` with `swa_start` average the weights over the
+tail of the schedule rather than keeping one epoch out of it. What a
+rare response weighs is the response head’s, not a training setting.
 
 `batch_size` is the most targets an optimiser step reads: the fitting
 targets are cut into as few batches of at most that many as they divide
@@ -176,7 +176,6 @@ TrainControl(
     val_frac,
     device,
     seed,
-    pos_weight_cap,
     swa,
     swa_start,
 )
@@ -194,7 +193,6 @@ Attributes:
 - `val_frac` - float
 - `device` - str
 - `seed` - int
-- `pos_weight_cap` - float
 - `swa` - bool
 - `swa_start` - float
 

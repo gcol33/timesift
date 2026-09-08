@@ -12,7 +12,7 @@ grains(..., stats = "mean", year_start = "09-01")
 
 lookbacks(..., lag = "0 days", bins = 1L, stats = "mean")
 
-timesift_sift(x)
+as_sift(x)
 ```
 
 ## Arguments

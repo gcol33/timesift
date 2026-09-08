@@ -5,7 +5,15 @@ Fit one learner at one grain
 ## Usage
 
 ``` r
-fit_learner(learner, x, y, response = "presence_absence", control = NULL, ...)
+fit_learner(
+  learner,
+  x,
+  y,
+  response = "presence_absence",
+  control = NULL,
+  group = NULL,
+  ...
+)
 
 # S3 method for class 'timesift_fit'
 predict(object, newdata, ...)
@@ -39,6 +47,14 @@ predict(object, newdata, ...)
   [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md).
   The learner's own control overrides it on the settings that control
   names, and a setting given in `...` overrides both.
+
+- group:
+
+  One value per unit of `x` naming the group it belongs to, or `NULL`. A
+  learner whose `fit` declares `group` draws its inner splits by it.
+  Under
+  [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md)
+  the run hands every fit the grouping its fold map carries.
 
 - ...:
 

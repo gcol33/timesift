@@ -8,11 +8,11 @@
 ## Citation
 
 Source:
-[`DESCRIPTION`](https://github.com/gcol33/timesift/blob/HEAD/DESCRIPTION)
+[`inst/CITATION`](https://github.com/gcol33/timesift/blob/HEAD/inst/CITATION)
 
-Colling G (2026). *timesift: Learn Predictive Representations of
-Time-Varying Data*. R package version 0.1.1,
-<https://gillescolling.com/timesift/>.
+Colling, G. (2026). timesift: Learn Predictive Representations of
+Time-Varying Data. R package version 0.1.1.
+https://gillescolling.com/timesift/
 
     @Manual{,
       title = {timesift: Learn Predictive Representations of Time-Varying Data},

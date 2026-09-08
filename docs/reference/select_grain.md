@@ -23,6 +23,7 @@ select_grain(
   response = "presence_absence",
   metric = NULL,
   compare = NULL,
+  control = train_control(),
   seed = 1L,
   verbose = TRUE
 )
@@ -63,7 +64,11 @@ summary(object, ...)
 - inner:
 
   Number of inner folds the selection is made on, or a function of the
-  outer training response returning a fold map for those units.
+  outer training response returning a fold map for those units. A count
+  deals the inner folds by the grouping the outer fold map carries, so
+  what
+  [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md)
+  kept whole outside stays whole inside.
 
 - response:
 
@@ -82,6 +87,13 @@ summary(object, ...)
   result on the same units, response and outer fold map, whose arms the
   selected procedure is contrasted against cell by cell. `NULL` for no
   contrast.
+
+- control:
+
+  [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md),
+  the training settings every neural learner reads, in the inner search
+  and in the refit alike. A learner carrying a control of its own
+  overrides it on the settings that control names.
 
 - seed:
 

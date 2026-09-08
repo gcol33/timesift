@@ -18,7 +18,6 @@ train_control(
   val_frac = 0.15,
   device = "auto",
   seed = 1L,
-  pos_weight_cap = 50,
   swa = FALSE,
   swa_start = 0.7
 )
@@ -66,12 +65,6 @@ train_control(
 - seed:
 
   Seed for initialisation, batching and the inner validation split.
-
-- pos_weight_cap:
-
-  Ceiling on the per-response positive-class weight, which is the ratio
-  of absences to presences among the fitting targets. At least one: a
-  weight under one would weight presences down.
 
 - swa:
 
