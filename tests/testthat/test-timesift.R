@@ -409,3 +409,75 @@ test_that("a fit prints what it compared", {
   expect_output(print.timesift(fit), "2 responses")
   expect_output(print.timesift(fit), "toy / week")
 })
+
+# ---- predicting targets the fit never saw -------------------------------------------------------
+
+test_that("a fit predicts units it was never fitted on", {
+  case <- toy_case(n_unit = 30L, days = 60L)
+  fitting <- case$units[1:20]
+  fit <- timesift(case$targets[case$targets$plot %in% fitting, , drop = FALSE],
+                  case$series[case$series$plot %in% fitting, , drop = FALSE],
+                  y = starts_with("sp"), id = plot, time = t, models = list(a = toy(), b = toy("b")),
+                  sift = grains("week"), resampling = cv(v = 3L), control = NULL, verbose = FALSE)
+  fresh <- case$units[21:30]
+  new_targets <- case$targets[case$targets$plot %in% fresh, , drop = FALSE]
+  new_series <- case$series[case$series$plot %in% fresh, , drop = FALSE]
+
+  p <- predict(fit, new_targets, new_series)
+  expect_equal(dim(p), c(10L, ncol(fit$y)))
+  expect_equal(rownames(p), sort(fresh))
+  expect_equal(colnames(p), colnames(fit$y))
+  expect_true(all(is.finite(p)))
+  one <- predict(fit, new_targets, new_series, candidate = "a / week")
+  expect_equal(dim(one), dim(p))
+})
+
+test_that("predicting needs no response column, because a new target has none", {
+  case <- toy_case(n_unit = 24L, days = 60L)
+  fit <- run_toy(case)
+  bare <- case$targets[, setdiff(names(case$targets), colnames(fit$y)), drop = FALSE]
+  expect_false(any(colnames(fit$y) %in% names(bare)))
+  expect_equal(predict(fit, bare, case$series, candidate = "toy / week"),
+               predict(fit, case$targets, case$series, candidate = "toy / week"))
+})
+
+test_that("a new target frame has to carry the static predictors the fit was made with", {
+  case <- toy_case(n_unit = 20L, days = 40L)
+  fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+                  static = elevation, models = list(toy()), sift = grains("week"),
+                  ensemble = FALSE, resampling = cv(v = 3L), control = NULL, verbose = FALSE)
+  expect_equal(dim(predict(fit, case$targets, case$series, candidate = "toy / week")),
+               c(20L, ncol(fit$y)))
+  without <- case$targets[, setdiff(names(case$targets), "elevation"), drop = FALSE]
+  expect_error(predict(fit, without, case$series, candidate = "toy / week"),
+               "does not carry the static predictor elevation", fixed = TRUE)
+})
+
+test_that("an anchored fit predicts new targets at their own instants", {
+  case <- toy_case(n_unit = 10L, days = 150L)
+  case$targets$when <- as.POSIXct(rep("2021-12-01", 10L), tz = "UTC")
+  fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+                  target_time = when, models = list(toy()), sift = lookbacks("30 days"),
+                  ensemble = FALSE, resampling = cv(v = 3L), control = NULL, verbose = FALSE)
+  later <- case$targets
+  later$when <- as.POSIXct(rep("2022-01-05", 10L), tz = "UTC")
+  moved <- predict(fit, later, case$series, candidate = "toy / 30 days")
+  same <- predict(fit, case$targets, case$series, candidate = "toy / 30 days")
+  expect_equal(dim(moved), c(10L, ncol(fit$y)))
+  # A different anchor is a different stretch of record, so the two are not the same prediction.
+  expect_false(isTRUE(all.equal(as.numeric(moved), as.numeric(same))))
+  expect_error(predict(fit, case$targets[, setdiff(names(case$targets), "when")], case$series,
+                       candidate = "toy / 30 days"),
+               "`target_time` has to name the column", fixed = TRUE)
+})
+
+test_that("a targets-only fit predicts from the static block alone", {
+  case <- toy_case(n_unit = 20L, days = 30L)
+  fit <- timesift(case$targets, y = starts_with("sp"), id = plot, static = elevation,
+                  models = list(a = toy(), b = toy("b")), resampling = cv(v = 3L),
+                  control = NULL, verbose = FALSE)
+  p <- predict(fit, case$targets)
+  expect_equal(dim(p), c(20L, ncol(fit$y)))
+  expect_equal(rownames(p), sort(case$units))
+  expect_true(all(is.finite(p)))
+})

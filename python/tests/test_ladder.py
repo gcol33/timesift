@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -10,7 +11,8 @@ from timesift.control import CONTROL_SETTINGS, as_control, train_control
 from timesift.ladder import (grain_ladder, paired_contrast, per_variable,
                              score_predictions, tss_inflation, variable_means)
 from timesift.learners import Learner, fit_learner
-from timesift.metrics import kappa_score, model_agreement, roc_auc, tss
+from timesift.metrics import (cohen_kappa, decision_threshold, kappa_score,
+                              model_agreement, roc_auc, tss)
 from timesift.representation import grain_matrix
 from timesift.response import Response, fold_map, scorable_cells
 
@@ -282,3 +284,66 @@ def test_score_predictions_refuses_a_prediction_that_is_not_a_number():
     p[0, 0] = np.inf
     with pytest.raises(ValueError, match="the predictions hold no number"):
         score_predictions(y, p, folds)
+
+
+def test_score_predictions_scores_one_row_per_variable_and_fold_on_the_masks_cells():
+    readings, y, _ = sim(n_unit=36, days=40, noise=1.0)
+    folds = fold_map(y, v=3, seed=2)
+    rng = np.random.default_rng(6)
+    rows = score_predictions(y, rng.random(y.values.shape), folds)
+    assert set(rows) == {"variable", "fold", "score", "scorable"}
+    assert len(rows["score"]) == len(y.variables) * 3
+    assert set(rows["variable"]) == set(y.variables)
+    for value, ok in zip(rows["score"], rows["scorable"]):
+        assert np.isfinite(value) == bool(ok)
+
+
+def test_score_predictions_reads_the_same_cells_and_numbers_a_ladder_arm_does():
+    readings, y, _ = sim(n_unit=36, days=40, noise=1.0)
+    x = grain_matrix(readings, "id", "time", "value", grain="week")
+    folds = fold_map(y, v=3, seed=6)
+    lad = grain_ladder(x, y, [constant_learner()], folds=folds, verbose=False)
+    again = score_predictions(y, lad.predictions["week|constant"], folds)
+    key = sorted(range(len(again["score"])),
+                 key=lambda i: (str(again["variable"][i]), int(again["fold"][i])))
+    order = sorted(range(len(lad.score)),
+                   key=lambda i: (str(lad.variable[i]), int(lad.fold[i])))
+    assert np.allclose([again["score"][i] for i in key], [lad.score[i] for i in order],
+                       equal_nan=True)
+    assert [bool(again["scorable"][i]) for i in key] == [bool(lad.scorable[i]) for i in order]
+
+
+def test_score_predictions_takes_a_mask_and_a_metric_of_its_own():
+    readings, y, _ = sim(n_unit=36, days=40, noise=1.0)
+    folds = fold_map(y, v=3, seed=2)
+    rng = np.random.default_rng(7)
+    p = rng.random(y.values.shape)
+    cells = scorable_cells(y, folds)
+    blocked = replace(cells, scorable=np.zeros_like(cells.scorable))
+    rows = score_predictions(y, p, folds, cells=blocked)
+    assert not any(rows["scorable"])
+    assert all(np.isnan(v) for v in rows["score"])
+    assert not np.allclose(score_predictions(y, p, folds, metric="roc_auc")["score"],
+                           score_predictions(y, p, folds)["score"], equal_nan=True)
+    with pytest.raises(KeyError, match="unknown metric"):
+        score_predictions(y, p, folds, metric="nope")
+
+
+def test_cohen_kappa_is_chance_corrected_and_symmetric():
+    a = np.array([1, 1, 0, 0, 1, 0, 1, 0])
+    b = np.array([1, 1, 0, 0, 0, 1, 1, 0])
+    assert cohen_kappa(a, a) == pytest.approx(1.0)
+    assert cohen_kappa(a, b) == pytest.approx(cohen_kappa(b, a))
+    assert 0 < cohen_kappa(a, b) < 1
+    # Two labellings that agree exactly as often as chance alone would predict.
+    assert cohen_kappa(np.array([1, 1, 0, 0]), np.array([1, 0, 1, 0])) == pytest.approx(0.0)
+    # One labelling that never varies leaves no chance-corrected agreement to read.
+    assert np.isnan(cohen_kappa(np.ones(4), np.ones(4)))
+
+
+def test_cohen_kappa_is_the_agreement_kappa_score_reads_against_the_response():
+    rng = np.random.default_rng(8)
+    y = rng.binomial(1, 0.4, 40)
+    p = rng.random(40)
+    thr = decision_threshold(y, p, "prevalence")
+    assert kappa_score(y, p, "prevalence") == pytest.approx(cohen_kappa(y, (p >= thr).astype(int)))

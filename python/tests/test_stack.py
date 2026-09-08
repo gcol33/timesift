@@ -6,6 +6,7 @@ matrices rather than from models, which is also the guarantee being checked.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
@@ -15,7 +16,8 @@ from timesift.ladder import grain_ladder, score_arm
 from timesift.learners import Learner
 from timesift.metrics import roc_auc, tss
 from timesift.occlusion import ladder_occlusion
-from timesift.report import candidate_table, ensemble_weights, occlusion, summary
+from timesift.report import (candidate_table, ensemble_row, ensemble_weights, occlusion,
+                             summary)
 from timesift.representation import grain_matrix
 from timesift.response import Response, align_folds, fold_map, scorable_cells
 from timesift.stack import (EnsembleSpec, Stack, as_ensemble, candidate_means, ensemble,
@@ -485,3 +487,34 @@ def test_the_combiner_refuses_to_drop_a_scorable_cell_rather_than_fitting_on_few
     spoiled["forest / month"][a, b] = np.nan
     with pytest.raises(ValueError, match="did not settle"):
         ensemble_fit(spoiled, y, cells, folds, ensemble(), score_table(oof, y, folds, cells))
+
+
+def test_the_ensemble_row_is_the_combination_levelled_on_the_fits_own_cells():
+    oof, y, cells, folds = board()
+    fit = fitted_object(oof, y, cells, folds)
+    row = ensemble_row(fit)
+    assert row["candidate"] == "ensemble"
+
+    # Read by hand off the same combination, the same mask and the same metric the fit carries:
+    # the ensemble row is comparable with the candidate rows above it because nothing else went
+    # into it.
+    f = align_folds(folds, y.units)
+    got = score_arm("", "ensemble", y, ensemble_combine(fit.stack, oof), f, np.unique(f), cells,
+                    tss)
+    by_hand = float(np.mean([np.mean([s for s, v, ok in zip(got["score"], got["variable"],
+                                                            got["scorable"])
+                                      if ok and v == name])
+                             for name in y.variables]))
+    assert row["mean"] == pytest.approx(by_hand)
+
+
+def test_a_fit_that_combined_nothing_has_no_ensemble_row():
+    assert ensemble_row(SimpleNamespace(stack=None)) is None
+
+
+def test_an_ensemble_with_no_scorable_cell_to_be_levelled_on_says_so():
+    oof, y, cells, folds = board()
+    fit = fitted_object(oof, y, cells, folds)
+    fit.cells = replace(cells, scorable=np.zeros_like(cells.scorable))
+    with pytest.raises(ValueError, match="no scorable cell"):
+        ensemble_row(fit)

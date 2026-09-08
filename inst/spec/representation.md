@@ -659,6 +659,12 @@ call site.
 - `select_grain()` searches the candidates in the order the grains and the learners were declared
   in, so which candidate an exact tie on the inner score falls to does not depend on how the names
   sort.
+- `models` takes one learner, a set or list of them, or the name of a registered one, and
+  `learners` on a ladder takes the same three forms.
+- Predicting rebuilds each member's representation for the new targets from the settings its own
+  arm was built with, so a new target frame has to carry the identifier, the anchor and the static
+  columns the fit was made with, and is refused by name where it does not. It carries no response
+  column, because a target being predicted has none.
 - A learner left without a `data =` runs across every representation of the run, and one given a
   representation there runs at that one alone. A pairing the learner cannot read is skipped and
   reported by name inside a set, and is an error where the caller named it.

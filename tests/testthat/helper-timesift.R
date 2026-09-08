@@ -71,3 +71,14 @@ local_learner <- function(name, constructor, env = parent.frame()) {
                else .learners_reg$set(name, held[[1L]], overwrite = TRUE), envir = env)
   invisible(name)
 }
+
+# Register a metric for one test and put the registry back afterwards, so the next test sees the
+# metrics that ship. `local_learner()` and `local_response()` above are the same thing for the
+# other two registries.
+local_metric <- function(name, fn, env = parent.frame()) {
+  held <- if (.metrics_reg$has(name)) list(.metrics_reg$get(name)) else NULL
+  register_metric(name, fn, overwrite = TRUE)
+  withr::defer(if (is.null(held)) .metrics_reg$remove(name)
+               else .metrics_reg$set(name, held[[1L]], overwrite = TRUE), envir = env)
+  invisible(name)
+}

@@ -26,6 +26,11 @@
 
 ## Fitting
 
+* Predicting from a fit whose new targets are missing a static predictor names the column that is
+  missing. An absent column read as one that is not numeric, and the message sent the reader to
+  encode something their table does not hold.
+* On the Python side `models` takes one learner as well as a list of them, which is the form R has
+  always taken; a single learner was reaching the fitting layer as a sequence of nothing.
 * A learner is handed the whole response matrix whether it declares `joint` or `separate`, and
   the three that fit one model per response already did that inside their own fit. The fitting
   layer was splitting the responses as well, so the flattened block of predictors was rebuilt once

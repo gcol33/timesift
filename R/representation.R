@@ -437,6 +437,14 @@ build_representation <- function(rep, series, targets, spec) {
   if (!length(cols)) {
     return(out)
   }
+  # Named before typed: a column that is not there reads as not numeric, and the message would
+  # send the reader to encode a column their table does not carry. This is the predicting path,
+  # where the targets are a new frame that has to hold what the fit was made with.
+  gone <- setdiff(cols, names(ordered))
+  if (length(gone)) {
+    stop("`targets` does not carry the static predictor", if (length(gone) > 1L) "s" else "",
+         " ", .listing(gone), " the fit was made with.", call. = FALSE)
+  }
   bad <- cols[!vapply(cols, function(v) is.numeric(ordered[[v]]), logical(1L))]
   if (length(bad)) {
     stop("`static` column", if (length(bad) > 1L) "s" else "", " ", .listing(bad), " ",

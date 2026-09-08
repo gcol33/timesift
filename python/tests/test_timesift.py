@@ -390,3 +390,15 @@ def repeated_targets() -> dict:
     return {"plot": plots, "visit": [visit[i % 2 * 6] for i in range(12)],
             "sp_a": [i % 2 for i in range(12)], "sp_b": [(i // 2) % 2 for i in range(12)],
             "sp_c": [(i // 3) % 2 for i in range(12)]}
+
+
+def test_models_takes_one_learner_as_well_as_a_list_of_them():
+    """A learner is not a list of learners, and iterating one reads a sequence of nothing.
+
+    R's `models` takes a learner, a set of them or a list, and this is the same three forms.
+    """
+    one = fitted(models=learner("alone"), sift=grains("day"))
+    assert list(one.candidates["candidate"]) == [f"alone{SEPARATOR}day"]
+    assert list(one.oof) == [f"alone{SEPARATOR}day"]
+    listed = fitted(models=[learner("alone")], sift=grains("day"))
+    assert np.allclose(one.oof[f"alone{SEPARATOR}day"], listed.oof[f"alone{SEPARATOR}day"])

@@ -80,3 +80,89 @@ test_that("the registered metrics are the ones the package ships", {
   expect_equal(.metrics_reg$get("tss")(c(0, 1), c(0.1, 0.9)), 1)
   expect_error(.metrics_reg$get("nope"), "unknown metric")
 })
+
+# ---- the registry a metric reaches a run through ----------------------------------------------
+
+test_that("a registered metric is listed and reachable by name", {
+  expect_false("hit_rate" %in% metrics())
+  local_metric("hit_rate", function(y, p) mean((p >= 0.5) == (y == 1)))
+  expect_true("hit_rate" %in% metrics())
+  # C collation, so the list is the same order on every machine and beside Python's.
+  expect_equal(metrics(), sort(metrics(), method = "radix"))
+  expect_equal(.metrics_reg$get("hit_rate")(c(0, 1), c(0.2, 0.9)), 1)
+})
+
+test_that("a metric is a function of (y, p) and a name is not re-registered by accident", {
+  expect_error(register_metric("nonsense", "tss"), "function of (y, p)", fixed = TRUE)
+  local_metric("hit_rate", function(y, p) 1)
+  expect_error(register_metric("hit_rate", function(y, p) 0), "already registered")
+  expect_silent(register_metric("hit_rate", function(y, p) 0, overwrite = TRUE))
+})
+
+test_that("a ladder scores by a registered metric named at the call", {
+  local_metric("prevalence_gap", function(y, p) mean(p) - mean(y))
+  sim <- sim_series(n_unit = 30L, days = 40L, seed = 41L)
+  y <- sim_response(sim, n_var = 2L, seed = 42L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
+  ladder <- learner("half", fit = function(x, y, ...) list(n = ncol(y)),
+                    predict = function(model, x) matrix(0.5, nrow = dim(x)[1L], ncol = model$n))
+  lad <- grain_ladder(x, y, ladder, folds = fold_map(y, v = 3L, seed = 4L),
+                       metric = "prevalence_gap", verbose = FALSE)
+  expect_equal(attr(lad, "metric"), "prevalence_gap")
+  expect_true(all(lad$score[lad$scorable] < 0.5))
+  expect_error(grain_ladder(x, y, ladder, folds = fold_map(y, v = 3L), metric = "nope",
+                             verbose = FALSE),
+               "unknown metric")
+})
+
+# ---- scoring predictions that came from somewhere else -----------------------------------------
+
+test_that("score_predictions() scores one row per variable and fold on the mask's cells", {
+  set.seed(3)
+  y <- matrix(stats::rbinom(120, 1, 0.4), nrow = 30,
+              dimnames = list(sprintf("p%02d", 1:30), paste0("sp", 1:4)))
+  folds <- fold_map(y, v = 3L, seed = 2L)
+  p <- matrix(stats::runif(120), nrow = 30, dimnames = dimnames(y))
+  rows <- score_predictions(y, p, folds)
+  expect_named(rows, c("variable", "fold", "score", "scorable"))
+  expect_equal(nrow(rows), 4L * 3L)
+  expect_setequal(rows$variable, colnames(y))
+  expect_true(all(is.na(rows$score[!rows$scorable])))
+  expect_true(all(!is.na(rows$score[rows$scorable])))
+})
+
+test_that("it reads the same cells and the same numbers a ladder arm does", {
+  set.seed(4)
+  sim <- sim_series(n_unit = 36L, days = 40L, seed = 43L)
+  y <- sim_response(sim, n_var = 3L, seed = 44L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
+  folds <- fold_map(y, v = 3L, seed = 6L)
+  arm <- learner("ranker", fit = function(x, y, ...) list(rate = colMeans(y)),
+                 predict = function(model, x) {
+                   outer(rank(apply(x[, , 1, drop = FALSE], 1L, mean)) / dim(x)[1L], model$rate,
+                         function(a, b) a)
+                 })
+  lad <- grain_ladder(x, y, arm, folds = folds, verbose = FALSE)
+  again <- score_predictions(y, attr(lad, "predictions")[["week|ranker"]], folds)
+  key <- order(again$variable, again$fold, method = "radix")
+  ladder_key <- order(lad$variable, lad$fold, method = "radix")
+  expect_equal(again$score[key], lad$score[ladder_key])
+  expect_equal(again$scorable[key], lad$scorable[ladder_key])
+})
+
+test_that("it takes a mask and a metric of its own", {
+  set.seed(5)
+  y <- matrix(stats::rbinom(90, 1, 0.4), nrow = 30,
+              dimnames = list(sprintf("p%02d", 1:30), paste0("sp", 1:3)))
+  folds <- fold_map(y, v = 3L, seed = 2L)
+  p <- matrix(stats::runif(90), nrow = 30, dimnames = dimnames(y))
+  cells <- scorable_cells(y, folds)
+  cells$scorable <- FALSE
+  blocked <- score_predictions(y, p, folds, cells = cells)
+  expect_true(all(!blocked$scorable))
+  expect_true(all(is.na(blocked$score)))
+  by_auc <- score_predictions(y, p, folds, metric = "roc_auc")
+  by_tss <- score_predictions(y, p, folds)
+  expect_false(isTRUE(all.equal(by_auc$score, by_tss$score)))
+  expect_error(score_predictions(y, p, folds, metric = "nope"), "unknown metric")
+})

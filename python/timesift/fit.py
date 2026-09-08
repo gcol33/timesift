@@ -133,7 +133,7 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
     ensemble = run_ensemble(ensemble, response)
 
     members = _members(sift, series, spec)
-    learners = [get_learner(m) for m in (models if models is not None else _default_models())]
+    learners = _as_learners(models)
     _check_anchored(members, learners, spec)
     pairs = _pair(members, learners)
 
@@ -295,6 +295,20 @@ def _candidate_table(pairs, representations) -> dict:
         columns["multi"].append(pair["learner"].multi)
         columns["reason"].append(pair["reason"] or "")
     return {k: np.asarray(v) for k, v in columns.items()}
+
+
+def _as_learners(models) -> list:
+    """A learner, the name of a registered one, or a list of either.
+
+    One learner is not a list of learners and reads in Python as a sequence of nothing, so it is
+    wrapped here rather than left to iterate into its own fields. ``learner_dict`` takes the same
+    three forms, and R's `models` takes a learner, a set of them or a list.
+    """
+    if models is None:
+        models = _default_models()
+    if not isinstance(models, (list, tuple)):
+        models = [models]
+    return [get_learner(m) for m in models]
 
 
 def _default_models() -> list:
