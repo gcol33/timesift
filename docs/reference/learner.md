@@ -34,7 +34,11 @@ learner(
   array and `y` the response matrix for the same units, returning a
   fitted object. A `fit` that declares a `control` argument is handed
   the resolved
-  [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md).
+  [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md),
+  and one that declares a `head` argument is handed the registered
+  response head, whose `loss` and `activation` say what it is fitting
+  toward. The learners that ship read both from there and hold no
+  response of their own.
 
 - predict:
 

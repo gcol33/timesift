@@ -43,7 +43,7 @@
 
     <a class="navbar-brand me-2" href="index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -195,7 +195,7 @@
 <div class="section level2">
 <h2 id="calendar-bins-not-blocks-of-hours">Calendar bins, not blocks of hours<a class="anchor" aria-label="anchor" href="#calendar-bins-not-blocks-of-hours"></a>
 </h2>
-<p>A month is 28, 30 or 31 days, and a week starts on a Monday. Bins that count hours instead drift away from both, so a “monthly” mean built from 730-hour blocks slides through the seasons over three years. <code>timesift</code> bins on the calendar and asserts every unit holds readings in every bin.</p>
+<p>A month is 28, 30 or 31 days, and a week starts on a Monday. Bins that count hours instead drift away from both, so a “monthly” mean built from 730-hour blocks slides through the seasons over three years. <code>timesift</code> bins on the calendar and asserts every unit holds readings in every bin. A record that fails that assertion is refused rather than padded, and <code><a href="reference/coverage.html">coverage()</a></code> lays the same binning out as a count of readings per unit and bin, so the logger that stopped early or the month the whole record skipped is a row or a column of zeros rather than a guess.</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="fu"><a href="reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">d</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span>, <span class="st">"bin_n"</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">]</span></span>
 <span><span class="co">#&gt; 2021-09-01T00:00:00Z 2021-10-01T00:00:00Z 2021-11-01T00:00:00Z</span></span>

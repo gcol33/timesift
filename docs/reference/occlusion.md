@@ -22,7 +22,7 @@ occlusion(
   arm,
   over = c("bin", "channel"),
   substitute = c("permute", "fold_mean", "unit_mean"),
-  metric = "roc_auc",
+  metric = NULL,
   permutations = 20L,
   seed = 1L,
   ...
@@ -69,10 +69,13 @@ occlusion(x, candidate, over = c("bin", "channel"), ...)
 
 - metric:
 
-  Name of the registered metric the rescoring is read by. The area under
-  the ROC curve responds to every reordering of the units, where a
-  maximum over thresholds frequently does not move at all, which is why
-  it is the default here and not for the ladder.
+  Name of the registered metric the rescoring is read by, or a function
+  of `(y, p)`. Left unset it is the one the fit was scored under, so a
+  weight is a fall in the number
+  [`summary()`](https://rdrr.io/r/base/summary.html) reports rather than
+  in a second one. `"roc_auc"` is usually the steadier reading over many
+  rescorings: it responds to every reordering of the units, where a
+  maximum over thresholds frequently does not move at all.
 
 - permutations:
 

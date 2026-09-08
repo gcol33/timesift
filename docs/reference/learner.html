@@ -31,7 +31,7 @@ scoring."><style>
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -115,7 +115,10 @@ scoring.</p>
 <dt id="arg-fit">fit<a class="anchor" aria-label="anchor" href="#arg-fit"></a></dt>
 <dd><p>A function of <code>(x, y, ...)</code>, where <code>x</code> is a <code>[unit, bin, channel]</code> array and <code>y</code> the
 response matrix for the same units, returning a fitted object. A <code>fit</code> that declares a
-<code>control</code> argument is handed the resolved <code><a href="train_control.html">train_control()</a></code>.</p></dd>
+<code>control</code> argument is handed the resolved <code><a href="train_control.html">train_control()</a></code>, and one that declares a <code>head</code>
+argument is handed the registered response head, whose <code>loss</code> and <code>activation</code> say what it
+is fitting toward. The learners that ship read both from there and hold no response of their
+own.</p></dd>
 
 
 <dt id="arg-predict">predict<a class="anchor" aria-label="anchor" href="#arg-predict"></a></dt>

@@ -109,7 +109,10 @@ timesift(
 
 - metric:
 
-  Name of the registered metric, or `NULL` for the response's own.
+  Name of a registered metric, or a function of `(y, p)`, or `NULL` for
+  the response head's own. Whichever it is, it travels with the fit and
+  is what every later rescoring reads; a function is reported as
+  `<function>`.
 
 - control:
 

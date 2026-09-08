@@ -32,7 +32,9 @@ train_control(
 
 - batch_size:
 
-  Targets per optimiser step.
+  Most targets per optimiser step. The fitting targets are cut into as
+  few batches of at most this many as they divide into, of as equal a
+  length as they can be, so no batch is a remainder of one.
 
 - learning_rate:
 
@@ -50,12 +52,16 @@ train_control(
 
   Share of the fitting targets held back as an inner validation set,
   used for early stopping and for nothing else. It is never scored as a
-  result.
+  result. The set is drawn from every fit alike, one target from each of
+  as many equal-count strata of the response total as the set holds, so
+  the fit on all targets that a run ends with also trains on the rest.
 
 - device:
 
-  `"auto"` to take a graphics processor where there is one, or a device
-  name such as `"cuda"` or `"cpu"`.
+  `"auto"` to take a graphics processor where there is one, NVIDIA's or
+  Apple's, or a device name such as `"cuda"`, `"mps"` or `"cpu"`. A
+  fitted encoder carries the setting rather than the device it resolved
+  to, so a fit made on one machine predicts on another.
 
 - seed:
 
@@ -64,7 +70,8 @@ train_control(
 - pos_weight_cap:
 
   Ceiling on the per-response positive-class weight, which is the ratio
-  of absences to presences among the fitting targets.
+  of absences to presences among the fitting targets. At least one: a
+  weight under one would weight presences down.
 
 - swa:
 

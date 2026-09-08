@@ -71,7 +71,7 @@ summary(object, ...)
 
 - metric:
 
-  Name of the registered metric the selection is made on, or `NULL` for
+  Name of a registered metric the selection is made on, or `NULL` for
   the response's own. The estimate is reported under every registered
   metric whichever this is.
 

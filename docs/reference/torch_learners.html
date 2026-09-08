@@ -31,7 +31,7 @@ across variables is what makes the rarer ones learnable at all at these sample s
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -169,7 +169,15 @@ concatenates global average with global maximum pooling so extremes reach the he
 level.</p>
 <p>The three constructors carry architecture. How that architecture is trained is
 <code><a href="train_control.html">train_control()</a></code>, which the run supplies; a setting named in <code>...</code> here overrides the run's
-control for this learner alone.</p>
+control for this learner alone. What the head is trained toward is the response head's: its
+<code>loss</code> is the training objective and its <code>activation</code> the output transform, so a head registered
+with a squared-error loss and an identity activation trains the same encoders on a continuous
+response.</p>
+<p>Every channel is standardised by its own centre and scale, computed over every unit and bin of
+the fitting units, so a static predictor appended as a channel sits on the same footing as a
+reading whatever its units are.</p>
+<p>A fitted encoder holds its weights as plain arrays and rebuilds the network when it predicts, so
+a fit saved with <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code> predicts after <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS()</a></code> in a fresh session.</p>
     </div>
 
     <div class="section level2">

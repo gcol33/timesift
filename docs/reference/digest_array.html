@@ -31,7 +31,7 @@ digest a statement about the representation rather than about the machine."><sty
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -113,6 +113,11 @@ formatted to twelve decimal places, joined with a line feed and terminated with 
 UTF-8 bytes of that are hashed. The line ending is a line feed on every platform. It is written
 explicitly because <code><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines()</a></code> emits CRLF on Windows, which would make a digest depend on
 the machine that produced it.</p>
+<p>The array has to be finite. <code>%.12f</code> writes an infinity as <code>Inf</code> here and as <code>inf</code> in Python, and
+R tells a missing value apart from a not-a-number where Python has one spelling for both, so a
+digest over such an array would say something about the language rather than about the
+representation. A representation never holds one: a reading that is not a finite number is
+refused where the record is read.</p>
     </div>
 
     <div class="section level2">

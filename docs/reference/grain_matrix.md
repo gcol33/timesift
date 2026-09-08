@@ -80,8 +80,11 @@ statistic names. Attributes:
 
 - `year_start`: the boundary used.
 
-- `bin_start`, `bin_end`: the first and last reading instant assigned to
-  each bin.
+- `bin_start`: the instant each bin begins on the calendar, which is
+  earlier than the bin's first reading wherever the record does not
+  reach the boundary.
+
+- `bin_end`: the last reading instant assigned to each bin.
 
 - `bin_n`: a `[unit, bin]` matrix of how many readings fell in each bin.
 
@@ -141,6 +144,9 @@ so a month missing from the whole record would otherwise pass as four
 adjacent monthly bins with one simply gone. Neither the `"native"`
 grain, whose bin is the reading itself, nor a supplied calendar, which
 declares its own bin lengths, is held to the second rule.
+[`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
+lays the same binning out as a count of readings per unit and bin, which
+is where a refused record's gaps are read off.
 
 ## Partial bins
 

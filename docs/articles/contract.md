@@ -10,20 +10,44 @@ A long table of readings with three columns of interest:
 
 | column | type | meaning |
 |----|----|----|
-| id | character or factor | the unit carrying the sensor (a plot, a site, a device) |
-| time | POSIXct, UTC | the instant of the reading |
+| id | character, factor, or a whole number | the unit carrying the sensor (a plot, a site, a device) |
+| time | POSIXct | the instant of the reading, read on the clock **The time zone** names |
 | value | numeric | the reading |
+
+An identifier is a name, and the two languages have to write the same
+name for the same value. A character id is itself and a factor is its
+label. A whole number is its digits, with no exponent and no decimal
+point, so a plot read as `100000` from a file is `100000` in both,
+rather than R’s `1e+05` beside Python’s `100000.0`. A number that is not
+whole has no such writing and is refused, naming the column, as is a
+column of any other type. This holds wherever an identifier names
+something: the id column of the readings, of the targets, of the target
+table a lookback is anchored by, and of a response.
 
 Requirements, each checked and each an error rather than a warning:
 
-- No missing `id`, `time` or `value`.
+- No missing `id` or `time`.
+- Every `value` is a finite number. A missing one propagates through a
+  sum and is skipped by a comparison, so a bin’s mean and its minimum
+  would disagree about which readings were in it, and an infinity makes
+  the mean of a bin holding both signs a not-a-number. The reading
+  columns are read by the shared core, so this is one guard rather than
+  one per language, and its message names the unit and the instant of
+  the first reading it refuses.
 - No duplicate `(id, time)` pair.
 - Every id spans the same set of bins once binned. A record that stops
   early is not silently padded; it is reported with the ids and the bins
   concerned.
 
-Ordering of the input rows carries no meaning and is not relied on. The
-output is ordered by sorted unique id and by bin start.
+Ordering of the input rows carries no meaning, exactly and not
+approximately: both reductions walk the record by unit and then by
+instant rather than in the order the caller wrote it, so a record and
+any permutation of its rows reduce to the same bytes and reach the same
+digest. Addition is not associative, and a reduction that accumulated in
+the caller’s order would move in its last bits under a permutation that
+changed nothing about the record. A record already in that order is the
+common case and pays the scan that establishes it. The output is ordered
+by sorted unique id and by bin start.
 
 ## Ordering identifiers
 
@@ -66,10 +90,14 @@ month is what the proleptic Gregorian calendar says.
 |  | how the zone is named |
 |----|----|
 | R | the `tzone` attribute of the `POSIXct` column; unset means UTC |
-| Python | the `tz` argument; `None`, the default, means the instants already read as the calendar to bin by, which is what a zone-free `datetime64` says |
+| Python | the zone the time column carries, where it carries one, else the `tz` argument; `None` and no zone on the column mean the instants already read as the calendar to bin by, which is what a zone-free `datetime64` says |
 
 The same instants and the same zone give the same answer in both
-languages, and the fixtures pin that rather than leaving it assumed.
+languages, and the fixtures pin that rather than leaving it assumed. On
+the Python side reading the column as instants drops the zone it was
+written on, so it is taken off the column before that; a `tz` naming a
+different zone beside one the column carries is an error, because two
+zones are two answers.
 
 Reading an instant as a clock is defined for every instant in every
 zone. The reverse is not: on the night a zone moves its clock forward a
@@ -229,10 +257,25 @@ is the natural way to write one and the two languages disagree below the
 first boundary, where R’s
 [`findInterval()`](https://rdrr.io/r/base/findInterval.html) gives 0 and
 NumPy’s `searchsorted() - 1` gives -1: the first silently shortens the
-result, which is an error, and the second silently wraps to the last
-boundary, which is not. Either put the first boundary at or before the
-record’s first reading, as the fixtures do, or handle the readings below
-it explicitly.
+result, and the second silently wraps to the last boundary. Either put
+the first boundary at or before the record’s first reading, as the
+fixtures do, or handle the readings below it explicitly.
+
+Two things have to hold of what the function returns, and both are
+checked before its bins are read as bins, naming the first reading that
+breaks them:
+
+- A bin begins at or before every reading it holds. A calendar shifted
+  by one boundary breaks it, and so does the wrap above, whose bin start
+  is the last edge of all and therefore later than the reading it was
+  asked about.
+- A bin’s readings are a stretch of the record. A calendar sending
+  alternate readings to two bins breaks it, and the two bins the array
+  then carries are not bins the record ever had.
+
+Neither is visible to the empty-cell guard or to the contiguity rule,
+which read the bins the calendar declared and can only ask whether every
+unit reaches each of them.
 
 ## Output
 
@@ -271,8 +314,12 @@ relative to the target rather than to a month or a week.
 
 | column | type                | meaning                                 |
 |--------|---------------------|-----------------------------------------|
-| id     | character or factor | the unit, which the readings must carry |
+| id     | as the readings’ id | the unit, which the readings must carry |
 | at     | POSIXct             | the instant the target is anchored at   |
+
+Both columns are read **by name**, as every alignment in the package is,
+and a table missing either is refused. A table carrying more columns
+than these two is read for these two.
 
 A target’s identity is its position in that table. A unit may carry any
 number of targets, so the unit cannot name a row, and the output is in
@@ -367,7 +414,10 @@ Attributes carried on the array:
 
 There is no `bin_start`, no `bin_end` and no `bin_partial`. A bin is a
 position relative to an anchor rather than a span of the calendar, and a
-cell the record does not cover is an error rather than a verdict.
+cell the record does not cover is an error rather than a verdict. R
+carries no such attribute and Python carries them as `None`; a column of
+not-a-time beside a column of `FALSE` would read as an answer to a
+question the reduction does not ask.
 
 ## What crosses the language boundary, and what does not
 
@@ -457,35 +507,68 @@ a whole study is a normal thing to read a subset of.
 
 ## Fixtures
 
-Three series, because a record that starts on a bin boundary cannot tell
-two binning rules apart and a record in UTC cannot tell two readings of
-a zone apart. `spec/fixtures/series.csv` is a synthetic three-unit,
-400-day hourly series beginning at midnight on the default anniversary,
-so every coarse grain is in phase with it from the first reading.
-`series_offset.csv` is a two-unit, 200-day series beginning at 05:00 on
-17 October, which is what a logger deployed when someone could walk to
-it gives, and puts every grain out of phase. `series_zoned.csv` is a
-two-unit, 10-day series across 4 November 2018, the night
+Four series, because a record that starts on a bin boundary cannot tell
+two binning rules apart, a record in UTC cannot tell two readings of a
+zone apart, and identifiers that agree under every collation rule cannot
+tell two row orders apart. `spec/fixtures/series.csv` is a synthetic
+three-unit, 400-day hourly series beginning at midnight on the default
+anniversary, so every coarse grain is in phase with it from the first
+reading. `series_offset.csv` is a two-unit, 200-day series beginning at
+05:00 on 17 October, which is what a logger deployed when someone could
+walk to it gives, and puts every grain out of phase. `series_zoned.csv`
+is a two-unit, 10-day series across 4 November 2018, the night
 `America/Sao_Paulo` moved its clock at midnight, which is the record
 that tells a calendar read by arithmetic apart from one read by writing
-a local midnight and parsing it back. `seasons.csv` holds the equinox
-and solstice boundaries that make each series a caller-supplied
-calendar, which is the only path the manuscript’s seasonal rung ever
-took.
+a local midnight and parsing it back. `series_order.csv` is a five-unit,
+30-day series whose identifiers C collation and an English locale order
+differently, `A1 P10 P9 _x a1` against `_x a1 A1 P10 P9`, and which
+arrive in a third order again. `seasons.csv` holds the equinox and
+solstice boundaries that make each series a caller-supplied calendar,
+which is the only path the manuscript’s seasonal rung ever took.
+
+The digests are the core’s own output: `inst/spec/make_fixtures.R` loads
+the R package and calls the same public functions a user calls. They pin
+a regression, not an agreement between two implementations. The evidence
+that the two agree is the oracles, checked against the core separately,
+on these fixtures and on random series.
 
 `digests.csv` holds one row per series, grain, time zone, `year_start`,
 `partial` setting and statistic, covering every grain-by-statistic
 combination, each of the three-channel schemes (`min+mean+max`,
 `mean_daily_min+mean+mean_daily_max`, `cold_day+mean+warm_day`), the
 coarse grains at anniversaries other than the default, both `partial`
-settings, the supplied calendar, and the zone: every grain of the
-aligned series read as a `Europe/Vienna` clock, which moves twice inside
-that record, and the short series read as an `America/Sao_Paulo` clock,
-which moves at midnight inside it, including a `year_start` landing on
-the night it moves. Each row carries `n_unit`, `n_bin`, the first and
-last bin start, how many bins are partial, and the digest.
+settings, the supplied calendar over the same grid of statistics a named
+grain is read at, and the zone: every grain of the aligned series read
+as a `Europe/Vienna` clock, which moves twice inside that record, and
+the short series read as an `America/Sao_Paulo` clock, which moves at
+midnight inside it, including a `year_start` landing on the night it
+moves. Each row carries `n_unit`, `n_bin`, the first and last bin start,
+how many bins are partial, and the digest.
 
-The lookback reads the same three series and three files of its own.
+`coverage.csv` holds what
+[`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
+reports, which is the same binning laid out as a count of readings per
+`(unit, bin)` and the one reduction no digest above reaches: every
+series here is complete, and a gap is what that table exists to show.
+Each case names the readings it takes out, by unit and by span, so both
+suites build the same record; a case takes none, a case takes a month
+from one unit, a case takes a span from every unit so that the calendar
+tiles over a bin no unit reaches at all, and a case reads a supplied
+calendar. Each row carries the shape, the first and last bin, how many
+cells are empty, how many units have a gap, how many bins no unit
+reaches, and the digest of the count matrix.
+
+`grain_guards.csv` holds one case per guard on a supplied calendar, each
+naming the series and the calendar that breaks it beside the substring
+of the message both implementations must raise. The calendars are named
+rather than written out, so both suites build the same function: `late`
+gives every reading the midnight after it,
+`(floor(t / 86400) + 1) * 86400`, and `alternate` sends consecutive
+readings to two bins an hour apart,
+`t0 + 3600 * (((t - t0) / 3600) mod 2)` with `t0` the record’s first
+reading.
+
+The lookback reads the same series and three files of its own.
 `lookback_targets.csv` holds the anchors, in named sets rather than one
 set per series, because an anchor that is a local midnight in one zone
 is not one in another and an anchor on the hour rules out the day-level
@@ -526,6 +609,15 @@ The line ending is LF on every platform. R’s
 [`writeLines()`](https://rdrr.io/r/base/writeLines.html) emits CRLF on
 Windows, so the bytes are written explicitly; a digest generated on
 Windows and checked on Linux must agree.
+
+The array has to be finite, and an array holding an infinity or a
+missing value is refused rather than digested. `%.12f` writes an
+infinity as `Inf` in R and as `inf` in Python, and R tells `NA` apart
+from `NaN` where Python has one spelling for both, so any pinned
+rendering would either compare the language or conflate two values R
+keeps distinct. Nothing built here reaches that case: a reading that is
+not a finite number is refused where the record is read, which is the
+guard below.
 
 Twelve places is far below any difference that could change a fitted
 model and far above the noise from the two languages accumulating a mean
@@ -608,6 +700,7 @@ the difference is recorded here rather than found at a call site.
 | the whole run | [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md), from a table of targets and a table of series to a scored comparison |
 | what a representation is | [`native()`](https://gillescolling.com/timesift/reference/native.md), [`grain()`](https://gillescolling.com/timesift/reference/native.md), [`multigrain()`](https://gillescolling.com/timesift/reference/native.md), [`lookback()`](https://gillescolling.com/timesift/reference/native.md), and the sets [`grains()`](https://gillescolling.com/timesift/reference/grains.md) and [`lookbacks()`](https://gillescolling.com/timesift/reference/grains.md) |
 | the target-anchored array | [`lookback_matrix()`](https://gillescolling.com/timesift/reference/lookback_matrix.md) |
+| which units reach which bins | [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md), the count of readings per unit and bin over every bin the calendar tiles the record with, which is where a refused record’s gaps are read off |
 | building one representation | [`build_representation()`](https://gillescolling.com/timesift/reference/build_representation.md) |
 | the penalised learner | [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md) |
 | the forward selector | [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md) |
@@ -627,6 +720,18 @@ the difference is recorded here rather than found at a call site.
 - Naming one grain returns the representation and naming two or more
   returns a set, whether the one is named as a string or as a sequence
   of one.
+- A representation refuses a statistic its grain has no definition for,
+  and a `year_start` that is not a month and a day, when it is
+  constructed rather than when it is built. `"auto"` is the whole set
+  the record supports and is refused beside a named grain, and the
+  `stats` and `year_start` given to
+  [`grains()`](https://gillescolling.com/timesift/reference/grains.md)
+  reach every member of the set it returns.
+- A representation anchored on the target and a run without
+  `target_time` are refused against each other in both directions, over
+  the members of the sift and the representations learners pinned
+  themselves to alike. A learner’s `data` is a representation or
+  nothing; the name of a grain is not one.
 - [`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md)
   and
   [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
@@ -641,11 +746,50 @@ the difference is recorded here rather than found at a call site.
   a setting the learner does not have is refused rather than ignored.
 - The response head and the metric are registry entries. `metric` takes
   a registered name or a function of `(y, p)`, and left unset it is the
-  one the response head carries.
+  one the response head carries. Both travel with the fit: the function
+  is what scores, and the name is what the report prints. A function has
+  no name to print and reads as `<function>` on both sides rather than
+  as whatever each language calls an anonymous one.
+  [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+  is the one door that takes a name only, because it reports the
+  estimate under every registered metric and the one it selects on has
+  to be a row of that table.
+- An occlusion profile left without a `metric` is read by the one the
+  fit was scored under, so a weight is a fall in the number the summary
+  reports rather than in a second one. It reaches the response through
+  the head the fit was made under, as everything else does, so a head
+  that is not presence-absence is occluded like any other.
 - The encoders take `swa` and `swa_start`: the schedule anneals until
   the averaging begins and is then held flat, the averaged weights get
-  their own pass to rebuild the batch-normalisation statistics, and the
-  default is off, so a default recipe is the same recipe on both sides.
+  their own pass to rebuild the batch-normalisation statistics from a
+  reset, and the default is off, so a default recipe is the same recipe
+  on both sides. `swa_start` is at least 0 and under 1, and
+  `pos_weight_cap` is at least 1, on both.
+- The encoders standardise every channel by its own centre and sample
+  standard deviation over every unit and bin of the fitting units; the
+  inner validation set is one unit from each of as many equal-count
+  strata of the response total as it holds; the fitting units are cut
+  into as few batches of at most `batch_size` rows as they divide into,
+  of as equal a length as they can be; the snapshot early stopping
+  restores, and the running average `swa` keeps, are copies of the
+  weights and never the storage the optimiser updates.
+- A `static` column enters the array as a channel holding the same
+  number in every bin, which is the constant an encoder reads beside the
+  readings. Flattening the bins into a block of features reads such a
+  channel once, so a static predictor is one column of the design
+  however many bins the grain has.
+- A learner is fitted toward the registered response head and holds no
+  response of its own: the encoders train under the head’s `loss` and
+  predict through its `activation`, and the three learners fitting one
+  model per response take the family the loss names, logistic under
+  `binary_cross_entropy` and Gaussian under `squared_error`. A fit that
+  declares a `head` argument is handed the head, as one that declares
+  `control` is handed the control.
+- A fitted encoder holds its weights as arrays and the device *setting*
+  rather than the device it resolved to, and rebuilds the network when
+  it predicts, so a fit written with
+  [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) or `pickle`
+  predicts in a fresh session and on another machine.
 - [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
   searches the candidates in the order the grains and the learners were
   declared in, so which candidate an exact tie on the inner score falls
@@ -658,6 +802,12 @@ the difference is recorded here rather than found at a call site.
   candidate emits an out-of-fold prediction for every scorable cell over
   the same folds. The combiner is handed those predictions, the
   response, the mask and the fold map, and never a model.
+- The combiner minimises the loss of the head the run was fitted under.
+  [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md)
+  left without a `response` takes the run’s, and one naming a different
+  head is refused before anything is fitted;
+  [`ensemble_fit()`](https://gillescolling.com/timesift/reference/ensemble_fit.md)
+  called on its own reads an unnamed head as `presence_absence`.
 
 ### The same thing, shaped differently
 
@@ -682,10 +832,11 @@ concatenates, so nothing is added there.
 | [`grain_contrasts()`](https://gillescolling.com/timesift/reference/grain_contrasts.md) | fits a mixed model over the whole ladder and reads Dunnett’s comparisons off it, on lme4, lmerTest and emmeans. The Python twin would need a mixed-model fitter of its own or a scientific stack the wheel does not depend on, and nothing in the contract reads it. |
 | [`simulate_records()`](https://gillescolling.com/timesift/reference/simulate_records.md) | generates a record with a planted grain, for the vignette and the recovery tests. The Python suite builds its records in its own fixtures. |
 | [`plot()`](https://rdrr.io/r/graphics/plot.default.html) on a ladder and on a selection | the wheel depends on numpy alone, and every number a plot draws is on the object it is called on. |
+| `elasticnet(s =)` | glmnet keeps the whole penalty path and `s` names the point on it to predict at. scikit-learn’s cross-validated fits refit at the best penalty and keep only that one, so there is no path there to name a point of. Both sides otherwise fit the same model: one penalised regression per variable over every column and, by default, their squares, on a design standardised before it is penalised, with the mixing given by `alpha` and the penalty chosen by an inner cross-validation on the fitting units. |
 
 | in Python only | what it is |
 |----|----|
-| `flatten`, `align_folds`, `as_response`, `get_learner`, `cohen_kappa` | the helpers R keeps unexported, as `.flatten()`, `.as_folds()`, `.as_response()`, `.as_learner()` and `.kappa_table()`. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
+| `flatten`, `align_folds`, `as_response`, `get_learner`, `resolve_metric`, `cohen_kappa` | the helpers R keeps unexported, as `.flatten()`, `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()` and `.kappa_table()`. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
 
 Models are the one thing neither side promises. A fit in torch and a fit
 in libtorch cannot be byte-identical, and the encoders match module for

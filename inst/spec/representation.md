@@ -10,7 +10,7 @@ A long table of readings with three columns of interest:
 | column | type | meaning |
 |---|---|---|
 | id | character, factor, or a whole number | the unit carrying the sensor (a plot, a site, a device) |
-| time | POSIXct, UTC | the instant of the reading |
+| time | POSIXct | the instant of the reading, read on the clock **The time zone** names |
 | value | numeric | the reading |
 
 An identifier is a name, and the two languages have to write the same name for the same value.

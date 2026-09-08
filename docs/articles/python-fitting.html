@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -168,11 +168,12 @@ table.</p>
 <span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>    cells,</span>
 <span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>    y,</span>
 <span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>    metric,</span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>    response,</span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>    spec,</span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>    fits,</span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>    control,</span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>    scorer,</span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>    response,</span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>    spec,</span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>    fits,</span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>    control,</span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a>)</span></code></pre></div>
 <p>A fitted sift: every candidate’s out-of-fold predictions, their
 scores, and the combiner.</p>
 <p><code>candidates</code> and <code>scores</code> are tables held as
@@ -206,6 +207,8 @@ here was read where the score was.</p>
 <code>y</code> - Response</li>
 <li>
 <code>metric</code> - str</li>
+<li>
+<code>scorer</code> - object</li>
 <li>
 <code>response</code> - str</li>
 <li>
@@ -372,7 +375,7 @@ as its members.</p>
 <span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>    method: <span class="bu">str</span> <span class="op">=</span> <span class="st">'stack'</span>,</span>
 <span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>    scope: <span class="bu">str</span> <span class="op">=</span> <span class="st">'all'</span>,</span>
 <span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>    metric<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>    response: <span class="bu">str</span> <span class="op">=</span> <span class="st">'presence_absence'</span>,</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>    response: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>,</span>
 <span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>)</span></code></pre></div>
 <p>Ask for an ensemble of the candidates a fit produced.</p>
 <p><code>stack</code> fits non-negative weights summing to one on the
@@ -384,7 +387,10 @@ sharing the best candidate’s representation, or only its learner across
 the representations. <code>metric</code> names the metric the ensemble
 is reported in, or <code>None</code> for the fit’s own, and
 <code>response</code> is the registered head whose loss the weights
-minimise.</p>
+minimise, or <code>None</code> for the head the run was fitted under.
+Naming a head the run does not fit toward is an error rather than an
+override, and <code>ensemble_fit</code> called on its own reads
+<code>None</code> as <code>"presence_absence"</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="ensemble_fit">
@@ -429,7 +435,7 @@ and under which head.</p>
 <li>
 <code>metric</code> - object</li>
 <li>
-<code>response</code> - str</li>
+<code>response</code> - str | None</li>
 </ul>
 </div>
 <div class="section level2">
@@ -477,8 +483,21 @@ same splits, build it once and read it in the other with
 <h2 id="fit_learner">
 <code>fit_learner()</code><a class="anchor" aria-label="anchor" href="#fit_learner"></a>
 </h2>
-<div class="sourceCode" id="cb22"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>fit_learner(learner, x: TimesiftMatrix, y, response: <span class="bu">str</span> <span class="op">=</span> <span class="st">'presence_absence'</span>, <span class="op">**</span>kwargs)</span></code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>fit_learner(</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>    learner,</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>    x: TimesiftMatrix,</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>    y,</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>    response: <span class="bu">str</span> <span class="op">=</span> <span class="st">'presence_absence'</span>,</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>    control<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
+<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a>)</span></code></pre></div>
 <p>Fit one learner at one grain, under one registered response head.</p>
+<p>A <code>fit</code> that declares a <code>head</code> argument is
+handed the registered head, whose <code>loss</code> and
+<code>activation</code> say what it is fitting toward; the learners that
+ship read both from there and hold no response of their own. A
+<code>fit</code> that declares a <code>control</code> is handed the
+run’s training settings the same way.</p>
 </div>
 <div class="section level2">
 <h2 id="select_grain">
@@ -527,8 +546,10 @@ quantity this function exists to keep out of a reported number.</p>
 <span id="cb24-9"><a href="#cb24-9" tabindex="-1"></a>    cells,</span>
 <span id="cb24-10"><a href="#cb24-10" tabindex="-1"></a>    folds,</span>
 <span id="cb24-11"><a href="#cb24-11" tabindex="-1"></a>    metric,</span>
-<span id="cb24-12"><a href="#cb24-12" tabindex="-1"></a>    fits,</span>
-<span id="cb24-13"><a href="#cb24-13" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb24-12"><a href="#cb24-12" tabindex="-1"></a>    scorer,</span>
+<span id="cb24-13"><a href="#cb24-13" tabindex="-1"></a>    response,</span>
+<span id="cb24-14"><a href="#cb24-14" tabindex="-1"></a>    fits,</span>
+<span id="cb24-15"><a href="#cb24-15" tabindex="-1"></a>)</span></code></pre></div>
 <p>One score per <code>(grain, learner, variable, fold)</code> cell, and
 what produced it.</p>
 <p>Attributes:</p>
@@ -553,6 +574,10 @@ what produced it.</p>
 <code>folds</code> - Folds</li>
 <li>
 <code>metric</code> - str</li>
+<li>
+<code>scorer</code> - object</li>
+<li>
+<code>response</code> - str</li>
 <li>
 <code>fits</code> - dict</li>
 </ul>

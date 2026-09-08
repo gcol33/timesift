@@ -35,7 +35,8 @@ score_predictions(y, p, folds, cells = NULL, metric = "tss")
 
 - metric:
 
-  Name of the registered metric to read the cells by.
+  Name of a registered metric to read the cells by, or a function of
+  `(y, p)`.
 
 ## Value
 

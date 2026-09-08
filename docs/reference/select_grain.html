@@ -37,7 +37,7 @@ is what an ecologist applying it to a new site would run."><style>
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -150,7 +150,7 @@ response returning a fold map for those units.</p></dd>
 
 
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
-<dd><p>Name of the registered metric the selection is made on, or <code>NULL</code> for the
+<dd><p>Name of a registered metric the selection is made on, or <code>NULL</code> for the
 response's own. The estimate is reported under every registered metric whichever this is.</p></dd>
 
 
@@ -221,8 +221,7 @@ comparison the <code>contrast</code> element holds.</p></div>
 <span><span class="va">sel</span> <span class="op">&lt;-</span> <span class="fu">select_grain</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, <span class="fu"><a href="elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, folds <span class="op">=</span> <span class="fu"><a href="fold_map.html">fold_map</a></span><span class="op">(</span><span class="va">y</span>, v <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>, inner <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                    verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="va">sel</span></span>
-<span><span class="va">sel</span><span class="op">$</span><span class="va">estimate</span></span>
-<span></span></code></pre></div>
+<span><span class="va">sel</span><span class="op">$</span><span class="va">estimate</span></span></code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>

@@ -44,9 +44,10 @@ lookback_matrix(
 
 - at:
 
-  A data frame of targets, whose first column is the unit and whose
-  second is the anchor instant, `POSIXct`. One row per target; a unit
-  may carry any number of them.
+  A data frame of targets with an `id` column naming the unit and an
+  `at` column of anchor instants, `POSIXct`. One row per target; a unit
+  may carry any number of them. The columns are read by name, as every
+  alignment in the package is.
 
 - span:
 
@@ -145,8 +146,8 @@ t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 60
 d <- data.frame(plot = rep(c("a", "b"), each = length(t)),
                 t = rep(t, 2),
                 temp = c(sin(seq_along(t) / 24), cos(seq_along(t) / 24)))
-at <- data.frame(plot = c("a", "b"),
-                 when = as.POSIXct(c("2021-10-20", "2021-10-25"), tz = "UTC"))
+at <- data.frame(id = c("a", "b"),
+                 at = as.POSIXct(c("2021-10-20", "2021-10-25"), tz = "UTC"))
 x <- lookback_matrix(d, plot, t, temp, at = at, span = "30 days", bins = 3L,
                    stats = c("cold_day", "mean", "warm_day"))
 dim(x)

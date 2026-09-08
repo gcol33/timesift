@@ -112,6 +112,11 @@ A month is 28, 30 or 31 days, and a week starts on a Monday. Bins that
 count hours instead drift away from both, so a “monthly” mean built from
 730-hour blocks slides through the seasons over three years. `timesift`
 bins on the calendar and asserts every unit holds readings in every bin.
+A record that fails that assertion is refused rather than padded, and
+[`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
+lays the same binning out as a count of readings per unit and bin, so
+the logger that stopped early or the month the whole record skipped is a
+row or a column of zeros rather than a guess.
 
 ``` r
 

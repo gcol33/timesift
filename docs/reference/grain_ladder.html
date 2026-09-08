@@ -31,7 +31,7 @@ point where making the record finer stops paying."><style>
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -133,7 +133,9 @@ of <code><a href="fold_map.html">fold_map()</a></code> when not given.</p></dd>
 
 
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
-<dd><p>Name of the registered metric, or <code>NULL</code> for the response's own.</p></dd>
+<dd><p>Name of a registered metric, or a function of <code>(y, p)</code>, or <code>NULL</code> for the
+response head's own. Whichever it is, it travels with the fit and is what every later
+rescoring reads; a function is reported as <code>&lt;function&gt;</code>.</p></dd>
 
 
 <dt id="arg-keep-fits">keep_fits<a class="anchor" aria-label="anchor" href="#arg-keep-fits"></a></dt>
@@ -179,8 +181,7 @@ denominator and any two of them can be compared cell by cell with <code><a href=
 <span>            dimnames <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">units</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sp1"</span>, <span class="st">"sp2"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">d</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"week"</span>, <span class="st">"month"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">lad</span> <span class="op">&lt;-</span> <span class="fu">grain_ladder</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, <span class="fu"><a href="elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, folds <span class="op">=</span> <span class="fu"><a href="fold_map.html">fold_map</a></span><span class="op">(</span><span class="va">y</span>, v <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">lad</span><span class="op">)</span></span>
-<span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">lad</span><span class="op">)</span></span></code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>

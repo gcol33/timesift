@@ -47,7 +47,9 @@ identifiers, the ISO-8601 start of each bin, and the statistic names. Attributes
 \item \code{grain}: the grain name.
 \item \code{stats}: the statistic names in channel order.
 \item \code{year_start}: the boundary used.
-\item \code{bin_start}, \code{bin_end}: the first and last reading instant assigned to each bin.
+\item \code{bin_start}: the instant each bin begins on the calendar, which is earlier
+than the bin's first reading wherever the record does not reach the boundary.
+\item \code{bin_end}: the last reading instant assigned to each bin.
 \item \code{bin_n}: a \verb{[unit, bin]} matrix of how many readings fell in each bin.
 \item \code{bin_partial}: a logical vector marking the bins the record does not cover for their
 whole calendar span.

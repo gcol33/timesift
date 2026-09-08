@@ -31,7 +31,7 @@ reduction, and the two are not interchangeable."><style>
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -153,7 +153,9 @@ default, returns it alongside the full bins; <code>"drop"</code> removes it. See
 identifiers, the ISO-8601 start of each bin, and the statistic names. Attributes:</p><ul><li><p><code>grain</code>: the grain name.</p></li>
 <li><p><code>stats</code>: the statistic names in channel order.</p></li>
 <li><p><code>year_start</code>: the boundary used.</p></li>
-<li><p><code>bin_start</code>, <code>bin_end</code>: the first and last reading instant assigned to each bin.</p></li>
+<li><p><code>bin_start</code>: the instant each bin begins on the calendar, which is earlier
+than the bin's first reading wherever the record does not reach the boundary.</p></li>
+<li><p><code>bin_end</code>: the last reading instant assigned to each bin.</p></li>
 <li><p><code>bin_n</code>: a <code>[unit, bin]</code> matrix of how many readings fell in each bin.</p></li>
 <li><p><code>bin_partial</code>: a logical vector marking the bins the record does not cover for their
 whole calendar span.</p></li>
@@ -198,7 +200,8 @@ one the clock repeated to the first of the two. Instants are read at whole secon
 calendar. A bin no unit reaches is never built, so a month missing from the whole record would
 otherwise pass as four adjacent monthly bins with one simply gone. Neither the <code>"native"</code> grain,
 whose bin is the reading itself, nor a supplied calendar, which declares its own bin lengths,
-is held to the second rule.</p>
+is held to the second rule. <code><a href="coverage.html">coverage()</a></code> lays the same binning out as a count of readings per
+unit and bin, which is where a refused record's gaps are read off.</p>
     </div>
     <div class="section level2">
     <h2 id="partial-bins">Partial bins<a class="anchor" aria-label="anchor" href="#partial-bins"></a></h2>

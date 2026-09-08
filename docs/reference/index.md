@@ -44,7 +44,7 @@ The arms that ship, how they are trained, and the interface a learner of
 your own goes through.
 
 - [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
-  : Penalised logistic regression on the flattened representation
+  : Penalised regression on the flattened representation
 - [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
   : Forward selection by AIC on the flattened representation
 - [`forest()`](https://gillescolling.com/timesift/reference/forest.md) :
@@ -119,6 +119,8 @@ without the fitting layer.
   : Reduce sensor series to a temporal grain
 - [`lookback_matrix()`](https://gillescolling.com/timesift/reference/lookback_matrix.md)
   : Reduce sensor series to a lookback anchored on each target
+- [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
+  : Which units reach which bins
 - [`timesift_set()`](https://gillescolling.com/timesift/reference/timesift_set.md)
   : Several built representations of the same targets
 - [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)

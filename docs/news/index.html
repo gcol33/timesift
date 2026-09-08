@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -76,6 +76,50 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.1.1" id="timesift-011">timesift 0.1.1<a class="anchor" aria-label="anchor" href="#timesift-011"></a></h2>
+<div class="section level3">
+<h3 id="new-0-1-1">New<a class="anchor" aria-label="anchor" href="#new-0-1-1"></a></h3>
+<ul><li>
+<code><a href="../reference/coverage.html">coverage()</a></code> lays the binning out as a count of readings per <code>(unit, bin)</code>, over every bin the calendar tiles the record with. <code><a href="../reference/grain_matrix.html">grain_matrix()</a></code> refuses a record where a unit misses a bin rather than padding it, and this is the table that decision is made on: a logger that started late, stopped early or lost a month is a row with zeros in it, and a bin the whole record skips is a column of zeros. Nothing here fills a cell. On both sides, and pinned by <code>inst/spec/fixtures/coverage.csv</code>.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="the-response-head-0-1-1">The response head<a class="anchor" aria-label="anchor" href="#the-response-head-0-1-1"></a></h3>
+<ul><li>A head carries a <code>loss</code> and an <code>activation</code>, and they are what every shipped learner fits toward. The encoders train under the loss and predict through the activation, the per-response learners take the family the loss names, and the combiner minimises the same loss. A registered head other than presence-absence is therefore fitted as itself rather than as clamped binary cross-entropy under another name.</li>
+<li>A <code>fit</code> that declares a <code>head</code> argument is handed the head, as one that declares <code>control</code> is handed the control. Both are read from the fit’s own signature, at the one point every fold loop fits through, so a learner whose fit takes <code>(x, y)</code> is called with <code>(x, y)</code>.</li>
+<li>
+<code><a href="../reference/elasticnet.html">elasticnet()</a></code>, <code><a href="../reference/stepwise.html">stepwise()</a></code> and <code><a href="../reference/forest.html">forest()</a></code> fit the Gaussian family where the head’s loss is squared error.</li>
+<li>
+<code><a href="../reference/ensemble.html">ensemble()</a></code> left without a response takes the run’s head; one naming a different head is refused before a candidate is fitted.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="fitting-0-1-1">Fitting<a class="anchor" aria-label="anchor" href="#fitting-0-1-1"></a></h3>
+<ul><li>A response is fitted under a seed of its own, taken from its name. A learner that covers the responses one at a time is handed one column per call, so a seed spent from one shared stream made a response’s fit depend on which responses were fitted before it, and a seed read off the column’s position inside its own call gave every response the same one. Either way the model of a response depended on how the columns were batched, and <code><a href="../reference/elasticnet.html">elasticnet()</a></code> and <code><a href="../reference/forest.html">forest()</a></code> both did. Fitting a response alone, or beside others, or in a different order now gives the same model, which <code>tests/testthat/test-variable-seeds.R</code> holds to. This changes the numbers those two produce; <code><a href="../reference/stepwise.html">stepwise()</a></code> spends no randomness and the encoders cover the responses jointly, so neither moves.</li>
+<li>
+<code>metric</code> takes a registered name or a function of <code>(y, p)</code> everywhere the contract says it does. What scores and what a report prints travel with the fit, so a function reads as <code>&lt;function&gt;</code> in a report rather than as whatever each language calls an anonymous one, and the occlusion profile rescores under the metric the fit was scored with. <code><a href="../reference/select_grain.html">select_grain()</a></code> is the one door that takes a name only, because it reports its estimate under every registered metric and selects on a row of that table.</li>
+<li>A static predictor enters the design once rather than once per bin. It reaches the array as a channel that does not move across the bins, which is what an encoder reads; flattening the bins was emitting it once per bin, so a penalised fit saw it as often as the grain had bins and a forward search could pick it repeatedly.</li>
+<li>A resampling given as an unnamed vector follows the targets into the order they are fitted in. <code><a href="../reference/timesift.html">timesift()</a></code> sorts the targets by identifier before it builds the fold map, so such a vector was landing on whichever unit had taken that position.</li>
+<li>
+<code><a href="../reference/elasticnet.html">elasticnet()</a></code> takes <code>s</code>, the point of the penalty path to predict at. It also raises what <code>cv.glmnet()</code> raises rather than turning any failure into the response’s own mean, and the forward search leaves out a column holding a single value rather than reaching a fitter’s error on it.</li>
+<li>On the Python side <code><a href="../reference/elasticnet.html">elasticnet()</a></code> honours its mixing – the scikit-learn floor is 1.8, where <code>l1_ratios</code> alone selects the elastic net – and standardises its design before penalising it, as glmnet does. The scaler travels with the fit.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="the-representation-boundary-0-1-1">The representation boundary<a class="anchor" aria-label="anchor" href="#the-representation-boundary-0-1-1"></a></h3>
+<ul><li>A supplied calendar is checked before its bins are read as bins: a bin begins at or before every reading it holds, and a bin’s readings are a stretch of the record. A calendar shifted by one boundary, and one interleaving consecutive readings, used to produce an array that looked like any other.</li>
+<li>An identifier is written by one rule in both languages. A whole number is its digits, a character id is itself, a factor is its label, and anything else is refused naming the column.</li>
+<li>A time column carrying a zone names the calendar to bin by, in <code><a href="../reference/grain_matrix.html">grain_matrix()</a></code>, <code><a href="../reference/coverage.html">coverage()</a></code> and <code><a href="../reference/lookback_matrix.html">lookback_matrix()</a></code> alike; a <code>tz</code> naming a different zone beside it is refused rather than silently preferred.</li>
+<li>The lookback’s target table is read by name, <code>id</code> and <code>at</code>, as every other alignment in the package is, and a lookback reaching the fitting layer without an anchor is refused with a message that says so.</li>
+<li>A reading that is not a finite number is refused by the shared core, naming the unit and the instant of the first one, so the rule is written once rather than once per wrapper. <code><a href="../reference/digest_array.html">digest_array()</a></code> refuses an array that is not finite for the same reason the contract gives.</li>
+<li>A record and any permutation of its rows now reduce to the same bytes. Both reductions walk the record by unit and then by instant; the calendar reduction accumulated in the caller’s order, which moved a mean in its last bits under a shuffle that changed nothing about the record.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="packaging-0-1-1">Packaging<a class="anchor" aria-label="anchor" href="#packaging-0-1-1"></a></h3>
+<ul><li>
+<code>DESCRIPTION</code> is where the version is written, and <code>pyproject.toml</code> reads it from there.</li>
+<li>
+<code>.gitattributes</code> holds the repository to one line ending.</li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.0" id="timesift-010">timesift 0.1.0<a class="anchor" aria-label="anchor" href="#timesift-010"></a></h2>
 <p><code><a href="../reference/timesift.html">timesift()</a></code> is the whole entry point. A table of targets, a table of time-stamped series belonging to them, and one call builds every candidate representation, fits the learners that can read each one, scores them all on one set of held-out folds, and stacks the out-of-fold predictions.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
@@ -107,7 +151,7 @@
 <div class="section level3">
 <h3 id="learners-and-training-0-1-0">Learners and training<a class="anchor" aria-label="anchor" href="#learners-and-training-0-1-0"></a></h3>
 <ul><li>
-<code><a href="../reference/elasticnet.html">elasticnet()</a></code>, <code><a href="../reference/stepwise.html">stepwise()</a></code>, <code><a href="../reference/torch_learners.html">mlp()</a></code>, <code><a href="../reference/torch_learners.html">cnn()</a></code> and <code><a href="../reference/torch_learners.html">rescnn()</a></code> drop the <code>_learner</code> suffix and gain <code>data</code>, <code>reads</code> and <code>multi</code>. <code><a href="../reference/forest.html">forest()</a></code> joins them, a probability forest on <code>ranger</code> in R and on scikit-learn in Python.</li>
+<code><a href="../reference/elasticnet.html">elasticnet()</a></code>, <code><a href="../reference/stepwise.html">stepwise()</a></code>, <code><a href="../reference/torch_learners.html">mlp()</a></code>, <code><a href="../reference/torch_learners.html">cnn()</a></code> and <code><a href="../reference/torch_learners.html">rescnn()</a></code> drop the <code>_learner</code> suffix and gain <code>data</code>. <code><a href="../reference/forest.html">forest()</a></code> joins them, a probability forest on <code>ranger</code> in R and on scikit-learn in Python. <code>reads</code> and <code>multi</code> are <code><a href="../reference/learner.html">learner()</a></code>’s, where a learner of your own declares what it reads and whether one fitted model covers every response.</li>
 <li>
 <code><a href="../reference/train_control.html">train_control()</a></code> is the one place a training setting is defaulted. The architecture constructors carry architecture, a run gives one control to every neural learner, and a learner given its own control overrides that on the settings it names.</li>
 <li>A learner declares whether one fitted model covers every response or one is fitted per response. Either way a candidate emits one <code>[target, response]</code> matrix, so nothing above the learner layer has to know which it was.</li>

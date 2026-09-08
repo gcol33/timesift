@@ -31,7 +31,7 @@ step with this one."><style>
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -115,7 +115,9 @@ step with this one.</p>
 
 
 <dt id="arg-batch-size">batch_size<a class="anchor" aria-label="anchor" href="#arg-batch-size"></a></dt>
-<dd><p>Targets per optimiser step.</p></dd>
+<dd><p>Most targets per optimiser step. The fitting targets are cut into as few
+batches of at most this many as they divide into, of as equal a length as they can be, so no
+batch is a remainder of one.</p></dd>
 
 
 <dt id="arg-learning-rate">learning_rate<a class="anchor" aria-label="anchor" href="#arg-learning-rate"></a></dt>
@@ -132,12 +134,15 @@ step with this one.</p>
 
 <dt id="arg-val-frac">val_frac<a class="anchor" aria-label="anchor" href="#arg-val-frac"></a></dt>
 <dd><p>Share of the fitting targets held back as an inner validation set, used for
-early stopping and for nothing else. It is never scored as a result.</p></dd>
+early stopping and for nothing else. It is never scored as a result. The set is drawn from
+every fit alike, one target from each of as many equal-count strata of the response total as
+the set holds, so the fit on all targets that a run ends with also trains on the rest.</p></dd>
 
 
 <dt id="arg-device">device<a class="anchor" aria-label="anchor" href="#arg-device"></a></dt>
-<dd><p><code>"auto"</code> to take a graphics processor where there is one, or a device name such as
-<code>"cuda"</code> or <code>"cpu"</code>.</p></dd>
+<dd><p><code>"auto"</code> to take a graphics processor where there is one, NVIDIA's or Apple's, or
+a device name such as <code>"cuda"</code>, <code>"mps"</code> or <code>"cpu"</code>. A fitted encoder carries the setting
+rather than the device it resolved to, so a fit made on one machine predicts on another.</p></dd>
 
 
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
@@ -146,7 +151,8 @@ early stopping and for nothing else. It is never scored as a result.</p></dd>
 
 <dt id="arg-pos-weight-cap">pos_weight_cap<a class="anchor" aria-label="anchor" href="#arg-pos-weight-cap"></a></dt>
 <dd><p>Ceiling on the per-response positive-class weight, which is the ratio of
-absences to presences among the fitting targets.</p></dd>
+absences to presences among the fitting targets. At least one: a weight under one would
+weight presences down.</p></dd>
 
 
 <dt id="arg-swa">swa<a class="anchor" aria-label="anchor" href="#arg-swa"></a></dt>

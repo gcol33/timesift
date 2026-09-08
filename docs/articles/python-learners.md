@@ -9,13 +9,21 @@ your own goes through.
 elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, weight_positives=True, seed=1)
 ```
 
-One penalised logistic regression per variable, over every
-bin-by-channel column and, by default, their squares, with the penalty
-chosen by an inner cross-validation on the fitting units.
+One penalised regression per variable, over every bin-by-channel column
+and, by default, their squares, with the penalty chosen by an inner
+cross-validation on the fitting units.
 
 There is no discrete selection step: the penalty path uses every column
 and shrinks, and nothing about the model is decided outside the fold it
-is fitted in.
+is fitted in. The family is the response head’s: logistic under a binary
+cross-entropy loss, linear under a squared-error one, and
+`weight_positives` is read under the first alone.
+
+The design is standardised before it is penalised, as it is on the R
+side, so a column is not penalised for the scale it was recorded on. The
+penalty itself is the one the inner cross-validation refits at; where R
+takes a named point of the path through `s`, scikit-learn keeps only
+that one, so there is nothing to name here.
 
 ## `stepwise()`
 
@@ -23,9 +31,9 @@ is fitted in.
 stepwise(data=None, max_terms=3, degree=2)
 ```
 
-One logistic regression per variable, its predictors chosen by forward
-selection over every bin-by-channel column, admitting a column while it
-lowers Akaike’s criterion and stopping at a fixed budget.
+One generalised linear model per variable, its predictors chosen by
+forward selection over every bin-by-channel column, admitting a column
+while it lowers Akaike’s criterion and stopping at a fixed budget.
 
 Each candidate enters as an orthogonal polynomial, so a term can be
 non-monotone in the reading the way a niche optimum is. Selection
@@ -33,7 +41,9 @@ happens inside whichever units the learner is handed, so under
 `grain_ladder` it is redone in every fold. Reported beside a penalised
 fit it also prices discrete selection: choosing a handful of columns out
 of hundreds is high variance, and that variance is a cost of the
-selector rather than of the features.
+selector rather than of the features. The family is the response head’s:
+logistic under a binary cross-entropy loss, Gaussian under a
+squared-error one.
 
 ## `forest()`
 
@@ -41,7 +51,9 @@ selector rather than of the features.
 forest(data=None, trees=500, mtry=None, min_node=1, seed=1)
 ```
 
-One random forest per variable, over every bin-by-channel column.
+One random forest per variable, over every bin-by-channel column: a
+classifier under a presence-absence head and a regressor under a head
+with a squared-error loss.
 
 `mtry` is how many columns are offered at a split, defaulting to the
 square root of how many there are, and `min_node` is the smallest leaf a
@@ -136,12 +148,21 @@ replacing its default.
 `epochs`, `batch_size`, `learning_rate`, `weight_decay`,
 `early_stopping`, `val_frac`, `device` and `seed` are the settings a run
 is described by. `pos_weight_cap` bounds the weight a rare response’s
-presences are given against its absences, and `swa` with `swa_start`
-average the weights over the tail of the schedule rather than keeping
-one epoch out of it.
+presences are given against its absences, at least one, and `swa` with
+`swa_start` average the weights over the tail of the schedule rather
+than keeping one epoch out of it.
 
-`device` is `"auto"` for the graphics processor where there is one, or
-the name of a device to train on.
+`batch_size` is the most targets an optimiser step reads: the fitting
+targets are cut into as few batches of at most that many as they divide
+into, of as equal a length as they can be. `val_frac` is held back from
+every fit alike, the fit on all targets a run ends with included, one
+target from each of as many equal-count strata of the response total as
+the set holds.
+
+`device` is `"auto"` for the graphics processor where there is one,
+NVIDIA’s or Apple’s, or the name of a device to train on. A fitted
+encoder carries the setting rather than the device it resolved to, so a
+fit made on one machine predicts on another.
 
 ## `TrainControl`
 
@@ -194,3 +215,9 @@ flatten(x: TimesiftMatrix)
 
 `[unit, bin, channel]` to `[unit, bin * channel]` in the array’s own
 order.
+
+A channel that holds the same number in every bin carries no bin of its
+own and is one predictor, read once: repeating it would put the same
+column in front of a penalised fit as often as the grain has bins, and
+give it that many chances of being drawn by a forest or picked by a
+forward search.

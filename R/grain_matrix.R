@@ -94,7 +94,9 @@
 #'     \item `grain`: the grain name.
 #'     \item `stats`: the statistic names in channel order.
 #'     \item `year_start`: the boundary used.
-#'     \item `bin_start`, `bin_end`: the first and last reading instant assigned to each bin.
+#'     \item `bin_start`: the instant each bin begins on the calendar, which is earlier
+#'       than the bin's first reading wherever the record does not reach the boundary.
+#'     \item `bin_end`: the last reading instant assigned to each bin.
 #'     \item `bin_n`: a `[unit, bin]` matrix of how many readings fell in each bin.
 #'     \item `bin_partial`: a logical vector marking the bins the record does not cover for their
 #'       whole calendar span.

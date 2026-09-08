@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -119,19 +119,26 @@ of your own goes through.</p>
 <code>elasticnet()</code><a class="anchor" aria-label="anchor" href="#elasticnet"></a>
 </h2>
 <div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>elasticnet(data<span class="op">=</span><span class="va">None</span>, alpha<span class="op">=</span><span class="fl">0.5</span>, n_inner<span class="op">=</span><span class="dv">5</span>, squares<span class="op">=</span><span class="va">True</span>, weight_positives<span class="op">=</span><span class="va">True</span>, seed<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div>
-<p>One penalised logistic regression per variable, over every
-bin-by-channel column and, by default, their squares, with the penalty
-chosen by an inner cross-validation on the fitting units.</p>
+<p>One penalised regression per variable, over every bin-by-channel
+column and, by default, their squares, with the penalty chosen by an
+inner cross-validation on the fitting units.</p>
 <p>There is no discrete selection step: the penalty path uses every
 column and shrinks, and nothing about the model is decided outside the
-fold it is fitted in.</p>
+fold it is fitted in. The family is the response head’s: logistic under
+a binary cross-entropy loss, linear under a squared-error one, and
+<code>weight_positives</code> is read under the first alone.</p>
+<p>The design is standardised before it is penalised, as it is on the R
+side, so a column is not penalised for the scale it was recorded on. The
+penalty itself is the one the inner cross-validation refits at; where R
+takes a named point of the path through <code>s</code>, scikit-learn
+keeps only that one, so there is nothing to name here.</p>
 </div>
 <div class="section level2">
 <h2 id="stepwise">
 <code>stepwise()</code><a class="anchor" aria-label="anchor" href="#stepwise"></a>
 </h2>
 <div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>stepwise(data<span class="op">=</span><span class="va">None</span>, max_terms<span class="op">=</span><span class="dv">3</span>, degree<span class="op">=</span><span class="dv">2</span>)</span></code></pre></div>
-<p>One logistic regression per variable, its predictors chosen by
+<p>One generalised linear model per variable, its predictors chosen by
 forward selection over every bin-by-channel column, admitting a column
 while it lowers Akaike’s criterion and stopping at a fixed budget.</p>
 <p>Each candidate enters as an orthogonal polynomial, so a term can be
@@ -140,14 +147,18 @@ happens inside whichever units the learner is handed, so under
 <code>grain_ladder</code> it is redone in every fold. Reported beside a
 penalised fit it also prices discrete selection: choosing a handful of
 columns out of hundreds is high variance, and that variance is a cost of
-the selector rather than of the features.</p>
+the selector rather than of the features. The family is the response
+head’s: logistic under a binary cross-entropy loss, Gaussian under a
+squared-error one.</p>
 </div>
 <div class="section level2">
 <h2 id="forest">
 <code>forest()</code><a class="anchor" aria-label="anchor" href="#forest"></a>
 </h2>
 <div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>forest(data<span class="op">=</span><span class="va">None</span>, trees<span class="op">=</span><span class="dv">500</span>, mtry<span class="op">=</span><span class="va">None</span>, min_node<span class="op">=</span><span class="dv">1</span>, seed<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div>
-<p>One random forest per variable, over every bin-by-channel column.</p>
+<p>One random forest per variable, over every bin-by-channel column: a
+classifier under a presence-absence head and a regressor under a head
+with a squared-error loss.</p>
 <p><code>mtry</code> is how many columns are offered at a split,
 defaulting to the square root of how many there are, and
 <code>min_node</code> is the smallest leaf a split may produce. The
@@ -243,11 +254,19 @@ replacing its default.</p>
 <code>early_stopping</code>, <code>val_frac</code>, <code>device</code>
 and <code>seed</code> are the settings a run is described by.
 <code>pos_weight_cap</code> bounds the weight a rare response’s
-presences are given against its absences, and <code>swa</code> with
-<code>swa_start</code> average the weights over the tail of the schedule
-rather than keeping one epoch out of it.</p>
+presences are given against its absences, at least one, and
+<code>swa</code> with <code>swa_start</code> average the weights over
+the tail of the schedule rather than keeping one epoch out of it.</p>
+<p><code>batch_size</code> is the most targets an optimiser step reads:
+the fitting targets are cut into as few batches of at most that many as
+they divide into, of as equal a length as they can be.
+<code>val_frac</code> is held back from every fit alike, the fit on all
+targets a run ends with included, one target from each of as many
+equal-count strata of the response total as the set holds.</p>
 <p><code>device</code> is <code>"auto"</code> for the graphics processor
-where there is one, or the name of a device to train on.</p>
+where there is one, NVIDIA’s or Apple’s, or the name of a device to
+train on. A fitted encoder carries the setting rather than the device it
+resolved to, so a fit made on one machine predicts on another.</p>
 </div>
 <div class="section level2">
 <h2 id="traincontrol">
@@ -308,6 +327,11 @@ of it.</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>flatten(x: TimesiftMatrix)</span></code></pre></div>
 <p><code>[unit, bin, channel]</code> to
 <code>[unit, bin * channel]</code> in the array’s own order.</p>
+<p>A channel that holds the same number in every bin carries no bin of
+its own and is one predictor, read once: repeating it would put the same
+column in front of a penalised fit as often as the grain has bins, and
+give it that many chances of being drawn by a forest or picked by a
+forward search.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

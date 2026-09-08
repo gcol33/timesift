@@ -1,10 +1,12 @@
 # Forward selection by AIC on the flattened representation
 
-One logistic regression per variable, its predictors chosen by forward
-selection over every bin-by-channel column, admitting a column while it
-lowers AIC and stopping at a fixed budget. Each candidate enters as an
-orthogonal polynomial, so a term can be non-monotone in the reading the
-way a niche optimum is.
+One generalised linear model per variable, its predictors chosen by
+forward selection over every bin-by-channel column, admitting a column
+while it lowers AIC and stopping at a fixed budget. Each candidate
+enters as an orthogonal polynomial, so a term can be non-monotone in the
+reading the way a niche optimum is. The family is the response head's:
+logistic under a binary cross-entropy loss, Gaussian under a
+squared-error one.
 
 ## Usage
 

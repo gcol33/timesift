@@ -96,7 +96,21 @@ The three constructors carry architecture. How that architecture is
 trained is
 [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md),
 which the run supplies; a setting named in `...` here overrides the
-run's control for this learner alone.
+run's control for this learner alone. What the head is trained toward is
+the response head's: its `loss` is the training objective and its
+`activation` the output transform, so a head registered with a
+squared-error loss and an identity activation trains the same encoders
+on a continuous response.
+
+Every channel is standardised by its own centre and scale, computed over
+every unit and bin of the fitting units, so a static predictor appended
+as a channel sits on the same footing as a reading whatever its units
+are.
+
+A fitted encoder holds its weights as plain arrays and rebuilds the
+network when it predicts, so a fit saved with
+[`saveRDS()`](https://rdrr.io/r/base/readRDS.html) predicts after
+[`readRDS()`](https://rdrr.io/r/base/readRDS.html) in a fresh session.
 
 ## Examples
 

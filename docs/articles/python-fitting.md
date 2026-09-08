@@ -57,6 +57,7 @@ Timesift(
     cells,
     y,
     metric,
+    scorer,
     response,
     spec,
     fits,
@@ -86,6 +87,7 @@ Attributes:
 - `cells` - object
 - `y` - Response
 - `metric` - str
+- `scorer` - object
 - `response` - str
 - `spec` - TimesiftSpec
 - `fits` - dict
@@ -249,7 +251,7 @@ ensemble(
     method: str = 'stack',
     scope: str = 'all',
     metric=None,
-    response: str = 'presence_absence',
+    response: str | None = None,
 )
 ```
 
@@ -262,7 +264,10 @@ which candidates are eligible: every one of them, only the several
 learners sharing the best candidate’s representation, or only its
 learner across the representations. `metric` names the metric the
 ensemble is reported in, or `None` for the fit’s own, and `response` is
-the registered head whose loss the weights minimise.
+the registered head whose loss the weights minimise, or `None` for the
+head the run was fitted under. Naming a head the run does not fit toward
+is an error rather than an override, and `ensemble_fit` called on its
+own reads `None` as `"presence_absence"`.
 
 ## `ensemble_fit()`
 
@@ -307,7 +312,7 @@ Attributes:
 - `method` - str
 - `scope` - str
 - `metric` - object
-- `response` - str
+- `response` - str \| None
 
 ## `Stack`
 
@@ -353,10 +358,23 @@ the other with `read_folds`.
 ## `fit_learner()`
 
 ``` python
-fit_learner(learner, x: TimesiftMatrix, y, response: str = 'presence_absence', **kwargs)
+fit_learner(
+    learner,
+    x: TimesiftMatrix,
+    y,
+    response: str = 'presence_absence',
+    control=None,
+    **kwargs,
+)
 ```
 
 Fit one learner at one grain, under one registered response head.
+
+A `fit` that declares a `head` argument is handed the registered head,
+whose `loss` and `activation` say what it is fitting toward; the
+learners that ship read both from there and hold no response of their
+own. A `fit` that declares a `control` is handed the run’s training
+settings the same way.
 
 ## `select_grain()`
 
@@ -408,6 +426,8 @@ Ladder(
     cells,
     folds,
     metric,
+    scorer,
+    response,
     fits,
 )
 ```
@@ -427,6 +447,8 @@ Attributes:
 - `cells` - object
 - `folds` - Folds
 - `metric` - str
+- `scorer` - object
+- `response` - str
 - `fits` - dict
 
 ### `arm()`

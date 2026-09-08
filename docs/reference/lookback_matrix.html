@@ -31,7 +31,7 @@ series, so the bins are relative to the target rather than to a month or a week.
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -125,8 +125,9 @@ series, so the bins are relative to the target rather than to a month or a week.
 
 
 <dt id="arg-at">at<a class="anchor" aria-label="anchor" href="#arg-at"></a></dt>
-<dd><p>A data frame of targets, whose first column is the unit and whose second is the
-anchor instant, <code>POSIXct</code>. One row per target; a unit may carry any number of them.</p></dd>
+<dd><p>A data frame of targets with an <code>id</code> column naming the unit and an <code>at</code> column of
+anchor instants, <code>POSIXct</code>. One row per target; a unit may carry any number of them. The
+columns are read by name, as every alignment in the package is.</p></dd>
 
 
 <dt id="arg-span">span<a class="anchor" aria-label="anchor" href="#arg-span"></a></dt>
@@ -203,8 +204,8 @@ that same calendar, whatever zone <code>at</code> carries, so one record is binn
 <span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>plot <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"a"</span>, <span class="st">"b"</span><span class="op">)</span>, each <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">t</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>                t <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="va">t</span>, <span class="fl">2</span><span class="op">)</span>,</span>
 <span>                temp <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Trig.html" class="external-link">sin</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_along</a></span><span class="op">(</span><span class="va">t</span><span class="op">)</span> <span class="op">/</span> <span class="fl">24</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/Trig.html" class="external-link">cos</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_along</a></span><span class="op">(</span><span class="va">t</span><span class="op">)</span> <span class="op">/</span> <span class="fl">24</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">at</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>plot <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"a"</span>, <span class="st">"b"</span><span class="op">)</span>,</span>
-<span>                 when <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2021-10-20"</span>, <span class="st">"2021-10-25"</span><span class="op">)</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">at</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"a"</span>, <span class="st">"b"</span><span class="op">)</span>,</span>
+<span>                 at <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2021-10-20"</span>, <span class="st">"2021-10-25"</span><span class="op">)</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu">lookback_matrix</span><span class="op">(</span><span class="va">d</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, at <span class="op">=</span> <span class="va">at</span>, span <span class="op">=</span> <span class="st">"30 days"</span>, bins <span class="op">=</span> <span class="fl">3L</span>,</span>
 <span>                   stats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cold_day"</span>, <span class="st">"mean"</span>, <span class="st">"warm_day"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>

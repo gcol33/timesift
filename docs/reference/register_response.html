@@ -31,7 +31,7 @@ a second fitting path."><style>
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -107,8 +107,11 @@ a second fitting path.</p>
 <dt id="arg-spec">spec<a class="anchor" aria-label="anchor" href="#arg-spec"></a></dt>
 <dd><p>A list with elements <code>prepare(y)</code>, returning the numeric matrix a learner is fitted
 on; <code>activation</code>, the name of the output transform (<code>"sigmoid"</code> or <code>"identity"</code>); <code>loss</code>, the
-name of the training objective; <code>metric</code>, the default metric name; and <code>cells(y, folds)</code>,
-returning the mask of scorable cells.</p></dd>
+name of the training objective (<code>"binary_cross_entropy"</code> or <code>"squared_error"</code>); <code>metric</code>, the
+default metric name; and <code>cells(y, folds)</code>, returning the mask of scorable cells. Every
+learner that ships reads <code>loss</code> and <code>activation</code> from here: the encoders train under the loss
+and predict through the activation, and the learners fitting one model per response take the
+family the loss names, logistic or Gaussian. The combiner minimises the same loss.</p></dd>
 
 
 <dt id="arg-overwrite">overwrite<a class="anchor" aria-label="anchor" href="#arg-overwrite"></a></dt>

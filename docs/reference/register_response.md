@@ -25,8 +25,13 @@ responses()
   A list with elements `prepare(y)`, returning the numeric matrix a
   learner is fitted on; `activation`, the name of the output transform
   (`"sigmoid"` or `"identity"`); `loss`, the name of the training
-  objective; `metric`, the default metric name; and `cells(y, folds)`,
-  returning the mask of scorable cells.
+  objective (`"binary_cross_entropy"` or `"squared_error"`); `metric`,
+  the default metric name; and `cells(y, folds)`, returning the mask of
+  scorable cells. Every learner that ships reads `loss` and `activation`
+  from here: the encoders train under the loss and predict through the
+  activation, and the learners fitting one model per response take the
+  family the loss names, logistic or Gaussian. The combiner minimises
+  the same loss.
 
 - overwrite:
 

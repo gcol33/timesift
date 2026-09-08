@@ -11,7 +11,7 @@ ensemble(
   method = c("stack", "mean", "median", "weighted"),
   scope = c("all", "learners", "representations"),
   metric = NULL,
-  response = "presence_absence"
+  response = NULL
 )
 ```
 
@@ -32,7 +32,11 @@ ensemble(
 
 - response:
 
-  Name of the registered response head whose loss `"stack"` minimises.
+  Name of the registered response head whose loss `"stack"` minimises,
+  or `NULL` for the head the run was fitted under. Naming a head the run
+  does not fit toward is an error rather than an override, and
+  [`ensemble_fit()`](https://gillescolling.com/timesift/reference/ensemble_fit.md)
+  called on its own reads `NULL` as `"presence_absence"`.
 
 ## Value
 

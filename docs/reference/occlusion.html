@@ -31,7 +31,7 @@ produced the reported scores rather than a fresh set of them."><style>
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -104,7 +104,7 @@ produced the reported scores rather than a fresh set of them.</p>
 <span>  <span class="va">arm</span>,</span>
 <span>  over <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"bin"</span>, <span class="st">"channel"</span><span class="op">)</span>,</span>
 <span>  substitute <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"permute"</span>, <span class="st">"fold_mean"</span>, <span class="st">"unit_mean"</span><span class="op">)</span>,</span>
-<span>  metric <span class="op">=</span> <span class="st">"roc_auc"</span>,</span>
+<span>  metric <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  permutations <span class="op">=</span> <span class="fl">20L</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">1L</span>,</span>
 <span>  <span class="va">...</span></span>
@@ -149,9 +149,11 @@ produced the reported scores rather than a fresh set of them.</p>
 
 
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
-<dd><p>Name of the registered metric the rescoring is read by. The area under the ROC
-curve responds to every reordering of the units, where a maximum over thresholds frequently
-does not move at all, which is why it is the default here and not for the ladder.</p></dd>
+<dd><p>Name of the registered metric the rescoring is read by, or a function of
+<code>(y, p)</code>. Left unset it is the one the fit was scored under, so a weight is a fall in the
+number <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> reports rather than in a second one. <code>"roc_auc"</code> is usually the steadier
+reading over many rescorings: it responds to every reordering of the units, where a maximum
+over thresholds frequently does not move at all.</p></dd>
 
 
 <dt id="arg-permutations">permutations<a class="anchor" aria-label="anchor" href="#arg-permutations"></a></dt>
@@ -201,8 +203,7 @@ it is rescored on. The candidate is named as <code><a href="https://rdrr.io/r/ba
 <span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">d</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span></span>
 <span><span class="va">lad</span> <span class="op">&lt;-</span> <span class="fu"><a href="grain_ladder.html">grain_ladder</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, <span class="fu"><a href="elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, folds <span class="op">=</span> <span class="fu"><a href="fold_map.html">fold_map</a></span><span class="op">(</span><span class="va">y</span>, v <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>,</span>
 <span>                     keep_fits <span class="op">=</span> <span class="cn">TRUE</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">occlusion</span><span class="op">(</span><span class="va">lad</span>, <span class="va">x</span>, <span class="va">y</span>, <span class="st">"month|elasticnet"</span>, permutations <span class="op">=</span> <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span>
-<span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">occlusion</span><span class="op">(</span><span class="va">lad</span>, <span class="va">x</span>, <span class="va">y</span>, <span class="st">"month|elasticnet"</span>, permutations <span class="op">=</span> <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>

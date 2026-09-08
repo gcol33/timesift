@@ -36,6 +36,13 @@ explicitly because
 Windows, which would make a digest depend on the machine that produced
 it.
 
+The array has to be finite. `%.12f` writes an infinity as `Inf` here and
+as `inf` in Python, and R tells a missing value apart from a
+not-a-number where Python has one spelling for both, so a digest over
+such an array would say something about the language rather than about
+the representation. A representation never holds one: a reading that is
+not a finite number is refused where the record is read.
+
 ## Examples
 
 ``` r

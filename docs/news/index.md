@@ -1,5 +1,127 @@
 # Changelog
 
+## timesift 0.1.1
+
+### New
+
+- [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
+  lays the binning out as a count of readings per `(unit, bin)`, over
+  every bin the calendar tiles the record with.
+  [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
+  refuses a record where a unit misses a bin rather than padding it, and
+  this is the table that decision is made on: a logger that started
+  late, stopped early or lost a month is a row with zeros in it, and a
+  bin the whole record skips is a column of zeros. Nothing here fills a
+  cell. On both sides, and pinned by `inst/spec/fixtures/coverage.csv`.
+
+### The response head
+
+- A head carries a `loss` and an `activation`, and they are what every
+  shipped learner fits toward. The encoders train under the loss and
+  predict through the activation, the per-response learners take the
+  family the loss names, and the combiner minimises the same loss. A
+  registered head other than presence-absence is therefore fitted as
+  itself rather than as clamped binary cross-entropy under another name.
+- A `fit` that declares a `head` argument is handed the head, as one
+  that declares `control` is handed the control. Both are read from the
+  fit’s own signature, at the one point every fold loop fits through, so
+  a learner whose fit takes `(x, y)` is called with `(x, y)`.
+- [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md),
+  [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
+  and
+  [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
+  fit the Gaussian family where the head’s loss is squared error.
+- [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md)
+  left without a response takes the run’s head; one naming a different
+  head is refused before a candidate is fitted.
+
+### Fitting
+
+- A response is fitted under a seed of its own, taken from its name. A
+  learner that covers the responses one at a time is handed one column
+  per call, so a seed spent from one shared stream made a response’s fit
+  depend on which responses were fitted before it, and a seed read off
+  the column’s position inside its own call gave every response the same
+  one. Either way the model of a response depended on how the columns
+  were batched, and
+  [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+  and
+  [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
+  both did. Fitting a response alone, or beside others, or in a
+  different order now gives the same model, which
+  `tests/testthat/test-variable-seeds.R` holds to. This changes the
+  numbers those two produce;
+  [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
+  spends no randomness and the encoders cover the responses jointly, so
+  neither moves.
+- `metric` takes a registered name or a function of `(y, p)` everywhere
+  the contract says it does. What scores and what a report prints travel
+  with the fit, so a function reads as `<function>` in a report rather
+  than as whatever each language calls an anonymous one, and the
+  occlusion profile rescores under the metric the fit was scored with.
+  [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+  is the one door that takes a name only, because it reports its
+  estimate under every registered metric and selects on a row of that
+  table.
+- A static predictor enters the design once rather than once per bin. It
+  reaches the array as a channel that does not move across the bins,
+  which is what an encoder reads; flattening the bins was emitting it
+  once per bin, so a penalised fit saw it as often as the grain had bins
+  and a forward search could pick it repeatedly.
+- A resampling given as an unnamed vector follows the targets into the
+  order they are fitted in.
+  [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+  sorts the targets by identifier before it builds the fold map, so such
+  a vector was landing on whichever unit had taken that position.
+- [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+  takes `s`, the point of the penalty path to predict at. It also raises
+  what `cv.glmnet()` raises rather than turning any failure into the
+  response’s own mean, and the forward search leaves out a column
+  holding a single value rather than reaching a fitter’s error on it.
+- On the Python side
+  [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+  honours its mixing – the scikit-learn floor is 1.8, where `l1_ratios`
+  alone selects the elastic net – and standardises its design before
+  penalising it, as glmnet does. The scaler travels with the fit.
+
+### The representation boundary
+
+- A supplied calendar is checked before its bins are read as bins: a bin
+  begins at or before every reading it holds, and a bin’s readings are a
+  stretch of the record. A calendar shifted by one boundary, and one
+  interleaving consecutive readings, used to produce an array that
+  looked like any other.
+- An identifier is written by one rule in both languages. A whole number
+  is its digits, a character id is itself, a factor is its label, and
+  anything else is refused naming the column.
+- A time column carrying a zone names the calendar to bin by, in
+  [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md),
+  [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
+  and
+  [`lookback_matrix()`](https://gillescolling.com/timesift/reference/lookback_matrix.md)
+  alike; a `tz` naming a different zone beside it is refused rather than
+  silently preferred.
+- The lookback’s target table is read by name, `id` and `at`, as every
+  other alignment in the package is, and a lookback reaching the fitting
+  layer without an anchor is refused with a message that says so.
+- A reading that is not a finite number is refused by the shared core,
+  naming the unit and the instant of the first one, so the rule is
+  written once rather than once per wrapper.
+  [`digest_array()`](https://gillescolling.com/timesift/reference/digest_array.md)
+  refuses an array that is not finite for the same reason the contract
+  gives.
+- A record and any permutation of its rows now reduce to the same bytes.
+  Both reductions walk the record by unit and then by instant; the
+  calendar reduction accumulated in the caller’s order, which moved a
+  mean in its last bits under a shuffle that changed nothing about the
+  record.
+
+### Packaging
+
+- `DESCRIPTION` is where the version is written, and `pyproject.toml`
+  reads it from there.
+- `.gitattributes` holds the repository to one line ending.
+
 ## timesift 0.1.0
 
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
@@ -93,10 +215,13 @@ reproduces from `inst/reproduce/schrankogel.R`.
   [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   and
   [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
-  drop the `_learner` suffix and gain `data`, `reads` and `multi`.
+  drop the `_learner` suffix and gain `data`.
   [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
   joins them, a probability forest on `ranger` in R and on scikit-learn
-  in Python.
+  in Python. `reads` and `multi` are
+  [`learner()`](https://gillescolling.com/timesift/reference/learner.md)’s,
+  where a learner of your own declares what it reads and whether one
+  fitted model covers every response.
 - [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md)
   is the one place a training setting is defaulted. The architecture
   constructors carry architecture, a run gives one control to every

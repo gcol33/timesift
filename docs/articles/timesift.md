@@ -61,12 +61,12 @@ fit
 #> timesift  60 targets, 6 responses, 5-fold random CV, tss
 #> 
 #> candidate                    mean    won  responses
-#> elasticnet / day            0.721      1  separate
+#> elasticnet / day            0.725      1  separate
 #> elasticnet / week           0.758      2  separate
-#> elasticnet / month          0.787      3  separate
-#> ensemble                    0.799      -
+#> elasticnet / month          0.780      3  separate
+#> ensemble                    0.776      -
 #> 
-#> weights  elasticnet / month 0.86   elasticnet / day 0.10   elasticnet / week 0.04
+#> weights  elasticnet / month 0.76   elasticnet / week 0.24
 ```
 
 Every representation named in `sift` was built, and `models` defaulting
@@ -110,9 +110,9 @@ built with, and combines them through the ensemble.
 p <- predict(fit, targets, series)
 round(p[1:3, 1:4], 3)
 #>        sp1   sp2   sp3   sp4
-#> p001 0.165 0.920 0.244 0.851
-#> p002 0.544 0.582 0.568 0.700
-#> p003 0.031 0.943 0.167 0.932
+#> p001 0.147 0.917 0.248 0.865
+#> p002 0.534 0.669 0.546 0.651
+#> p003 0.037 0.953 0.149 0.926
 ```
 
 ## Representations
@@ -303,11 +303,11 @@ summary(both)
 #> candidate                    mean    won  responses
 #> 1nn / week                  0.432      0  separate
 #> 1nn / month                 0.489      0  separate
-#> elasticnet / week           0.758      1  separate
+#> elasticnet / week           0.763      1  separate
 #> elasticnet / month          0.802      5  separate
-#> ensemble                    0.797      -
+#> ensemble                    0.801      -
 #> 
-#> weights  elasticnet / month 0.89   elasticnet / week 0.11
+#> weights  elasticnet / month 0.82   elasticnet / week 0.18
 ```
 
 ## The combination
@@ -322,7 +322,7 @@ without fitting anything.
 
 ensemble_weights(fit)
 #>   elasticnet / day  elasticnet / week elasticnet / month 
-#>         0.09995481         0.03840539         0.86163979
+#>       1.583445e-10       2.365589e-01       7.634411e-01
 ```
 
 The weights say how much of the combination each candidate carries, and
@@ -428,9 +428,9 @@ set <- grain_matrix(series, plot, t, temp, grain = c("day", "week", "month"))
 lad <- grain_ladder(set, fit$y, elasticnet(), folds = fit$folds, verbose = FALSE)
 summary(lad)
 #>      learner grain     score n_variable  best
-#> 1 elasticnet   day 0.7205556          6 FALSE
-#> 2 elasticnet  week 0.7581349          6 FALSE
-#> 3 elasticnet month 0.8020346          6  TRUE
+#> 1 elasticnet   day 0.7253571          6 FALSE
+#> 2 elasticnet  week 0.7634127          6 FALSE
+#> 3 elasticnet month 0.8020599          6  TRUE
 ```
 
 A claim about one step of that curve rests on the paired contrast. The
@@ -443,7 +443,7 @@ test behind `p_value` has few values to work with.
 
 paired_contrast(lad, "month|elasticnet", "day|elasticnet")
 #>                  a              b       diff      lower     upper n_variable
-#> 1 month|elasticnet day|elasticnet 0.08147908 0.02078153 0.1421766          6
+#> 1 month|elasticnet day|elasticnet 0.07670274 0.02712753 0.1262779          6
 #>   n_cell n_favour p_value
 #> 1     30        5  0.0625
 ```
@@ -456,9 +456,9 @@ against the best one, correcting for the comparisons made and no others.
 ``` r
 
 grain_contrasts(lad)
-#>      learner grain reference        diff      lower       upper    p_value
-#> 1 elasticnet   day     month -0.08147908 -0.1676444 0.004686274 0.06638815
-#> 2 elasticnet  week     month -0.04389971 -0.1300651 0.042265639 0.41335058
+#>      learner grain reference        diff      lower      upper   p_value
+#> 1 elasticnet   day     month -0.07670274 -0.1683411 0.01493563 0.1128965
+#> 2 elasticnet  week     month -0.03864719 -0.1302856 0.05299118 0.5378049
 ```
 
 ## What was read
@@ -476,10 +476,10 @@ kept <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
 weight <- occlusion(kept, "elasticnet / month", permutations = 5)
 head(aggregate(weight ~ part, weight, mean), 4)
 #>                   part     weight
-#> 1 2021-09-01T00:00:00Z 0.11109740
-#> 2 2021-10-01T00:00:00Z 0.09029750
-#> 3 2021-11-01T00:00:00Z 0.10322054
-#> 4 2021-12-01T00:00:00Z 0.05507654
+#> 1 2021-09-01T00:00:00Z 0.13731890
+#> 2 2021-10-01T00:00:00Z 0.11331650
+#> 3 2021-11-01T00:00:00Z 0.12181217
+#> 4 2021-12-01T00:00:00Z 0.09230688
 ```
 
 Holding a channel back instead asks what each statistic of a grain

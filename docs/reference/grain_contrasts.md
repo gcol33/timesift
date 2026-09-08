@@ -69,6 +69,6 @@ y <- matrix(rbinom(60 * 6, 1, plogis(3 * as.numeric(outer(warmth, rep(c(1, -1), 
             ncol = 6, dimnames = list(units, paste0("sp", 1:6)))
 x <- grain_matrix(d, plot, t, temp, grain = c("day", "week", "month"))
 lad <- grain_ladder(x, y, elasticnet(), folds = fold_map(y, v = 5), verbose = FALSE)
-if (requireNamespace("emmeans", quietly = TRUE)) grain_contrasts(lad)
+grain_contrasts(lad)
 # }
 ```
