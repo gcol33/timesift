@@ -26,6 +26,13 @@
 
 ## Fitting
 
+* A fit refers to the code that made it rather than carrying a copy of it. R writes a closure's
+  body out beside the closure, so `saveRDS()` on a fit copied every function that produced it and a
+  fit read back after an upgrade rebuilt the old encoder and loaded the new weights into it. A
+  fitted encoder now stores the name of its module builder, and a fit stores the name and the
+  settings of its learner wherever the registry can rebuild it; a learner defined outside any
+  registry still travels whole, because there is nowhere else for it to come from. The Python side
+  stores the encoder's name for the same reason.
 * A candidate that holds no number on a scorable cell stops the run and names itself. A threshold
   metric returns `NA` on a cell whose predictions are `NaN` or infinite, which is the same `NA` a
   one-class cell returns, so a network whose training diverged was reported as an unscorable cell

@@ -300,3 +300,75 @@ test_that("a learner's fit is handed the head only where it declares one", {
                    predict = function(model, x) matrix(0.5, nrow = dim(x)[1L], ncol = 1L))
   expect_equal(fit_learner(aware, x, y)$model, "binary_cross_entropy")
 })
+
+# ---- what a fit carries of the learner that made it -------------------------------------------
+
+toy_registered <- function(shift = 0) {
+  learner("toy_ref",
+          fit = function(x, y, shift, ...) list(rate = colMeans(y), shift = shift),
+          predict = function(model, x) {
+            outer(rep(1, dim(x)[1L]), model$rate + model$shift)
+          },
+          params = list(shift = shift))
+}
+
+fit_case <- function() {
+  sim <- sim_series(n_unit = 20L, days = 40L, seed = 61L)
+  list(x = grain_matrix(sim$readings, plot, t, temp, grain = "week"),
+       y = sim_response(sim, n_var = 2L, seed = 62L))
+}
+
+test_that("a fit made by a registered learner refers to it rather than carrying its code", {
+  local_learner("toy_ref", toy_registered)
+  case <- fit_case()
+  fit <- fit_learner(toy_registered(shift = 0.1), case$x, case$y)
+  expect_s3_class(fit$learner, "timesift_learner_ref")
+  expect_false(any(c("fit", "predict") %in% names(fit$learner)))
+  expect_identical(fit$learner$name, "toy_ref")
+  expect_equal(fit$learner$params$shift, 0.1)
+  expect_output(print(fit$learner), "toy_ref")
+})
+
+test_that("a fit predicts through the registry rather than through the code it was made with", {
+  local_learner("toy_ref", toy_registered)
+  case <- fit_case()
+  fit <- fit_learner(toy_registered(), case$x, case$y)
+  before <- stats::predict(fit, case$x)
+  # The registration is replaced by one whose predict answers differently. A fit carrying a copy of
+  # the code that made it would go on predicting the old way; one that refers to the registry
+  # reads whatever is registered now, which is what a package upgrade looks like from inside a
+  # saved fit.
+  local_learner("toy_ref", function() {
+    learner("toy_ref",
+            fit = function(x, y, shift, ...) list(rate = colMeans(y), shift = shift),
+            predict = function(model, x) outer(rep(1, dim(x)[1L]), model$rate) + 1,
+            params = list(shift = 0))
+  })
+  expect_equal(stats::predict(fit, case$x), before + 1)
+})
+
+test_that("a learner defined outside any registry travels whole", {
+  case <- fit_case()
+  # Not registered, and the name of a registered one is not enough to make it one: the two
+  # functions have to be the ones the registry writes.
+  local_learner("toy_ref", toy_registered)
+  mine <- learner("toy_ref",
+                  fit = function(x, y, ...) list(rate = colMeans(y)),
+                  predict = function(model, x) outer(rep(1, dim(x)[1L]), model$rate) - 1)
+  fit <- fit_learner(mine, case$x, case$y)
+  expect_s3_class(fit$learner, "timesift_learner")
+  expect_true(is.function(fit$learner$predict))
+  path <- tempfile(fileext = ".rds")
+  on.exit(unlink(path), add = TRUE)
+  saveRDS(fit, path)
+  expect_equal(stats::predict(readRDS(path), case$x), stats::predict(fit, case$x))
+})
+
+test_that("a fit whose learner is no longer registered says so by name", {
+  local_learner("toy_ref", toy_registered)
+  case <- fit_case()
+  fit <- fit_learner(toy_registered(), case$x, case$y)
+  .learners_reg$remove("toy_ref")
+  expect_error(stats::predict(fit, case$x), "toy_ref")
+  expect_error(stats::predict(fit, case$x), "not registered")
+})

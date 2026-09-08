@@ -497,8 +497,8 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
   fits <- lapply(columns, function(j) {
     fit_learner(learner, x, y[, j, drop = FALSE], response = response, control = control)
   })
-  structure(list(fits = fits, learner = learner, variables = colnames(y), response = response,
-                 multi = learner$multi),
+  structure(list(fits = fits, learner = .learner_ref(learner), variables = colnames(y),
+                 response = response, multi = learner$multi),
             class = "timesift_candidate")
 }
 

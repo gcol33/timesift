@@ -646,6 +646,11 @@ call site.
 - A fitted encoder holds its weights as arrays and the device *setting* rather than the device it
   resolved to, and rebuilds the network when it predicts, so a fit written with `saveRDS()` or
   `pickle` predicts in a fresh session and on another machine.
+- A fit refers to the code that made it rather than carrying a copy of it: an encoder stores the
+  name of its module builder, and a fit stores the name and the settings of its learner wherever
+  the registry can rebuild it. A fit read back therefore predicts through the code the package
+  holds now, and one naming a builder or a learner the session does not carry says so by name. A
+  learner defined outside any registry has no name to be rebuilt from and travels whole.
 - `select_grain()` searches the candidates in the order the grains and the learners were declared
   in, so which candidate an exact tie on the inner score falls to does not depend on how the names
   sort.

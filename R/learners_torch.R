@@ -54,7 +54,7 @@ NULL
 #' @rdname torch_learners
 #' @export
 mlp <- function(data = NULL, hidden = c(512L, 256L), dropout = 0.3, ...) {
-  .torch_learner("mlp", .mlp_module, data, "tabular",
+  .torch_learner("mlp", data, "tabular",
                  list(hidden = as.integer(hidden), dropout = dropout),
                  .given_control(list(...), "the mlp learner"))
 }
@@ -62,7 +62,7 @@ mlp <- function(data = NULL, hidden = c(512L, 256L), dropout = 0.3, ...) {
 #' @rdname torch_learners
 #' @export
 cnn <- function(data = NULL, channels = c(16L, 32L, 64L, 128L), kernel = 7L, dropout = 0.3, ...) {
-  .torch_learner("cnn", .cnn_module, data, "sequence",
+  .torch_learner("cnn", data, "sequence",
                  list(channels = as.integer(channels), kernel = as.integer(kernel),
                       dropout = dropout),
                  .given_control(list(...), "the cnn learner"))
@@ -72,7 +72,7 @@ cnn <- function(data = NULL, channels = c(16L, 32L, 64L, 128L), kernel = 7L, dro
 #' @export
 rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_stage = 2L,
                    kernel = 7L, dilations = c(1L, 2L, 4L, 8L), dropout = 0.3, ...) {
-  .torch_learner("rescnn", .rescnn_module, data, "sequence",
+  .torch_learner("rescnn", data, "sequence",
                  list(channels = as.integer(channels),
                       blocks_per_stage = as.integer(blocks_per_stage),
                       kernel = as.integer(kernel), dilations = as.integer(dilations),
@@ -80,10 +80,11 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
                  .given_control(list(...), "the rescnn learner"))
 }
 
-# One learner factory for every encoder: the architecture is a module constructor and nothing else,
-# so the training recipe, the standardiser, the objective and the early stopping have one
-# definition and cannot drift between architectures.
-.torch_learner <- function(name, module_fn, data, reads, arch, control) {
+# One learner factory for every encoder: the architecture is a module builder and nothing else, so
+# the training recipe, the standardiser, the objective and the early stopping have one definition
+# and cannot drift between architectures. The builder is named rather than passed, because a
+# fitted encoder stores that name and looks the builder up when it rebuilds the network.
+.torch_learner <- function(name, data, reads, arch, control) {
   learner(
     name = name,
     data = data, reads = reads, multi = "joint", control = control,
@@ -96,7 +97,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
         stop("the ", name, " learner has no setting called ",
              paste(sort(unknown, method = "radix"), collapse = ", "), ".", call. = FALSE)
       }
-      .torch_fit(x, y, module_fn,
+      .torch_fit(x, y, name,
                  utils::modifyList(arch, given[intersect(names(given), names(arch))]),
                  .resolve_control(control,
                                   .given_control(given[intersect(names(given),
@@ -147,7 +148,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
 # ---- the training recipe -------------------------------------------------------------------
 
-.torch_fit <- function(x, y, module_fn, arch, cfg, head) {
+.torch_fit <- function(x, y, module, arch, cfg, head) {
   torch <- .torch()
   device <- .torch_device(cfg$device)
   objective <- .torch_objective(head)
@@ -169,7 +170,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   loss_fn <- objective$loss(torch, y[fit_idx, , drop = FALSE], cfg, device)
 
   shape <- c(dim(m)[2L], dim(m)[3L], ncol(y))
-  net <- .torch_build(module_fn, shape, arch)
+  net <- .torch_build(module, shape, arch)
   net$to(device = device)
   opt <- torch$optim_adamw(net$parameters, lr = cfg$learning_rate,
                            weight_decay = cfg$weight_decay)
@@ -220,7 +221,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   # The weights leave here as plain arrays rather than as a live network, so the fit is an R object
   # through and through: it serialises, it copies and it predicts in a session that has never seen
   # the network that produced it.
-  structure(list(module_fn = module_fn, arch = arch, shape = shape, state = .state_arrays(net),
+  structure(list(module = module, arch = arch, shape = shape, state = .state_arrays(net),
                  scaler = scaler, device = cfg$device, activation = objective$activation,
                  channels = dimnames(x)[[3L]], bins = dim(x)[2L], batch_size = cfg$batch_size),
             class = "timesift_torch")
@@ -376,8 +377,8 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
 # ---- the weights as arrays -----------------------------------------------------------------
 
-.torch_build <- function(module_fn, shape, arch) {
-  module_fn(in_ch = shape[1L], in_len = shape[2L], n_out = shape[3L], arch = arch)
+.torch_build <- function(module, shape, arch) {
+  .torch_module(module)(in_ch = shape[1L], in_len = shape[2L], n_out = shape[3L], arch = arch)
 }
 
 .state_arrays <- function(net) {
@@ -399,7 +400,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
 # The network a fitted encoder is, built from its architecture and loaded with its weights.
 .torch_restore <- function(torch, model, device) {
-  net <- .torch_build(model$module_fn, model$shape, model$arch)
+  net <- .torch_build(model$module, model$shape, model$arch)
   net$load_state_dict(.state_tensors(torch, model$state))
   net$to(device = device)
   net$eval()
@@ -530,4 +531,19 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
       self$head(torch$torch_cat(list(h$mean(dim = 3L), h$amax(dim = 3L)), dim = 2L))
     }
   )()
+}
+
+# The encoders' module builders, by name. A fitted encoder stores the name and the builder is
+# looked up when the network is rebuilt, for the reason `.learner_ref()` gives: a builder written
+# into a fit carries a copy of its own body, and a fit read back after an upgrade would load this
+# version's weights into the last version's architecture.
+.torch_modules <- list(mlp = .mlp_module, cnn = .cnn_module, rescnn = .rescnn_module)
+
+.torch_module <- function(name) {
+  if (!is.character(name) || length(name) != 1L || !name %in% names(.torch_modules)) {
+    stop("this fit was made by the ", .describe(name), " encoder, which this version of the ",
+         "package does not carry. It has ", paste(names(.torch_modules), collapse = ", "), ".",
+         call. = FALSE)
+  }
+  .torch_modules[[name]]
 }

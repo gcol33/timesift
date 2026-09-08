@@ -273,3 +273,16 @@ def test_the_control_ranges_are_the_ones_the_r_side_checks():
         train_control(swa_start=1)
     assert train_control(swa_start=0).swa_start == 0
     assert train_control(device="cpu").device == "cpu"
+
+
+def test_a_fitted_encoder_names_its_module_builder_rather_than_carrying_it():
+    pytest.importorskip("torch")
+    from timesift.learners import _torch_module
+    x, y, _ = fixture(n_unit=20, days=40)
+    fit = fit_learner(cnn(epochs=2, channels=(8, 16)), x, y)
+    assert fit.model["module"] == "cnn"
+    assert not any(callable(v) for v in fit.model.values())
+    # A saved fit rebuilds the network from this version's builder, so one naming a builder the
+    # package no longer carries says so rather than loading its weights into another architecture.
+    with pytest.raises(ValueError, match="gru"):
+        _torch_module("gru")

@@ -282,3 +282,16 @@ test_that("no training batch holds one row, which batch normalisation cannot sta
   fit <- fit_learner(cnn(epochs = 1L), f$x, f$y, control = train_control(batch_size = 8L))
   expect_true(all(is.finite(stats::predict(fit, f$x))))
 })
+
+test_that("a fitted encoder names its module builder rather than carrying it", {
+  skip_if_no_torch()
+  f <- torch_fixture(n_unit = 20L, days = 40L)
+  fit <- fit_learner(cnn(epochs = 2L, channels = c(8L, 16L)), f$x, f$y)
+  expect_identical(fit$model$module, "cnn")
+  expect_false(any(vapply(fit$model, is.function, logical(1L))))
+  # A saved fit rebuilds the network from this version's builder, so a fit that names a builder the
+  # package no longer carries says so rather than loading its weights into the wrong architecture.
+  broken <- fit
+  broken$model$module <- "gru"
+  expect_error(stats::predict(broken, f$x), "gru")
+})

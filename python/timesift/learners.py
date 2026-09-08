@@ -263,20 +263,21 @@ def _rescnn_module(in_ch, in_len, n_out, channels, blocks_per_stage, kernel, dil
 # one definition and cannot drift between architectures. Architecture reaches the module builder
 # and everything else reaches the control, so a setting given at fit time is applied to whichever
 # of the two it belongs to.
-def _torch_learner(name, module_fn, arch, given, data, reads) -> Learner:
+def _torch_learner(name, arch, given, data, reads) -> Learner:
     settings = check_settings(given)
     return Learner(name=name, needs=("torch",), params={**arch, **settings},
-                   fit=_TorchFitter(name, module_fn, arch), predict=_torch_predict, data=data,
+                   fit=_TorchFitter(name, arch), predict=_torch_predict, data=data,
                    reads=reads, multi="joint")
 
 
 # The fit of an encoder is an object rather than a closure, and the fitted encoder holds its
 # weights as arrays rather than as a live network, so a learner and a fit both pickle: what is
-# written out is a module builder named by reference, an architecture, and numbers.
+# written out is the encoder's name, an architecture, and numbers. The module builder is looked up
+# by that name when the network is rebuilt, so a fit read back after an upgrade is this version's
+# architecture loaded with the weights, never the last version's.
 @dataclass(frozen=True)
 class _TorchFitter:
     name: str
-    module_fn: Callable
     arch: dict
 
     def __call__(self, x, y, *, head, control=None, **passed):
@@ -284,7 +285,7 @@ class _TorchFitter:
         if unknown:
             raise TypeError(f"the {self.name} learner has no setting called "
                             f"{', '.join(sorted(unknown))}")
-        return _torch_fit(x, y, self.module_fn,
+        return _torch_fit(x, y, self.name,
                           {**self.arch, **{k: v for k, v in passed.items() if k in self.arch}},
                           as_control(control).override(
                               {k: v for k, v in passed.items() if k in CONTROL_SETTINGS}),
@@ -335,7 +336,7 @@ def _objective(head):
 
 # ---- the training recipe ---------------------------------------------------------------------
 
-def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module_fn, arch, cfg, head):
+def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head):
     torch = _torch()
     device = _resolve_device(cfg.device)
     make_loss, activation = _objective(head)
@@ -354,7 +355,8 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module_fn, arch, cfg, head):
     yt = torch.tensor(y, dtype=torch.float32, device=device)
     loss_fn = make_loss(torch, y[fit_idx], cfg, device)
 
-    net = module_fn(in_ch=m.shape[1], in_len=m.shape[2], n_out=y.shape[1], **arch).to(device)
+    net = _torch_module(module)(in_ch=m.shape[1], in_len=m.shape[2],
+                                n_out=y.shape[1], **arch).to(device)
     opt = torch.optim.AdamW(net.parameters(), lr=cfg.learning_rate,
                             weight_decay=cfg.weight_decay)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.epochs)
@@ -397,7 +399,7 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module_fn, arch, cfg, head):
     # The weights leave here as arrays rather than as a live network, and the fit carries the
     # device setting rather than the device it resolved to, so a fit made on one machine is a
     # plain object that predicts on another.
-    return dict(module_fn=module_fn, arch=arch, shape=(m.shape[1], m.shape[2], y.shape[1]),
+    return dict(module=module, arch=arch, shape=(m.shape[1], m.shape[2], y.shape[1]),
                 state={k: v.detach().cpu().numpy().copy() for k, v in net.state_dict().items()},
                 centre=centre, scale=scale, device=cfg.device, activation=activation,
                 channels=x.stats, bins=x.values.shape[1], batch_size=cfg.batch_size)
@@ -406,7 +408,7 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module_fn, arch, cfg, head):
 def _torch_restore(torch, model, device):
     """The network a fitted encoder is, built from its architecture and loaded with its weights."""
     in_ch, in_len, n_out = model["shape"]
-    net = model["module_fn"](in_ch=in_ch, in_len=in_len, n_out=n_out, **model["arch"])
+    net = _torch_module(model["module"])(in_ch=in_ch, in_len=in_len, n_out=n_out, **model["arch"])
     net.load_state_dict({k: torch.from_numpy(v.copy()) for k, v in model["state"].items()})
     return net.to(device).eval()
 
@@ -522,19 +524,31 @@ def _torch_predict(model, x: TimesiftMatrix) -> np.ndarray:
     return np.concatenate(out, axis=0)
 
 
+# The encoders' module builders, by name. A fitted encoder stores the name and the builder is
+# looked up when the network is rebuilt, so a fit carries no reference to a function at all.
+TORCH_MODULES = {"mlp": _mlp_module, "cnn": _cnn_module, "rescnn": _rescnn_module}
+
+
+def _torch_module(name):
+    if name not in TORCH_MODULES:
+        raise ValueError(f"this fit was made by the {name!r} encoder, which this version of the "
+                         f"package does not carry. It has {', '.join(TORCH_MODULES)}.")
+    return TORCH_MODULES[name]
+
+
 def mlp(data=None, hidden=(512, 256), dropout=0.3, **settings) -> Learner:
     """Flattens the channels and builds in no temporal geometry.
 
     ``hidden`` and ``dropout`` are the architecture; anything else named is a training setting
     applied on top of the ``train_control()`` the learner is fitted under.
     """
-    return _torch_learner("mlp", _mlp_module, dict(hidden=tuple(hidden), dropout=dropout),
+    return _torch_learner("mlp", dict(hidden=tuple(hidden), dropout=dropout),
                           settings, data=data, reads="tabular")
 
 
 def cnn(data=None, channels=(16, 32, 64, 128), kernel=7, dropout=0.3, **settings) -> Learner:
     """Convolution, batch normalisation, activation and pooling, then global average pooling."""
-    return _torch_learner("cnn", _cnn_module,
+    return _torch_learner("cnn",
                           dict(channels=tuple(channels), kernel=kernel, dropout=dropout),
                           settings, data=data, reads="sequence")
 
@@ -542,7 +556,7 @@ def cnn(data=None, channels=(16, 32, 64, 128), kernel=7, dropout=0.3, **settings
 def rescnn(data=None, channels=(32, 64, 128, 256), blocks_per_stage=2, kernel=7,
            dilations=(1, 2, 4, 8), dropout=0.3, **settings) -> Learner:
     """Dilated residual blocks with channel gates, pooling average and maximum together."""
-    return _torch_learner("rescnn", _rescnn_module,
+    return _torch_learner("rescnn",
                           dict(channels=tuple(channels), blocks_per_stage=blocks_per_stage,
                                kernel=kernel, dilations=tuple(dilations), dropout=dropout),
                           settings, data=data, reads="sequence")

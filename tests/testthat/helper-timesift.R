@@ -61,3 +61,13 @@ temp_dir <- function() {
   dir.create(dir)
   dir
 }
+
+# Register a learner for one test and put the registry back afterwards, so the next test sees the
+# one that ships. `local_response()` above is the same thing for a response head.
+local_learner <- function(name, constructor, env = parent.frame()) {
+  held <- if (.learners_reg$has(name)) list(.learners_reg$get(name)) else NULL
+  register_learner(name, constructor, overwrite = TRUE)
+  withr::defer(if (is.null(held)) .learners_reg$remove(name)
+               else .learners_reg$set(name, held[[1L]], overwrite = TRUE), envir = env)
+  invisible(name)
+}

@@ -94,6 +94,13 @@ print.timesift_learner <- function(x, ...) {
   invisible(x)
 }
 
+# A reference carries every field of a learner but its two functions, so it prints as the learner
+# it refers to without the registry having to be asked for one.
+#' @export
+print.timesift_learner_ref <- function(x, ...) {
+  print.timesift_learner(x, ...)
+}
+
 # A representation names itself; the fitting layer builds the objects and this reads the label off
 # one without knowing anything else about it.
 .rep_label <- function(rep) {
@@ -178,10 +185,51 @@ fit_learner <- function(learner, x, y, response = "presence_absence", control = 
     args$head <- spec
   }
   model <- do.call(learner$fit, args)
-  structure(list(learner = learner, model = model, response = response,
+  structure(list(learner = .learner_ref(learner), model = model, response = response,
                  variables = colnames(y), grain = attr(x, "grain"),
                  stats = attr(x, "stats")),
             class = "timesift_fit")
+}
+
+# A fit refers to its learner rather than carrying it whole. R writes a closure's body out with the
+# closure, so `saveRDS()` on a fit copies the code that made it, and a fit read back after an
+# upgrade runs that copy inside the new package: this version's weights, the last version's model.
+# A learner the registry can rebuild is written out as its name and its settings, and its two
+# functions are looked up when they are needed; one defined outside any registry has no name to be
+# rebuilt from and travels whole, which is the only form it has.
+.learner_ref <- function(learner) {
+  if (!.registry_owns(learner)) {
+    return(learner)
+  }
+  structure(learner[setdiff(names(learner), c("fit", "predict"))],
+            class = "timesift_learner_ref")
+}
+
+# The registry owns a learner where it holds that name and its constructor writes the same two
+# functions. What is compared is the bodies rather than the closures, because a closure carries the
+# frame of the constructor call that made it: `cnn(epochs = 5)` and `cnn()` are not the same
+# object, and the registry rebuilds either, while a learner of one's own that happens to be called
+# "cnn" it cannot rebuild at all.
+.registry_owns <- function(learner) {
+  if (!.learners_reg$has(learner$name)) {
+    return(FALSE)
+  }
+  registered <- .learners_reg$get(learner$name)()
+  identical(body(registered$fit), body(learner$fit)) &&
+    identical(body(registered$predict), body(learner$predict))
+}
+
+# The two functions come from the registry and every setting from the reference, so a fit read back
+# predicts through the code the package now holds, under the settings it was fitted with.
+.rebuild_learner <- function(ref) {
+  if (!.learners_reg$has(ref$name)) {
+    stop("this fit was made by the \"", ref$name, "\" learner, which is not registered in this ",
+         "session. Register it with register_learner(\"", ref$name,
+         "\", ...) before predicting from the fit.", call. = FALSE)
+  }
+  built <- .learners_reg$get(ref$name)()
+  out <- utils::modifyList(unclass(built), unclass(ref))
+  structure(out[names(unclass(built))], class = "timesift_learner")
 }
 
 # A response's own randomness starts from a seed of its own, so the model of one response is the
@@ -207,7 +255,7 @@ fit_learner <- function(learner, x, y, response = "presence_absence", control = 
 #' @rdname fit_learner
 #' @export
 predict.timesift_fit <- function(object, newdata, ...) {
-  p <- object$learner$predict(object$model, newdata)
+  p <- .as_learner(object$learner)$predict(object$model, newdata)
   p <- as.matrix(p)
   if (nrow(p) != dim(newdata)[1L]) {
     stop("the learner returned ", nrow(p), " rows for ", dim(newdata)[1L], " units.",
@@ -276,6 +324,9 @@ print.timesift_models <- function(x, ...) {
 .as_learner <- function(learner) {
   if (inherits(learner, "timesift_learner")) {
     return(learner)
+  }
+  if (inherits(learner, "timesift_learner_ref")) {
+    return(.rebuild_learner(learner))
   }
   if (is.character(learner) && length(learner) == 1L) {
     return(.learners_reg$get(learner)())
