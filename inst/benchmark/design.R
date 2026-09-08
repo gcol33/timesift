@@ -5,6 +5,11 @@
 
 BENCH <- list(
   scale        = "full",
+  # The one default of each selector a launcher, a runner and a reader all have to agree on. The
+  # launcher asks this file for them rather than carrying its own copy.
+  results      = "benchmark-results",
+  results_b4   = "benchmark-results-b4",
+  device       = Sys.getenv("TIMESIFT_DEVICE", unset = "cpu"),
   variables    = 10L,
   prevalence   = 0.10,
   auc          = 0.75,
@@ -111,8 +116,7 @@ bench_learner <- function(block) {
   switch(bench_block(block),
          elasticnet = timesift::elasticnet(squares = BENCH$elasticnet_squares,
                                            n_inner = BENCH$elasticnet_n_inner),
-         cnn = timesift::cnn(epochs = BENCH$cnn_epochs,
-                             device = Sys.getenv("TIMESIFT_DEVICE", unset = "cpu")),
+         cnn = timesift::cnn(epochs = BENCH$cnn_epochs, device = BENCH$device),
          stop("unknown block: ", block))
 }
 
@@ -135,6 +139,11 @@ bench_representation <- function(readings, candidates) {
 # Every run says what it was fed before it is fed it: the cell, the seeds, the package it is
 # exercising and the candidate set it will search. A row without this cannot be traced to a cell
 # and is not a row.
+#
+# The package the rows are fitted by is the one installed, and the commit the stamp carries is the
+# checkout's, so the two are held to each other here: the installed version has to be the
+# checkout's DESCRIPTION, and a full-scale run refuses a checkout with uncommitted changes, because
+# a commit stamped onto rows fitted by code that commit does not hold is a row nobody can trace.
 bench_stamp <- function(cell, replicate, candidates, pkg_dir, learner) {
   commit <- tryCatch(
     system2("git", c("-C", shQuote(pkg_dir), "rev-parse", "HEAD"), stdout = TRUE, stderr = NULL),
@@ -143,6 +152,7 @@ bench_stamp <- function(cell, replicate, candidates, pkg_dir, learner) {
     length(system2("git", c("-C", shQuote(pkg_dir), "status", "--porcelain"), stdout = TRUE,
                    stderr = NULL)) > 0L,
     error = function(e) NA)
+  bench_assert_package(pkg_dir, dirty)
   list(
     scale = BENCH$scale,
     cell_id = cell$cell_id,
@@ -168,8 +178,26 @@ bench_stamp <- function(cell, replicate, candidates, pkg_dir, learner) {
     pkg_dirty = isTRUE(dirty),
     r_version = paste(R.version$major, R.version$minor, sep = "."),
     platform = R.version$platform,
-    device = Sys.getenv("TIMESIFT_DEVICE", unset = "cpu")
+    device = BENCH$device
   )
+}
+
+bench_assert_package <- function(pkg_dir, dirty) {
+  declared <- tryCatch(
+    as.character(read.dcf(file.path(pkg_dir, "DESCRIPTION"), fields = "Version")[[1L]]),
+    error = function(e) NA_character_)
+  installed <- as.character(utils::packageVersion("timesift"))
+  if (is.na(declared) || !identical(installed, declared)) {
+    stop("the installed timesift is ", installed, " and the checkout at ", pkg_dir, " declares ",
+         declared, ". Install the checkout before running the benchmark: launch.ps1 does, or ",
+         "install.packages(\"", pkg_dir, "\", repos = NULL, type = \"source\").",
+         call. = FALSE)
+  }
+  if (identical(BENCH$scale, "full") && isTRUE(dirty)) {
+    stop("the checkout at ", pkg_dir, " has uncommitted changes, and a full-scale run stamps its ",
+         "commit onto every row. Commit, or run --scale=smoke.", call. = FALSE)
+  }
+  invisible(TRUE)
 }
 
 # The candidate set actually searched is read back off the selection and checked against the one

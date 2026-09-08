@@ -10,7 +10,7 @@ here <- grep("^--file=", commandArgs(FALSE), value = TRUE)
 here <- if (length(here)) dirname(normalizePath(sub("^--file=", "", here[1L]))) else getwd()
 source(file.path(here, "design.R"))
 
-opt <- bench_args(list(out = "benchmark-results-b4", csv = NA_character_))
+opt <- bench_args(list(out = BENCH$results_b4, csv = NA_character_))
 
 files <- list.files(opt$out, pattern = "^rep_[0-9]+[.]csv[.]gz$", recursive = TRUE,
                     full.names = TRUE)

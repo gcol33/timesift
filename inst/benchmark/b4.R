@@ -23,7 +23,7 @@ here <- if (length(here)) dirname(normalizePath(sub("^--file=", "", here[1L]))) 
 source(file.path(here, "design.R"))
 
 opt <- bench_args(list(cell = NA_character_, reps = NA_character_,
-                       results = "benchmark-results", out = "benchmark-results-b4",
+                       results = BENCH$results, out = BENCH$results_b4,
                        tol = "1e-08", force = FALSE, pkg = NA_character_))
 pkg_dir <- if (is.na(opt$pkg)) dirname(dirname(here)) else opt$pkg
 tol <- as.numeric(opt$tol)
@@ -95,7 +95,7 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
   # The fold each grain was selected for, as the run recorded it. Refitting there is the whole of
   # the replay: no candidate is scored again, and nothing is chosen here.
   sel <- d[d$arm == "nested" & d$quantity == "selected", c("candidate", "outer_fold")]
-  stored <- d[d$arm == "nested" & d$quantity == "true_fold" & d$metric == "roc_auc",
+  stored <- d[d$arm == "nested" & d$quantity == "true_fold" & d$metric == BENCH$metric,
               c("outer_fold", "value")]
   sel <- sel[order(sel$outer_fold), ]
   stored <- stored[order(stored$outer_fold), ]

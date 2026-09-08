@@ -34,7 +34,7 @@ reps <- if (is.na(opt$reps)) seq_len(cell$replicates) else eval(parse(text = opt
 if (!is.numeric(reps) || anyNA(reps) || any(reps < 1L)) {
   stop("--reps must evaluate to positive whole numbers, e.g. 1:200 or c(3,7).", call. = FALSE)
 }
-out_dir <- file.path(if (is.na(opt$out)) file.path(getwd(), "benchmark-results") else opt$out,
+out_dir <- file.path(if (is.na(opt$out)) file.path(getwd(), BENCH$results) else opt$out,
                      cell$cell_id)
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 

@@ -20,20 +20,43 @@ param(
   [string] $Reps = '',
   [int]    $Workers = 14,
   [string] $Out = '',
-  [string] $Device = 'cpu',
-  [string] $Rscript = 'C:\Program Files\R\R-4.6.1\bin\x64\Rscript.exe'
+  [string] $Device = '',
+  [string] $Rscript = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $bench = $PSScriptRoot
 $repo = Split-Path (Split-Path $bench -Parent) -Parent
-if (-not $Out) { $Out = Join-Path $repo 'benchmark-results' }
+
+# Rscript is the one on the path, or the one the R installation registered; a version written
+# here would be the version of whoever wrote it.
+if (-not $Rscript) {
+  $found = Get-Command Rscript.exe -ErrorAction SilentlyContinue
+  if ($found) { $Rscript = $found.Source }
+  else {
+    $key = Get-ItemProperty 'HKLM:\SOFTWARE\R-core\R' -ErrorAction SilentlyContinue
+    if ($key -and $key.InstallPath) { $Rscript = Join-Path $key.InstallPath 'bin\x64\Rscript.exe' }
+  }
+}
+if (-not $Rscript -or -not (Test-Path $Rscript)) { throw "Rscript not found; pass -Rscript" }
+
+# The device and the results directory are defaulted in design.R and nowhere else. The launcher
+# sets the device only when asked to, so the runner's own default is the one that applies, and
+# asks design.R for the results directory rather than carrying a copy of the name.
+if ($Device) { $env:TIMESIFT_DEVICE = $Device }
+if (-not $Out) {
+  $default = & $Rscript -e "source(file.path('$($bench -replace '\\', '/')', 'design.R')); cat(BENCH[['results']])"
+  $Out = Join-Path $repo $default
+}
 $runDir = Join-Path $Out ('_run_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 
-if (-not (Test-Path $Rscript)) { throw "Rscript not found at $Rscript" }
-$env:TIMESIFT_DEVICE = $Device
+# The workers fit with whatever timesift is installed, and the rows they write are stamped with
+# the checkout's commit, so the checkout is installed first and once, before any worker starts.
+# The runner refuses to fit if the installed version is not the checkout's.
+& $Rscript -e "install.packages('$($repo -replace '\\', '/')', repos = NULL, type = 'source', quiet = TRUE)"
+if ($LASTEXITCODE -ne 0) { throw "installing the checkout failed" }
 
 # The cell list comes from design.R, never from a copy here, so the launcher cannot schedule a cell
 # the runner does not recognise.
@@ -58,9 +81,11 @@ for ($i = 0; $i -lt $stripes; $i++) {
   "started      $(Get-Date -Format o)"
   "repo         $repo"
   "rscript      $Rscript"
+  "installed    $(& $Rscript -e "cat(as.character(packageVersion('timesift')))")"
+  "commit       $(git -C $repo rev-parse HEAD)"
   "scale        $Scale"
   "block        $Block"
-  "device       $Device"
+  "device       $(if ($Device) { $Device } else { 'design.R default' })"
   "out          $Out"
   "cells        $($ids -join ', ')"
   "workers      $stripes"
