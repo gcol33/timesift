@@ -68,7 +68,7 @@ seconds slot_bin_start(std::int64_t slot, Grain w, YearStart ys) noexcept;
 struct Request {
   const std::int32_t* unit = nullptr;   // 0-based unit index, one per reading
   const double* value = nullptr;        // one per reading
-  const seconds* when = nullptr;        // the true instant, one per reading; only bin_end reads it
+  const seconds* when = nullptr;        // the true instant, one per reading; `native` bins on it
   const seconds* local = nullptr;       // naive local seconds, one per reading
   const seconds* custom = nullptr;      // a supplied calendar's bin start per reading, else null
   const char* const* unit_name = nullptr;  // n_unit names, for the guards; may be null
@@ -80,9 +80,13 @@ struct Request {
   std::vector<Stat> stats;
 };
 
+// The bins of every grain but `native` are read on the naive local clock, and their starts come
+// back on it. The `native` grain's bin is the reading itself, and a reading is its instant: the two
+// readings of an hour a zone repeats share a local second and are two bins, so that grain is read
+// on the instant and its bin starts come back as instants.
 struct Result {
   std::vector<double> values;            // [unit, bin, channel], unit fastest, as the digest reads it
-  std::vector<seconds> bin_start;        // naive local seconds, sorted distinct
+  std::vector<seconds> bin_start;        // sorted distinct, on the clock the grain is read on
   std::vector<seconds> bin_end;          // the last reading instant assigned to each bin
   std::vector<std::int32_t> bin_n;       // [unit, bin], unit fastest
   std::vector<std::uint8_t> bin_partial; // one per bin
@@ -96,7 +100,8 @@ Result reduce(const Request& req);
 // It is what `reduce` refuses a gap on, laid out so the gaps can be read: a bin no unit reaches is
 // a column of zeros rather than a bin left out. `stats` and `value` are not read.
 struct Coverage {
-  std::vector<seconds> bin_start;   // every bin from the first to the last the record touches
+  std::vector<seconds> bin_start;   // every bin from the first to the last the record touches, on
+                                    // the clock the grain is read on, as Result::bin_start is
   std::vector<std::int32_t> count;  // [unit, bin], unit fastest
 };
 
@@ -105,10 +110,13 @@ Coverage coverage(const Request& req);
 // The second reduction: a lookback anchored on each target, which no calendar expresses.
 // A target is a thing to predict, carrying the unit whose record it reads and the instant it is
 // anchored at, and the lookback is a fixed length of time ending a fixed lag before that instant.
-// Naive local seconds here as everywhere below the wrappers.
+// Naive local seconds here as everywhere below the wrappers: the length is measured on the local
+// clock, which is what keeps a calendar day whole inside a bin for the day-level statistics, so a
+// lookback spanning a clock change holds an hour more or less of record than one that does not.
 struct LookbackRequest {
   const std::int32_t* unit = nullptr;         // series unit index, one per reading
   const double* value = nullptr;              // one per reading
+  const seconds* when = nullptr;              // the true instant, one per reading
   const seconds* local = nullptr;             // naive local seconds, one per reading
   const char* const* unit_name = nullptr;     // n_unit names, for the guards; may be null
   std::size_t n = 0;

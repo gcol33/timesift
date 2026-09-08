@@ -5,8 +5,18 @@
 # shared binary would otherwise make the agreement between the two languages trivially true. One
 # implementation in production, two in evidence.
 #
-# It reads the calendar by writing local strings and parsing them back, so it answers only for a
-# series in UTC; that is what the tests hand it.
+# It reads the calendar off a clock with no zone in it. A series carried in a zone is first
+# relabelled into that zone's clock, by writing each instant as a local string and parsing it back
+# as UTC, and every grain but `native` is then binned on the relabelled series; `native` is binned
+# on the instants themselves, because its bin is the reading and two readings of an hour a zone
+# repeats are two bins.
+
+oracle_local_clock <- function(when, tz) {
+  if (tz %in% c("UTC", "GMT")) {
+    return(when)
+  }
+  as.POSIXct(format(when, "%Y-%m-%d %H:%M:%S", tz = tz), tz = "UTC")
+}
 
 oracle_group_sum <- function(values, cell, n_cell) {
   s <- rowsum(values, cell, reorder = TRUE)
@@ -28,8 +38,8 @@ oracle_group_edge <- function(values, cell, n_cell, upper) {
 # say which bin cell each of those days belongs to. The four day-level statistics are then a second
 # reduction over the days of a bin, which is what keeps an extreme day distinct from an extreme
 # reading.
-oracle_day_level <- function(reading, unit, when, units, bins, ys, tz, n_cell) {
-  day_start <- oracle_bin_start(when, "day", ys, tz)
+oracle_day_level <- function(reading, unit, when, units, bins, ys, n_cell) {
+  day_start <- oracle_bin_start(when, "day", ys)
   n_u <- length(units)
   days <- sort(unique(day_start))
   dcell <- (match(unclass(day_start), unclass(days)) - 1L) * n_u + match(unit, units)
@@ -54,15 +64,15 @@ oracle_day_level <- function(reading, unit, when, units, bins, ys, tz, n_cell) {
 # instant alone, so the calendar is read once per distinct instant rather than once per reading.
 # On three years of hourly readings from 894 units that is 26,304 calendar lookups instead of
 # 23,515,776, and the difference is minutes.
-oracle_bin_start <- function(when, grain, ys, tz) {
+oracle_bin_start <- function(when, grain, ys) {
   u <- unique(when)
   if (length(u) == length(when)) {
-    return(oracle_bin_of(when, grain, ys, tz))
+    return(oracle_bin_of(when, grain, ys))
   }
-  oracle_bin_of(u, grain, ys, tz)[match(unclass(when), unclass(u))]
+  oracle_bin_of(u, grain, ys)[match(unclass(when), unclass(u))]
 }
 
-oracle_bin_of <- function(when, grain, ys, tz) {
+oracle_bin_of <- function(when, grain, ys) {
   if (is.function(grain)) {
     out <- grain(when)
     if (!inherits(out, "POSIXct") || length(out) != length(when)) {
@@ -74,33 +84,34 @@ oracle_bin_of <- function(when, grain, ys, tz) {
     return(when)
   }
   if (grain == "halfday") {
-    day <- as.POSIXct(trunc(when, units = "days"), tz = tz)
-    return(day + 43200 * (as.integer(format(when, "%H", tz = tz)) >= 12L))
+    day <- as.POSIXct(trunc(when, units = "days"), tz = "UTC")
+    return(day + 43200 * (as.integer(format(when, "%H", tz = "UTC")) >= 12L))
   }
   if (grain == "day") {
-    return(as.POSIXct(trunc(when, units = "days"), tz = tz))
+    return(as.POSIXct(trunc(when, units = "days"), tz = "UTC"))
   }
   if (grain == "week") {
-    day <- as.Date(when, tz = tz)
+    day <- as.Date(when, tz = "UTC")
     monday <- day - (as.integer(format(day, "%u")) - 1L)
-    return(as.POSIXct(paste0(monday, " 00:00:00"), tz = tz))
+    return(as.POSIXct(paste0(monday, " 00:00:00"), tz = "UTC"))
   }
   if (grain == "month") {
-    return(as.POSIXct(paste0(format(when, "%Y-%m", tz = tz), "-01 00:00:00"), tz = tz))
+    return(as.POSIXct(paste0(format(when, "%Y-%m", tz = "UTC"), "-01 00:00:00"), tz = "UTC"))
   }
   step <- if (grain == "season") 3L else 12L
-  oracle_anniversary(oracle_offset_months(when, ys, tz) %/% step * step, ys, tz)
+  oracle_anniversary(oracle_offset_months(when, ys) %/% step * step, ys)
 }
 
 # Which bins the record does not cover for their whole calendar span. The record covers from its
 # first reading to its last plus one sampling interval, and a bin is partial when its own span
 # reaches outside that. Only a bin at an end of the record can, because .check_grid() has already
-# required every unit to hold readings in every bin between them.
-oracle_bin_partial <- function(when, bins, grain, ys, tz) {
-  covered <- range(as.numeric(when))
+# required every unit to hold readings in every bin between them. The record's ends are read on
+# the clock the bins are; the sampling interval is the record's own, read off the instants.
+oracle_bin_partial <- function(clock, when, bins, grain, ys) {
+  covered <- range(as.numeric(clock))
   covered[2L] <- covered[2L] + oracle_sampling_step(when)
   as.numeric(bins) < covered[1L] |
-    as.numeric(oracle_bin_next(bins, grain, ys, tz, covered[2L])) > covered[2L]
+    as.numeric(oracle_bin_next(bins, grain, ys, covered[2L])) > covered[2L]
 }
 
 oracle_sampling_step <- function(when) {
@@ -113,31 +124,31 @@ oracle_sampling_step <- function(when) {
 # landing well inside the following bin and flooring that, which is exact whatever the month length
 # or the daylight-saving offset. A caller-supplied binning declares its own bins, so its successors
 # are read off the bins themselves and its last bin is taken to end with the record.
-oracle_bin_next <- function(bins, grain, ys, tz, covered_end) {
+oracle_bin_next <- function(bins, grain, ys, covered_end) {
   if (is.function(grain) || identical(grain, "native")) {
-    return(c(bins[-1L], .POSIXct(covered_end, tz = tz)))
+    return(c(bins[-1L], .POSIXct(covered_end, tz = "UTC")))
   }
   switch(grain,
          halfday = bins + 43200,
-         day = oracle_bin_of(bins + 36 * 3600, "day", ys, tz),
-         week = oracle_bin_of(bins + 180 * 3600, "week", ys, tz),
-         month = oracle_bin_of(bins + 40 * 86400, "month", ys, tz),
-         season = oracle_anniversary(oracle_offset_months(bins, ys, tz) + 3L, ys, tz),
-         year = oracle_anniversary(oracle_offset_months(bins, ys, tz) + 12L, ys, tz))
+         day = oracle_bin_of(bins + 36 * 3600, "day", ys),
+         week = oracle_bin_of(bins + 180 * 3600, "week", ys),
+         month = oracle_bin_of(bins + 40 * 86400, "month", ys),
+         season = oracle_anniversary(oracle_offset_months(bins, ys) + 3L, ys),
+         year = oracle_anniversary(oracle_offset_months(bins, ys) + 12L, ys))
 }
 
-oracle_offset_months <- function(when, ys, tz) {
-  y <- as.integer(format(when, "%Y", tz = tz))
-  m <- as.integer(format(when, "%m", tz = tz))
-  d <- as.integer(format(when, "%d", tz = tz))
+oracle_offset_months <- function(when, ys) {
+  y <- as.integer(format(when, "%Y", tz = "UTC"))
+  m <- as.integer(format(when, "%m", tz = "UTC"))
+  d <- as.integer(format(when, "%d", tz = "UTC"))
   y * 12L + (m - 1L) - (ys$month - 1L) - as.integer(d < ys$day)
 }
 
-oracle_anniversary <- function(offset, ys, tz) {
+oracle_anniversary <- function(offset, ys) {
   absolute <- offset + (ys$month - 1L)
   as.POSIXct(sprintf("%04d-%02d-%02d 00:00:00",
                      absolute %/% 12L, absolute %% 12L + 1L, ys$day),
-             tz = tz)
+             tz = "UTC")
 }
 
 # The lookback, from the section of `inst/spec/representation.md` that describes it rather
@@ -244,7 +255,9 @@ oracle_grain_matrix <- function(data, id, time, value, grain = "day", stats = "m
   ys <- list(month = as.integer(substr(year_start, 1L, 2L)),
              day = as.integer(substr(year_start, 4L, 5L)))
 
-  bin_start <- oracle_bin_start(when, grain, ys, tz)
+  # The clock the bins are read on: the instant itself at `native`, the series' zone elsewhere.
+  clock <- if (identical(grain, "native")) when else oracle_local_clock(when, tz)
+  bin_start <- oracle_bin_start(clock, grain, ys)
   units <- sort(unique(unit), method = "radix")
   bins <- sort(unique(bin_start))
   n_u <- length(units)
@@ -259,7 +272,7 @@ oracle_grain_matrix <- function(data, id, time, value, grain = "day", stats = "m
                dim = c(n_u, n_b, length(stats)),
                dimnames = list(units, format(bins, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"), stats))
   day <- if (any(stats %in% c("cold_day", "warm_day", "mean_daily_min", "mean_daily_max"))) {
-    oracle_day_level(reading, unit, when, units, bins, ys, tz, n_cell)
+    oracle_day_level(reading, unit, clock, units, bins, ys, n_cell)
   } else {
     NULL
   }
@@ -285,5 +298,5 @@ oracle_grain_matrix <- function(data, id, time, value, grain = "day", stats = "m
        bin_start = bins,
        bin_end = .POSIXct(oracle_group_edge(as.numeric(when), bin_of, n_b, TRUE), tz = tz),
        bin_n = matrix(count, nrow = n_u, ncol = n_b),
-       bin_partial = oracle_bin_partial(when, bins, grain, ys, tz))
+       bin_partial = oracle_bin_partial(clock, when, bins, grain, ys))
 }

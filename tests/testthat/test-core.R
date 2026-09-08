@@ -90,11 +90,11 @@ test_that("the core's calendar agrees with the oracle's, instant by instant", {
   ys <- list(month = 9L, day = 1L)
   for (w in c("native", "halfday", "day", "week", "month", "season", "year")) {
     expect_equal(ts_bin_starts_(as.numeric(t), w, 9L, 1L),
-                 as.numeric(oracle_bin_start(t, w, ys, "UTC")), info = w)
+                 as.numeric(oracle_bin_start(t, w, ys)), info = w)
   }
-  bins <- unique(oracle_bin_start(t, "month", ys, "UTC"))
+  bins <- unique(oracle_bin_start(t, "month", ys))
   expect_equal(ts_bin_nexts_(as.numeric(bins), "month", 9L, 1L),
-               as.numeric(oracle_bin_next(bins, "month", ys, "UTC", max(as.numeric(t)))))
+               as.numeric(oracle_bin_next(bins, "month", ys, max(as.numeric(t)))))
 })
 
 test_that("a gap the whole record shares is an error, not four adjacent bins", {
@@ -219,4 +219,111 @@ test_that("a reading that is not a finite number is refused, and named", {
   bad <- d
   bad$v[30L] <- NA_real_
   expect_identical(sum(coverage(bad, id, t, grain = "day")), nrow(d))
+})
+
+test_that("the two readings of an hour a zone repeats are two `native` bins", {
+  set.seed(31)
+  # 2021-10-31 in Europe/Vienna: at 03:00 CEST the clock goes back to 02:00 CET, so the readings
+  # at 00:00Z and 01:00Z both read 02:00 on that clock.
+  t <- seq(as.POSIXct("2021-10-30", tz = "UTC"), by = "hour", length.out = 72)
+  d <- data.frame(id = rep(c("a", "b"), each = length(t)), t = rep(t, 2),
+                  v = rnorm(2 * length(t)))
+  utc <- grain_matrix(d, id, t, v, grain = "native", stats = "mean")
+  attr(d$t, "tzone") <- "Europe/Vienna"
+  vienna <- grain_matrix(d, id, t, v, grain = "native", stats = "mean")
+
+  # The record unreduced is the record, whichever clock it is read on.
+  expect_identical(dim(vienna)[2L], 72L)
+  expect_true(all(attr(vienna, "bin_n") == 1L))
+  expect_identical(digest_array(vienna), digest_array(utc))
+  expect_identical(dimnames(vienna)[[2L]], dimnames(utc)[[2L]])
+  expect_identical(as.numeric(attr(vienna, "bin_start")), as.numeric(t))
+  expect_identical(attr(vienna, "bin_partial"), attr(utc, "bin_partial"))
+  expect_identical(dim(coverage(d, id, t, grain = "native"))[2L], 72L)
+
+  # The day that hour falls in holds 25 readings, and its digest is the oracle's.
+  day <- grain_matrix(d, id, t, v, grain = "day", stats = c("min", "mean", "max"))
+  expect_identical(unname(attr(day, "bin_n")["a", "2021-10-30T22:00:00Z"]), 25L)
+  o <- oracle_grain_matrix(d, "id", "t", "v", grain = "day", stats = c("min", "mean", "max"))
+  expect_identical(as.vector(unclass(day)), as.vector(o$values))
+})
+
+test_that("the core reproduces the oracle on a series carried in a zone that moves its clock", {
+  set.seed(20260908)
+  # Across both of Europe/Vienna's transitions in 2021, at a sampling step that puts two readings
+  # in the repeated hour and none on some local hours.
+  t <- seq(as.POSIXct("2021-03-20 13:00:00", tz = "UTC"), by = "50 min", length.out = 24 * 260)
+  attr(t, "tzone") <- "Europe/Vienna"
+  d <- data.frame(id = rep(c("p1", "p2"), each = length(t)), t = rep(t, 2),
+                  v = rnorm(2 * length(t), sd = 5))
+  schemes <- list(c("min", "mean", "max"),
+                  c("mean_daily_min", "mean", "mean_daily_max"),
+                  c("cold_day", "mean", "warm_day"))
+  for (w in c("native", "halfday", "day", "week", "month", "season", "year")) {
+    for (scheme in schemes) {
+      if (w %in% c("native", "halfday") && !identical(scheme, schemes[[1L]])) next
+      x <- grain_matrix(d, id, t, v, grain = w, stats = scheme)
+      o <- oracle_grain_matrix(d, "id", "t", "v", grain = w, stats = scheme)
+      label <- paste(w, paste(scheme, collapse = "+"))
+      expect_identical(as.vector(unclass(x)), as.vector(o$values), info = label)
+      expect_identical(as.vector(attr(x, "bin_n")), as.vector(o$bin_n), info = label)
+      expect_identical(attr(x, "bin_partial"), o$bin_partial, info = label)
+      expect_equal(as.numeric(attr(x, "bin_end")), as.numeric(o$bin_end), info = label)
+      # The oracle's bin starts are on the local clock, and the core's are the instants that
+      # clock reads them at.
+      clock <- if (w == "native") attr(x, "bin_start") else
+        oracle_local_clock(attr(x, "bin_start"), "Europe/Vienna")
+      expect_equal(as.numeric(clock), as.numeric(o$bin_start), info = label)
+    }
+  }
+})
+
+test_that("a lookback measures the local clock, so a day across a clock change is 25 or 23 hours", {
+  set.seed(32)
+  t <- seq(as.POSIXct("2021-03-25", tz = "UTC"), by = "hour", length.out = 24 * 230)
+  attr(t, "tzone") <- "Europe/Vienna"
+  d <- data.frame(id = "p1", t = t, v = rnorm(length(t)), stringsAsFactors = FALSE)
+  at <- data.frame(id = c("p1", "p1", "p1"),
+                   at = as.POSIXct(c("2021-03-29", "2021-11-01", "2021-06-01"),
+                                   tz = "Europe/Vienna"),
+                   stringsAsFactors = FALSE)
+  x <- lookback_matrix(d, id, t, v, at = at, span = "1 day", stats = c("mean", "cold_day"))
+  expect_identical(as.vector(attr(x, "bin_n")), c(23L, 25L, 24L))
+
+  # The whole local day before each anchor, which is what a day-level statistic reads.
+  for (i in seq_len(nrow(at))) {
+    day <- d$v[d$t >= at$at[i] - 3600 * attr(x, "bin_n")[i] & d$t < at$at[i]]
+    expect_equal(x[i, 1L, "mean"], mean(day))
+    expect_equal(x[i, 1L, "cold_day"], mean(day))
+  }
+})
+
+test_that("a negative lag is refused by the core", {
+  t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 20)
+  d <- data.frame(id = "p1", t = t, v = seq_along(t), stringsAsFactors = FALSE)
+  at <- data.frame(id = "p1", at = as.POSIXct("2021-09-15", tz = "UTC"), stringsAsFactors = FALSE)
+  expect_error(lookback_matrix(d, id, t, v, at = at, span = "2 days", lag = -3600),
+               "lag cannot be negative")
+})
+
+test_that("a record too long for the day table is refused by the core", {
+  # The day-level stage of a lookback tables every calendar day the record spans, and stops at
+  # 2^24 of them: a record with a reading 45,000 years after its first.
+  far <- .POSIXct(c(0, (2^24 + 1) * 86400), tz = "UTC")
+  d <- data.frame(id = "p1", t = far, v = c(1, 2), stringsAsFactors = FALSE)
+  at <- data.frame(id = "p1", at = far[2L] + 86400, stringsAsFactors = FALSE)
+  expect_error(lookback_matrix(d, id, t, v, at = at, span = "1 day", stats = "cold_day"),
+               "too many days")
+  expect_silent(lookback_matrix(d, id, t, v, at = at, span = "1 day", stats = "max"))
+})
+
+test_that("a unit index outside the units is refused by the core, which no wrapper can send", {
+  expect_error(timesift:::ts_reduce_(2L, 1, 0, 0, NULL, "a", "day", 9L, 1L, "mean", 0),
+               "unit index outside the units")
+  expect_error(timesift:::ts_reduce_lookbacks_(2L, 1, 0, 0, "a", 1L, 86400, "1", 86400, 0, 1L,
+                                               "mean"),
+               "unit index outside the units")
+  expect_error(timesift:::ts_reduce_lookbacks_(1L, 1, 0, 0, "a", 2L, 86400, "1", 86400, 0, 1L,
+                                               "mean"),
+               "target carries a unit index outside the units")
 })

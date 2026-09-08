@@ -378,3 +378,41 @@ test_that("a numeric identifier is written by its digits", {
   expect_error(grain_matrix(transform(d, id = d$t), id, t, v, grain = "day"),
                "must identify a unit by text")
 })
+
+test_that("a zone the database does not know is an error, not a warning and a UTC calendar", {
+  t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 3)
+  d <- data.frame(id = "a", t = t, v = seq_along(t), stringsAsFactors = FALSE)
+  attr(d$t, "tzone") <- "Europe/Vienn"
+  expect_error(grain_matrix(d, id, t, v, grain = "day"), "\"Europe/Vienn\", which the zone database")
+  expect_error(coverage(d, id, t, grain = "day"), "which the zone database")
+  at <- data.frame(id = "a", at = t[48L], stringsAsFactors = FALSE)
+  expect_error(lookback_matrix(d, id, t, v, at = at, span = "1 day"), "which the zone database")
+  attr(d$t, "tzone") <- "Europe/Vienna"
+  expect_silent(grain_matrix(d, id, t, v, grain = "day"))
+})
+
+test_that("a supplied calendar that gives no bin start for a reading is refused, and names it", {
+  t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 3)
+  d <- data.frame(id = rep(c("a", "b"), each = length(t)), t = rep(t, 2),
+                  v = seq_len(2 * length(t)), stringsAsFactors = FALSE)
+  days <- function(when) .POSIXct(floor(as.numeric(when) / 86400) * 86400, tz = "UTC")
+  holed <- function(when) {
+    out <- days(when)
+    out[as.numeric(when) == as.numeric(t[30L])] <- NA
+    out
+  }
+  expect_error(grain_matrix(d, id, t, v, grain = holed),
+               "gives no bin start for 2 readings, first: unit a at 2021-09-02T05:00:00Z")
+  expect_error(coverage(d, id, t, grain = holed), "gives no bin start for 2 readings")
+  expect_identical(dim(grain_matrix(d, id, t, v, grain = days))[2L], 3L)
+})
+
+test_that("a duplicated reading is named by its instant in UTC, and the noun agrees", {
+  t <- as.POSIXct(c(0, 0, 3600, 7200), origin = "1970-01-01", tz = "Europe/Vienna")
+  d <- data.frame(id = "a", t = t, v = 1:4, stringsAsFactors = FALSE)
+  expect_error(grain_matrix(d, id, t, v, grain = "native"),
+               "1 duplicated (unit, time) pair, first: a at 1970-01-01T00:00:00Z.", fixed = TRUE)
+  d <- rbind(d, d[3L, ])
+  expect_error(grain_matrix(d, id, t, v, grain = "native"),
+               "2 duplicated (unit, time) pairs, first: a at 1970-01-01T00:00:00Z.", fixed = TRUE)
+})

@@ -30,7 +30,7 @@ struct Held {
   timesift::Request req;
 };
 
-Held hold(cpp11::integers unit, cpp11::sexp value, cpp11::sexp when, cpp11::doubles local,
+Held hold(cpp11::integers unit, cpp11::sexp value, cpp11::doubles when, cpp11::doubles local,
           cpp11::sexp custom, cpp11::strings unit_names, const std::string& grain,
           int year_month, int year_day) {
   Held h;
@@ -45,7 +45,7 @@ Held hold(cpp11::integers unit, cpp11::sexp value, cpp11::sexp when, cpp11::doub
     for (std::size_t i = 0; i < n; ++i) h.reading[i] = v[static_cast<R_xlen_t>(i)];
   }
 
-  h.instant = when == R_NilValue ? as_seconds(local) : as_seconds(cpp11::doubles(when));
+  h.instant = as_seconds(when);
   h.naive = as_seconds(local);
   if (custom != R_NilValue) h.supplied = as_seconds(cpp11::doubles(custom));
 
@@ -115,11 +115,10 @@ cpp11::list ts_reduce_(cpp11::integers unit, cpp11::doubles value, cpp11::double
 }
 
 [[cpp11::register]]
-cpp11::list ts_coverage_(cpp11::integers unit, cpp11::doubles local, cpp11::sexp custom,
-                         cpp11::strings unit_names, std::string grain, int year_month,
-                         int year_day) {
-  Held h = hold(unit, R_NilValue, R_NilValue, local, custom, unit_names, grain, year_month,
-                year_day);
+cpp11::list ts_coverage_(cpp11::integers unit, cpp11::doubles when, cpp11::doubles local,
+                         cpp11::sexp custom, cpp11::strings unit_names, std::string grain,
+                         int year_month, int year_day) {
+  Held h = hold(unit, R_NilValue, when, local, custom, unit_names, grain, year_month, year_day);
   const timesift::Coverage result = timesift::coverage(h.req);
 
   cpp11::writable::doubles bin_start(static_cast<R_xlen_t>(result.bin_start.size()));
@@ -135,8 +134,9 @@ cpp11::list ts_coverage_(cpp11::integers unit, cpp11::doubles local, cpp11::sexp
 }
 
 [[cpp11::register]]
-cpp11::list ts_reduce_lookbacks_(cpp11::integers unit, cpp11::doubles value, cpp11::doubles local,
-                               cpp11::strings unit_names, cpp11::integers target_unit,
+cpp11::list ts_reduce_lookbacks_(cpp11::integers unit, cpp11::doubles value, cpp11::doubles when,
+                               cpp11::doubles local, cpp11::strings unit_names,
+                               cpp11::integers target_unit,
                                cpp11::doubles target_at, cpp11::strings target_names,
                                double span, double lag, int bins, cpp11::strings stats) {
   const std::size_t n = static_cast<std::size_t>(value.size());
@@ -148,6 +148,7 @@ cpp11::list ts_reduce_lookbacks_(cpp11::integers unit, cpp11::doubles value, cpp
   std::vector<double> reading(n);
   for (std::size_t i = 0; i < n; ++i) reading[i] = value[static_cast<R_xlen_t>(i)];
 
+  const std::vector<timesift::seconds> instant = as_seconds(when);
   const std::vector<timesift::seconds> naive = as_seconds(local);
   const std::vector<timesift::seconds> anchor = as_seconds(target_at);
 
@@ -168,6 +169,7 @@ cpp11::list ts_reduce_lookbacks_(cpp11::integers unit, cpp11::doubles value, cpp
   timesift::LookbackRequest req;
   req.unit = unit_index.data();
   req.value = reading.data();
+  req.when = instant.data();
   req.local = naive.data();
   req.unit_name = unit_ptr.empty() ? nullptr : unit_ptr.data();
   req.n = n;

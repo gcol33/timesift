@@ -309,3 +309,27 @@ test_that("the target table is read by name", {
   expect_error(lookback_matrix(d, id, t, v, at = named, span = "10 days", stats = "mean"),
                "an `id` column naming the unit and an `at` column", fixed = TRUE)
 })
+
+test_that("a target row is named by its row name, whatever kind of row name the frame carries", {
+  d <- lookback_record(days = 60L)
+  at <- data.frame(id = c("p1", "p2", "p1"),
+                   at = as.POSIXct(c("2021-10-20", "2021-10-21", "2021-10-22"), tz = "UTC"),
+                   stringsAsFactors = FALSE)
+  x <- lookback_matrix(d, id, t, v, at = at, span = "7 days")
+  expect_identical(dimnames(x)[[1L]], c("1", "2", "3"))
+  # A frame subset keeps its rows' original names, and so does the array built from it.
+  expect_identical(dimnames(lookback_matrix(d, id, t, v, at = at[c(3L, 1L), ],
+                                            span = "7 days"))[[1L]],
+                   c("3", "1"))
+  expect_identical(dimnames(lookback_matrix(d, id, t, v, at = at[2L, , drop = FALSE],
+                                            span = "7 days"))[[1L]],
+                   "2")
+})
+
+test_that("a double `bins` that is a whole number is that whole number", {
+  d <- lookback_record(days = 60L)
+  at <- data.frame(id = "p1", at = as.POSIXct("2021-10-20", tz = "UTC"), stringsAsFactors = FALSE)
+  expect_identical(dim(lookback_matrix(d, id, t, v, at = at, span = "6 days", bins = 3))[2L], 3L)
+  expect_error(lookback_matrix(d, id, t, v, at = at, span = "6 days", bins = 2.5),
+               "positive whole number")
+})

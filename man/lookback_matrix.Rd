@@ -42,9 +42,9 @@ exactly. One bin gives a block of features; several give a sequence a convolutio
 }
 \value{
 A numeric array of shape \verb{[target, bin, channel]}, of class \code{timesift_matrix}. Its rows
-are the rows of \code{at}, in \code{at}'s own order, named by \code{at}'s row names where it carries them and
-by position where it does not. Its bins are named by where each one opens relative to the
-anchor, oldest first, and its channels by the statistic. Attributes:
+are the rows of \code{at}, in \code{at}'s own order, named by \code{at}'s row names. Its bins are named by
+where each one opens relative to the anchor, oldest first, and its channels by the statistic.
+Attributes:
 \itemize{
 \item \code{grain}: \code{"lookback"}.
 \item \code{span}, \code{lag}: the durations, resolved to seconds.
@@ -89,7 +89,11 @@ plural.
 
 The calendar is the series', taken from the \code{tzone} attribute of \code{time} as \code{\link[=grain_matrix]{grain_matrix()}}
 takes it; a column with none is read as UTC. The anchors are instants and are read as a clock in
-that same calendar, whatever zone \code{at} carries, so one record is binned by one calendar.
+that same calendar, whatever zone \code{at} carries, so one record is binned by one calendar. The
+span is measured on that clock: a lookback of one day ending at a local midnight holds the
+whole local day before it, which is 25 hours of record on the night a zone sets its clock back
+and 23 on the night it sets it forward. That is what keeps a calendar day whole inside a bin
+for the four day-level statistics; a length fixed in instants could not.
 }
 
 \examples{

@@ -52,7 +52,7 @@ def read_guards(name):
 
 
 def calendar(name):
-    """The two calendars the guard fixture names, built from the name so that both suites build
+    """The three calendars the guard fixture names, built from the name so that both suites build
     the same function rather than each writing one that happens to break the same rule."""
     if name == "late":
         def late(when):
@@ -64,6 +64,13 @@ def calendar(name):
             t = when.astype("datetime64[s]").astype(np.int64)
             return (t.min() + 3600 * ((t - t.min()) // 3600 % 2)).astype("datetime64[s]")
         return alternate
+    if name == "missing":
+        def missing(when):
+            t = when.astype("datetime64[s]").astype(np.int64)
+            out = (t // 86400 * 86400).astype("datetime64[s]")
+            out[t == t.min() + 86400] = np.datetime64("NaT")
+            return out
+        return missing
     raise KeyError(f"no calendar called {name}")
 
 
@@ -295,3 +302,25 @@ def test_a_supplied_calendar_that_breaks_its_guarantees_is_refused(series, row):
         grain_matrix(series[row["series"]], "id", "time", "value",
                      grain=calendar(row["calendar"]), stats="mean")
     assert row["message"] in str(raised.value)
+
+
+def test_every_zoned_digest_has_the_oracle_as_its_independent_witness():
+    from oracle import oracle_grain_matrix
+
+    rows = [r for r in read_digests() if r["tz"] != "UTC"]
+    assert rows
+    # A digest the core produced under a zone is a regression pin until something that is not the
+    # core reproduces it. The oracle reads the same instants as a clock in the same zone and bins
+    # that clock with its own calendar.
+    for r in rows:
+        data = read_series(r["series"])
+        o = oracle_grain_matrix(data, "id", "time", "value",
+                                grain=binning(r["series"], r["grain"]),
+                                stats=r["stat"].split("+"), year_start=r["year_start"],
+                                tz=r["tz"])
+        values = o["values"]
+        if r["partial"] == "drop":
+            values = values[:, ~o["bin_partial"], :]
+        label = " ".join(r[k] for k in ("series", "grain", "tz", "year_start", "partial", "stat"))
+        assert values.shape[1] == int(r["n_bin"]), label
+        assert digest_array(values) == r["digest"], label

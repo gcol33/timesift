@@ -288,3 +288,13 @@ def test_the_target_table_is_read_by_name_and_carries_no_calendar_attribute():
     with pytest.raises(ValueError, match='must give an "id" naming the unit'):
         lookback_matrix(d, "id", "time", "value", {"id": ["p1"], "time": at["at"]},
                       "10 days", stats="mean")
+
+
+def test_a_float_bins_that_is_a_whole_number_is_that_whole_number():
+    from timesift.representation import _check_bins
+
+    assert _check_bins(3.0) == 3
+    assert _check_bins(np.float64(2)) == 2
+    for bad in (2.5, 0.0, float("nan"), float("inf"), True, "3"):
+        with pytest.raises(ValueError, match="positive whole number"):
+            _check_bins(bad)

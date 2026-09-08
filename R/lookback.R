@@ -48,12 +48,16 @@
 #' @section Time zone:
 #' The calendar is the series', taken from the `tzone` attribute of `time` as [grain_matrix()]
 #' takes it; a column with none is read as UTC. The anchors are instants and are read as a clock in
-#' that same calendar, whatever zone `at` carries, so one record is binned by one calendar.
+#' that same calendar, whatever zone `at` carries, so one record is binned by one calendar. The
+#' span is measured on that clock: a lookback of one day ending at a local midnight holds the
+#' whole local day before it, which is 25 hours of record on the night a zone sets its clock back
+#' and 23 on the night it sets it forward. That is what keeps a calendar day whole inside a bin
+#' for the four day-level statistics; a length fixed in instants could not.
 #'
 #' @return A numeric array of shape `[target, bin, channel]`, of class `timesift_matrix`. Its rows
-#'   are the rows of `at`, in `at`'s own order, named by `at`'s row names where it carries them and
-#'   by position where it does not. Its bins are named by where each one opens relative to the
-#'   anchor, oldest first, and its channels by the statistic. Attributes:
+#'   are the rows of `at`, in `at`'s own order, named by `at`'s row names. Its bins are named by
+#'   where each one opens relative to the anchor, oldest first, and its channels by the statistic.
+#'   Attributes:
 #'   \itemize{
 #'     \item `grain`: `"lookback"`.
 #'     \item `span`, `lag`: the durations, resolved to seconds.
@@ -98,12 +102,7 @@ lookback_matrix <- function(data,
   unit <- .unit_names(data[[id_col]], id_col)
   when <- data[[time_col]]
   reading <- as.numeric(data[[value_col]])
-
-  if (!inherits(when, "POSIXct")) {
-    stop("`", time_col, "` must be POSIXct, not ", class(when)[1L], ".", call. = FALSE)
-  }
-  tz <- attr(when, "tzone")
-  if (is.null(tz) || !nzchar(tz)) tz <- "UTC"
+  tz <- .series_zone(when, time_col)
 
   instant <- floor(as.numeric(when))
   .check_readings(unit, when, instant, id_col, time_col)
@@ -112,7 +111,7 @@ lookback_matrix <- function(data,
   units <- sort(unique(unit), method = "radix")
   target <- .check_targets(at, units, tz)
 
-  fit <- ts_reduce_lookbacks_(match(unit, units), reading, local, units,
+  fit <- ts_reduce_lookbacks_(match(unit, units), reading, instant, local, units,
                             target$unit, target$at, target$label, span, lag, bins, stats)
 
   n_t <- length(target$label)
@@ -156,10 +155,9 @@ lookback_matrix <- function(data,
     stop(n, " target", if (n > 1L) "s" else "", " name a unit the series does not carry, first: ",
          who[which(is.na(index))[1L]], ".", call. = FALSE)
   }
-  labels <- attr(at, "row.names")
   list(unit = index,
        at = .naive_seconds(floor(as.numeric(anchor)), tz),
-       label = if (is.character(labels)) labels else as.character(seq_len(nrow(at))))
+       label = rownames(at))
 }
 
 .check_bins <- function(bins) {

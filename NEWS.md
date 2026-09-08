@@ -109,6 +109,33 @@
 * A record and any permutation of its rows now reduce to the same bytes. Both reductions walk the
   record by unit and then by instant; the calendar reduction accumulated in the caller's order,
   which moved a mean in its last bits under a shuffle that changed nothing about the record.
+* The `native` grain is read on the instant rather than on the local clock, so the two readings
+  of the hour a zone repeats when it sets its clock back are two bins. They used to share a local
+  second and were merged into one bin holding their mean, on a grain the contract defines as the
+  record unreduced; the `Europe/Vienna` native fixture pinned 9599 bins for 9600 readings, and
+  is regenerated. The walk order both reductions accumulate in carries the instant as a third
+  key, so those two readings are no longer a tie the sort resolved as it liked, and a zoned
+  record already in order is no longer sorted again.
+* A supplied calendar that returns no bin start for a reading, `NA` in R or `NaT` in Python, is
+  refused naming the first such reading. It used to reach the core as a bin at the beginning of
+  time, holding the reading its real bin then lacked, with nothing raised; the guard fixture
+  carries the case as `missing`.
+* A time column carried in a zone the database does not know is an error in R, as it was in
+  Python. R's zone resolution used to warn and read the clock in UTC.
+* The contract now says that a lookback's length is measured on the local clock, as everything
+  below the zone boundary is: a one-day lookback ending at a local midnight holds 25 hours of
+  record on the night a zone sets its clock back and 23 on the night it sets it forward. That is
+  what keeps a calendar day whole inside a bin for the day-level statistics; both suites pin it.
+* The guards above the core name what they refuse the same way on both sides: a missing
+  identifier or instant names its column in Python as it did in R, a duplicated reading is named
+  by its instant in UTC in R as it was in Python and the noun agrees with the count on both, and
+  Python reads `bins = 3.0` as R reads `bins = 3`. A zoned record from before 1970 no longer
+  raises `OSError` on Windows in Python. A lookback's rows are named by the row names of `at`
+  whatever kind of row names the frame carries, which is what the contract already said.
+* The zoned digests have a witness that is not the core. Each oracle reads a zoned series as a
+  clock in its zone and bins that clock with its own calendar, and both suites assert every
+  `Europe/Vienna` and `America/Sao_Paulo` digest against it. The core's negative-lag guard, its
+  out-of-range unit index and its bound on the day table are exercised by both suites as well.
 
 * The two orderings among the seven statistics, `min <= mean_daily_min <= mean <= mean_daily_max
   <= max` and `min <= cold_day <= mean <= warm_day <= max`, are asserted by both test suites on

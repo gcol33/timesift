@@ -44,7 +44,7 @@ struct Held {
   timesift::Request req;
 };
 
-Held hold(ConstI32 unit, const double* value, const std::int64_t* when, ConstI64 local,
+Held hold(ConstI32 unit, const double* value, ConstI64 when, ConstI64 local,
           std::optional<ConstI64> custom, const std::vector<std::string>& unit_names,
           const std::string& grain, int year_month, int year_day) {
   Held h;
@@ -54,7 +54,7 @@ Held hold(ConstI32 unit, const double* value, const std::int64_t* when, ConstI64
 
   h.req.unit = unit.data();
   h.req.value = value == nullptr ? h.zeros.data() : value;
-  h.req.when = when == nullptr ? local.data() : when;
+  h.req.when = when.data();
   h.req.local = local.data();
   h.req.custom = custom.has_value() ? custom->data() : nullptr;
   h.req.unit_name = h.names.empty() ? nullptr : h.names.data();
@@ -84,8 +84,8 @@ NB_MODULE(_core, m) {
            std::optional<ConstI64> custom, const std::vector<std::string>& unit_names,
            const std::string& grain, int year_month, int year_day,
            const std::vector<std::string>& stats, std::int64_t sampling_step) {
-          Held h = hold(unit, value.data(), when.data(), local, custom, unit_names, grain,
-                        year_month, year_day);
+          Held h = hold(unit, value.data(), when, local, custom, unit_names, grain, year_month,
+                        year_day);
           h.req.sampling_step = sampling_step;
           h.req.stats = parse_stats(stats);
 
@@ -100,19 +100,19 @@ NB_MODULE(_core, m) {
         nb::arg("stats"), nb::arg("sampling_step"));
 
   m.def("coverage",
-        [](ConstI32 unit, ConstI64 local, std::optional<ConstI64> custom,
+        [](ConstI32 unit, ConstI64 when, ConstI64 local, std::optional<ConstI64> custom,
            const std::vector<std::string>& unit_names, const std::string& grain, int year_month,
            int year_day) {
-          Held h = hold(unit, nullptr, nullptr, local, custom, unit_names, grain, year_month,
+          Held h = hold(unit, nullptr, when, local, custom, unit_names, grain, year_month,
                         year_day);
           timesift::Coverage out = timesift::coverage(h.req);
           return nb::make_tuple(give(std::move(out.bin_start)), give(std::move(out.count)));
         },
-        nb::arg("unit"), nb::arg("local"), nb::arg("custom"), nb::arg("unit_names"),
-        nb::arg("grain"), nb::arg("year_month"), nb::arg("year_day"));
+        nb::arg("unit"), nb::arg("when"), nb::arg("local"), nb::arg("custom"),
+        nb::arg("unit_names"), nb::arg("grain"), nb::arg("year_month"), nb::arg("year_day"));
 
   m.def("reduce_lookbacks",
-        [](ConstI32 unit, ConstF64 value, ConstI64 local,
+        [](ConstI32 unit, ConstF64 value, ConstI64 when, ConstI64 local,
            const std::vector<std::string>& unit_names, ConstI32 target_unit, ConstI64 target_at,
            const std::vector<std::string>& target_names, std::int64_t span, std::int64_t lag,
            std::int32_t bins, const std::vector<std::string>& stats) {
@@ -125,6 +125,7 @@ NB_MODULE(_core, m) {
           timesift::LookbackRequest req;
           req.unit = unit.data();
           req.value = value.data();
+          req.when = when.data();
           req.local = local.data();
           req.unit_name = units.empty() ? nullptr : units.data();
           req.n = value.size();
@@ -141,8 +142,9 @@ NB_MODULE(_core, m) {
           timesift::LookbackResult out = timesift::reduce_lookbacks(req);
           return nb::make_tuple(give(std::move(out.values)), give(std::move(out.bin_n)));
         },
-        nb::arg("unit"), nb::arg("value"), nb::arg("local"), nb::arg("unit_names"),
-        nb::arg("target_unit"), nb::arg("target_at"), nb::arg("target_names"), nb::arg("span"),
+        nb::arg("unit"), nb::arg("value"), nb::arg("when"), nb::arg("local"),
+        nb::arg("unit_names"), nb::arg("target_unit"), nb::arg("target_at"),
+        nb::arg("target_names"), nb::arg("span"),
         nb::arg("lag"), nb::arg("bins"), nb::arg("stats"));
 
   m.def("bin_starts",

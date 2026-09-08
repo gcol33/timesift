@@ -164,7 +164,7 @@ offset,astronomical,UTC,09-01,keep,mean_daily_max,2,3,2021-10-17T00:00:00Z,2022-
 offset,astronomical,UTC,09-01,keep,min+mean+max,2,3,2021-10-17T00:00:00Z,2022-03-20T00:00:00Z,1,p01,p02,4c22d41652231461921283b9179c1e01
 offset,astronomical,UTC,09-01,keep,mean_daily_min+mean+mean_daily_max,2,3,2021-10-17T00:00:00Z,2022-03-20T00:00:00Z,1,p01,p02,1b1e417d930883f4d93f92d240cb9789
 offset,astronomical,UTC,09-01,keep,cold_day+mean+warm_day,2,3,2021-10-17T00:00:00Z,2022-03-20T00:00:00Z,1,p01,p02,b7cfd742976f8fe5bedb2d8ad8c2749f
-aligned,native,Europe/Vienna,09-01,keep,mean,3,9599,2021-09-01T00:00:00Z,2022-10-05T23:00:00Z,0,p01,p03,6b296e8835e0c21cf2b0d0cbc18da6b7
+aligned,native,Europe/Vienna,09-01,keep,mean,3,9600,2021-09-01T00:00:00Z,2022-10-05T23:00:00Z,0,p01,p03,3c7d6efffba24e5605dd1ac72b2a7904
 aligned,halfday,Europe/Vienna,09-01,keep,mean,3,801,2021-08-31T22:00:00Z,2022-10-05T22:00:00Z,2,p01,p03,b3173de98e63b1743018b2d3a1e91698
 aligned,day,Europe/Vienna,09-01,keep,mean,3,401,2021-08-31T22:00:00Z,2022-10-05T22:00:00Z,2,p01,p03,35038fb66d1707570ff9c93ed425fa04
 aligned,week,Europe/Vienna,09-01,keep,mean,3,58,2021-08-29T22:00:00Z,2022-10-02T22:00:00Z,2,p01,p03,4a7c098fb2f6e9348d7a3610cdd063fb

@@ -37,23 +37,19 @@ coverage <- function(data, id, time, grain = "day", year_start = "09-01") {
 
   unit <- .unit_names(data[[id_col]], id_col)
   when <- data[[time_col]]
-  if (!inherits(when, "POSIXct")) {
-    stop("`", time_col, "` must be POSIXct, not ", class(when)[1L], ".", call. = FALSE)
-  }
-  tz <- attr(when, "tzone")
-  if (is.null(tz) || !nzchar(tz)) tz <- "UTC"
+  tz <- .series_zone(when, time_col)
   instant <- floor(as.numeric(when))
   .check_readings(unit, when, instant, id_col, time_col)
   local <- .naive_seconds(instant, tz, time_col)
 
   units <- sort(unique(unit), method = "radix")
-  supplied <- if (is.function(grain)) .custom_bins(grain, when, tz, time_col) else NULL
-  got <- ts_coverage_(match(unit, units), local, supplied, units,
+  supplied <- if (is.function(grain)) .custom_bins(grain, when, tz, unit) else NULL
+  got <- ts_coverage_(match(unit, units), instant, local, supplied, units,
                       if (is.function(grain)) "custom" else grain, ys$month, ys$day)
 
-  bins <- .local_to_instant(got$bin_start, tz)
+  bins <- .bin_instants(got$bin_start, grain, tz)
   out <- matrix(got$count, nrow = length(units), ncol = length(bins),
-                dimnames = list(units, format(bins, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")))
+                dimnames = list(units, .iso_instant(bins)))
   attr(out, "grain") <- if (is.function(grain)) "custom" else grain
   attr(out, "bin_start") <- bins
   class(out) <- c("timesift_coverage", class(out))

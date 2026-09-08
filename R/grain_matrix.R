@@ -49,11 +49,16 @@
 #'
 #' @section Time zone:
 #' Bins follow the calendar the series is carried in, which is the `tzone` attribute of `time`;
-#' a column with none is read as UTC. The zone is resolved once, at the edge: below it the binning
-#' works in local time, where a day is 86400 seconds whatever the night did, so a zone that moves
-#' its clock at midnight has no midnight to lose. A bin start is a local time, so reporting it back
-#' as an instant needs a rule: one the clock skipped resolves to the instant the clock jumped to,
-#' one the clock repeated to the first of the two. Instants are read at whole seconds.
+#' a column with none is read as UTC, and a name the zone database does not know is an error. The
+#' zone is resolved once, at the edge: below it the binning works in local time, where a day is
+#' 86400 seconds whatever the night did, so a zone that moves its clock at midnight has no
+#' midnight to lose. A bin start is a local time, so reporting it back as an instant needs a rule:
+#' one the clock skipped resolves to the instant the clock jumped to, one the clock repeated to
+#' the first of the two. Instants are read at whole seconds.
+#'
+#' The `"native"` grain is the one grain not read on that clock: its bin is the reading itself,
+#' so the two readings of an hour a zone repeats are two bins, and the record read at `"native"`
+#' is the same array whichever zone it is carried in.
 #'
 #' @section Bins that do not tile the record:
 #' Every unit must reach every bin, and consecutive bins must be one bin apart on the grain's own
@@ -145,12 +150,7 @@ grain_matrix <- function(data,
   unit <- .unit_names(data[[id_col]], id_col)
   when <- data[[time_col]]
   reading <- as.numeric(data[[value_col]])
-
-  if (!inherits(when, "POSIXct")) {
-    stop("`", time_col, "` must be POSIXct, not ", class(when)[1L], ".", call. = FALSE)
-  }
-  tz <- attr(when, "tzone")
-  if (is.null(tz) || !nzchar(tz)) tz <- "UTC"
+  tz <- .series_zone(when, time_col)
 
   # Instants at second resolution, and the same instants read as a clock in the series' own zone.
   # The zone is resolved here and nowhere below it: the core bins a calendar with no zone in it, so
@@ -165,18 +165,18 @@ grain_matrix <- function(data,
   # differ between locales, and a response matrix built in one order against a
   # representation built in the other lines up row for row while naming different units.
   units <- sort(unique(unit), method = "radix")
-  supplied <- if (is.function(grain)) .custom_bins(grain, when, tz, time_col) else NULL
+  supplied <- if (is.function(grain)) .custom_bins(grain, when, tz, unit) else NULL
 
   fit <- ts_reduce_(match(unit, units), reading, instant, local, supplied, units,
                     if (is.function(grain)) "custom" else grain,
                     ys$month, ys$day, stats, .sampling_step(instant))
 
-  bins <- .local_to_instant(fit$bin_start, tz)
+  bins <- .bin_instants(fit$bin_start, grain, tz)
   n_u <- length(units)
   n_b <- length(bins)
   out <- array(fit$values,
                dim = c(n_u, n_b, length(stats)),
-               dimnames = list(units, format(bins, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"), stats))
+               dimnames = list(units, .iso_instant(bins), stats))
 
   attr(out, "grain") <- if (is.function(grain)) "custom" else grain
   attr(out, "stats") <- stats
@@ -360,9 +360,33 @@ print.timesift_matrix <- function(x, ...) {
   if (any(same)) {
     first <- o[which(same)[1L] + 1L]
     stop(sum(same), " duplicated (unit, time) pair", if (sum(same) > 1L) "s" else "",
-         ", first: ", unit[first], " at ", format(when[first]), ".", call. = FALSE)
+         ", first: ", unit[first], " at ", .iso_instant(when[first]), ".", call. = FALSE)
   }
   invisible(TRUE)
+}
+
+# An instant written the one way both languages write one: ISO 8601 in UTC, to the second.
+.iso_instant <- function(x) {
+  format(x, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+}
+
+# The calendar a series is carried in: the `tzone` of its time column, UTC where it carries none.
+# A name the zone database does not know is refused here, because reading a clock in it would
+# otherwise fall back to UTC under a warning and bin the record on the wrong calendar.
+.series_zone <- function(when, column) {
+  if (!inherits(when, "POSIXct")) {
+    stop("`", column, "` must be POSIXct, not ", class(when)[1L], ".", call. = FALSE)
+  }
+  tz <- attr(when, "tzone")
+  if (is.null(tz) || !nzchar(tz[1L])) {
+    return("UTC")
+  }
+  tz <- tz[1L]
+  if (!tz %in% c("UTC", "GMT", OlsonNames())) {
+    stop("`", column, "` is carried in the time zone \"", tz, "\", which the zone database ",
+         "does not know. Name one of `OlsonNames()`.", call. = FALSE)
+  }
+  tz
 }
 
 # The zone lives at this boundary and nowhere else. Reading an instant as a clock is defined for
@@ -403,14 +427,29 @@ print.timesift_matrix <- function(x, ...) {
   .POSIXct(out, tz = tz)
 }
 
+# The bin starts as instants. Every grain but `native` is read on the local clock and its starts
+# come back on it, so they go back through the zone; the `native` grain is read on the instant
+# itself, so its starts already are one.
+.bin_instants <- function(bin_start, grain, tz) {
+  if (identical(grain, "native")) .POSIXct(bin_start, tz = tz) else .local_to_instant(bin_start, tz)
+}
+
 # A supplied calendar returns instants, and the core reads a clock rather than an instant, so its
-# bins go through the same boundary as the readings.
-.custom_bins <- function(grain, when, tz, column) {
+# bins go through the same boundary as the readings. A missing one is refused here, before that
+# boundary: a bin start that is not a number would otherwise reach the core as a bin at the
+# beginning of time, holding the reading its real bin then lacks.
+.custom_bins <- function(grain, when, tz, unit) {
   out <- grain(when)
   if (!inherits(out, "POSIXct") || length(out) != length(when)) {
     stop("a `grain` function must return one POSIXct bin start per reading.", call. = FALSE)
   }
-  .naive_seconds(floor(as.numeric(out)), tz, column)
+  missing <- which(is.na(out))
+  if (length(missing)) {
+    stop("the supplied calendar gives no bin start for ", .plural(length(missing), "reading"),
+         ", first: unit ", unit[missing[1L]], " at ", .iso_instant(when[missing[1L]]),
+         ". A calendar returns a bin start for every reading it is handed.", call. = FALSE)
+  }
+  .naive_seconds(floor(as.numeric(out)), tz)
 }
 
 .sampling_step <- function(instant) {

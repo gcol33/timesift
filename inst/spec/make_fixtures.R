@@ -13,6 +13,12 @@ out_dir <- "inst/spec/fixtures"
 # feed to CRLF on Windows, which would make a regeneration there a diff of every byte rather than
 # of the digests that moved.
 write_fixture <- function(x, file) {
+  holds_comma <- vapply(x, function(col) any(grepl(",", as.character(col), fixed = TRUE)),
+                        logical(1L))
+  if (any(holds_comma)) {
+    stop(file, " is written unquoted and a field of ", names(x)[holds_comma][1L],
+         " holds a comma.", call. = FALSE)
+  }
   con <- file(file.path(out_dir, file), open = "wb")
   on.exit(close(con), add = TRUE)
   write.csv(x, con, row.names = FALSE, quote = FALSE, eol = "\n")
@@ -82,10 +88,11 @@ astronomical <- function(name) {
   function(when) edges[findInterval(as.numeric(when), as.numeric(edges))]
 }
 
-# Two calendars that break what a supplied one has to satisfy, each named so both suites build the
-# same function. `late` gives every reading the midnight after it, which is what a calendar shifted
-# by one boundary returns and what an interval lookup wraps to below its first edge; `alternate`
-# sends consecutive readings to two bins an hour apart, which interleaves them.
+# Three calendars that break what a supplied one has to satisfy, each named so both suites build
+# the same function. `late` gives every reading the midnight after it, which is what a calendar
+# shifted by one boundary returns and what an interval lookup wraps to below its first edge;
+# `alternate` sends consecutive readings to two bins an hour apart, which interleaves them;
+# `missing` gives the first reading of the second day no bin start at all.
 BAD_CALENDARS <- list(
   late = function(when) {
     as.POSIXct((floor(as.numeric(when) / 86400) + 1) * 86400, origin = "1970-01-01", tz = "UTC")
@@ -94,6 +101,11 @@ BAD_CALENDARS <- list(
     t0 <- min(as.numeric(when))
     as.POSIXct(t0 + 3600 * (((as.numeric(when) - t0) / 3600) %% 2), origin = "1970-01-01",
                tz = "UTC")
+  },
+  missing = function(when) {
+    out <- as.POSIXct(floor(as.numeric(when) / 86400) * 86400, origin = "1970-01-01", tz = "UTC")
+    out[as.numeric(when) == min(as.numeric(when)) + 86400] <- NA
+    out
   }
 )
 
@@ -319,7 +331,12 @@ cat("wrote", length(lookback_rows), "lookback digests and", length(WINDOW_GUARDS
 # and the part of the message both languages must raise.
 GRAIN_GUARDS <- list(
   list(series = "aligned", calendar = "late", message = "beginning after it"),
-  list(series = "offset", calendar = "alternate", message = "interleaves two of its bins")
+  list(series = "offset", calendar = "alternate", message = "interleaves two of its bins"),
+  # The count and the first reading are two rows of one calendar: the fixtures are written
+  # unquoted, so a field holds no comma, and the message joins the two with one.
+  list(series = "aligned", calendar = "missing", message = "gives no bin start for 3 readings"),
+  list(series = "aligned", calendar = "missing",
+       message = "first: unit p01 at 2021-09-02T00:00:00Z")
 )
 for (guard in GRAIN_GUARDS) {
   raised <- tryCatch({

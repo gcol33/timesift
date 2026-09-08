@@ -21,13 +21,18 @@ struct Grouping {
   std::vector<std::int32_t> bin_of;   // one per reading
 };
 
-// The order both reductions walk a record in: by unit, then by instant.
+// The order both reductions walk a record in: by unit, then by the local clock, then by the
+// instant. The lookback searches a unit's readings by local second, so that is the second key; the
+// instant is what tells the two readings of an hour a zone repeated apart, so the order is a
+// total one and a sum accumulated in it is the same bytes wherever it is taken.
 struct ReadingOrder {
   const std::int32_t* unit;
   const seconds* local;
+  const seconds* when;
   bool operator()(std::size_t a, std::size_t b) const {
     if (unit[a] != unit[b]) return unit[a] < unit[b];
-    return local[a] < local[b];
+    if (local[a] != local[b]) return local[a] < local[b];
+    return when[a] < when[b];
   }
 };
 
@@ -325,6 +330,13 @@ void check_full_grid(const std::vector<std::int32_t>& count, const std::vector<s
               ". Every unit must span every bin; gaps are not padded. coverage() lists them.");
 }
 
+// The clock a grain's bins are read on. The `native` grain's bin is the reading itself, and a
+// reading is its instant: the two readings of an hour a zone repeats share a local second and are
+// two bins. Every other grain is a stretch of the local calendar.
+const seconds* bin_clock(const Request& req) {
+  return req.grain == Grain::native ? req.when : req.local;
+}
+
 // The distinct bins of the record and the bin each reading falls in, whichever way the request
 // says the bins are made. A supplied calendar declares its bins, and the `native` grain is the
 // record unreduced, so in both the bin start is already in hand and the distinct ones are read off
@@ -341,7 +353,7 @@ Grouping group(const Request& req) {
     return grid;
   }
   return req.grain == Grain::native
-             ? group_by_search(req.local, req.n)
+             ? group_by_search(bin_clock(req), req.n)
              : group_by_grain(req.local, req.n, req.grain, req.year_start);
 }
 
@@ -451,7 +463,7 @@ Result reduce(const Request& req) {
   if (need_min) low.assign(n_cell, kInf);
   if (need_max) high.assign(n_cell, -kInf);
 
-  const ReadingOrder before{req.unit, req.local};
+  const ReadingOrder before{req.unit, req.local, req.when};
   const std::vector<std::size_t> order = reading_order(before, n);
   const auto walk = [&](std::size_t k) { return order.empty() ? k : order[k]; };
 
@@ -519,12 +531,13 @@ Result reduce(const Request& req) {
   // reaches outside that. Only a bin at an end of the record can, because every unit has already
   // been required to hold readings in every bin between them. A supplied calendar declares where
   // its bins begin but not where the last one was meant to end, so that one is taken to end with
-  // the record and is never partial.
-  seconds covered_start = req.local[0];
-  seconds covered_end = req.local[0];
+  // the record and is never partial. The record's ends are read on the clock the bins are.
+  const seconds* clock = bin_clock(req);
+  seconds covered_start = clock[0];
+  seconds covered_end = clock[0];
   for (std::size_t i = 1; i < n; ++i) {
-    if (req.local[i] < covered_start) covered_start = req.local[i];
-    if (req.local[i] > covered_end) covered_end = req.local[i];
+    if (clock[i] < covered_start) covered_start = clock[i];
+    if (clock[i] > covered_end) covered_end = clock[i];
   }
   covered_end += req.sampling_step;
 
@@ -587,7 +600,7 @@ LookbackResult reduce_lookbacks(const LookbackRequest& req) {
 
   // Put in the same order the calendar reduction walks, so each target's readings are a range found
   // by binary search rather than a pass over the record. This one needs the permutation itself.
-  std::vector<std::size_t> order = reading_order(ReadingOrder{req.unit, req.local}, n);
+  std::vector<std::size_t> order = reading_order(ReadingOrder{req.unit, req.local, req.when}, n);
   if (order.empty()) {
     order.resize(n);
     for (std::size_t i = 0; i < n; ++i) order[i] = i;

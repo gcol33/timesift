@@ -34,12 +34,14 @@ Requirements, each checked and each an error rather than a warning:
   padded; it is reported with the ids and the bins concerned.
 
 Ordering of the input rows carries no meaning, exactly and not approximately: both reductions walk
-the record by unit and then by instant rather than in the order the caller wrote it, so a record
-and any permutation of its rows reduce to the same bytes and reach the same digest. Addition is not
-associative, and a reduction that accumulated in the caller's order would move in its last bits
-under a permutation that changed nothing about the record. A record already in that order is the
-common case and pays the scan that establishes it. The output is ordered by sorted unique id and by
-bin start.
+the record by unit, then by the local clock, then by the instant, rather than in the order the
+caller wrote it, so a record and any permutation of its rows reduce to the same bytes and reach the
+same digest. Addition is not associative, and a reduction that accumulated in the caller's order
+would move in its last bits under a permutation that changed nothing about the record. The instant
+is the third key because two readings can share a local second, on the night a zone sets its clock
+back, and an order that left them tied would leave their sum to whatever the sort did with the tie.
+A record already in that order is the common case and pays the scan that establishes it. The
+output is ordered by sorted unique id and by bin start.
 
 ## Ordering identifiers
 
@@ -79,7 +81,14 @@ the night did, and a month is what the proleptic Gregorian calendar says.
 The same instants and the same zone give the same answer in both languages, and the fixtures pin
 that rather than leaving it assumed. On the Python side reading the column as instants drops the
 zone it was written on, so it is taken off the column before that; a `tz` naming a different zone
-beside one the column carries is an error, because two zones are two answers.
+beside one the column carries is an error, because two zones are two answers. A zone name the
+database does not know is an error on both sides, never a warning and a calendar in UTC.
+
+The `native` grain is the one grain not read on that clock. Its bin is the reading itself, and a
+reading is its instant: the two readings of the hour a zone repeats when it sets its clock back
+share a local second and are two bins, not one bin holding two readings, so the record read at
+`native` is the same array whichever zone it is carried in, and its bin starts are the instants
+themselves.
 
 Reading an instant as a clock is defined for every instant in every zone. The reverse is not: on
 the night a zone moves its clock forward a local time exists on no instant, and on the night it
@@ -212,7 +221,11 @@ boundary. Deciding that with an interval lookup is the natural way to write one 
 languages disagree below the first boundary, where R's `findInterval()` gives 0 and NumPy's
 `searchsorted() - 1` gives -1: the first silently shortens the result, and the second silently
 wraps to the last boundary. Either put the first boundary at or before the record's first reading,
-as the fixtures do, or handle the readings below it explicitly.
+as the fixtures do, or handle the readings below it explicitly. A reading the function returns no
+bin start for, an `NA` in R or a `NaT` in Python, is refused before the bins are read, naming how
+many there are and the unit and instant of the first: below the boundary a missing time is not
+distinguishable from one at the beginning of time, and the bin it would open there would hold the
+reading its real bin then lacks.
 
 Two things have to hold of what the function returns, and both are checked before its bins are
 read as bins, naming the first reading that breaks them:
@@ -305,6 +318,14 @@ month is 30 days.** A lookback of a fixed length is a fixed length rather than a
 comparing two targets' representations means each read the same amount of record, and a February
 or a leap year takes that away. Where the calendar is what matters, a grain is the reduction that
 follows it.
+
+The length is measured on the local clock, as everything below the zone boundary is. In a zone
+that moves its clock, a lookback of one day ending at a local midnight holds the whole local day
+before it, which is 25 hours of record on the night the clock is set back and 23 on the night it
+is set forward; a lookback that spans neither night holds 24. That is what keeps a calendar day
+whole inside a bin for the four day-level statistics, which a length fixed in instants could not:
+a day-level lookback anchored within `span` after a transition would then have to be refused. The
+difference is one hour twice a year, against the whole day a February differs by.
 
 | unit | seconds |
 |---|---|
@@ -468,9 +489,10 @@ and the digest of the count matrix.
 `grain_guards.csv` holds one case per guard on a supplied calendar, each naming the series and the
 calendar that breaks it beside the substring of the message both implementations must raise. The
 calendars are named rather than written out, so both suites build the same function: `late` gives
-every reading the midnight after it, `(floor(t / 86400) + 1) * 86400`, and `alternate` sends
+every reading the midnight after it, `(floor(t / 86400) + 1) * 86400`; `alternate` sends
 consecutive readings to two bins an hour apart, `t0 + 3600 * (((t - t0) / 3600) mod 2)` with `t0`
-the record's first reading.
+the record's first reading; and `missing` bins by the calendar day but returns no bin start,
+`NA` or `NaT`, for the reading exactly one day after the record's first.
 
 The lookback reads the same series and three files of its own. `lookback_targets.csv`
 holds the anchors, in named sets rather than one set per series, because an anchor that is a local
@@ -606,6 +628,10 @@ call site.
 
 - Naming one grain returns the representation and naming two or more returns a set, whether the
   one is named as a string or as a sequence of one.
+- A guard above the core names what it refuses the same way: a missing identifier or instant
+  names its column, a duplicated reading and a supplied calendar returning no bin start name the
+  unit and the instant in UTC to the second, and the noun agrees with the count. `bins` given as a
+  whole number in floating point is that whole number, as R reads `3` and Python reads `3.0`.
 - A representation refuses a statistic its grain has no definition for, and a `year_start` that is
   not a month and a day, when it is constructed rather than when it is built. `"auto"` is the whole
   set the record supports and is refused beside a named grain, and the `stats` and `year_start`

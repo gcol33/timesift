@@ -17,7 +17,7 @@ import re
 import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 
@@ -156,7 +156,10 @@ def grain_matrix(data=None, id=None, time=None, value=None, *, grain="day", stat
     that zone's clock, which is what the R side does for a series carrying a ``tzone``: the same
     instants and the same zone give the same answer in both languages. A time column that carries
     a zone of its own names the calendar the same way, so a zone-aware column bins by its own
-    clock without being told to; naming a different one in ``tz`` beside it is an error.
+    clock without being told to; naming a different one in ``tz`` beside it is an error. The
+    ``"native"`` grain is the one grain not read on that clock: its bin is the reading itself, so
+    the two readings of an hour a zone repeats are two bins, and the record read at ``"native"``
+    is the same array whichever zone it is carried in.
 
     ``partial`` says what becomes of a bin the record does not cover for its whole calendar span,
     which is what a record beginning or ending away from a bin boundary produces. ``"keep"``, the
@@ -182,19 +185,8 @@ def grain_matrix(data=None, id=None, time=None, value=None, *, grain="day", stat
     stats = _check_stats(stats, grain)
     ys = _parse_year_start(year_start)
     zone = _resolve_zone(tz, carried)
-
-    instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
-    units, unit_ix = np.unique(unit, return_inverse=True)
-    unit_ix = np.ascontiguousarray(unit_ix.astype(np.int32))
-    _check_readings(units, unit_ix, instant, when)
-    local = _naive_seconds(instant, zone)
-
-    supplied = None
-    if callable(grain):
-        given = np.asarray(grain(when), dtype="datetime64[s]")
-        if given.shape != when.shape:
-            raise ValueError("a grain function must return one bin start per reading")
-        supplied = _naive_seconds(np.ascontiguousarray(given.astype(np.int64)), zone)
+    instant, units, unit_ix, local = _readings(unit, when, zone)
+    supplied = _custom_bins(grain, when, zone, units, unit_ix)
 
     name = "custom" if callable(grain) else grain
     values, bin_start, bin_end, bin_n, bin_partial = _core.reduce(
@@ -202,7 +194,7 @@ def grain_matrix(data=None, id=None, time=None, value=None, *, grain="day", stat
         name, ys[0], ys[1], list(stats), _sampling_step(instant))
 
     n_u, n_b, n_c = len(units), len(bin_start), len(stats)
-    starts = _local_to_instant(bin_start, zone).astype("datetime64[s]")
+    starts = _bin_instants(bin_start, name, zone)
     x = TimesiftMatrix(
         values=np.ascontiguousarray(values.reshape(n_c, n_b, n_u).transpose(2, 1, 0)),
         units=tuple(str(u) for u in units), bins=tuple(_iso(b) for b in starts),
@@ -271,24 +263,13 @@ def coverage(data=None, id=None, time=None, *, grain="day", year_start="09-01",
         _check_grains([grain])
     ys = _parse_year_start(year_start)
     zone = _resolve_zone(tz, carried)
-
-    instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
-    units, unit_ix = np.unique(unit, return_inverse=True)
-    unit_ix = np.ascontiguousarray(unit_ix.astype(np.int32))
-    _check_readings(units, unit_ix, instant, when)
-    local = _naive_seconds(instant, zone)
-
-    supplied = None
-    if callable(grain):
-        given = np.asarray(grain(when), dtype="datetime64[s]")
-        if given.shape != when.shape:
-            raise ValueError("a grain function must return one bin start per reading")
-        supplied = _naive_seconds(np.ascontiguousarray(given.astype(np.int64)), zone)
+    instant, units, unit_ix, local = _readings(unit, when, zone)
+    supplied = _custom_bins(grain, when, zone, units, unit_ix)
 
     name = "custom" if callable(grain) else grain
-    bin_start, count = _core.coverage(unit_ix, local, supplied, [str(u) for u in units], name,
-                                      ys[0], ys[1])
-    starts = _local_to_instant(bin_start, zone).astype("datetime64[s]")
+    bin_start, count = _core.coverage(unit_ix, instant, local, supplied,
+                                      [str(u) for u in units], name, ys[0], ys[1])
+    starts = _bin_instants(bin_start, name, zone)
     return Coverage(count=count.reshape(len(bin_start), len(units)).T.copy(),
                     units=tuple(str(u) for u in units), bins=tuple(_iso(b) for b in starts),
                     grain=name, bin_start=starts)
@@ -329,7 +310,11 @@ def lookback_matrix(data=None, id=None, time=None, value=None, at=None, span=Non
     here, because a lookback of a fixed length is a fixed length rather than a calendar step.
 
     ``tz`` names the calendar, as it does for :func:`grain_matrix`. The anchors are instants and
-    are read as a clock in that same calendar, so one record is binned by one calendar.
+    are read as a clock in that same calendar, so one record is binned by one calendar. The span
+    is measured on that clock: a lookback of one day ending at a local midnight holds the whole
+    local day before it, which is 25 hours of record on the night a zone sets its clock back and
+    23 on the night it sets it forward. That is what keeps a calendar day whole inside a bin for
+    the four day-level statistics; a length fixed in instants could not.
     """
     if value is None:
         raise ValueError("`value` names the column of readings")
@@ -339,17 +324,12 @@ def lookback_matrix(data=None, id=None, time=None, value=None, at=None, span=Non
     bins = _check_bins(bins)
     stats = _check_stats(stats, "lookback")
     zone = _resolve_zone(tz, carried)
-
-    instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
-    units, unit_ix = np.unique(unit, return_inverse=True)
-    unit_ix = np.ascontiguousarray(unit_ix.astype(np.int32))
-    _check_readings(units, unit_ix, instant, when)
-    local = _naive_seconds(instant, zone)
+    instant, units, unit_ix, local = _readings(unit, when, zone)
 
     target_unit, anchor, labels = _targets(at, units, zone)
     values, bin_n = _core.reduce_lookbacks(
-        unit_ix, reading, local, [str(u) for u in units], target_unit, anchor, list(labels),
-        span, lag, bins, list(stats))
+        unit_ix, reading, instant, local, [str(u) for u in units], target_unit, anchor,
+        list(labels), span, lag, bins, list(stats))
 
     n_t = len(labels)
     # No bin_start, bin_end or bin_partial: a bin is a position relative to an anchor rather than
@@ -393,7 +373,10 @@ def _targets(at, units, zone):
 
 
 def _check_bins(bins):
-    if isinstance(bins, bool) or not isinstance(bins, (int, np.integer)) or int(bins) < 1:
+    """A positive whole number, as R reads it: ``3.0`` is ``3`` there and is here."""
+    whole = (isinstance(bins, (int, np.integer)) and not isinstance(bins, bool)) or \
+        (isinstance(bins, (float, np.floating)) and np.isfinite(bins) and float(bins).is_integer())
+    if not whole or int(bins) < 1:
         raise ValueError("`bins` must be a positive whole number")
     return int(bins)
 
@@ -522,6 +505,45 @@ def _zone(tz):
     return tz
 
 
+def _readings(unit, when, zone):
+    """What the core is handed for a record: the instants at whole seconds, the sorted distinct
+    units and each reading's index into them, and the instants read as a clock in ``zone``."""
+    instant = np.ascontiguousarray(when.astype("datetime64[s]").astype(np.int64))
+    units, unit_ix = np.unique(unit, return_inverse=True)
+    unit_ix = np.ascontiguousarray(unit_ix.astype(np.int32))
+    _check_readings(units, unit_ix, instant, when)
+    return instant, units, unit_ix, _naive_seconds(instant, zone)
+
+
+def _custom_bins(grain, when, zone, units, unit_ix):
+    """A supplied calendar's bin starts as the core reads them, or ``None`` where the grain is a
+    named one. The calendar returns instants and the core reads a clock, so its bins go through
+    the same boundary as the readings. A missing one is refused here, before that boundary: a bin
+    start that is not a time would otherwise reach the core as a bin at the beginning of time,
+    holding the reading its real bin then lacks."""
+    if not callable(grain):
+        return None
+    given = np.asarray(grain(when), dtype="datetime64[s]")
+    if given.shape != when.shape:
+        raise ValueError("a grain function must return one bin start per reading")
+    missing = np.flatnonzero(np.isnat(given))
+    if len(missing):
+        n = len(missing)
+        raise ValueError(f"the supplied calendar gives no bin start for {n} reading"
+                         f"{'' if n == 1 else 's'}, first: unit {units[unit_ix[missing[0]]]} at "
+                         f"{_iso(when[missing[0]])}. A calendar returns a bin start for every "
+                         "reading it is handed.")
+    return _naive_seconds(np.ascontiguousarray(given.astype(np.int64)), zone)
+
+
+def _bin_instants(bin_start: np.ndarray, grain: str, zone) -> np.ndarray:
+    """The bin starts as instants. Every grain but ``native`` is read on the local clock and its
+    starts come back on it, so they go back through the zone; the ``native`` grain is read on the
+    instant itself, so its starts already are one."""
+    instants = bin_start if grain == "native" else _local_to_instant(bin_start, zone)
+    return instants.astype("datetime64[s]")
+
+
 def _naive_seconds(instant: np.ndarray, zone) -> np.ndarray:
     """The clock each instant reads in ``zone``, as seconds. Defined for every instant in every
     zone; it is the reverse direction that is not."""
@@ -548,8 +570,13 @@ def _local_to_instant(local: np.ndarray, zone) -> np.ndarray:
     return out
 
 
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
 def _offset_at(instant: int, zone) -> int:
-    return int(datetime.fromtimestamp(instant, zone).utcoffset().total_seconds())
+    """The zone's offset from UTC at an instant. Counted from the epoch rather than read through
+    ``fromtimestamp``, which on Windows refuses an instant before 1970."""
+    return int((_EPOCH + timedelta(seconds=instant)).astimezone(zone).utcoffset().total_seconds())
 
 
 def _sampling_step(instant: np.ndarray) -> int:
@@ -597,10 +624,6 @@ def _columns(data, id, time, value):
     seconds every path below here works in, which is what numpy makes of a column in any zone.
     """
     raw = list(data[id])
-    if any(v is None or (isinstance(v, float) and v != v) for v in raw):
-        raise ValueError("missing values in the readings. "
-                         "Fill or drop them before building a representation.")
-    unit = _unit_names(raw, id)
     column = data[time]
     zone = _column_zone(column)
     with warnings.catch_warnings():
@@ -610,6 +633,15 @@ def _columns(data, id, time, value):
         if zone is not None:
             warnings.simplefilter("ignore", UserWarning)
         when = np.asarray(column, dtype="datetime64[s]")
+    # A hole in the id or the time column has already become something else by the time the core
+    # sees unit indices and whole seconds, so both are named here, by column, as R names them.
+    holes = [any(v is None or (isinstance(v, float) and v != v) for v in raw),
+             bool(np.isnat(when).any())]
+    missing = [name for name, hole in zip((id, time), holes) if hole]
+    if missing:
+        raise ValueError("missing values in " + " and ".join(f"`{m}`" for m in missing)
+                         + ". Fill or drop them before building a representation.")
+    unit = _unit_names(raw, id)
     reading = None if value is None else \
         np.ascontiguousarray(np.asarray(data[value], dtype=np.float64))
     if len(unit) != len(when) or (reading is not None and len(reading) != len(unit)):
@@ -672,9 +704,6 @@ def _check_readings(units, unit_ix, instant, when):
     A reading's own value is not read here: whether it is a number a bin can hold is the core's
     guard, raised once for both languages.
     """
-    if np.isnat(when).any():
-        raise ValueError("missing values in the readings. "
-                         "Fill or drop them before building a representation.")
     if len(instant) < 2:
         return
     order = np.lexsort((instant, unit_ix))
@@ -682,8 +711,9 @@ def _check_readings(units, unit_ix, instant, when):
             & (instant[order][1:] == instant[order][:-1]))
     if same.any():
         first = order[int(np.flatnonzero(same)[0]) + 1]
-        raise ValueError(f"{int(same.sum())} duplicated (unit, time) pairs, "
-                         f"first: {units[unit_ix[first]]} at {_iso(when[first])}")
+        n = int(same.sum())
+        raise ValueError(f"{n} duplicated (unit, time) pair{'' if n == 1 else 's'}, "
+                         f"first: {units[unit_ix[first]]} at {_iso(when[first])}.")
 
 
 def _iso(t: np.datetime64) -> str:

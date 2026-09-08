@@ -28,7 +28,7 @@ coverage_input <- function(dir, row) {
   series[!lost, , drop = FALSE]
 }
 
-# The two calendars the guard fixture names, built from the name so that both suites build the
+# The three calendars the guard fixture names, built from the name so that both suites build the
 # same function rather than each writing one that happens to break the same rule.
 fixture_calendar <- function(name) {
   switch(name,
@@ -39,6 +39,11 @@ fixture_calendar <- function(name) {
       t0 <- min(as.numeric(when))
       as.POSIXct(t0 + 3600 * (((as.numeric(when) - t0) / 3600) %% 2), origin = "1970-01-01",
                  tz = "UTC")
+    },
+    missing = function(when) {
+      out <- as.POSIXct(floor(as.numeric(when) / 86400) * 86400, origin = "1970-01-01", tz = "UTC")
+      out[as.numeric(when) == min(as.numeric(when)) + 86400] <- NA
+      out
     },
     stop("no calendar called ", name))
 }
@@ -218,7 +223,7 @@ test_that("a supplied calendar that breaks its guarantees is refused, as the fix
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
   guards <- read.csv(file.path(dir, "grain_guards.csv"), stringsAsFactors = FALSE)
-  expect_gte(nrow(guards), 2L)
+  expect_gte(nrow(guards), 3L)
 
   for (i in seq_len(nrow(guards))) {
     row <- guards[i, ]
@@ -226,5 +231,32 @@ test_that("a supplied calendar that breaks its guarantees is refused, as the fix
     expect_error(grain_matrix(record, id, time, value,
                               grain = fixture_calendar(row$calendar), stats = "mean"),
                  row$message, fixed = TRUE)
+  }
+})
+
+test_that("every zoned digest has the oracle as its independent witness", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures are not in the built package")
+  expected <- read.csv(file.path(dir, "digests.csv"), stringsAsFactors = FALSE)
+  zoned <- expected[expected$tz != "UTC", ]
+  expect_gt(nrow(zoned), 0L)
+
+  # A digest the core produced under a zone is a regression pin until something that is not the
+  # core reproduces it. The oracle reads the same instants as a clock in the same zone and bins
+  # that clock with its own calendar.
+  series <- lapply(stats::setNames(nm = unique(zoned$series)), fixture_series, dir = dir)
+  for (i in seq_len(nrow(zoned))) {
+    row <- zoned[i, ]
+    label <- paste(row$series, row$grain, row$tz, row$year_start, row$partial, row$stat)
+    record <- series[[row$series]]
+    attr(record$time, "tzone") <- row$tz
+    o <- oracle_grain_matrix(record, "id", "time", "value",
+                             grain = fixture_binning(dir, row$series, row$grain),
+                             stats = strsplit(row$stat, "+", fixed = TRUE)[[1L]],
+                             year_start = row$year_start)
+    values <- o$values
+    if (row$partial == "drop") values <- values[, !o$bin_partial, , drop = FALSE]
+    expect_equal(dim(values)[2L], row$n_bin, info = label)
+    expect_identical(digest_array(values), row$digest, info = label)
   }
 })

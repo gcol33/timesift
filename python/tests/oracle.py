@@ -5,11 +5,17 @@ because it was written from ``inst/spec/representation.md`` rather than from the
 shared binary would otherwise make the agreement between the two languages trivially true. One
 implementation in production, two in evidence.
 
-It reads the calendar off zone-free ``datetime64`` values, so it answers only for a series already
-expressed in the calendar to bin by; that is what the tests hand it.
+It reads the calendar off zone-free ``datetime64`` values. A series carried in a zone is first
+relabelled into that zone's clock, instant by instant through ``zoneinfo``, and every grain but
+``native`` is then binned on the relabelled series; ``native`` is binned on the instants
+themselves, because its bin is the reading and two readings of an hour a zone repeats are two
+bins.
 """
 
 from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import numpy as np
 
@@ -17,6 +23,18 @@ DAY_LEVEL_STATS = ("cold_day", "warm_day", "mean_daily_min", "mean_daily_max")
 
 _HOUR = np.timedelta64(1, "h")
 _DAY = np.timedelta64(1, "D")
+
+
+def oracle_local_clock(when: np.ndarray, tz) -> np.ndarray:
+    """The instants read as a clock in ``tz``, as zone-free ``datetime64`` values."""
+    if tz is None or tz in ("UTC", "GMT"):
+        return when
+    zone = ZoneInfo(tz)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    seconds = when.astype("datetime64[s]").astype(np.int64)
+    clock = [(epoch + timedelta(seconds=int(t))).astimezone(zone).replace(tzinfo=None)
+             for t in seconds]
+    return np.asarray(clock, dtype="datetime64[s]")
 
 
 def oracle_bin_start(when: np.ndarray, grain, ys) -> np.ndarray:
@@ -44,13 +62,16 @@ def oracle_bin_start(when: np.ndarray, grain, ys) -> np.ndarray:
     return oracle_anniversary(oracle_offset_months(when, ys) // step * step, ys)
 
 
-def oracle_bin_partial(when: np.ndarray, bins: np.ndarray, grain, ys) -> np.ndarray:
+def oracle_bin_partial(clock: np.ndarray, when: np.ndarray, bins: np.ndarray, grain,
+                       ys) -> np.ndarray:
     """Which bins the record does not cover for their whole calendar span. The record covers from
     its first reading to its last plus one sampling interval, and a bin is partial when its own
     span reaches outside that. Only a bin at an end of the record can, because _check_grid() has
-    already required every unit to hold readings in every bin between them."""
-    covered_start = when.min()
-    covered_end = when.max() + oracle_sampling_step(when)
+    already required every unit to hold readings in every bin between them. The record's ends are
+    read on the clock the bins are; the sampling interval is the record's own, read off the
+    instants."""
+    covered_start = clock.min()
+    covered_end = clock.max() + oracle_sampling_step(when)
     return (bins < covered_start) | (oracle_bin_next(bins, grain, ys, covered_end) > covered_end)
 
 
@@ -224,14 +245,16 @@ def oracle_lookback_matrix(data, id, time, value, at, span, lag="0 days", bins=1
 
 
 def oracle_grain_matrix(data, id, time, value, *, grain="day", stats=("mean",),
-                         year_start="09-01"):
+                         year_start="09-01", tz=None):
     unit = np.asarray([str(v) for v in data[id]])
     when = np.asarray(data[time], dtype="datetime64[s]")
     reading = np.asarray(data[value], dtype=np.float64)
     stats = [stats] if isinstance(stats, str) else list(stats)
     ys = (int(year_start.split("-")[0]), int(year_start.split("-")[1]))
 
-    bin_start = oracle_bin_start(when, grain, ys)
+    # The clock the bins are read on: the instant itself at `native`, the series' zone elsewhere.
+    clock = when if grain == "native" else oracle_local_clock(when, tz)
+    bin_start = oracle_bin_start(clock, grain, ys)
     units, unit_ix = np.unique(unit, return_inverse=True)
     bins, bin_ix = np.unique(bin_start, return_inverse=True)
     n_u, n_b = len(units), len(bins)
@@ -242,7 +265,8 @@ def oracle_grain_matrix(data, id, time, value, *, grain="day", stats=("mean",),
     reading_sorted = reading[order]
     starts = np.searchsorted(cell[order], np.arange(n_u * n_b), side="left")
 
-    day = oracle_day_level(reading, unit_ix, when, bins, n_u, ys)         if any(s in DAY_LEVEL_STATS for s in stats) else None
+    day = oracle_day_level(reading, unit_ix, clock, bins, n_u, ys) \
+        if any(s in DAY_LEVEL_STATS for s in stats) else None
 
     out = np.empty((n_u, n_b, len(stats)), dtype=np.float64)
     for k, s in enumerate(stats):
@@ -265,4 +289,4 @@ def oracle_grain_matrix(data, id, time, value, *, grain="day", stats=("mean",),
     return {"values": out, "units": units, "bin_start": bins,
             "bin_end": oracle_bin_extent(when, bin_ix, n_b),
             "bin_n": count.reshape(n_b, n_u).T,
-            "bin_partial": oracle_bin_partial(when, bins, grain, ys)}
+            "bin_partial": oracle_bin_partial(clock, when, bins, grain, ys)}

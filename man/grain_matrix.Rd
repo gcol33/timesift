@@ -90,11 +90,16 @@ representation, because computing it over all units would leak held-out units in
 \section{Time zone}{
 
 Bins follow the calendar the series is carried in, which is the \code{tzone} attribute of \code{time};
-a column with none is read as UTC. The zone is resolved once, at the edge: below it the binning
-works in local time, where a day is 86400 seconds whatever the night did, so a zone that moves
-its clock at midnight has no midnight to lose. A bin start is a local time, so reporting it back
-as an instant needs a rule: one the clock skipped resolves to the instant the clock jumped to,
-one the clock repeated to the first of the two. Instants are read at whole seconds.
+a column with none is read as UTC, and a name the zone database does not know is an error. The
+zone is resolved once, at the edge: below it the binning works in local time, where a day is
+86400 seconds whatever the night did, so a zone that moves its clock at midnight has no
+midnight to lose. A bin start is a local time, so reporting it back as an instant needs a rule:
+one the clock skipped resolves to the instant the clock jumped to, one the clock repeated to
+the first of the two. Instants are read at whole seconds.
+
+The \code{"native"} grain is the one grain not read on that clock: its bin is the reading itself,
+so the two readings of an hour a zone repeats are two bins, and the record read at \code{"native"}
+is the same array whichever zone it is carried in.
 }
 
 \section{Bins that do not tile the record}{
