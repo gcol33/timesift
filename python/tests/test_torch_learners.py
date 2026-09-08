@@ -267,8 +267,8 @@ def test_the_inner_validation_set_is_drawn_from_every_level_of_the_response():
 
 
 def test_the_control_ranges_are_the_ones_the_r_side_checks():
-    with pytest.raises(ValueError, match="at least 1"):
-        train_control(pos_weight_cap=0.5)
+    with pytest.raises(TypeError, match="no training setting called pos_weight_cap"):
+        train_control(pos_weight_cap=50)
     with pytest.raises(ValueError, match=r"\[0, 1\)"):
         train_control(swa_start=1)
     assert train_control(swa_start=0).swa_start == 0
@@ -298,3 +298,15 @@ def test_the_inner_validation_set_keeps_a_grouping_whole_as_the_outer_folds_do()
         assert len(val) == 10
         drawn = [group[i] for i in val]
         assert all(drawn.count(g) == 2 for g in set(drawn))
+
+def test_the_encoders_fit_under_the_heads_weight(temporary_response):
+    from timesift.registry import RESPONSES
+    x, y, _ = fixture(n_unit=30, days=28)
+    rare = Response(np.column_stack([np.r_[np.ones(3), np.zeros(27)]]), y.units, ("rare",))
+    temporary_response("unweighted_test", {k: v for k, v in RESPONSES.get("presence_absence").items()
+                                           if k != "weights"})
+    weighted = fit_learner(mlp(epochs=8, seed=3, val_frac=0), x, rare).predict(x)
+    plain = fit_learner(mlp(epochs=8, seed=3, val_frac=0), x, rare,
+                        response="unweighted_test").predict(x)
+    assert not np.allclose(weighted, plain)
+    assert weighted[:3].mean() > plain[:3].mean()

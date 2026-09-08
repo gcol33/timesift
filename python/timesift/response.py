@@ -265,11 +265,34 @@ def scorable_cells(y: Response, folds) -> Cells:
                            (p_test >= 1) & (a_test >= 1))[order])
 
 
+def positive_weights(y, cap: float = 50.0) -> np.ndarray:
+    """Case weights that balance a rare response.
+
+    The weight every learner that ships fits a presence-absence response under: each presence of
+    a response weighs the ratio of absences to presences among the units handed in, capped, and
+    each absence weighs one. A response with a presence in one target of a hundred is otherwise
+    fitted away by any learner that minimises a mean loss.
+
+    The weights are the response head's: the shipped presence-absence head carries this function
+    as its ``weights``, and a head registered with ``weights=lambda y: positive_weights(y, cap=20)``
+    weights every learner by that cap instead. A head without ``weights`` is fitted unweighted.
+    Returns a ``[unit, variable]`` array of case weights, one per cell of ``y``.
+    """
+    if cap < 1:
+        raise ValueError(f"`cap` must be at least 1, got {cap}")
+    values = np.asarray(y.values if isinstance(y, Response) else y, dtype=np.float64)
+    pos = (values == 1).sum(axis=0)
+    neg = (values == 0).sum(axis=0)
+    w = np.where(pos > 0, np.clip(neg / np.maximum(pos, 1), 1, cap), 1.0)
+    return np.where(values == 1, w[None, :], 1.0)
+
+
 PRESENCE_ABSENCE = dict(
     prepare=lambda y: as_response(y).check_presence_absence(),
     activation="sigmoid",
     loss="binary_cross_entropy",
     metric="tss",
+    weights=positive_weights,
     cells=lambda y, folds: scorable_cells(y, folds),
 )
 

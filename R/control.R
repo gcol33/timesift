@@ -24,9 +24,6 @@
 #'   a device name such as `"cuda"`, `"mps"` or `"cpu"`. A fitted encoder carries the setting
 #'   rather than the device it resolved to, so a fit made on one machine predicts on another.
 #' @param seed Seed for initialisation, batching and the inner validation split.
-#' @param pos_weight_cap Ceiling on the per-response positive-class weight, which is the ratio of
-#'   absences to presences among the fitting targets. At least one: a weight under one would
-#'   weight presences down.
 #' @param swa Average the weights of the tail epochs instead of restoring the best single epoch.
 #'   The schedule anneals to `swa_start` of the epoch budget and is then held flat while the
 #'   remaining epochs' weights are averaged, and the batch-normalisation statistics are recomputed
@@ -43,8 +40,7 @@
 #' @export
 train_control <- function(epochs = 60L, batch_size = 64L, learning_rate = 1e-3,
                           weight_decay = 1e-4, early_stopping = 10L, val_frac = 0.15,
-                          device = "auto", seed = 1L,
-                          pos_weight_cap = 50, swa = FALSE, swa_start = 0.7) {
+                          device = "auto", seed = 1L, swa = FALSE, swa_start = 0.7) {
   given <- names(as.list(match.call()))[-1L]
   # `early_stopping = Inf` is a patience that never runs out, so the whole budget is trained; an
   # integer cannot hold it, and the largest one is the same thing.
@@ -55,8 +51,7 @@ train_control <- function(epochs = 60L, batch_size = 64L, learning_rate = 1e-3,
     epochs = as.integer(epochs), batch_size = as.integer(batch_size),
     learning_rate = learning_rate, weight_decay = weight_decay,
     early_stopping = as.integer(early_stopping), val_frac = val_frac,
-    device = device, seed = as.integer(seed), pos_weight_cap = pos_weight_cap,
-    swa = isTRUE(swa), swa_start = swa_start)
+    device = device, seed = as.integer(seed), swa = isTRUE(swa), swa_start = swa_start)
   .check_control(settings)
   structure(settings, given = given, class = "timesift_control")
 }
@@ -68,11 +63,6 @@ train_control <- function(epochs = 60L, batch_size = 64L, learning_rate = 1e-3,
       stop("`", nm, "` is a single positive number, got ",
            paste(format(settings[[nm]]), collapse = ", "), ".", call. = FALSE)
     }
-  }
-  if (length(settings$pos_weight_cap) != 1L || is.na(settings$pos_weight_cap) ||
-      settings$pos_weight_cap < 1) {
-    stop("`pos_weight_cap` is a single number of at least 1, got ",
-         paste(format(settings$pos_weight_cap), collapse = ", "), ".", call. = FALSE)
   }
   for (nm in c("val_frac", "swa_start")) {
     if (length(settings[[nm]]) != 1L || is.na(settings[[nm]]) ||

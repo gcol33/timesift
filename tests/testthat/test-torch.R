@@ -261,7 +261,7 @@ test_that("the inner validation set is drawn from every level of the response", 
 })
 
 test_that("the control ranges are the ones the Python side checks", {
-  expect_error(train_control(pos_weight_cap = 0.5), "at least 1")
+  expect_error(train_control(pos_weight_cap = 50), "unused argument")
   expect_error(train_control(swa_start = 1), "under 1")
   expect_equal(train_control(swa_start = 0)$swa_start, 0)
 })
@@ -323,4 +323,18 @@ test_that("the inner validation set keeps a grouping whole, as the outer folds d
     expect_length(val, 10L)
     expect_true(all(table(group[val]) == 2L))
   }
+})
+
+test_that("the encoders fit under the head's weight", {
+  skip_if_no_torch()
+  head <- .responses_reg$get("presence_absence")
+  local_response("unweighted_test", head[setdiff(names(head), "weights")])
+  f <- torch_fixture(n_unit = 30L, days = 28L)
+  rare <- matrix(c(rep(1, 3), rep(0, 27)), ncol = 1L, dimnames = list(rownames(f$y), "rare"))
+  weighted <- stats::predict(fit_learner(mlp(epochs = 8L, seed = 3L, val_frac = 0), f$x, rare),
+                             f$x)
+  plain <- stats::predict(fit_learner(mlp(epochs = 8L, seed = 3L, val_frac = 0), f$x, rare,
+                                      response = "unweighted_test"), f$x)
+  expect_false(isTRUE(all.equal(weighted, plain)))
+  expect_gt(mean(weighted[1:3, 1L]), mean(plain[1:3, 1L]))
 })

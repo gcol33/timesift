@@ -22,7 +22,8 @@ One generalised linear model per variable, its predictors chosen by forward sele
 bin-by-channel column, admitting a column while it lowers AIC and stopping at a fixed budget.
 Each candidate enters as an orthogonal polynomial, so a term can be non-monotone in the reading
 the way a niche optimum is. The family is the response head's: logistic under a binary
-cross-entropy loss, Gaussian under a squared-error one.
+cross-entropy loss, Gaussian under a squared-error one. So are the case weights, so a rare
+response weighs here what it weighs in every other learner.
 }
 \details{
 Selection happens inside whichever units the learner is handed, so under \code{\link[=grain_ladder]{grain_ladder()}} it is

@@ -623,6 +623,7 @@ call site.
 | the three artifacts | `write_folds()` and `read_folds()`, `write_response()` and `read_response()`, `write_cells()` and `read_cells()` |
 | the digest | `digest_array()`, exported |
 | the three registries | `register_learner()` and `learners()`, `register_metric()` and `metrics()`, `register_response()` and `responses()` |
+| what a rare response weighs | `positive_weights()`, the case weights the shipped presence-absence head carries as its weights function and every learner that ships reads through the head |
 
 ### The same call does the same thing
 
@@ -670,7 +671,17 @@ call site.
 - The encoders take `swa` and `swa_start`: the schedule anneals until the averaging begins and is
   then held flat, the averaged weights get their own pass to rebuild the batch-normalisation
   statistics from a reset, and the default is off, so a default recipe is the same recipe on both
-  sides. `swa_start` is at least 0 and under 1, and `pos_weight_cap` is at least 1, on both.
+  sides. `swa_start` is at least 0 and under 1 on both.
+- What a rare response weighs is the response head's and not a training setting. The head's
+  weights function returns one case weight per cell of the response, and the encoders, the
+  penalised fit, the forest and the forward search all fit under it: the encoders as an
+  elementwise weight on the loss, the penalised fit and the forward search as case weights, and
+  the forest as the probability a unit is drawn into a tree's bootstrap, which is what ranger's
+  case weights are and what the Python side's forest does with its own draw, because
+  scikit-learn's forest grows the same pure-leaved tree under any sample weight. The shipped
+  presence-absence head weights each presence by the ratio of absences to presences among the
+  fitting units, capped at 50, and each absence by one; a head without a weights function fits
+  unweighted. On both sides.
 - The encoders standardise every channel by its own centre and sample standard deviation over
   every unit and bin of the fitting units; the inner validation set is one unit from each of as
   many equal-count strata of the response total as it holds; the fitting units are cut into as

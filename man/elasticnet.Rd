@@ -10,7 +10,6 @@ elasticnet(
   n_inner = 5L,
   squares = TRUE,
   s = "lambda.min",
-  weight_positives = TRUE,
   seed = 1L
 )
 }
@@ -27,10 +26,6 @@ second-order polynomial term would.}
 
 \item{s}{Which penalty of the inner path to predict at.}
 
-\item{weight_positives}{Weight presences by the ratio of absences to presences among the
-fitting units, so a rare variable is not fitted away. Read under a presence-absence head
-only.}
-
 \item{seed}{Seed for the inner cross-validation's fold draw, which is random and would otherwise
 make the fit irreproducible.}
 }
@@ -46,7 +41,8 @@ so nothing about the model is decided outside the fold it is fitted in.
 \details{
 The family is the response head's: a binary cross-entropy loss fits a logistic model and a
 squared-error loss a linear one, so the learner is the same under a presence-absence head and
-under a continuous one.
+under a continuous one. So are the case weights: the head's \code{weights}, \code{\link[=positive_weights]{positive_weights()}}
+for presence-absence, are what every learner that ships fits under.
 
 This is the aggregate-feature side of the comparison the package was built for, and it is the
 fair opponent for a network: a per-fold discrete selector pays selection variance a network

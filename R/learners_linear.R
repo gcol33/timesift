@@ -7,7 +7,8 @@
 #'
 #' The family is the response head's: a binary cross-entropy loss fits a logistic model and a
 #' squared-error loss a linear one, so the learner is the same under a presence-absence head and
-#' under a continuous one.
+#' under a continuous one. So are the case weights: the head's `weights`, [positive_weights()]
+#' for presence-absence, are what every learner that ships fits under.
 #'
 #' This is the aggregate-feature side of the comparison the package was built for, and it is the
 #' fair opponent for a network: a per-fold discrete selector pays selection variance a network
@@ -20,9 +21,6 @@
 #' @param squares Add the square of every column, giving the same quadratic capacity a
 #'   second-order polynomial term would.
 #' @param s Which penalty of the inner path to predict at.
-#' @param weight_positives Weight presences by the ratio of absences to presences among the
-#'   fitting units, so a rare variable is not fitted away. Read under a presence-absence head
-#'   only.
 #' @param seed Seed for the inner cross-validation's fold draw, which is random and would otherwise
 #'   make the fit irreproducible.
 #'
@@ -33,15 +31,13 @@
 #'
 #' @export
 elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s = "lambda.min",
-                       weight_positives = TRUE, seed = 1L) {
+                       seed = 1L) {
   learner(
     name = "elasticnet",
     data = data, reads = "tabular", multi = "separate",
     needs = "glmnet",
-    params = list(alpha = alpha, n_inner = n_inner, squares = squares, s = s,
-                  weight_positives = weight_positives, seed = seed),
-    fit = function(x, y, alpha, n_inner, squares, s, weight_positives, seed, head, group = NULL,
-                   ...) {
+    params = list(alpha = alpha, n_inner = n_inner, squares = squares, s = s, seed = seed),
+    fit = function(x, y, alpha, n_inner, squares, s, seed, head, group = NULL, ...) {
       family <- .head_family(head)
       m <- .design(x, squares)
       if (ncol(m) < 2L) {
@@ -52,17 +48,16 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
       old <- .seed_state()
       on.exit(.restore_seed(old), add = TRUE)
       seeds <- .variable_seeds(seed, y)
+      weights <- .head_weights(head, y)
       models <- lapply(seq_len(ncol(y)), function(j) {
         yj <- y[, j]
         if (length(unique(yj)) < 2L) {
           return(mean(yj))
         }
         set.seed(seeds[j])
-        w <- if (weight_positives && family == "binomial") .imbalance_weights(yj)
-             else rep(1, length(yj))
         # The inner folds are dealt here rather than by cv.glmnet, so a grouping the outer folds
         # keep whole stays whole where the penalty is chosen.
-        glmnet::cv.glmnet(m, yj, family = family, alpha = alpha, weights = w,
+        glmnet::cv.glmnet(m, yj, family = family, alpha = alpha, weights = weights[, j],
                           foldid = .inner_folds(y, n_inner, seeds[j], group),
                           type.measure = "deviance")
       })
@@ -84,7 +79,8 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
 #' bin-by-channel column, admitting a column while it lowers AIC and stopping at a fixed budget.
 #' Each candidate enters as an orthogonal polynomial, so a term can be non-monotone in the reading
 #' the way a niche optimum is. The family is the response head's: logistic under a binary
-#' cross-entropy loss, Gaussian under a squared-error one.
+#' cross-entropy loss, Gaussian under a squared-error one. So are the case weights, so a rare
+#' response weighs here what it weighs in every other learner.
 #'
 #' Selection happens inside whichever units the learner is handed, so under [grain_ladder()] it is
 #' redone in every fold. That is the footing the other learners are fitted on. Reported beside a
@@ -109,8 +105,9 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L) {
     fit = function(x, y, max_terms, degree, head, ...) {
       family <- .head_family(head)
       m <- .flatten(x)
+      weights <- .head_weights(head, y)
       models <- lapply(seq_len(ncol(y)), function(j) {
-        .forward_aic(m, y[, j], max_terms, degree, family)
+        .forward_aic(m, y[, j], max_terms, degree, family, weights[, j])
       })
       list(models = models, columns = colnames(m), degree = degree, family = family)
     },
@@ -124,14 +121,14 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L) {
 
 # Forward selection by AIC, one column admitted at a time. The polynomial basis is stored with the
 # fit rather than rebuilt, because an orthogonal basis refitted on new units is a different basis.
-.forward_aic <- function(m, y, max_terms, degree, family) {
+.forward_aic <- function(m, y, max_terms, degree, family, w = rep(1, length(y))) {
   if (length(unique(y)) < 2L) {
     return(list(constant = mean(y)))
   }
   link <- .glm_family(family)
   chosen <- integer(0)
   bases <- list()
-  best_aic <- stats::glm(y ~ 1, family = link)$aic
+  best_aic <- .glm_aic(stats::glm(y ~ 1, family = link, weights = w), family)
   # A column holding one value has no polynomial basis to enter as, so it is not a candidate. It
   # is the intercept the search already starts from, and offering it is what makes an orthogonal
   # basis divide by a norm of zero.
@@ -149,9 +146,10 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L) {
       # admitted: those are the states the criterion cannot be read off, and admitting one would
       # let the search prefer a column for having no answer. Anything the fitter raises as an
       # error is a fault rather than a verdict on the candidate, and propagates.
-      fit <- tryCatch(stats::glm(y ~ ., data = d, family = link), warning = function(w) NULL)
-      if (!is.null(fit) && is.finite(fit$aic)) {
-        gains[j] <- fit$aic
+      fit <- tryCatch(stats::glm(y ~ ., data = d, family = link, weights = w),
+                      warning = function(cond) NULL)
+      if (!is.null(fit) && is.finite(.glm_aic(fit, family))) {
+        gains[j] <- .glm_aic(fit, family)
         fits[[j]] <- list(fit = fit, basis = b)
       }
     }
@@ -222,9 +220,3 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L) {
   matrix(p, nrow = units)
 }
 
-.imbalance_weights <- function(y, cap = Inf) {
-  pos <- sum(y == 1)
-  neg <- sum(y == 0)
-  w <- if (pos > 0) min(neg / pos, cap) else 1
-  ifelse(y == 1, w, 1)
-}

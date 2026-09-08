@@ -7,9 +7,9 @@
 #' and it finds an interaction between two bins that a linear model would need the product term
 #' for.
 #'
-#' Under a presence-absence head, presences are up-weighted in the bootstrap draw by the ratio of
-#' absences to presences among the fitting targets, the same weighting the penalised fit uses, so a
-#' rare response is not fitted away by either of them for a reason the other does not share.
+#' The case weights are the response head's, [positive_weights()] under presence-absence, and
+#' weight the bootstrap draw: a rare response is not fitted away here for a reason the other
+#' learners do not share, because every learner that ships reads the same weights.
 #'
 #' @inheritParams elasticnet
 #' @param trees Trees in the forest.
@@ -36,6 +36,7 @@ forest <- function(data = NULL, trees = 500L, mtry = NULL, min_node = 1L, seed =
       m <- .flatten(x)
       try_columns <- if (is.null(mtry)) max(1L, floor(sqrt(ncol(m)))) else as.integer(mtry)
       seeds <- .variable_seeds(seed, y)
+      weights <- .head_weights(head, y)
       models <- lapply(seq_len(ncol(y)), function(j) {
         yj <- y[, j]
         if (length(unique(yj)) < 2L) {
@@ -44,11 +45,11 @@ forest <- function(data = NULL, trees = 500L, mtry = NULL, min_node = 1L, seed =
         if (family == "binomial") {
           ranger::ranger(x = m, y = factor(yj, levels = c(0, 1)), num.trees = trees,
                          mtry = try_columns, min.node.size = min_node, probability = TRUE,
-                         case.weights = .imbalance_weights(yj), num.threads = 1L,
-                         seed = seeds[j])
+                         case.weights = weights[, j], num.threads = 1L, seed = seeds[j])
         } else {
           ranger::ranger(x = m, y = yj, num.trees = trees, mtry = try_columns,
-                         min.node.size = min_node, num.threads = 1L, seed = seeds[j])
+                         min.node.size = min_node, case.weights = weights[, j],
+                         num.threads = 1L, seed = seeds[j])
         }
       })
       list(models = models, columns = colnames(m), family = family)

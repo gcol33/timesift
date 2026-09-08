@@ -154,6 +154,19 @@ def _declared(fit, **given) -> dict:
     return {name: value for name, value in given.items() if name in parameters}
 
 
+def _head_weights(head, y: np.ndarray) -> np.ndarray:
+    """The case weights a fit is made under, one per cell of the response it is handed: the head's
+    where it carries ``weights``, and one everywhere where it does not. Every learner that ships
+    reads them here, so what a rare response weighs is decided once, by the head."""
+    if head.get("weights") is None:
+        return np.ones(y.shape, dtype=np.float64)
+    w = np.asarray(head["weights"](y), dtype=np.float64)
+    if w.shape != y.shape or not np.isfinite(w).all() or (w < 0).any():
+        raise ValueError("a response head's `weights(y)` returns a numeric array of the "
+                         "response's shape, with no missing or negative entry.")
+    return w
+
+
 # The family a learner fitting one model per response fits under is read off the response head's
 # loss, so a head registered with a squared-error loss reaches the same learners as a
 # presence-absence one and each fits the model that loss names.
@@ -336,19 +349,19 @@ def _resolve_device(name):
 
 # ---- the objective ---------------------------------------------------------------------------
 
-# The response head names its loss and its activation, and the trainer looks both up here. A loss
-# is built once per fit from the fitting responses, which is where the positive-class weight of the
-# binary objective comes from; an activation is applied at prediction and nowhere else.
-def _binary_cross_entropy(torch, y_fit, cfg, device):
-    pos = y_fit.sum(axis=0)
-    neg = len(y_fit) - pos
-    w = np.clip(np.where(pos > 0, neg / np.maximum(pos, 1), 1), 1, cfg.pos_weight_cap)
-    return torch.nn.BCEWithLogitsLoss(
-        pos_weight=torch.tensor(w, dtype=torch.float32, device=device))
+# The response head names its loss and its activation, and the trainer looks both up here. Each
+# loss takes the head's case weights for the cells of the batch, so a rare response weighs what
+# the head says it weighs; an activation is applied at prediction and nowhere else.
+def _binary_cross_entropy(torch):
+    def loss(out, target, weight):
+        return torch.nn.functional.binary_cross_entropy_with_logits(out, target, weight=weight)
+    return loss
 
 
-def _squared_error(torch, y_fit, cfg, device):
-    return torch.nn.MSELoss()
+def _squared_error(torch):
+    def loss(out, target, weight):
+        return torch.mean(weight * (out - target) ** 2)
+    return loss
 
 
 TORCH_LOSSES = {"binary_cross_entropy": _binary_cross_entropy,
@@ -386,7 +399,12 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head, group=
 
     xt = torch.tensor(m, dtype=torch.float32, device=device)
     yt = torch.tensor(y, dtype=torch.float32, device=device)
-    loss_fn = make_loss(torch, y[fit_idx], cfg, device)
+    # The weights are the head's, read off the fitting units alone: the validation units are held
+    # out of the count a rare response's weight is made from, as they are held out of the fit.
+    weights = np.ones_like(y, dtype=np.float64)
+    weights[fit_idx] = _head_weights(head, y[fit_idx])
+    wt = torch.tensor(weights, dtype=torch.float32, device=device)
+    loss_fn = make_loss(torch)
 
     net = _torch_module(module)(in_ch=m.shape[1], in_len=m.shape[2],
                                 n_out=y.shape[1], **arch).to(device)
@@ -405,7 +423,7 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head, group=
         for b in _batches(rng.permutation(fit_idx), cfg.batch_size):
             idx = torch.tensor(b, dtype=torch.long, device=device)
             opt.zero_grad()
-            loss_fn(net(xt[idx]), yt[idx]).backward()
+            loss_fn(net(xt[idx]), yt[idx], wt[idx]).backward()
             opt.step()
         if epoch < swa_from:
             sched.step()
@@ -414,7 +432,7 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head, group=
             continue
         if not len(val):
             continue
-        vloss = _torch_loss(net, loss_fn, xt, yt, val, cfg.batch_size, device)
+        vloss = _torch_loss(net, loss_fn, xt, yt, wt, val, cfg.batch_size, device)
         if vloss < best_loss - 1e-4:
             best_loss, bad = vloss, 0
             best_state = _snapshot(net)
@@ -446,14 +464,14 @@ def _torch_restore(torch, model, device):
     return net.to(device).eval()
 
 
-def _torch_loss(net, loss_fn, xt, yt, idx_all, batch_size, device) -> float:
+def _torch_loss(net, loss_fn, xt, yt, wt, idx_all, batch_size, device) -> float:
     torch = _torch()
     net.eval()
     total = 0.0
     with torch.no_grad():
         for b in _batches(idx_all, batch_size):
             idx = torch.tensor(b, dtype=torch.long, device=device)
-            total += float(loss_fn(net(xt[idx]), yt[idx])) * len(b)
+            total += float(loss_fn(net(xt[idx]), yt[idx], wt[idx])) * len(b)
     return total / len(idx_all)
 
 
@@ -619,11 +637,12 @@ def _inner_folds(y: np.ndarray, v: int, seed: int, group=None) -> list:
     return [(np.flatnonzero(fold != k), np.flatnonzero(fold == k)) for k in np.unique(fold)]
 
 
-def _fit_columns(m: np.ndarray, y: np.ndarray, make, seeds) -> list:
+def _fit_columns(m: np.ndarray, y: np.ndarray, make, seeds, weights) -> list:
     out = []
     for j in range(y.shape[1]):
         yj = y[:, j]
-        out.append(float(yj.mean()) if len(np.unique(yj)) < 2 else make(m, yj, seeds[j]))
+        out.append(float(yj.mean()) if len(np.unique(yj)) < 2
+                   else make(m, yj, seeds[j], weights[:, j]))
     return out
 
 
@@ -653,15 +672,15 @@ def _design(x: TimesiftMatrix, squares: bool) -> np.ndarray:
     return np.hstack([m, m ** 2]) if squares else m
 
 
-def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, weight_positives=True,
-               seed=1) -> Learner:
+def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, seed=1) -> Learner:
     """One penalised regression per variable, over every bin-by-channel column and, by default,
     their squares, with the penalty chosen by an inner cross-validation on the fitting units.
 
     There is no discrete selection step: the penalty path uses every column and shrinks, and
     nothing about the model is decided outside the fold it is fitted in. The family is the
     response head's: logistic under a binary cross-entropy loss, linear under a squared-error
-    one, and ``weight_positives`` is read under the first alone.
+    one, and so are the case weights, :func:`~timesift.response.positive_weights` under
+    presence-absence, which every learner that ships fits under.
 
     The design is standardised before it is penalised, as it is on the R side, so a column is
     not penalised for the scale it was recorded on. The penalty itself is the one the inner
@@ -671,11 +690,10 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, weight_positives=T
     return Learner(name="elasticnet", fit=_elasticnet_fit, predict=_elasticnet_predict,
                    needs=("sklearn",), data=data, reads="tabular", multi="separate",
                    params=dict(alpha=alpha, n_inner=n_inner, squares=squares,
-                               weight_positives=weight_positives, seed=seed))
+                               seed=seed))
 
 
-def _elasticnet_fit(x, y, alpha, n_inner, squares, weight_positives, seed, head, variables,
-                    group=None, **_):
+def _elasticnet_fit(x, y, alpha, n_inner, squares, seed, head, variables, group=None, **_):
     from sklearn.linear_model import ElasticNetCV, LogisticRegressionCV
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
@@ -689,18 +707,19 @@ def _elasticnet_fit(x, y, alpha, n_inner, squares, weight_positives, seed, head,
     # through the centre and the spread the model was fitted at rather than through their own.
     # The inner folds are dealt here rather than by scikit-learn, so a grouping the outer folds
     # keep whole stays whole where the penalty is chosen.
-    def make(design, yj, seed_j):
+    def make(design, yj, seed_j, w):
         cv = _inner_folds(y, n_inner, seed_j, group)
         if family == "binomial":
             return make_pipeline(StandardScaler(), LogisticRegressionCV(
-                Cs=10, cv=cv, solver="saga", l1_ratios=[alpha],
-                class_weight="balanced" if weight_positives else None,
-                max_iter=5000, random_state=seed_j)).fit(design, yj)
+                Cs=10, cv=cv, solver="saga", l1_ratios=[alpha], max_iter=5000,
+                random_state=seed_j)).fit(design, yj, logisticregressioncv__sample_weight=w)
         return make_pipeline(StandardScaler(),
                              ElasticNetCV(l1_ratio=alpha, cv=cv, max_iter=5000,
-                                          random_state=seed_j)).fit(design, yj)
+                                          random_state=seed_j)).fit(
+                                              design, yj, elasticnetcv__sample_weight=w)
 
-    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables)),
+    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables),
+                                    _head_weights(head, y)),
                 squares=squares, n_col=m.shape[1], family=family)
 
 
@@ -724,18 +743,65 @@ def forest(data=None, trees=500, mtry=None, min_node=1, seed=1) -> Learner:
 
 
 def _rf_fit(x, y, trees, mtry, min_node, seed, head, variables, **_):
-    from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
     family = _family(head)
     m = flatten(x)
-    forest_of = RandomForestClassifier if family == "binomial" else RandomForestRegressor
 
-    def make(design, yj, seed_j):
-        return forest_of(
-            n_estimators=trees, max_features="sqrt" if mtry is None else mtry,
-            min_samples_leaf=min_node, random_state=seed_j, n_jobs=-1).fit(design, yj)
+    def make(design, yj, seed_j, w):
+        return _WeightedForest(trees, mtry, min_node, family).fit(design, yj, w, seed_j)
 
-    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables)),
+    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables),
+                                    _head_weights(head, y)),
                 n_col=m.shape[1], family=family)
+
+
+class _WeightedForest:
+    """A forest whose bootstrap draw is weighted by the case weights, as ranger's is on the R
+    side.
+
+    scikit-learn's forest takes a sample weight into its impurities and its leaf values, and a
+    tree grown to pure leaves is the same tree under any weight, so a rare response's presences
+    would weigh nothing there. Here each tree is grown on a draw of the units with replacement in
+    which a unit is drawn in proportion to its weight, and the forest's prediction is the mean
+    over the trees.
+    """
+
+    def __init__(self, trees: int, mtry, min_node: int, family: str):
+        self.trees, self.mtry, self.min_node, self.family = trees, mtry, min_node, family
+        self.members = []
+
+    def fit(self, design, yj, w, seed):
+        from joblib import Parallel, delayed
+        from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+        rng = np.random.default_rng(seed)
+        n = len(yj)
+        p = np.asarray(w, dtype=np.float64) / np.sum(w)
+        draws = [rng.choice(n, size=n, replace=True, p=p) for _ in range(self.trees)]
+        states = rng.integers(0, 2 ** 31 - 1, size=self.trees)
+        tree_of = DecisionTreeClassifier if self.family == "binomial" else DecisionTreeRegressor
+
+        def grow(rows, state):
+            return tree_of(max_features="sqrt" if self.mtry is None else self.mtry,
+                           min_samples_leaf=self.min_node,
+                           random_state=int(state)).fit(design[rows], yj[rows])
+
+        self.members = Parallel(n_jobs=-1)(delayed(grow)(rows, state)
+                                           for rows, state in zip(draws, states))
+        return self
+
+    def predict_proba(self, m):
+        # A draw can hold one class alone, and that tree knows one column; the probability of a
+        # presence is read off whichever column carries class 1.
+        present = np.zeros(m.shape[0])
+        for tree in self.members:
+            proba = tree.predict_proba(m)
+            which = np.flatnonzero(tree.classes_ == 1)
+            if len(which):
+                present += proba[:, which[0]]
+        present /= len(self.members)
+        return np.column_stack([1 - present, present])
+
+    def predict(self, m):
+        return np.mean([tree.predict(m) for tree in self.members], axis=0)
 
 
 def _rf_predict(model, x):
@@ -763,7 +829,8 @@ def stepwise(data=None, max_terms=3, degree=2) -> Learner:
 def _stepwise_fit(x, y, max_terms, degree, head, **_):
     family = _family(head)
     m = flatten(x)
-    return dict(models=[_forward_aic(m, y[:, j], max_terms, degree, family)
+    weights = _head_weights(head, y)
+    return dict(models=[_forward_aic(m, y[:, j], max_terms, degree, family, weights[:, j])
                         for j in range(y.shape[1])],
                 n_col=m.shape[1], degree=degree, family=family)
 
@@ -777,10 +844,15 @@ def _stepwise_predict(model, x):
 # stored with the fit rather than rebuilt, because an orthogonal basis refitted on new units is a
 # different basis.
 def _forward_aic(m: np.ndarray, y: np.ndarray, max_terms: int, degree: int,
-                 family: str) -> dict:
+                 family: str, w=None) -> dict:
     if len(np.unique(y)) < 2:
         return dict(constant=float(y.mean()))
-    glm = _logistic if family == "binomial" else _least_squares
+    w = np.ones(len(y)) if w is None else np.asarray(w, dtype=np.float64)
+    fitter = _logistic if family == "binomial" else _least_squares
+
+    def glm(design, y):
+        return fitter(design, y, w)
+
     chosen: list[int] = []
     bases: list[dict] = []
     current = None
@@ -820,23 +892,29 @@ def _predict_forward(f: dict, m: np.ndarray, family: str) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-eta)) if family == "binomial" else eta
 
 
-def _least_squares(design: np.ndarray, y: np.ndarray):
-    """One Gaussian regression by least squares, and its criterion as R's ``glm`` reports it for
-    the Gaussian family. A fit with no residual has no criterion to read and is refused."""
+def _least_squares(design: np.ndarray, y: np.ndarray, prior=None):
+    """One Gaussian regression by weighted least squares under the case weights ``prior``, and its
+    criterion as R's ``glm`` reports it for the Gaussian family. A fit with no residual has no
+    criterion to read and is refused."""
     x = np.column_stack([np.ones(len(y)), design]) if design.shape[1] else np.ones((len(y), 1))
-    beta, *_ = np.linalg.lstsq(x, y, rcond=None)
+    prior = np.ones(len(y)) if prior is None else np.asarray(prior, dtype=np.float64)
+    root = np.sqrt(prior)
+    beta, *_ = np.linalg.lstsq(x * root[:, None], y * root, rcond=None)
     if not np.all(np.isfinite(beta)):
         return None
-    rss = float(np.sum((y - x @ beta) ** 2))
+    rss = float(np.sum(prior * (y - x @ beta) ** 2))
     n = len(y)
     if rss <= 0:
         return None
-    aic = n * (np.log(2 * np.pi * rss / n) + 1) + 2 + 2 * x.shape[1]
+    aic = n * (np.log(2 * np.pi * rss / n) + 1) + 2 - float(np.sum(np.log(prior))) \
+        + 2 * x.shape[1]
     return dict(beta=beta, deviance=rss, aic=aic)
 
 
-def _logistic(design: np.ndarray, y: np.ndarray, max_iter: int = 25):
-    """One logistic regression by iteratively reweighted least squares, and its criterion.
+def _logistic(design: np.ndarray, y: np.ndarray, prior=None, max_iter: int = 25):
+    """One logistic regression by iteratively reweighted least squares under the case weights
+    ``prior``, and its criterion: the weighted deviance plus twice the number of coefficients,
+    which is what R's fitter reports for a 0/1 response.
 
     A candidate whose fit separates the response, or does not settle, is refused rather than
     returned: those are the two states the criterion cannot be read off, and admitting one would
@@ -844,7 +922,8 @@ def _logistic(design: np.ndarray, y: np.ndarray, max_iter: int = 25):
     candidate its own fitter warned about.
     """
     x = np.column_stack([np.ones(len(y)), design]) if design.shape[1] else np.ones((len(y), 1))
-    share = float(np.mean(y))
+    prior = np.ones(len(y)) if prior is None else np.asarray(prior, dtype=np.float64)
+    share = float(np.sum(prior * y) / np.sum(prior))
     beta = np.zeros(x.shape[1])
     beta[0] = np.log(share / (1.0 - share))
     deviance = np.inf
@@ -852,8 +931,8 @@ def _logistic(design: np.ndarray, y: np.ndarray, max_iter: int = 25):
         mu = _mu(x, beta)
         if mu is None:
             return None
-        w = mu * (1.0 - mu)
-        z = x @ beta + (y - mu) / w
+        w = prior * mu * (1.0 - mu)
+        z = x @ beta + (y - mu) / (mu * (1.0 - mu))
         try:
             beta = np.linalg.solve((x * w[:, None]).T @ x, (x * w[:, None]).T @ z)
         except np.linalg.LinAlgError:
@@ -863,7 +942,7 @@ def _logistic(design: np.ndarray, y: np.ndarray, max_iter: int = 25):
         mu = _mu(x, beta)
         if mu is None:
             return None
-        new = -2.0 * float(np.sum(y * np.log(mu) + (1 - y) * np.log1p(-mu)))
+        new = -2.0 * float(np.sum(prior * (y * np.log(mu) + (1 - y) * np.log1p(-mu))))
         if abs(new - deviance) / (abs(new) + 0.1) < 1e-8:
             return dict(beta=beta, deviance=new, aic=new + 2 * x.shape[1])
         deviance = new

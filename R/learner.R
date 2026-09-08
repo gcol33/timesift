@@ -437,6 +437,21 @@ print.timesift_models <- function(x, ...) {
   cbind(out, once)
 }
 
+# The case weights a fit is made under, one per cell of the response it is handed: the head's
+# where it carries a `weights`, and one everywhere where it does not. Every learner that ships
+# reads them here, so what a rare response weighs is decided once, by the head.
+.head_weights <- function(head, y) {
+  if (is.null(head$weights)) {
+    return(matrix(1, nrow(y), ncol(y), dimnames = dimnames(y)))
+  }
+  w <- head$weights(y)
+  if (!is.numeric(w) || !identical(dim(w), dim(y)) || anyNA(w) || any(w < 0)) {
+    stop("a response head's `weights(y)` returns a numeric matrix of the response's shape, with ",
+         "no missing or negative entry.", call. = FALSE)
+  }
+  w
+}
+
 # The family a learner fitting one model per response fits under is read off the response head's
 # loss, so a head registered with a squared-error loss reaches the same learners as a
 # presence-absence one and each fits the model that loss names.
@@ -456,8 +471,19 @@ print.timesift_models <- function(x, ...) {
   as.integer(fold_map(y, v = v, seed = seed, strata = 1L, group = group))
 }
 
+# The family the forward search fits under. The binomial one is the quasi-binomial: the
+# coefficients and the deviance are the same, and it takes a case weight that is not a whole
+# number without complaint, where the binomial family reads one as a fractional count of
+# successes. The criterion is read off the deviance, see `.glm_aic()`.
 .glm_family <- function(family) {
-  switch(family, binomial = stats::binomial(), gaussian = stats::gaussian())
+  switch(family, binomial = stats::quasibinomial(), gaussian = stats::gaussian())
+}
+
+# Akaike's criterion of a forward-search fit. For a 0/1 response the saturated log-likelihood is
+# zero, so the criterion is the weighted deviance plus twice the rank, which is what the binomial
+# family reports for unweighted data; the Gaussian family reports its own.
+.glm_aic <- function(fit, family) {
+  if (identical(family, "binomial")) fit$deviance + 2 * fit$rank else fit$aic
 }
 
 # Scaling belongs to the fold it is computed on: each column is centred on its mean and divided by

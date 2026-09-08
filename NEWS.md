@@ -154,6 +154,32 @@
   without a line there fails the suite. Python exports `resolve_metric` beside `get_learner`, as
   the contract had said it did.
 
+## What a rare response weighs
+
+* The response head owns it. A head's `weights(y)` returns one case weight per cell of the
+  response, and the encoders, the penalised fit, the forest and the forward search all fit
+  under it: the encoders as an elementwise weight on the loss, the penalised fit and the forward
+  search as case weights, the forest as the probability a unit is drawn into a tree's bootstrap.
+  The shipped presence-absence head carries `positive_weights()`, exported on both sides: each
+  presence weighs the ratio of absences to presences among the fitting units, capped at 50, and
+  each absence weighs one. A head registered with `weights = function(y) positive_weights(y,
+  cap = 20)` weights every learner by that cap, and a head without `weights` fits unweighted.
+* Three learners used to decide this for themselves, three ways. The encoders capped the weight
+  at `pos_weight_cap` from `train_control()`, the elastic net and the forest weighted uncapped
+  under `weight_positives`, and the forward search did not weight at all, so a response present
+  in one target of a hundred weighed 99 in two learners, 50 in a third and 1 in the fourth, in
+  the rare regime the network-against-aggregates comparison is about. `pos_weight_cap` and
+  `weight_positives` are gone. On the study's data, whose rarest species has 26 presences in
+  894 plots, the cap never binds, so the reproduced elastic net is the same number.
+* Python's forest draws each tree's bootstrap by the weights itself, as ranger's `case.weights`
+  does. scikit-learn's forest takes a sample weight into its impurities and leaf values, and a
+  tree grown to pure leaves is the same tree under any weight, so the Python forest was fitting
+  a rare response unweighted while the R forest was not.
+* The forward search fits the quasi-binomial family and reads its criterion off the deviance,
+  which is the same number the binomial family reports for a 0/1 response and takes a case
+  weight that is not a whole number without a warning. The Python forward search runs its
+  iteratively reweighted least squares under the same case weights.
+
 ## Fitting under a grouping
 
 * A fit is checked once, on the `timesift_fit`, against the bins and the channels it was made

@@ -169,7 +169,7 @@ def test_the_settings_a_learner_carries_are_the_ones_it_reports():
     learner = elasticnet(alpha=0.25, n_inner=3)
     assert learner.params["alpha"] == 0.25
     assert learner.params["n_inner"] == 3
-    assert learner.params["weight_positives"] is True
+    assert "weight_positives" not in learner.params
 
 
 def test_every_learner_declares_what_it_reads_and_how_it_covers_the_responses():
@@ -414,3 +414,52 @@ def test_a_calendar_grain_fit_refuses_a_record_from_another_period_naming_the_bi
     # A lookback names its rows by the targets' own positions.
     yw = Response(y.values, w.units, y.variables)
     assert fit_learner(toy, w, yw).predict(w_later).shape == (12, 2)
+
+def test_the_head_owns_what_a_rare_response_weighs(temporary_response):
+    from timesift.learners import _head_weights
+    from timesift.response import positive_weights
+    y = np.array([[1, 1], [0, 1], [0, 0], [0, 0], [0, 0], [0, 0]], dtype=float)
+    w = positive_weights(y)
+    # Five absences to one presence in the first response, four to two in the second: the
+    # presence weighs the ratio, at least one, and the absence weighs one.
+    assert w[:, 0].tolist() == [5, 1, 1, 1, 1, 1]
+    assert w[:, 1].tolist() == [2, 2, 1, 1, 1, 1]
+    assert positive_weights(y, cap=3)[0, 0] == 3
+    with pytest.raises(ValueError, match="at least 1"):
+        positive_weights(y, cap=0.5)
+    # The shipped head carries it, a head without `weights` fits unweighted, and a cap of one's
+    # own is a registration.
+    from timesift.registry import RESPONSES
+    assert np.array_equal(_head_weights(RESPONSES.get("presence_absence"), y), w)
+    plain = {**RESPONSES.get("presence_absence")}
+    plain.pop("weights")
+    assert np.array_equal(_head_weights(plain, y), np.ones_like(y))
+    capped = temporary_response("capped_test", {**RESPONSES.get("presence_absence"),
+                                                "weights": lambda y: positive_weights(y, cap=2)})
+    assert _head_weights(RESPONSES.get("capped_test"), y)[0, 0] == 2
+    with pytest.raises(ValueError, match="response's shape"):
+        _head_weights({"weights": lambda y: np.ones(3)}, y)
+
+
+@needs_sklearn
+def test_every_shipped_learner_fits_a_rare_response_under_the_heads_weight(temporary_response):
+    # The same planted signal, one head weighting presences and one not: every learner that ships
+    # reads the head, so the unweighted head changes every one of them.
+    x, y = planted(n_unit=60, days=28)
+    from timesift.registry import RESPONSES
+    temporary_response("unweighted_test", {k: v for k, v in RESPONSES.get("presence_absence").items()
+                                           if k != "weights"})
+    # A rare response drawn on the warmth, so every learner has a signal to read and none of
+    # them a column that separates it, which the forward search refuses.
+    level = x.values[:, :, 0].mean(axis=1)
+    z = (level - level.mean()) / level.std()
+    present = np.random.default_rng(72).binomial(1, 1 / (1 + np.exp(-(3 * z - 1.5)))) == 1
+    assert 15 <= present.sum() <= 30
+    rare = Response(np.column_stack([present.astype(float)]), y.units, ("rare",))
+    for make in (lambda: elasticnet(n_inner=3), lambda: forest(trees=30),
+                 lambda: stepwise(max_terms=1)):
+        weighted = fit_learner(make(), x, rare).predict(x)
+        plain = fit_learner(make(), x, rare, response="unweighted_test").predict(x)
+        assert not np.allclose(weighted, plain), make().name
+        # Presences weigh more than twice an absence, so the weighted fit predicts them higher.
+        assert weighted[present].mean() > plain[present].mean(), make().name

@@ -13,7 +13,6 @@ train_control(
   val_frac = 0.15,
   device = "auto",
   seed = 1L,
-  pos_weight_cap = 50,
   swa = FALSE,
   swa_start = 0.7
 )
@@ -41,10 +40,6 @@ a device name such as \code{"cuda"}, \code{"mps"} or \code{"cpu"}. A fitted enco
 rather than the device it resolved to, so a fit made on one machine predicts on another.}
 
 \item{seed}{Seed for initialisation, batching and the inner validation split.}
-
-\item{pos_weight_cap}{Ceiling on the per-response positive-class weight, which is the ratio of
-absences to presences among the fitting targets. At least one: a weight under one would
-weight presences down.}
 
 \item{swa}{Average the weights of the tail epochs instead of restoring the best single epoch.
 The schedule anneals to \code{swa_start} of the epoch budget and is then held flat while the

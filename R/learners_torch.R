@@ -111,21 +111,17 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
 # ---- the objective -------------------------------------------------------------------------
 
-# The response head names its loss and its activation, and the trainer looks both up here. A loss
-# is built once per fit from the fitting responses, which is where the positive-class weight of the
-# binary objective comes from; an activation is applied at prediction and nowhere else.
+# The response head names its loss and its activation, and the trainer looks both up here. Each
+# loss takes the head's case weights for the cells of the batch, so a rare response weighs what
+# the head says it weighs; an activation is applied at prediction and nowhere else.
 .torch_losses <- list(
-  binary_cross_entropy = function(torch, y_fit, cfg, device) {
-    pos <- colSums(y_fit)
-    neg <- nrow(y_fit) - pos
-    w <- pmin(pmax(ifelse(pos > 0, neg / pmax(pos, 1), 1), 1), cfg$pos_weight_cap)
-    pw <- torch$torch_tensor(w, dtype = torch$torch_float())$to(device = device)
-    function(out, target) {
-      torch$nnf_binary_cross_entropy_with_logits(out, target, pos_weight = pw)
+  binary_cross_entropy = function(torch) {
+    function(out, target, weight) {
+      torch$nnf_binary_cross_entropy_with_logits(out, target, weight = weight)
     }
   },
-  squared_error = function(torch, y_fit, cfg, device) {
-    function(out, target) torch$nnf_mse_loss(out, target)
+  squared_error = function(torch) {
+    function(out, target, weight) (weight * (out - target)$pow(2))$mean()
   }
 )
 
@@ -143,7 +139,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
     stop("the encoders have no ", .describe(head$activation), " activation. They know ",
          paste(names(.torch_activations), collapse = " and "), ".", call. = FALSE)
   }
-  list(loss = .torch_losses[[head$loss]], activation = head$activation)
+  list(loss = .torch_losses[[head$loss]](.torch()), activation = head$activation)
 }
 
 # ---- the training recipe -------------------------------------------------------------------
@@ -171,7 +167,12 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
   xt <- torch$torch_tensor(m, dtype = torch$torch_float())$to(device = device)
   yt <- torch$torch_tensor(y, dtype = torch$torch_float())$to(device = device)
-  loss_fn <- objective$loss(torch, y[fit_idx, , drop = FALSE], cfg, device)
+  # The weights are the head's, read off the fitting units alone: the validation units are held
+  # out of the count a rare response's weight is made from, as they are held out of the fit.
+  weights <- matrix(1, nrow(y), ncol(y))
+  weights[fit_idx, ] <- .head_weights(head, y[fit_idx, , drop = FALSE])
+  wt <- torch$torch_tensor(weights, dtype = torch$torch_float())$to(device = device)
+  loss_fn <- objective$loss
 
   shape <- c(dim(m)[2L], dim(m)[3L], ncol(y))
   net <- .torch_build(module, shape, arch)
@@ -189,7 +190,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
     for (b in .batches(fit_idx, cfg$batch_size, shuffle = TRUE)) {
       idx <- .index(torch, b, device)
       opt$zero_grad()
-      loss <- loss_fn(net(xt[idx, , ]), yt[idx, ])
+      loss <- loss_fn(net(xt[idx, , ]), yt[idx, ], wt[idx, ])
       loss$backward()
       opt$step()
     }
@@ -202,7 +203,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
     if (!length(val)) {
       next
     }
-    vloss <- .torch_loss(torch, net, loss_fn, xt, yt, val, cfg$batch_size, device)
+    vloss <- .torch_loss(torch, net, loss_fn, xt, yt, wt, val, cfg$batch_size, device)
     if (vloss < best$loss - 1e-4) {
       best <- list(loss = vloss, state = .snapshot(net))
       bad <- 0L
@@ -248,13 +249,14 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   do.call(rbind, out)
 }
 
-.torch_loss <- function(torch, net, loss_fn, xt, yt, idx_all, batch_size, device) {
+.torch_loss <- function(torch, net, loss_fn, xt, yt, wt, idx_all, batch_size, device) {
   net$eval()
   total <- 0
   torch$with_no_grad({
     for (b in .batches(idx_all, batch_size, shuffle = FALSE)) {
       idx <- .index(torch, b, device)
-      total <- total + as.numeric(loss_fn(net(xt[idx, , ]), yt[idx, ])$to(device = "cpu")) *
+      total <- total +
+        as.numeric(loss_fn(net(xt[idx, , ]), yt[idx, ], wt[idx, ])$to(device = "cpu")) *
         length(b)
     }
   })

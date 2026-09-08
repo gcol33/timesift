@@ -33,7 +33,7 @@ from .representation import (DAY_LEVEL_STATS, GRAINS, STATS, Coverage, TimesiftM
                              TimesiftSet, bind_channels, calendar_channels, coverage,
                              grain_matrix, lookback_matrix, timesift_set)
 from .response import (PRESENCE_ABSENCE, Cells, Folds, Response, align_folds, as_response,
-                       fold_map, scorable_cells)
+                       fold_map, positive_weights, scorable_cells)
 from .select import column_names, select_columns
 from .selection import Selection, select_grain
 from .specs import (Representation, Resampling, Sift, TimesiftSpec, as_resampling, as_sift,
@@ -77,7 +77,8 @@ __all__ = [
     "get_learner", "grain",
     "grain_ladder", "grain_matrix", "grains", "grouped_cv", "implied_skill", "kappa_score",
     "learners", "lookback", "lookback_matrix", "lookbacks", "metrics", "mlp", "model_agreement",
-    "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "read_cells",
+    "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "positive_weights",
+    "read_cells",
     "read_folds", "read_response", "register_learner", "register_metric", "register_response",
     "rescnn", "resolve_folds", "resolve_metric", "responses", "roc_auc", "scorable_cells",
     "score_predictions", "select_columns",

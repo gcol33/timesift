@@ -414,3 +414,48 @@ test_that("a calendar-grain fit refuses a record from another period, naming the
                              bins = 2L)
   expect_equal(dim(stats::predict(fit_learner(toy, w, y), w_later)), c(12L, 2L))
 })
+
+test_that("the head owns what a rare response weighs", {
+  y <- cbind(a = c(1, 0, 0, 0, 0, 0), b = c(1, 1, 0, 0, 0, 0))
+  w <- positive_weights(y)
+  # Five absences to one presence in the first response, four to two in the second: the presence
+  # weighs the ratio, at least one, and the absence weighs one.
+  expect_equal(unname(w[, "a"]), c(5, 1, 1, 1, 1, 1))
+  expect_equal(unname(w[, "b"]), c(2, 2, 1, 1, 1, 1))
+  expect_equal(unname(positive_weights(y, cap = 3)[1, "a"]), 3)
+  expect_error(positive_weights(y, cap = 0.5), "at least 1")
+  head <- .responses_reg$get("presence_absence")
+  expect_equal(.head_weights(head, y), w)
+  # A head without `weights` fits unweighted, and a cap of one's own is a registration.
+  plain <- head[setdiff(names(head), "weights")]
+  expect_equal(unname(.head_weights(plain, y)), matrix(1, 6L, 2L))
+  local_response("capped_test", utils::modifyList(
+    head, list(weights = function(y) positive_weights(y, cap = 2))))
+  expect_equal(unname(.head_weights(.responses_reg$get("capped_test"), y)[1, "a"]), 2)
+  expect_error(.head_weights(list(weights = function(y) rep(1, 3)), y), "response's shape")
+})
+
+test_that("every shipped learner fits a rare response under the head's weight", {
+  skip_if_not_installed("glmnet")
+  skip_if_not_installed("ranger")
+  head <- .responses_reg$get("presence_absence")
+  local_response("unweighted_test", head[setdiff(names(head), "weights")])
+  sim <- sim_series(n_unit = 60L, days = 28L, seed = 71L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
+  # A rare response drawn on the warmth, so every learner has a signal to read and none of them
+  # a column that separates it, which the forward search refuses. Enough presences that glmnet
+  # sees eight of a class in every inner fold; its warning below that is a verdict on the
+  # fixture rather than on the weights.
+  set.seed(72)
+  present <- stats::rbinom(60L, 1L, stats::plogis(3 * sim$warmth - 1.5)) == 1
+  stopifnot(sum(present) >= 15L, sum(present) <= 30L)
+  rare <- matrix(as.numeric(present), ncol = 1L, dimnames = list(sim$units, "rare"))
+  for (make in list(function() elasticnet(n_inner = 3L), function() forest(trees = 30L),
+                    function() stepwise(max_terms = 1L))) {
+    weighted <- stats::predict(fit_learner(make(), x, rare), x)
+    plain <- stats::predict(fit_learner(make(), x, rare, response = "unweighted_test"), x)
+    expect_false(isTRUE(all.equal(weighted, plain)), info = make()$name)
+    # Presences weigh more than twice an absence, so the weighted fit predicts them higher.
+    expect_gt(mean(weighted[present, 1L]), mean(plain[present, 1L]))
+  }
+})

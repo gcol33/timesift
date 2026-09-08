@@ -25,7 +25,6 @@ class TrainControl:
     val_frac: float = 0.15
     device: str = "auto"
     seed: int = 1
-    pos_weight_cap: float = 50.0
     swa: bool = False
     swa_start: float = 0.7
 
@@ -44,8 +43,6 @@ class TrainControl:
             raise ValueError(f"`val_frac` must be in [0, 1), got {self.val_frac}")
         if not 0 <= self.swa_start < 1:
             raise ValueError(f"`swa_start` must be in [0, 1), got {self.swa_start}")
-        if self.pos_weight_cap < 1:
-            raise ValueError(f"`pos_weight_cap` must be at least 1, got {self.pos_weight_cap}")
 
     def override(self, settings: dict) -> "TrainControl":
         """The control with the settings a learner or a call gave applied on top of it."""
@@ -68,10 +65,9 @@ def train_control(**settings) -> TrainControl:
     """The settings every neural learner reads, with anything named here replacing its default.
 
     ``epochs``, ``batch_size``, ``learning_rate``, ``weight_decay``, ``early_stopping``,
-    ``val_frac``, ``device`` and ``seed`` are the settings a run is described by. ``pos_weight_cap``
-    bounds the weight a rare response's presences are given against its absences, at least one,
-    and ``swa`` with ``swa_start`` average the weights over the tail of the schedule rather than
-    keeping one epoch out of it.
+    ``val_frac``, ``device`` and ``seed`` are the settings a run is described by, and ``swa`` with
+    ``swa_start`` average the weights over the tail of the schedule rather than keeping one epoch
+    out of it. What a rare response weighs is the response head's, not a training setting.
 
     ``batch_size`` is the most targets an optimiser step reads: the fitting targets are cut into as
     few batches of at most that many as they divide into, of as equal a length as they can be.
