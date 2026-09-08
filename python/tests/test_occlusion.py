@@ -71,13 +71,25 @@ def test_the_profile_is_read_by_the_metric_the_fit_was_scored_under():
 
 
 def test_a_head_that_is_not_presence_absence_can_be_occluded(temporary_response):
-    from timesift.learners import fit_learner
+    from timesift.registry import METRICS, register_metric
     from timesift.response import as_response, scorable_cells
-    temporary_response("continuous_occlusion_test", dict(
-        prepare=as_response, activation="identity", loss="squared_error", metric="roc_auc",
-        cells=lambda y, folds: scorable_cells(
-            Response((y.values > np.median(y.values)).astype(float), y.units, y.variables),
-            folds)))
+    # A continuous response is scored by a metric written for one; a threshold metric refuses
+    # it, as it should.
+    register_metric("neg_mse_occlusion_test", lambda y, p: -float(np.mean((y - p) ** 2)),
+                    overwrite=True)
+    try:
+        temporary_response("continuous_occlusion_test", dict(
+            prepare=as_response, activation="identity", loss="squared_error",
+            metric="neg_mse_occlusion_test",
+            cells=lambda y, folds: scorable_cells(
+                Response((y.values > np.median(y.values)).astype(float), y.units, y.variables),
+                folds)))
+        _occlude_a_continuous_head()
+    finally:
+        METRICS.remove("neg_mse_occlusion_test")
+
+
+def _occlude_a_continuous_head():
 
     readings, binary, _ = planted(n_unit=30, seed=65)
     x = grain_matrix(readings, "id", "time", "value", grain="month")

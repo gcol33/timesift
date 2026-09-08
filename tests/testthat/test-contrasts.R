@@ -37,3 +37,12 @@ test_that("a contrast says which learner it needs and which grains it has", {
   expect_error(grain_contrasts(lad, reference = "fortnight"), "not a grain")
   expect_error(grain_contrasts(lad["day" == lad$grain, ]), "at least two grains")
 })
+
+test_that("a ladder with no scored cell for a learner names the missing reference", {
+  skip_if_not_installed("lmerTest")
+  lad <- data.frame(grain = rep(c("week", "month"), each = 4L), learner = "l",
+                    variable = rep(c("a", "a", "b", "b"), 2L), fold = rep(1:2, 4L),
+                    score = NA_real_, scorable = FALSE, stringsAsFactors = FALSE)
+  lad <- structure(lad, class = c("timesift_ladder", "data.frame"), metric = "tss")
+  expect_error(grain_contrasts(lad, learner = "l"), "no scored cell")
+})

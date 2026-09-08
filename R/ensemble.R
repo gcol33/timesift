@@ -119,6 +119,11 @@ ensemble_fit <- function(oof, y, cells, folds, spec = ensemble(), scores = NULL)
   spec$response <- spec$response %||% "presence_absence"
   y <- .as_response(y)
   oof <- .check_oof(oof, y)
+  if (!any(cells$scorable)) {
+    stop("no cell is scorable, so there is nothing to fit a combiner on. Every (response, fold) ",
+         "cell needs both classes on each side of its split; see scorable_cells().",
+         call. = FALSE)
+  }
   mean_score <- .member_scores(oof, y, cells, folds, spec, scores,
                                required = !identical(spec$scope, "all") ||
                                  identical(spec$method, "weighted"))
@@ -237,8 +242,10 @@ ensemble_weights <- function(fit) {
 # the simplex and no projection step is needed. The step is halved until the loss falls, which
 # makes the sequence of losses monotone and the stopping point the same on every machine; the
 # gradient is divided by its largest entry, so the step means the same thing whatever scale the
-# loss is on.
-.simplex_weights <- function(P, y, loss, iterations = 500L, tol = 1e-12) {
+# loss is on. The loop stops when a step buys less than `tol` of the loss it is on; near the
+# minimum the loss is flat to second order in the weights, so the stop settles the gradient to a
+# precision of about the square root of `tol`.
+.simplex_weights <- function(P, y, loss, iterations = 500L, tol = 1e-14) {
   k <- ncol(P)
   w <- rep(1 / k, k)
   value <- loss$value(as.numeric(P %*% w), y)
@@ -409,15 +416,13 @@ ensemble_weights <- function(fit) {
     f <- .as_folds(folds, rownames(y))
     levels <- sort(unique(f))
     return(vapply(oof, function(p) {
-      per <- .arm_means(.score_arm("member", "member", y, p, f, levels, cells, score))
+      per <- .cell_means(.score_arm("member", "member", y, p, f, levels, cells, score))
       if (!nrow(per)) NA_real_ else mean(per$score)
     }, numeric(1L)))
   }
   if (!is.null(scores)) {
-    keep <- scores[!is.na(scores$score), , drop = FALSE]
-    per <- stats::aggregate(list(score = keep$score), keep[c("candidate", "variable")], mean)
-    by_candidate <- tapply(per$score, per$candidate, mean)
-    return(stats::setNames(as.numeric(by_candidate[names(oof)]), names(oof)))
+    level <- .level_means(.cell_means(scores, "candidate"), "candidate")
+    return(stats::setNames(level$score[match(names(oof), level$candidate)], names(oof)))
   }
   if (required) {
     stop("a ", spec$method, " combination over the ", spec$scope,

@@ -295,3 +295,20 @@ test_that("a fitted encoder names its module builder rather than carrying it", {
   broken$model$module <- "gru"
   expect_error(stats::predict(broken, f$x), "gru")
 })
+
+test_that("a fit leaves torch's random stream where it found it, as it leaves R's", {
+  skip_if_no_torch()
+  f <- torch_fixture(n_unit = 24L, days = 60L)
+  torch::torch_manual_seed(11L)
+  before <- as.numeric(torch::torch_rand(3L))
+  torch::torch_manual_seed(11L)
+  fit_learner(cnn(epochs = 2L, seed = 4L), f$x, f$y)
+  after <- as.numeric(torch::torch_rand(3L))
+  expect_equal(after, before)
+})
+
+test_that("a patience of Inf trains the whole budget", {
+  ctrl <- train_control(early_stopping = Inf)
+  expect_true(ctrl$early_stopping >= .Machine$integer.max)
+  expect_error(train_control(early_stopping = -Inf), "at least one")
+})

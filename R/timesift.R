@@ -176,6 +176,12 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
   folds <- .as_fold_map(resampling, y_matrix, targets, tf)
   f <- .as_folds(folds, tf$label)
   cells <- head$cells(y_matrix, folds)
+  if (!any(cells$scorable)) {
+    stop("no (response, fold) cell is scorable under this fold map, so no candidate can be ",
+         "scored: every cell needs both classes on each side of its split. See scorable_cells() ",
+         "for the counts; a rarer response needs fewer folds, or a response present somewhere.",
+         call. = FALSE)
+  }
   metric <- .as_metric(metric, head$metric)
   score <- metric$fn
   levels <- sort(unique(f))
@@ -528,6 +534,9 @@ predict.timesift <- function(object, targets, series = NULL, candidate = "ensemb
     stop("unknown candidate: ", .listing(unknown), ". This fit carries ",
          .listing(names(object$models)), ".", call. = FALSE)
   }
+  # The new targets are held to what the fit's own were held to: one row per identifier unless
+  # `target_time` places the rows in time. Two rows for one plot would predict twice, silently.
+  .check_targets_unique(.target_frame(targets, spec), spec)
   labels <- object$candidates$representation[match(members, object$candidates$candidate)]
   built <- lapply(stats::setNames(unique(labels), unique(labels)), function(label) {
     build_representation(spec$sift[[label]], series, targets, spec)

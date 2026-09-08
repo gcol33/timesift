@@ -134,7 +134,7 @@ occlusion.timesift <- function(x, candidate, over = c("bin", "channel"), ...) {
   if (!nrow(keep)) {
     return(empty)
   }
-  per <- stats::aggregate(list(score = keep$score), keep[c("candidate", "variable")], mean)
+  per <- .cell_means(keep, "candidate")
   i <- match(per$candidate, fit$candidates$candidate)
   per$representation <- fit$candidates$representation[i]
   per$learner <- fit$candidates$learner[i]
@@ -176,7 +176,7 @@ occlusion.timesift <- function(x, candidate, over = c("bin", "channel"), ...) {
   f <- .as_folds(fit$folds, rownames(fit$y))
   rows <- .score_arm("ensemble", "ensemble", fit$y, combined, f, sort(unique(f)), fit$cells,
                      fit$scorer)
-  per <- .arm_means(rows)
+  per <- .cell_means(rows)
   if (!nrow(per)) NA_real_ else mean(per$score)
 }
 

@@ -481,3 +481,18 @@ test_that("a targets-only fit predicts from the static block alone", {
   expect_equal(rownames(p), sort(case$units))
   expect_true(all(is.finite(p)))
 })
+
+test_that("new targets are held to one row per identifier, as the fit's own were", {
+  case <- toy_case(n_unit = 15L, days = 40L)
+  fit <- run_toy(case)
+  twice <- case$targets[c(1L, 1L, 2L), ]
+  expect_error(stats::predict(fit, twice, case$series, candidate = names(fit$models)[1L]),
+               "more than one row")
+})
+
+test_that("a design under which no cell is scorable stops before anything is fitted", {
+  case <- toy_case(n_unit = 15L, days = 40L)
+  case$targets$sp1 <- 0
+  case$targets$sp2 <- 0
+  expect_error(run_toy(case), "no \\(response, fold\\) cell is scorable")
+})

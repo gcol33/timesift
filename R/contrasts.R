@@ -69,8 +69,12 @@ grain_contrasts <- function(ladder, learner = NULL, reference = NULL, adjust = "
   if (is.null(reference)) {
     s <- summary(ladder)
     reference <- s$grain[s$learner == learner & s$best]
+    if (length(reference) != 1L) {
+      stop("no grain of learner \"", learner, "\" has a score to take as the reference. Name ",
+           "`reference`.", call. = FALSE)
+    }
   }
-  if (!reference %in% grains) {
+  if (length(reference) != 1L || !reference %in% grains) {
     stop("\"", reference, "\" is not a grain of this ladder.", call. = FALSE)
   }
 

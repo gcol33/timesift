@@ -207,3 +207,30 @@ test_that("score_predictions() refuses a prediction that is not a number on a sc
   p[1L, 1L] <- Inf
   expect_error(score_predictions(f$y, p, f$folds), "the predictions hold no number")
 })
+
+test_that("learners arrive as a character vector of registered names, as the docs say", {
+  skip_if_not_installed("glmnet")
+  skip_if_not_installed("ranger")
+  f <- ladder_fixture()
+  x <- timesift_set(list(week = f$x$week))
+  lad <- grain_ladder(x, f$y, c("elasticnet", "forest"), folds = f$folds, verbose = FALSE)
+  expect_setequal(unique(lad$learner), c("elasticnet", "forest"))
+})
+
+test_that("every level of the package averages cells by one rule", {
+  rows <- data.frame(grain = rep(c("week", "month"), each = 4L),
+                     learner = "l", variable = rep(c("a", "a", "b", "b"), 2L),
+                     fold = rep(1:2, 4L), score = c(0.2, 0.4, 0.9, NA, 0.5, 0.5, 0.1, 0.3),
+                     stringsAsFactors = FALSE)
+  per <- .cell_means(rows, c("grain", "learner"))
+  expect_equal(per$score[per$grain == "week" & per$variable == "a"], 0.3)
+  expect_equal(per$score[per$grain == "week" & per$variable == "b"], 0.9)
+  level <- .level_means(per, c("learner", "grain"))
+  expect_equal(level$score[level$grain == "week"], 0.6)
+  expect_equal(level$score[level$grain == "month"], 0.35)
+  expect_equal(level$n_variable, c(2L, 2L))
+  # One arm's rows have only the variable to group on, and an empty table stays empty.
+  expect_equal(.cell_means(rows[rows$grain == "week", ])$score, c(0.3, 0.9))
+  expect_equal(nrow(.cell_means(rows[0, ])), 0L)
+  expect_equal(nrow(.level_means(.cell_means(rows[0, ], "grain"), "grain")), 0L)
+})

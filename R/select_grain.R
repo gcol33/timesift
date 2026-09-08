@@ -263,7 +263,7 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
   out <- lapply(metrics(), function(nm) {
     rows <- .score_arm(.selected_label, "selected", y, p, f, levels, cells,
                        .metrics_reg$get(nm))
-    per_variable <- .arm_means(rows)
+    per_variable <- .cell_means(rows)
     ms <- .mean_se(per_variable$score)
     data.frame(metric = nm, score = ms[1L], se = ms[2L], n_variable = nrow(per_variable),
                stringsAsFactors = FALSE)

@@ -370,3 +370,22 @@ test_that("a fit whose learner is no longer registered says so by name", {
   expect_error(stats::predict(fit, case$x), "toy_ref")
   expect_error(stats::predict(fit, case$x), "not registered")
 })
+
+test_that("a fit read back through its reference keeps the settings held at NULL", {
+  skip_if_not_installed("ranger")
+  case <- fit_case()
+  fit <- fit_learner(forest(trees = 20L), case$x, case$y)
+  rebuilt <- .as_learner(fit$learner)
+  expect_true("mtry" %in% names(rebuilt$params))
+  expect_null(rebuilt$params$mtry)
+  again <- fit_learner(rebuilt, case$x, case$y)
+  expect_equal(stats::predict(again, case$x), stats::predict(fit, case$x))
+})
+
+test_that("the penalised learner refuses a design of one column rather than surfacing glmnet's", {
+  skip_if_not_installed("glmnet")
+  sim <- sim_series(n_unit = 20L, days = 40L, seed = 61L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "year")
+  y <- sim_response(sim, n_var = 2L, seed = 62L)
+  expect_error(fit_learner(elasticnet(squares = FALSE), x, y), "at least two columns")
+})

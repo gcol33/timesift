@@ -156,6 +156,35 @@
 
 ## Fixes
 
+* `fold_map()` deals with one round-robin counter that runs on from each stratum into the next,
+  on both sides, so the folds are equal in size to within one unit whatever `v` is and
+  leave-one-out is every unit in a fold of its own. A counter restarted in every stratum used
+  the first labels once more than the last in every stratum, and a stratum smaller than `v`
+  never reached the last labels at all: ten folds over thirty units came back holding two to
+  five units each. The fold-map fixture, and the mask and the inflation built on it, are
+  regenerated.
+* A fold map given as `resampling` that holds one fold is refused, and one built by
+  `fold_map()` keeps its `grouped`, `seed` and `strata` when it reaches the run, so a grouped
+  design reports as one. A run under which no `(response, fold)` cell is scorable stops before
+  anything is fitted, and `ensemble_fit()` handed no scorable cell says so rather than fitting a
+  combiner on nothing.
+* The threshold metrics check that the response is 0/1 before coercing it, on both sides. They
+  used to coerce first, which read 0.6 as 0 and scored a response that was never binary.
+* A torch fit puts torch's generators back where it found them, as it does R's.
+* `.simplex_weights()` stops at a relative gain of 1e-14 rather than 1e-12, on both sides. Near
+  the minimum the loss is flat to second order, so the stop settles the gradient to about the
+  square root of the tolerance, and the looser one left the carried members' gradients apart by
+  more than a millionth on some boards.
+* The within-variable-then-across-variables mean is one function, `.cell_means()`, read by the
+  ladder, the report, the stack's member scores and the selection's estimate; the five copies
+  had four spellings.
+* Small edges: `models` and `learners` take a character vector of registered names, as the docs
+  said; a fit read back through its reference keeps a setting held at `NULL`, so a forest refits
+  with its default `mtry`; `train_control(early_stopping = Inf)` is a patience that never runs
+  out; `predict()` on a `timesift` fit holds the new targets to one row per identifier, as the
+  fit's own were held; the elastic net refuses a design of one column in its own words; and
+  `grain_contrasts()` names the reference it cannot find rather than failing on a length-zero
+  test.
 * Python: a learner pinned to a representation that shares a sift member's label but not its
   definition is refused, as R refuses it, rather than fitted on the sift's array.
 * Python: `auto_grains()` counts the bins in the zone the time column carries, the clock the

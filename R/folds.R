@@ -9,10 +9,12 @@
 #' neighbours' reaches the model.
 #'
 #' Folds are balanced within strata: units are grouped into `strata` equal-count groups of the
-#' stratifying value, shuffled inside each group, and dealt round-robin, so each fold carries the
-#' same mix. With a multi-variable response the default stratifies on richness, the number of
-#' variables present at a unit, because one fold map has to serve every variable at once and cannot
-#' be stratified on any single one of them.
+#' stratifying value, shuffled inside each group, and dealt round-robin by one counter that runs
+#' on from each stratum into the next, so each fold carries the same mix and the folds are equal
+#' in size to within one unit whatever `v` is, up to one unit per fold. With a multi-variable
+#' response the default stratifies on richness, the number of variables present at a unit,
+#' because one fold map has to serve every variable at once and cannot be stratified on any
+#' single one of them.
 #'
 #' @param y The response: a matrix or data frame of units by variables, with unit identifiers in
 #'   the row names or in a leading character or factor column.
@@ -62,13 +64,19 @@ fold_map <- function(y, v = 10L, seed = 1L, strata = 5L, by = NULL, group = NULL
   on.exit(.restore_seed(old), add = TRUE)
   set.seed(seed)
 
+  # The fold labels are permuted once, and the deal runs on from one stratum into the next: a
+  # counter restarted in every stratum hands the first labels one unit more than the last in
+  # every stratum, and a stratum smaller than `v` never reaches the last labels at all.
+  labels <- sample.int(v)
   dealt <- integer(n_group)
-  for (s in unique(stratum)) {
+  dealt_so_far <- 0L
+  for (s in sort(unique(stratum))) {
     idx <- which(stratum == s)
     # Permute by position, never by value: sample() on a length-one vector samples 1:x instead of
     # returning x, so a stratum holding a single group would scatter one fold over every position
     # below that group's index and leave the map degenerate with nothing raised.
-    dealt[idx[sample.int(length(idx))]] <- rep_len(sample.int(v), length(idx))
+    dealt[idx[sample.int(length(idx))]] <- labels[(dealt_so_far + seq_along(idx) - 1L) %% v + 1L]
+    dealt_so_far <- dealt_so_far + length(idx)
   }
   structure(stats::setNames(dealt[key], rownames(y)), v = as.integer(v), seed = seed,
             strata = as.integer(strata), grouped = !is.null(group), class = "timesift_folds")
@@ -140,6 +148,17 @@ print.timesift_resampling <- function(x, ...) {
                     group = .resampling_group(resampling, targets, tf)))
   }
   f <- .as_folds(.against_targets(resampling, tf), tf$label)
+  if (length(unique(f)) < 2L) {
+    stop("the fold map given as `resampling` holds one fold, so every unit is held out at once ",
+         "and nothing is left to fit on. A fold map needs at least two folds.", call. = FALSE)
+  }
+  # A fold map the caller built carries what it knows about itself: reordered here to the
+  # targets' order, and otherwise as it came, so a grouped design reports as one.
+  if (inherits(resampling, "timesift_folds")) {
+    return(structure(stats::setNames(f, tf$label), v = attr(resampling, "v"),
+                     seed = attr(resampling, "seed"), strata = attr(resampling, "strata"),
+                     grouped = isTRUE(attr(resampling, "grouped")), class = "timesift_folds"))
+  }
   structure(stats::setNames(f, tf$label), v = length(unique(f)), seed = NA,
             strata = NA_integer_, grouped = FALSE, class = "timesift_folds")
 }

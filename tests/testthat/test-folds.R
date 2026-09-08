@@ -192,3 +192,35 @@ test_that("a split written against the targets follows them into their fitting o
   as_table <- data.frame(plot = rownames(y), fold = given, stringsAsFactors = FALSE)
   expect_equal(unclass(.as_fold_map(as_table, y, targets, tf)), unclass(by_row))
 })
+
+test_that("the deal is balanced whatever `v` is, down to one unit per fold", {
+  y <- sim_response(sim_series(n_unit = 30L, days = 2L))
+  # Six units per stratum and ten folds: a deal restarted in every stratum would use six of the
+  # ten labels per stratum and leave the fold sizes anywhere from two to five.
+  n <- table(fold_map(y, v = 10L))
+  expect_length(n, 10L)
+  expect_lte(max(n) - min(n), 1L)
+  # Leave one out is every unit in a fold of its own, and the map says how many folds it holds.
+  loo <- fold_map(y, v = 30L)
+  expect_equal(sort(as.integer(loo)), 1:30)
+  expect_equal(attr(loo, "v"), 30L)
+  # The strata still each reach every fold in turn, so a fold is not one stratum's.
+  f <- fold_map(y, v = 5L, strata = 5L)
+  value <- rowSums(y)
+  spread <- tapply(value, f, mean)
+  expect_lt(max(spread) - min(spread), diff(range(value)))
+})
+
+test_that("a fold map holding one fold is refused, and a caller's map keeps what it knows", {
+  y <- sim_response(sim_series(n_unit = 24L, days = 2L))
+  tf <- list(label = rownames(y), order = seq_len(nrow(y)))
+  targets <- data.frame(plot = rownames(y), site = rep(sprintf("s%02d", 1:8), each = 3L),
+                        stringsAsFactors = FALSE)
+  expect_error(.as_fold_map(rep(1L, 24L), y, targets, tf), "holds one fold")
+  grouped <- fold_map(y, v = 4L, group = targets$site, seed = 7L)
+  kept <- .as_fold_map(grouped, y, targets, tf)
+  expect_true(attr(kept, "grouped"))
+  expect_equal(attr(kept, "seed"), 7L)
+  expect_equal(attr(kept, "v"), 4L)
+  expect_equal(as.integer(kept), as.integer(grouped))
+})

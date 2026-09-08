@@ -330,14 +330,14 @@ def test_grouped_cv_keeps_every_target_of_a_group_in_one_fold():
 def test_grouping_does_not_move_the_map_a_plain_call_draws():
     y = Response(values=np.eye(6), units=tuple("abcdef"), variables=tuple("uvwxyz"))
     # The maps a plain call draws, pinned so that giving `group` a meaning cannot move them.
-    assert fold_map(y, v=3, seed=1, strata=1).fold.tolist() == [2, 1, 3, 3, 1, 2]
+    assert fold_map(y, v=3, seed=1, strata=1).fold.tolist() == [2, 3, 2, 1, 1, 3]
     assert fold_map(y, v=3, seed=1, strata=1, group=list("aabbcc")).fold.tolist() == \
-        [3, 3, 1, 1, 2, 2]
+        [2, 2, 3, 3, 1, 1]
     values = np.random.default_rng(7).integers(0, 2, size=(24, 4)).astype(float)
     stratified = Response(values=values, units=tuple(f"u{i:02d}" for i in range(24)),
                           variables=tuple("abcd"))
     assert fold_map(stratified, v=4, seed=3).fold.tolist() == [
-        4, 1, 1, 4, 4, 3, 2, 3, 3, 2, 4, 1, 2, 4, 1, 3, 1, 3, 2, 2, 4, 3, 2, 2]
+        2, 4, 4, 2, 3, 2, 1, 3, 1, 3, 1, 3, 2, 2, 1, 4, 4, 1, 1, 2, 3, 4, 4, 3]
 
 
 def test_a_group_needs_one_value_per_unit():

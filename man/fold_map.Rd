@@ -38,10 +38,12 @@ logger in each plot is, a held-out unit brings its own measured input with it an
 neighbours' reaches the model.
 
 Folds are balanced within strata: units are grouped into \code{strata} equal-count groups of the
-stratifying value, shuffled inside each group, and dealt round-robin, so each fold carries the
-same mix. With a multi-variable response the default stratifies on richness, the number of
-variables present at a unit, because one fold map has to serve every variable at once and cannot
-be stratified on any single one of them.
+stratifying value, shuffled inside each group, and dealt round-robin by one counter that runs
+on from each stratum into the next, so each fold carries the same mix and the folds are equal
+in size to within one unit whatever \code{v} is, up to one unit per fold. With a multi-variable
+response the default stratifies on richness, the number of variables present at a unit,
+because one fold map has to serve every variable at once and cannot be stratified on any
+single one of them.
 }
 \examples{
 y <- matrix(rbinom(300, 1, 0.3), nrow = 60,

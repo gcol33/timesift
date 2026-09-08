@@ -207,7 +207,7 @@ def in_scope(names, scope: str, scores) -> tuple[str, ...]:
 
 
 def simplex_weights(p: np.ndarray, y: np.ndarray, loss: dict, iterations: int = 500,
-                    tol: float = 1e-12) -> np.ndarray:
+                    tol: float = 1e-14) -> np.ndarray:
     """Non-negative weights summing to one that minimise a loss of the mixture ``p w``.
 
     ``p`` is one column of predictions per member and ``y`` the observed values they are read
@@ -219,7 +219,8 @@ def simplex_weights(p: np.ndarray, y: np.ndarray, loss: dict, iterations: int = 
     The step is halved until the loss falls, which makes the sequence of losses monotone and the
     stopping point the same on every machine, and the gradient is divided by its largest entry, so
     a step means the same thing whatever scale the loss is on. The loop stops when a step buys less
-    than ``tol`` of the loss it is on.
+    than ``tol`` of the loss it is on. Near the minimum the loss is flat to second order in the
+    weights, so the stop settles the gradient to a precision of about the square root of ``tol``.
     """
     p = np.asarray(p, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)

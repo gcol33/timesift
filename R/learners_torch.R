@@ -159,6 +159,10 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   n <- dim(m)[1L]
   old <- .seed_state()
   on.exit(.restore_seed(old), add = TRUE)
+  # torch's generators are seeded for the fit and put back with R's, so a fit leaves every
+  # stream where it found it and what runs after it draws what it would have drawn anyway.
+  torch_state <- .torch_rng_state(torch, device)
+  on.exit(.restore_torch_rng(torch, device, torch_state), add = TRUE)
   set.seed(cfg$seed)
   torch$torch_manual_seed(cfg$seed)
 
@@ -366,6 +370,19 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
 .scale_channels <- function(m, scaler) {
   sweep(sweep(m, 2L, scaler$centre, "-"), 2L, scaler$scale, "/")
+}
+
+.torch_rng_state <- function(torch, device) {
+  list(cpu = torch$torch_get_rng_state(),
+       cuda = if (identical(device, "cuda")) torch$cuda_get_rng_state() else NULL)
+}
+
+.restore_torch_rng <- function(torch, device, state) {
+  torch$torch_set_rng_state(state$cpu)
+  if (!is.null(state$cuda)) {
+    torch$cuda_set_rng_state(state$cuda)
+  }
+  invisible(TRUE)
 }
 
 .torch <- function() {

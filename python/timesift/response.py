@@ -201,13 +201,18 @@ def _deal(value: np.ndarray, v: int, seed: int, strata: int, what: str) -> np.nd
         raise ValueError(f"`v` must be between 2 and the {n} {what}, got {v}")
     stratum = np.ones(n, dtype=int) if strata <= 1 else _quantile_strata(value, strata)
 
+    # The fold labels are permuted once, and the deal runs on from one stratum into the next: a
+    # counter restarted in every stratum hands the first labels one unit more than the last in
+    # every stratum, and a stratum smaller than ``v`` never reaches the last labels at all.
     rng = np.random.default_rng(seed)
+    labels = rng.permutation(v) + 1
     fold = np.empty(n, dtype=int)
+    dealt = 0
     for s in np.unique(stratum):
         idx = np.flatnonzero(stratum == s)
         rng.shuffle(idx)
-        labels = rng.permutation(v) + 1
-        fold[idx] = np.resize(labels, len(idx))
+        fold[idx] = labels[(dealt + np.arange(len(idx))) % v]
+        dealt += len(idx)
     return fold
 
 

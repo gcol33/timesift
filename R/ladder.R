@@ -182,14 +182,28 @@ score_predictions <- function(y, p, folds, cells = NULL, metric = "tss") {
   rows
 }
 
-# The per-variable mean of one arm's cells. A ladder groups by its own label as well because it
-# holds several arms; one arm's rows have only the variable to group on.
-.arm_means <- function(rows) {
-  keep <- rows[!is.na(rows$score), c("variable", "score"), drop = FALSE]
+# The one rule every level of the package averages cells by. A variable is the independent
+# replicate, so a cell mean is taken within a variable over its folds before anything is averaged
+# across variables; averaging cells directly would weight a variable by how many folds it happened
+# to be scorable in. `by` names the columns that tell arms apart, a ladder's grain and learner or
+# a run's candidate, and is empty for the rows of a single arm.
+.cell_means <- function(rows, by = character()) {
+  keep <- rows[!is.na(rows$score), c(by, "variable", "score"), drop = FALSE]
   if (!nrow(keep)) {
     return(keep)
   }
-  stats::aggregate(list(score = keep$score), keep["variable"], mean)
+  stats::aggregate(list(score = keep$score), keep[c(by, "variable")], mean)
+}
+
+# The level of each arm, as the mean over the variables `.cell_means()` left it, and how many
+# variables that mean is over.
+.level_means <- function(per_variable, by) {
+  if (!nrow(per_variable)) {
+    return(data.frame(per_variable[by], score = numeric(), n_variable = integer()))
+  }
+  merge(stats::aggregate(list(score = per_variable$score), per_variable[by], mean),
+        stats::aggregate(list(n_variable = per_variable$score), per_variable[by], length),
+        by = by)
 }
 
 # Every attribute the array carries is carried through, rather than a list of the ones a calendar
@@ -208,8 +222,13 @@ score_predictions <- function(y, p, folds, cells = NULL, metric = "tss") {
 }
 
 .learner_list <- function(learners) {
-  if (inherits(learners, "timesift_learner") || is.character(learners)) {
+  if (inherits(learners, "timesift_learner")) {
     learners <- list(learners)
+  }
+  # A character vector is one name per learner, as the docs promise; `list()` on it would make
+  # the whole vector one entry.
+  if (is.character(learners)) {
+    learners <- as.list(learners)
   }
   learners <- lapply(learners, .as_learner)
   names(learners) <- .fill_names(learners, "name")
@@ -261,10 +280,7 @@ summary.timesift_ladder <- function(object, ...) {
     return(data.frame(learner = character(), grain = character(), score = numeric(),
                       n_variable = integer(), best = logical(), stringsAsFactors = FALSE))
   }
-  key <- per_variable[c("learner", "grain")]
-  out <- merge(stats::aggregate(list(score = per_variable$score), key, mean),
-               stats::aggregate(list(n_variable = per_variable$score), key, length),
-               by = c("learner", "grain"))
+  out <- .level_means(per_variable, c("learner", "grain"))
   grains <- unique(object$grain)
   out <- out[order(out$learner, match(out$grain, grains), method = "radix"), ]
   # One grain per learner is the best, even where two tie: it is the reference a contrast is read
@@ -275,16 +291,8 @@ summary.timesift_ladder <- function(object, ...) {
   out
 }
 
-# A variable is the independent replicate, so a cell mean is taken within a variable over its folds
-# before anything is averaged across variables. Averaging cells directly would weight a variable by
-# how many folds it happened to be scorable in.
 .per_variable <- function(ladder) {
-  keep <- ladder[!is.na(ladder$score), , drop = FALSE]
-  if (!nrow(keep)) {
-    return(keep[c("grain", "learner", "variable", "score")])
-  }
-  stats::aggregate(list(score = keep$score), keep[c("grain", "learner", "variable")],
-                   mean)
+  .cell_means(ladder, c("grain", "learner"))
 }
 
 # A level and the spread of the variables it was averaged over, in one place, so a ladder and a

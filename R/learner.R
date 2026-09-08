@@ -231,7 +231,9 @@ fit_learner <- function(learner, x, y, response = "presence_absence", control = 
          "\", ...) before predicting from the fit.", call. = FALSE)
   }
   built <- .learners_reg$get(ref$name)()
-  out <- utils::modifyList(unclass(built), unclass(ref))
+  # A setting held at NULL, `mtry = NULL` for a forest's default, is a setting; without
+  # `keep.null` it would be dropped and the refit would be asked for an argument it never had.
+  out <- utils::modifyList(unclass(built), unclass(ref), keep.null = TRUE)
   structure(out[names(unclass(built))], class = "timesift_learner")
 }
 

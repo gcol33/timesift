@@ -46,6 +46,11 @@ train_control <- function(epochs = 60L, batch_size = 64L, learning_rate = 1e-3,
                           device = "auto", seed = 1L,
                           pos_weight_cap = 50, swa = FALSE, swa_start = 0.7) {
   given <- names(as.list(match.call()))[-1L]
+  # `early_stopping = Inf` is a patience that never runs out, so the whole budget is trained; an
+  # integer cannot hold it, and the largest one is the same thing.
+  if (is.numeric(early_stopping) && length(early_stopping) == 1L && is.infinite(early_stopping)) {
+    early_stopping <- if (early_stopping > 0) .Machine$integer.max else -1L
+  }
   settings <- list(
     epochs = as.integer(epochs), batch_size = as.integer(batch_size),
     learning_rate = learning_rate, weight_decay = weight_decay,
@@ -76,9 +81,15 @@ train_control <- function(epochs = 60L, batch_size = 64L, learning_rate = 1e-3,
            paste(format(settings[[nm]]), collapse = ", "), ".", call. = FALSE)
     }
   }
-  if (settings$weight_decay < 0 || settings$early_stopping < 1L) {
-    stop("`weight_decay` cannot be negative and `early_stopping` is at least one epoch.",
-         call. = FALSE)
+  if (length(settings$early_stopping) != 1L || is.na(settings$early_stopping) ||
+        settings$early_stopping < 1L) {
+    stop("`early_stopping` is a count of epochs of at least one, or Inf for never, got ",
+         paste(format(settings$early_stopping), collapse = ", "), ".", call. = FALSE)
+  }
+  if (length(settings$weight_decay) != 1L || is.na(settings$weight_decay) ||
+        settings$weight_decay < 0) {
+    stop("`weight_decay` is a single number that is not negative, got ",
+         paste(format(settings$weight_decay), collapse = ", "), ".", call. = FALSE)
   }
   if (!is.character(settings$device) || length(settings$device) != 1L) {
     stop("`device` is \"auto\" or the name of a device, got ", class(settings$device)[1L], ".",

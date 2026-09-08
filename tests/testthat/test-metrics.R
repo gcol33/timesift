@@ -166,3 +166,12 @@ test_that("it takes a mask and a metric of its own", {
   expect_false(isTRUE(all.equal(by_auc$score, by_tss$score)))
   expect_error(score_predictions(y, p, folds, metric = "nope"), "unknown metric")
 })
+
+test_that("a response that is not 0/1 is refused rather than truncated to it", {
+  p <- c(0.1, 0.2, 0.8, 0.9)
+  for (fn in list(tss, roc_auc, kappa_score)) {
+    expect_error(fn(c(0.4, 0.6, 1, 1), p), "presence-absence")
+  }
+  expect_error(model_agreement(c(0.4, 0.6, 1, 1), p, rev(p)), "presence-absence")
+  expect_equal(tss(c(FALSE, FALSE, TRUE, TRUE), p), 1)
+})

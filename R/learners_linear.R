@@ -43,6 +43,11 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
     fit = function(x, y, alpha, n_inner, squares, s, weight_positives, seed, head, ...) {
       family <- .head_family(head)
       m <- .design(x, squares)
+      if (ncol(m) < 2L) {
+        stop("the elastic net needs at least two columns to penalise over, and this ",
+             "representation flattens to ", ncol(m), ". Give it more bins or channels, or ",
+             "leave `squares = TRUE`.", call. = FALSE)
+      }
       old <- .seed_state()
       on.exit(.restore_seed(old), add = TRUE)
       seeds <- .variable_seeds(seed, y)

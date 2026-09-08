@@ -88,7 +88,7 @@ kappa_score <- function(y, p, rule = c("youden", "kappa", "prevalence")) {
   if (!is.finite(thr)) {
     return(NA_real_)
   }
-  .kappa_table(as.integer(y), as.integer(p >= thr))
+  .kappa_table(.labels(y), as.integer(p >= thr))
 }
 
 #' @rdname kappa_score
@@ -119,7 +119,7 @@ decision_threshold <- function(y, p, rule = c("youden", "kappa", "prevalence")) 
 #' @export
 model_agreement <- function(y, p_a, p_b, rule = c("youden", "kappa", "prevalence")) {
   rule <- match.arg(rule)
-  y <- as.integer(y)
+  y <- .labels(y)
   ta <- decision_threshold(y, p_a, rule)
   tb <- decision_threshold(y, p_b, rule)
   if (!is.finite(ta) || !is.finite(tb)) {
@@ -145,14 +145,20 @@ model_agreement <- function(y, p_a, p_b, rule = c("youden", "kappa", "prevalence
   if (pe >= 1) NA_real_ else (po - pe) / (1 - pe)
 }
 
+# The response as 0/1 integers, refused where it is not one: checked on the values as given,
+# because coercing first would read 0.6 as 0 and pass a response that was never binary.
+.labels <- function(y) {
+  if (!all(y %in% c(0, 1))) {
+    stop("`y` must be presence-absence, 0/1 or logical.", call. = FALSE)
+  }
+  as.integer(y)
+}
+
 .check_labels <- function(y, p) {
-  y <- as.integer(y)
+  y <- .labels(y)
   if (length(y) != length(p)) {
     stop("`y` and `p` must be the same length, got ", length(y), " and ", length(p), ".",
          call. = FALSE)
-  }
-  if (!all(y %in% c(0L, 1L))) {
-    stop("`y` must be presence-absence, 0/1 or logical.", call. = FALSE)
   }
   if (anyNA(p) || any(!is.finite(as.numeric(p)))) {
     return(NULL)

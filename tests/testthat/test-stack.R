@@ -267,7 +267,7 @@ test_that("the ensemble row is the combined prediction scored on the run's own c
   f <- .as_folds(fit$folds, rownames(fit$y))
   rows <- .score_arm("ensemble", "ensemble", fit$y, combined, f, sort(unique(f)), fit$cells,
                      .metrics_reg$get(fit$metric))
-  expect_equal(s$mean[s$candidate == "ensemble"], mean(.arm_means(rows)$score))
+  expect_equal(s$mean[s$candidate == "ensemble"], mean(.cell_means(rows)$score))
   expect_equal(sum(rows$scorable), sum(fit$cells$scorable))
 })
 
@@ -350,4 +350,13 @@ test_that("the combiner refuses to drop a scorable cell rather than fitting on f
   f$oof$noise[hit[1L], hit[2L]] <- NaN
   expect_error(ensemble_fit(f$oof, f$y, f$cells, f$folds), "did not settle")
   expect_error(ensemble_fit(f$oof, f$y, f$cells, f$folds), "noise (1)", fixed = TRUE)
+})
+
+test_that("a combiner handed no scorable cell says so rather than fitting on nothing", {
+  y <- matrix(0, nrow = 6L, ncol = 1L, dimnames = list(paste0("u", 1:6), "sp1"))
+  f <- stats::setNames(rep(1:2, 3L), rownames(y))
+  cells <- scorable_cells(y, f)
+  oof <- list(a = matrix(0.5, 6L, 1L, dimnames = dimnames(y)),
+              b = matrix(0.4, 6L, 1L, dimnames = dimnames(y)))
+  expect_error(ensemble_fit(oof, y, cells, f), "no cell is scorable")
 })

@@ -12,8 +12,17 @@ import numpy as np
 THRESHOLD_RULES = ("youden", "kappa", "prevalence")
 
 
+def _labels(y) -> np.ndarray:
+    """The response as 0/1 integers, refused where it is not one: checked on the values as given,
+    because coercing first would read 0.6 as 0 and pass a response that was never binary."""
+    y = np.asarray(y, dtype=np.float64)
+    if not np.isin(y, (0.0, 1.0)).all():
+        raise ValueError("`y` must be presence-absence, 0/1 or logical.")
+    return y.astype(np.int64)
+
+
 def _sweep(y, p):
-    y = np.asarray(y).astype(np.int64)
+    y = _labels(y)
     p = np.asarray(p, dtype=np.float64)
     if y.shape != p.shape:
         raise ValueError("`y` and `p` must be the same length")
@@ -41,7 +50,7 @@ def tss(y, p) -> float:
 
 def roc_auc(y, p) -> float:
     """The area under the ROC curve, as the rank sum of the presences. Ties take the average rank."""
-    y = np.asarray(y).astype(np.int64)
+    y = _labels(y)
     p = np.asarray(p, dtype=np.float64)
     n_pos, n_neg = int(y.sum()), int((1 - y).sum())
     if n_pos == 0 or n_neg == 0 or not np.isfinite(p).all():
@@ -99,13 +108,12 @@ def kappa_score(y, p, rule: str = "youden") -> float:
     thr = decision_threshold(y, p, rule)
     if not np.isfinite(thr):
         return float("nan")
-    return cohen_kappa(np.asarray(y).astype(int),
-                       (np.asarray(p, dtype=np.float64) >= thr).astype(int))
+    return cohen_kappa(_labels(y), (np.asarray(p, dtype=np.float64) >= thr).astype(int))
 
 
 def model_agreement(y, p_a, p_b, rule: str = "youden") -> dict:
     """Agreement between two models' decisions, with how often each is right where they differ."""
-    y = np.asarray(y).astype(int)
+    y = _labels(y)
     ta, tb = decision_threshold(y, p_a, rule), decision_threshold(y, p_b, rule)
     if not (np.isfinite(ta) and np.isfinite(tb)):
         return dict(kappa=float("nan"), n=len(y), n_disagree=0, share_disagree=float("nan"),
