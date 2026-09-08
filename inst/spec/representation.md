@@ -180,7 +180,8 @@ single readings, and the difference is the point: an extreme day is a state the 
 extreme reading can be one hour, and an average daily extreme is the exposure a typical day of the
 bin brought.
 
-Two orderings follow from the definitions and are asserted:
+Two orderings follow from the definitions, and both test suites assert them on every bin of
+every grain, on the core's output and on the oracle's alike:
 `min <= mean_daily_min <= mean <= mean_daily_max <= max` and
 `min <= cold_day <= mean <= warm_day <= max`. The two day-level pairs are not ordered against each
 other, and a bin whose days differ widely in level is where they part: a bin of one day at 0 and
@@ -574,19 +575,30 @@ call site.
 |---|---|
 | the whole run | `timesift()`, from a table of targets and a table of series to a scored comparison |
 | what a representation is | `native()`, `grain()`, `multigrain()`, `lookback()`, and the sets `grains()` and `lookbacks()` |
+| coercing to a set of representations | `as_sift()`, from a representation, a list of them or a vector of grain names |
+| the calendar-binned array | `grain_matrix()` |
 | the target-anchored array | `lookback_matrix()` |
+| an already-reduced feature table | `feature_matrix()`, a one-channel array with no time axis, so a published set of aggregates can be an arm beside a grain |
 | which units reach which bins | `coverage()`, the count of readings per unit and bin over every bin the calendar tiles the record with, which is where a refused record's gaps are read off |
 | building one representation | `build_representation()` |
+| a channel added to an array | `bind_channels()`, and `calendar_channels()` for the sine and cosine of each bin's position in the year |
 | the penalised learner | `elasticnet()` |
 | the forward selector | `stepwise()` |
 | the forest | `forest()` |
 | the encoders | `mlp()`, `cnn()`, `rescnn()` |
 | how an encoder is trained | `train_control()` |
+| fitting one learner on one representation | `fit_learner()` |
 | the resampling | `cv()` and `grouped_cv()` |
+| the fold map and the mask | `fold_map()` and `scorable_cells()` |
+| fitting across a set of grains | `grain_ladder()`, and `select_grain()` for the nested selection |
 | the combiner | `ensemble()`, `ensemble_fit()`, `ensemble_combine()` and `ensemble_weights()` |
 | scoring held-out predictions | `score_predictions()`, on the cells the mask allows |
+| the metrics | `tss()`, `roc_auc()` and `kappa_score()`, with `decision_threshold()` and `model_agreement()` beside them |
+| two arms on matched cells | `paired_contrast()` |
+| the inflation of a self-selected threshold | `tss_inflation()`, and `implied_skill()` for the level it implies |
 | a set of representations | `timesift_set()`, which reads as a mapping of grain name to representation |
 | folds of the inner cross-validation | `n_inner` |
+| the three artifacts | `write_folds()` and `read_folds()`, `write_response()` and `read_response()`, `write_cells()` and `read_cells()` |
 | the digest | `digest_array()`, exported |
 | the three registries | `register_learner()` and `learners()`, `register_metric()` and `metrics()`, `register_response()` and `responses()` |
 
@@ -679,14 +691,19 @@ call site.
 
 | concept | in R | in Python |
 |---|---|---|
+| a learner of your own | `learner()`, a constructor taking the fit and the predict | `Learner`, the dataclass, built directly with the same fields |
 | a learner's own training settings | a `control` field holding a partly specified `train_control()` | its `params`, beside the architecture |
 | the occlusion profile | `occlusion()`, an S3 generic with methods on a run and on a ladder | `occlusion()`, one function taking either |
+| the report on a run | `summary()`, a method on the base generic, printing the candidates and the ensemble | `summary()`, one function returning the text, with `candidate_table()` and `ensemble_row()` for the two tables it prints |
+| predicting new targets | `predict()`, a method on the base generic | `.predict()`, a method on the fit |
 | a set of learners, or of representations | `c()`, an S3 method on each spec class | a `list`, and `+` between two of them |
 
-All three are shapes rather than behaviours: a setting given to a learner beats the run's control
-on both sides, the profile is one implementation on both sides, and a set is the same set. `c()`
-is a method rather than a second constructor because R's own way to combine things of one kind is
-`c()`; a Python list already concatenates, so nothing is added there.
+All of these are shapes rather than behaviours: a setting given to a learner beats the run's
+control on both sides, the profile is one implementation on both sides, and a set is the same set.
+`c()` is a method rather than a second constructor because R's own way to combine things of one
+kind is `c()`; a Python list already concatenates, so nothing is added there. `summary()` and
+`predict()` are methods in R because R has the generics to add them to, and Python's `summary()`
+is a function because it has none.
 
 ### Present in one language only
 
@@ -695,11 +712,14 @@ is a method rather than a second constructor because R's own way to combine thin
 | `grain_contrasts()` | fits a mixed model over the whole ladder and reads Dunnett's comparisons off it, on lme4, lmerTest and emmeans. The Python twin would need a mixed-model fitter of its own or a scientific stack the wheel does not depend on, and nothing in the contract reads it. |
 | `simulate_records()` | generates a record with a planted grain, for the vignette and the recovery tests. The Python suite builds its records in its own fixtures. |
 | `plot()` on a ladder and on a selection | the wheel depends on numpy alone, and every number a plot draws is on the object it is called on. |
+| `starts_with()`, `ends_with()`, `contains()`, `matches()`, `all_of()`, `any_of()`, `everything()` and `where()` | tidyselect's verbs, re-exported so that `y = starts_with("sp_")` is written the way R writes a selection. Python has no non-standard evaluation, so a selection there is a name, a list of names, a glob such as `"sp_*"` or a predicate on the name, resolved by `select_columns()`. |
 | `elasticnet(s =)` | glmnet keeps the whole penalty path and `s` names the point on it to predict at. scikit-learn's cross-validated fits refit at the best penalty and keep only that one, so there is no path there to name a point of. Both sides otherwise fit the same model: one penalised regression per variable over every column and, by default, their squares, on a design standardised before it is penalised, with the mixing given by `alpha` and the penalty chosen by an inner cross-validation on the fitting units. |
 
 | in Python only | what it is |
 |---|---|
-| `flatten`, `align_folds`, `as_response`, `get_learner`, `resolve_metric`, `cohen_kappa` | the helpers R keeps unexported, as `.flatten()`, `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()` and `.kappa_table()`. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
+| `flatten`, `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.flatten()`, `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
+| `Representation`, `Sift`, `Resampling`, `TimesiftSpec`, `Learner`, `TrainControl`, `TimesiftMatrix`, `TimesiftSet`, `Coverage`, `Response`, `Folds`, `Cells`, `Fit`, `Ladder`, `Selection`, `Timesift`, `Stack`, `EnsembleSpec` | the types. R attaches a class attribute to a list or an array and the constructor is the only door to it; a Python dataclass is the type itself, and a user annotating a function or building one by hand reaches it by name. |
+| `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `PRESENCE_ABSENCE` | the grain and statistic vocabularies as tuples, and the shipped head as the mapping `register_response()` takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through `responses()` on both sides. |
 
 Models are the one thing neither side promises. A fit in torch and a fit in libtorch cannot be
 byte-identical, and the encoders match module for module rather than number for number.

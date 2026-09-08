@@ -53,7 +53,7 @@ SECTIONS = (
         title="Python: fitting",
         desc="The run from targets and series, the combiner over its candidates, and fitting "
              "across a set of grains on its own.",
-        names=("timesift", "Timesift", "TimesiftSpec", "CandidateFit", "n_targets",
+        names=("timesift", "Timesift", "TimesiftSpec", "n_targets",
                "target_labels", "select_columns", "column_names", "summary", "candidate_table",
                "ensemble_row", "ensemble", "ensemble_fit", "ensemble_combine",
                "ensemble_weights", "EnsembleSpec", "Stack", "grain_ladder", "fit_learner",
@@ -82,7 +82,7 @@ SECTIONS = (
         desc="The response head and the metric are registrations, never a fork of the fitting "
              "code.",
         names=("register_learner", "register_metric", "register_response", "learners", "metrics",
-               "responses", "get_learner"),
+               "responses", "get_learner", "resolve_metric"),
     ),
     dict(
         slug="python-artifacts",

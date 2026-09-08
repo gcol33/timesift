@@ -41,6 +41,21 @@ def test_core_reproduces_the_numpy_oracle(start):
             np.testing.assert_array_equal(x.bin_partial, o["bin_partial"])
 
 
+def test_the_seven_statistics_keep_the_two_orderings_in_the_core_and_the_oracle():
+    data = series("2020-02-17T05:00:00", seed=8)
+    stats = ["min", "mean_daily_min", "cold_day", "mean", "warm_day", "mean_daily_max", "max"]
+    chains = [["min", "mean_daily_min", "mean", "mean_daily_max", "max"],
+              ["min", "cold_day", "mean", "warm_day", "max"]]
+    for grain in ("day", "week", "month", "season", "year"):
+        x = grain_matrix(data, "id", "t", "v", grain=grain, stats=stats)
+        o = oracle_grain_matrix(data, "id", "t", "v", grain=grain, stats=stats)["values"]
+        for values in (x.values, o):
+            for chain in chains:
+                for a, b in zip(chain, chain[1:]):
+                    lower, upper = values[:, :, stats.index(a)], values[:, :, stats.index(b)]
+                    assert (lower <= upper + 1e-9).all(), f"{grain}: {a} <= {b}"
+
+
 @pytest.mark.parametrize("year_start", ["01-01", "03-01", "09-01", "12-28"])
 def test_core_reproduces_the_oracle_at_other_anniversaries(year_start):
     data = series("2019-01-01", days=500, units=("a", "b"))

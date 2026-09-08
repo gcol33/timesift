@@ -78,7 +78,7 @@ occlusion.timesift_ladder <- function(x, data, y, arm, over = c("bin", "channel"
   }
   rows <- .arm_rows(ladder, arm)
   label <- attr(rows, "label")
-  grain <- strsplit(label, "|", fixed = TRUE)[[1L]][1L]
+  grain <- attr(rows, "grain")
   set <- .as_set(x)
   m <- set[[grain]]
   if (is.null(m)) {

@@ -308,12 +308,12 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 # it is the static one, and the automatic set is still a promise the record has to keep.
 .sift_specs <- function(sift, series) {
   if (is.null(series)) {
-    return(timesift_sift(list(.static_representation())))
+    return(as_sift(list(.static_representation())))
   }
   if (is.null(sift)) {
     return(grains("auto"))
   }
-  timesift_sift(sift)
+  as_sift(sift)
 }
 
 # Whether the targets are anchored in time and whether a representation is has to be one answer,
@@ -358,7 +358,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
     built <- .auto_grains(attr(sift, "stats"), attr(sift, "year_start"), series, tf, spec)
     reps <- lapply(names(built), grain, stats = attr(sift, "stats"),
                    year_start = attr(sift, "year_start"))
-    sift <- timesift_sift(stats::setNames(reps, names(built)))
+    sift <- as_sift(stats::setNames(reps, names(built)))
   } else {
     built <- lapply(sift, build_representation, series = series, targets = targets, spec = spec)
     names(built) <- names(sift)
@@ -381,7 +381,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
     known[[rep$label]] <- rep
     built[[rep$label]] <- build_representation(rep, series, targets, spec)
   }
-  list(built = built, sift = timesift_sift(known), labels = labels)
+  list(built = built, sift = as_sift(known), labels = labels)
 }
 
 # One row per (learner, representation) pair considered, whether or not it was fitted, so what was

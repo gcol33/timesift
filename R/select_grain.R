@@ -322,11 +322,12 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
   if (is.function(inner)) {
     return(function(y_train, seed) inner(y_train))
   }
-  inner <- as.integer(inner)
-  if (length(inner) != 1L || is.na(inner) || inner < 2L) {
+  if (!is.numeric(inner) || length(inner) != 1L || is.na(inner) || inner < 2L ||
+        inner != trunc(inner)) {
     stop("`inner` is a number of folds of at least 2, or a function of the training response, got ",
-         inner, ".", call. = FALSE)
+         paste(deparse(inner), collapse = ""), ".", call. = FALSE)
   }
+  inner <- as.integer(inner)
   function(y_train, seed) fold_map(y_train, v = inner, seed = seed)
 }
 

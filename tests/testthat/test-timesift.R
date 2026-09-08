@@ -178,7 +178,7 @@ test_that("a pair no learner can read is skipped, named, and reported as not app
   expect_message(
     fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
                     models = list(seq = toy(reads = "sequence")),
-                    sift = timesift_sift(list(grain("week"), multigrain(c("month", "season")))),
+                    sift = as_sift(list(grain("week"), multigrain(c("month", "season")))),
                     ensemble = FALSE, resampling = cv(v = 3L), control = NULL, verbose = TRUE),
     "multigrain")
   skipped <- fit$candidates[fit$candidates$status == "not applicable", ]

@@ -62,9 +62,9 @@ test_that("a sift is keyed by label, whichever way it was written", {
   expect_equal(names(s), c("day", "week"))
   expect_equal(names(grains(c("month", "year"))), c("month", "year"))
   expect_equal(names(lookbacks("30 days", "90 days")), c("30 days", "90 days"))
-  expect_equal(names(timesift_sift(c("day", "week"))), c("day", "week"))
-  expect_equal(names(timesift_sift(grain("week"))), "week")
-  expect_equal(names(timesift_sift(list(coarse = grain("month")))), "coarse")
+  expect_equal(names(as_sift(c("day", "week"))), c("day", "week"))
+  expect_equal(names(as_sift(grain("week"))), "week")
+  expect_equal(names(as_sift(list(coarse = grain("month")))), "coarse")
   expect_true(isTRUE(attr(grains("auto"), "auto")))
 })
 
@@ -82,10 +82,10 @@ test_that("a sift refuses what it cannot key", {
   expect_error(grains(), "at least one grain")
   expect_error(grains("auto", "week"), "whole set")
   expect_error(lookbacks(), "at least one span")
-  expect_error(timesift_sift(list(grain("week"), grain("week", stats = "min"))),
+  expect_error(as_sift(list(grain("week"), grain("week", stats = "min"))),
                "same name")
-  expect_error(timesift_sift(list(grain("week"), 1)), "not a representation")
-  expect_error(timesift_sift(list()), "non-empty list")
+  expect_error(as_sift(list(grain("week"), 1)), "not a representation")
+  expect_error(as_sift(list()), "non-empty list")
 })
 
 test_that("a grain block covers the targets in sorted identifier order", {

@@ -6,6 +6,7 @@ from dataclasses import replace
 
 import numpy as np
 
+from .ladder import _split_arm
 from .registry import RESPONSES, resolve_metric
 from .representation import TimesiftMatrix
 from .response import Response, align_folds, as_response
@@ -44,15 +45,13 @@ def ladder_occlusion(ladder, x, y: Response, arm: str, over: str = "bin",
     """
     if not ladder.fits:
         raise ValueError("this ladder kept no fits; refit with grain_ladder(..., keep_fits=True)")
-    if "|" in arm:
-        grain, learner = arm.split("|", 1)
-        m = x if isinstance(x, TimesiftMatrix) else dict(x)[grain]
+    grain, learner = _split_arm(ladder, arm)
+    if isinstance(x, TimesiftMatrix):
+        m = x
     else:
-        learner, m = arm, x
-        if not isinstance(m, TimesiftMatrix):
-            raise ValueError(f'"{arm}" names no grain, so it can only be read against one '
-                             "representation rather than a set of them")
-        grain = m.grain
+        m = dict(x).get(grain)
+        if m is None:
+            raise ValueError(f'the representation carries no "{grain}" grain')
     prefix = f"{grain}|{learner}|"
     fits = {int(key[len(prefix):]): fit for key, fit in ladder.fits.items()
             if key.startswith(prefix)}

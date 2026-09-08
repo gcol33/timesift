@@ -106,6 +106,7 @@ def test_an_unknown_grain_is_named_where_it_is_asked_for():
 def test_a_lookback_carries_its_lag_and_its_bins_in_its_label():
     assert lookback("30 days").label == "30 days"
     assert lookback("30 days", lag="7 days").label == "30 days lag 7 days"
+    assert lookback("30 days", lag="0 hours").label == "30 days"
     assert lookback("30 days", bins=3).label == "30 days 3 bins"
     with pytest.raises(ValueError, match="positive whole number"):
         lookback("30 days", bins=0)

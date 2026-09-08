@@ -19,8 +19,8 @@ import numpy as np
 
 from .learners import flatten
 from .representation import (DAY_LEVEL_STATS, GRAINS, TimesiftMatrix, _check_bins, _check_grain,
-                             _check_stats, _parse_year_start, _unit_names, bind_channels,
-                             grain_matrix, lookback_matrix)
+                             _check_stats, _parse_duration, _parse_year_start, _unit_names,
+                             bind_channels, grain_matrix, lookback_matrix)
 from .response import Folds, fold_map
 from .select import column_names, select_columns
 
@@ -455,7 +455,7 @@ def _whole(x, arg) -> int:
 
 def _lookback_label(span, lag, bins) -> str:
     parts = [str(span)]
-    if lag not in (0, "0 days"):
+    if _parse_duration(lag, "lag") != 0:
         parts.append(f"lag {lag}")
     if bins != 1:
         parts.append(f"{bins} bins")

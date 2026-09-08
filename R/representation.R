@@ -172,7 +172,7 @@ grains <- function(..., stats = "mean", year_start = "09-01") {
     return(structure(list(), class = "timesift_sift", auto = TRUE, stats = stats,
                      year_start = year_start))
   }
-  timesift_sift(lapply(named, grain, stats = stats, year_start = year_start))
+  as_sift(lapply(named, grain, stats = stats, year_start = year_start))
 }
 
 #' @rdname grains
@@ -182,12 +182,12 @@ lookbacks <- function(..., lag = "0 days", bins = 1L, stats = "mean") {
   if (!length(spans)) {
     stop("`lookbacks()` needs at least one span, such as \"30 days\".", call. = FALSE)
   }
-  timesift_sift(lapply(spans, lookback, lag = lag, bins = bins, stats = stats))
+  as_sift(lapply(spans, lookback, lag = lag, bins = bins, stats = stats))
 }
 
 #' @rdname grains
 #' @export
-timesift_sift <- function(x) {
+as_sift <- function(x) {
   if (inherits(x, "timesift_sift")) {
     return(x)
   }
@@ -238,7 +238,7 @@ c.timesift_sift <- function(...) {
     stop("grains(\"auto\") is every grain the record carries, so it cannot be combined with ",
          "others. Name the grains you want instead.", call. = FALSE)
   }
-  timesift_sift(.splice(args, "timesift_representation"))
+  as_sift(.splice(args, "timesift_representation"))
 }
 
 #' @export
@@ -258,7 +258,7 @@ print.timesift_sift <- function(x, ...) {
 
 #' @export
 `[.timesift_sift` <- function(x, i) {
-  timesift_sift(NextMethod())
+  as_sift(NextMethod())
 }
 
 #' Build one representation for a set of targets

@@ -131,36 +131,6 @@ Attributes:
 - `response` - str
 - `metric` - object
 
-## `CandidateFit`
-
-```python
-CandidateFit(learner, fits, variables)
-```
-
-One candidate's fitted models, whichever way its learner covers the responses.
-
-A joint learner is one model over the whole response matrix and a separate one is a model per
-response; either way this predicts the same `[target, response]` matrix, in the response
-order the candidate was fitted on.
-
-Attributes:
-
-- `learner` - object
-- `fits` - tuple[Fit, ...]
-- `variables` - tuple[str, ...]
-
-### `predict()`
-
-```python
-predict(self, x: TimesiftMatrix)
-```
-
-One `[row, response]` matrix, whatever the candidate is made of.
-
-A joint learner contributes one fit covering every response and a separate one contributes
-a fit per response; the columns are assembled by name either way, so nothing above a
-candidate can tell which it was.
-
 ## `n_targets()`
 
 ```python
@@ -322,6 +292,7 @@ grain_ladder(
     folds=None,
     response: str = 'presence_absence',
     metric=None,
+    control=None,
     keep_fits: bool = False,
     verbose: bool = True,
 )
@@ -334,6 +305,9 @@ a denominator and any two of them can be compared with `paired_contrast`.
 
 `folds` left at `None` builds one with the defaults of `fold_map`. Where both languages
 must see the same splits, build it once and read it in the other with `read_folds`.
+
+`control` is the `train_control` every neural learner of the ladder trains under; a learner
+carrying settings of its own overrides it on the ones it names.
 
 ## `fit_learner()`
 
@@ -367,6 +341,7 @@ select_grain(
     response: str = 'presence_absence',
     metric=None,
     compare: Ladder | None = None,
+    control=None,
     seed: int = 1,
     verbose: bool = True,
 )
@@ -386,6 +361,9 @@ function exists to keep out of a reported number.
 
 The cost is the ladder's, multiplied by the number of inner folds: `v_outer * (v_inner *
 candidates + 1)` fits.
+
+`control` is the `train_control` every neural learner trains under, in the inner search and
+in the refit alike; a learner carrying settings of its own overrides it on the ones it names.
 
 ## `Ladder`
 

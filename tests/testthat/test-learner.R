@@ -68,8 +68,6 @@ test_that("a scaler is computed on what it is given and applied to something els
   s <- .scaler(m)
   expect_equal(s$centre, c(2, 20))
   expect_equal(.apply_scaler(s, m)[, 1], c(-1, 0, 1))
-  scalar <- .scaler(m, per_column = FALSE)
-  expect_equal(scalar$centre, rep(mean(m), 2))
   constant <- .scaler(matrix(1, nrow = 4, ncol = 2))
   expect_equal(constant$scale, c(1, 1))
 })

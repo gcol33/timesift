@@ -165,6 +165,8 @@ def grain_matrix(data=None, id=None, time=None, value=None, *, grain="day", stat
     caller-supplied binning declares its own bins, so the package cannot know where the last one
     was meant to end and takes the record's end as its end.
     """
+    if value is None:
+        raise ValueError("`value` names the column of readings")
     unit, when, reading, carried = _columns(data, id, time, value)
     partial = _check_partial(partial)
 
@@ -329,6 +331,8 @@ def lookback_matrix(data=None, id=None, time=None, value=None, at=None, span=Non
     ``tz`` names the calendar, as it does for :func:`grain_matrix`. The anchors are instants and
     are read as a clock in that same calendar, so one record is binned by one calendar.
     """
+    if value is None:
+        raise ValueError("`value` names the column of readings")
     unit, when, reading, carried = _columns(data, id, time, value)
     span = _parse_duration(span, "span")
     lag = _parse_duration(lag, "lag")

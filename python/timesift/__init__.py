@@ -26,7 +26,7 @@ from .metrics import (cohen_kappa, decision_threshold, kappa_score, model_agreem
                       roc_auc, tss)
 from .occlusion import feature_matrix
 from .registry import (get_learner, learners, metrics, register_learner, register_metric,
-                       register_response, responses)
+                       register_response, resolve_metric, responses)
 from .report import (candidate_table, ensemble_row, ensemble_weights, occlusion,
                      summary)
 from .representation import (DAY_LEVEL_STATS, GRAINS, STATS, Coverage, TimesiftMatrix,
@@ -79,7 +79,7 @@ __all__ = [
     "learners", "lookback", "lookback_matrix", "lookbacks", "metrics", "mlp", "model_agreement",
     "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "read_cells",
     "read_folds", "read_response", "register_learner", "register_metric", "register_response",
-    "rescnn", "resolve_folds", "responses", "roc_auc", "scorable_cells",
+    "rescnn", "resolve_folds", "resolve_metric", "responses", "roc_auc", "scorable_cells",
     "score_predictions", "select_columns",
     "select_grain", "stepwise", "summary", "target_labels", "timesift", "timesift_set",
     "train_control", "tss", "tss_inflation", "write_cells", "write_folds", "write_response",

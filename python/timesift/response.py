@@ -60,10 +60,10 @@ class Response:
 
     def check_presence_absence(self) -> "Response":
         """Error unless every value is 0 or 1 and none is missing."""
-        if not np.isin(self.values, (0, 1)).all():
-            raise ValueError("a presence-absence response must be 0/1 or logical")
         if np.isnan(self.values).any():
             raise ValueError("the response holds missing values")
+        if not np.isin(self.values, (0, 1)).all():
+            raise ValueError("a presence-absence response must be 0/1 or logical")
         return self
 
 

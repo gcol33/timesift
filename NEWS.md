@@ -110,10 +110,39 @@
   record by unit and then by instant; the calendar reduction accumulated in the caller's order,
   which moved a mean in its last bits under a shuffle that changed nothing about the record.
 
+* The two orderings among the seven statistics, `min <= mean_daily_min <= mean <= mean_daily_max
+  <= max` and `min <= cold_day <= mean <= warm_day <= max`, are asserted by both test suites on
+  the core's output and the oracle's. They used to sit in a block of the core that neither build
+  compiled.
+* `grain_matrix()` and `lookback_matrix()` on the Python side refuse a call that names no `value`
+  column before reaching the compiled core, and a lookback's label reads a zero lag as zero however
+  it is spelled.
+
+## Names
+
+* `as_sift()` is the coercer to a set of representations on both sides, in place of R's
+  `timesift_sift()`; the class keeps its name.
+* The last section of the contract records every public name of both languages, on the side it
+  is on, and each suite reads that section against its own exports, so a name added to one side
+  without a line there fails the suite. Python exports `resolve_metric` beside `get_learner`, as
+  the contract had said it did.
+
+## Fixes
+
+* A response given as a data frame with two or more non-numeric columns is refused, naming them,
+  rather than read through the first and silently stripped of the rest.
+* A presence-absence response holding a missing value says so on the Python side, rather than
+  reporting it as a value that is not 0 or 1.
+* An arm is matched whole against the ladder's labels rather than split at the `|`, so a learner
+  or a sift whose own name holds one is still found, on both sides.
+* `select_grain()`'s `inner` is checked before it is coerced, so a value that is not a count is
+  named in the error rather than printed as `NA`.
+
 ## Packaging
 
 * `DESCRIPTION` is where the version is written, and `pyproject.toml` reads it from there.
 * `.gitattributes` holds the repository to one line ending.
+* The wheel ships `py.typed`.
 
 # timesift 0.1.0
 

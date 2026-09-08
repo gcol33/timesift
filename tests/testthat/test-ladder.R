@@ -89,6 +89,16 @@ test_that("a paired contrast runs on cells both arms scored", {
                -paired_contrast(lad, "week|b", "week|a")$diff)
 })
 
+test_that("an arm is found whole, so a learner whose name holds the separator is still an arm", {
+  f <- ladder_fixture()
+  lad <- grain_ladder(f$x, f$y, list("a|b" = constant_learner(), b = constant_learner(0.3)),
+                       folds = f$folds, verbose = FALSE)
+  p <- paired_contrast(lad, "week|a|b", "week|b")
+  expect_equal(p$a, "week|a|b")
+  expect_equal(paired_contrast(lad, "a|b", "b")$a, attr(.arm_rows(lad, "a|b"), "label"))
+  expect_error(paired_contrast(lad, "week|c", "week|b"), 'no arm or learner called "week|c"')
+})
+
 test_that("naming a learner alone contrasts it at its own best grain", {
   f <- ladder_fixture()
   lad <- grain_ladder(f$x, f$y, list(a = constant_learner(), b = constant_learner(0.3)),

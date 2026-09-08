@@ -403,17 +403,16 @@ def learner_dict(learners):
 
 
 def _split_arm(ladder: Ladder, name: str):
-    if "|" in name:
-        grain, learner = name.split("|", 1)
-    else:
-        learner = name
-        rows = [r for r in ladder.summary() if r["learner"] == learner]
-        if not rows:
-            raise KeyError(f'no learner called "{learner}" in this ladder')
-        grain = max(rows, key=lambda r: r["score"])["grain"]
-    if not ((ladder.grain == grain) & (ladder.learner == learner)).any():
-        raise KeyError(f'no arm "{grain}|{learner}" in this ladder')
-    return grain, learner
+    """The grain and the learner an arm names, matched whole against the labels the ladder
+    carries rather than split at a ``|``, so a grain or a learner whose own name holds one is
+    still found. A name that is no arm's label is a learner, read at its best grain."""
+    for grain, learner in zip(ladder.grain, ladder.learner):
+        if f"{grain}|{learner}" == name:
+            return str(grain), str(learner)
+    rows = [r for r in ladder.summary() if r["learner"] == name and r["score"] == r["score"]]
+    if not rows:
+        raise KeyError(f'no arm or learner called "{name}" in this ladder')
+    return max(rows, key=lambda r: r["score"])["grain"], name
 
 
 def _label(ladder: Ladder, name: str) -> str:

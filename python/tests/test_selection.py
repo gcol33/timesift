@@ -232,6 +232,19 @@ def test_with_no_signal_at_any_grain_the_procedure_scores_at_the_designs_own_flo
     assert own < floor + 0.15
 
 
+def test_an_arm_is_found_whole_so_a_learner_named_with_the_separator_is_still_an_arm():
+    from dataclasses import replace
+    x, y, folds = fixture()
+    lad = grain_ladder(x, y, [replace(linear_learner(), name="a|b"), linear_learner(0.3)],
+                       folds=folds, verbose=False)
+    grain = lad.summary()[0]["grain"]
+    whole = paired_contrast(lad, f"{grain}|a|b", f"{grain}|linear")
+    assert whole["a"] == f"{grain}|a|b"
+    assert paired_contrast(lad, "a|b", "linear")["a"].endswith("|a|b")
+    with pytest.raises(KeyError, match=r'no arm or learner called "week\|c"'):
+        paired_contrast(lad, "week|c", "week|linear")
+
+
 def test_a_contrast_needs_both_arms_to_have_scored_a_shared_cell():
     x, y, folds = fixture()
     lad = grain_ladder(x, y, linear_learner(), folds=folds, verbose=False)

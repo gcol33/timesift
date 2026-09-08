@@ -540,23 +540,6 @@ Result reduce(const Request& req) {
     out.bin_partial[k] = (bins[k] < covered_start || next[k] > covered_end) ? 1 : 0;
   }
 
-#ifndef NDEBUG
-  // min <= mean_daily_min <= mean <= mean_daily_max <= max, and min <= cold_day <= mean <=
-  // warm_day <= max, both of which follow from the definitions.
-  if (need_min && need_sum) {
-    for (std::size_t c = 0; c < n_cell; ++c) {
-      const double m = sum[c] / count[c];
-      if (low[c] > m + 1e-9) throw Error("min above the mean at cell " + std::to_string(c) + ".");
-      if (need.min && day.min_sum[c] / day.n_day[c] < low[c] - 1e-9) {
-        throw Error("mean_daily_min below the min at cell " + std::to_string(c) + ".");
-      }
-      if (need.mean && day.low[c] < low[c] - 1e-9) {
-        throw Error("cold_day below the min at cell " + std::to_string(c) + ".");
-      }
-    }
-  }
-#endif
-
   return out;
 }
 

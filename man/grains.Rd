@@ -3,14 +3,14 @@
 \name{grains}
 \alias{grains}
 \alias{lookbacks}
-\alias{timesift_sift}
+\alias{as_sift}
 \title{Several representations to run the same learners across}
 \usage{
 grains(..., stats = "mean", year_start = "09-01")
 
 lookbacks(..., lag = "0 days", bins = 1L, stats = "mean")
 
-timesift_sift(x)
+as_sift(x)
 }
 \arguments{
 \item{...}{Grain names for \code{grains()}, lookback spans for \code{lookbacks()}, given as separate

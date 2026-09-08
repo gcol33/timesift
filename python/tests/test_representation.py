@@ -291,3 +291,11 @@ def test_a_numeric_identifier_is_written_by_its_digits():
         grain_matrix(dict(d, id=d["id"] + 0.5), "id", "time", "value", grain="day")
     with pytest.raises(ValueError, match="must identify a unit by text"):
         grain_matrix(dict(d, id=np.tile(t, 3)), "id", "time", "value", grain="day")
+
+
+def test_the_value_column_is_named_before_any_reading_is_read():
+    t = np.arange(np.datetime64("2021-09-01T00", "s"), np.datetime64("2021-09-03T00", "s"),
+                  np.timedelta64(1, "h"))
+    data = {"id": ["p1"] * len(t), "t": t, "v": np.zeros(len(t))}
+    with pytest.raises(ValueError, match="`value` names the column of readings"):
+        grain_matrix(data, "id", "t", grain="day")

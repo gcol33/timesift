@@ -80,10 +80,14 @@ print.timesift_cells <- function(x, ...) {
   }
   if (is.data.frame(y)) {
     id <- vapply(y, function(col) is.character(col) || is.factor(col), logical(1L))
+    if (sum(id) > 1L) {
+      stop("the response holds ", sum(id), " non-numeric columns (",
+           paste(names(y)[id], collapse = ", "),
+           "). One may be the unit identifier; the rest cannot be a response.", call. = FALSE)
+    }
     if (any(id)) {
-      first <- which(id)[1L]
-      rn <- as.character(y[[first]])
-      y <- y[, -which(id), drop = FALSE]
+      rn <- as.character(y[[which(id)]])
+      y <- y[, !id, drop = FALSE]
       rownames(y) <- rn
     }
     rn <- rownames(y)

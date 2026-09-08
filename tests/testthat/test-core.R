@@ -30,6 +30,29 @@ test_that("the core reproduces the pure-R oracle on every grain and statistic", 
   }
 })
 
+test_that("the seven statistics keep the two orderings the definitions imply, in the core and the oracle", {
+  set.seed(20260908)
+  t <- seq(as.POSIXct("2020-02-17 05:00:00", tz = "UTC"), by = "hour", length.out = 24 * 400)
+  d <- data.frame(id = rep(c("p1", "p2", "p3"), each = length(t)), t = rep(t, 3),
+                  v = rnorm(3 * length(t), sd = 5))
+  stats <- c("min", "mean_daily_min", "cold_day", "mean", "warm_day", "mean_daily_max", "max")
+  ordered <- function(m, chain) {
+    for (i in seq_len(length(chain) - 1L)) {
+      expect_true(all(m[, , chain[i]] <= m[, , chain[i + 1L]] + 1e-9),
+                  info = paste(attr(m, "grain"), chain[i], "<=", chain[i + 1L]))
+    }
+  }
+  for (w in c("day", "week", "month", "season", "year")) {
+    x <- grain_matrix(d, id, t, v, grain = w, stats = stats)
+    o <- oracle_grain_matrix(d, "id", "t", "v", grain = w, stats = stats)$values
+    attr(o, "grain") <- w
+    for (m in list(x, o)) {
+      ordered(m, c("min", "mean_daily_min", "mean", "mean_daily_max", "max"))
+      ordered(m, c("min", "cold_day", "mean", "warm_day", "max"))
+    }
+  }
+})
+
 test_that("the core reproduces the oracle at anniversaries other than the default", {
   set.seed(11)
   t <- seq(as.POSIXct("2019-01-01", tz = "UTC"), by = "hour", length.out = 24 * 500)

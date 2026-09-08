@@ -42,6 +42,8 @@ test_that("a response arrives as a matrix, a data frame with identifiers, or a v
   expect_equal(.as_response(stats::setNames(c(0, 1, 0, 1, 1, 0), units)),
                matrix(c(0, 1, 0, 1, 1, 0), ncol = 1, dimnames = list(units, "y")))
   expect_error(.as_response(data.frame(id = units, sp1 = c(0, 1, NA, 1, 1, 0))), "missing values")
+  expect_error(.as_response(data.frame(id = units, site = units, sp1 = c(0, 1, 0, 1, 1, 0))),
+               "2 non-numeric columns (id, site)", fixed = TRUE)
 })
 
 test_that("a presence-absence response must actually be presence-absence", {

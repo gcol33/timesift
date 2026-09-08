@@ -361,7 +361,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
 # One centre and one scale per channel, over every unit and bin of the units handed in.
 .channel_scaler <- function(x) {
-  .scaler(matrix(as.numeric(x), ncol = dim(x)[3L]), per_column = TRUE)
+  .scaler(matrix(as.numeric(x), ncol = dim(x)[3L]))
 }
 
 .scale_channels <- function(m, scaler) {

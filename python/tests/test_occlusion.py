@@ -113,8 +113,11 @@ def test_an_arm_naming_only_a_learner_is_read_against_the_one_representation_giv
     bare = ladder_occlusion(lad, x, y, "a", permutations=2, seed=3)
     assert named["part"] == bare["part"]
     assert np.allclose(np.nan_to_num(named["weight"]), np.nan_to_num(bare["weight"]))
-    with pytest.raises(ValueError, match="names no grain"):
-        ladder_occlusion(lad, {"month": x}, y, "a")
+    # Against a set, a bare learner reads the representation of its best grain, as R does.
+    from_set = ladder_occlusion(lad, {"month": x}, y, "a", permutations=2, seed=3)
+    assert np.allclose(np.nan_to_num(named["weight"]), np.nan_to_num(from_set["weight"]))
+    with pytest.raises(ValueError, match='no "month" grain'):
+        ladder_occlusion(lad, {"week": x}, y, "a", permutations=2, seed=3)
 
 
 def test_an_arm_the_ladder_never_fitted_says_so():

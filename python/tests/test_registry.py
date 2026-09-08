@@ -124,3 +124,6 @@ def test_the_head_that_ships_refuses_a_response_that_is_not_presence_absence():
     counts = Response(y.values * 3, y.units, y.variables)
     with pytest.raises(ValueError, match="presence-absence"):
         grain_ladder(x, counts, ["elasticnet"], folds=fold_map(y, v=3), verbose=False)
+    holes = Response(np.where(y.values > 0, np.nan, y.values), y.units, y.variables)
+    with pytest.raises(ValueError, match="missing values"):
+        grain_ladder(x, holes, ["elasticnet"], folds=fold_map(y, v=3), verbose=False)

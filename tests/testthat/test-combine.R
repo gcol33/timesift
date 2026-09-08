@@ -62,7 +62,7 @@ test_that("a set and the list it replaces reach the fitting layer the same way",
   expect_equal(.learner_list(c(elasticnet(), forest())),
                .learner_list(list(elasticnet(), forest())))
   expect_equal(unclass(c(grain("week"), grain("month"))),
-               unclass(timesift_sift(list(grain("week"), grain("month")))))
+               unclass(as_sift(list(grain("week"), grain("month")))))
 })
 
 test_that("a set prints what it holds", {

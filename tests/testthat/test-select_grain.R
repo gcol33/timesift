@@ -292,3 +292,10 @@ test_that("a selection hands its control to the inner search and to the refit al
   expect_equal(length(seen$epochs), 2L * (3L * 2L + 1L))
   expect_true(all(seen$epochs == 7L))
 })
+
+test_that("the inner fold count is checked before it is coerced", {
+  expect_error(.inner_splitter("five"), 'got "five"')
+  expect_error(.inner_splitter(1L), "got 1")
+  expect_error(.inner_splitter(2.5), "got 2.5")
+  expect_type(.inner_splitter(3), "closure")
+})

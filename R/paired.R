@@ -67,24 +67,22 @@ paired_contrast <- function(ladder, a, b) {
   if (!inherits(ladder, "timesift_ladder")) {
     stop("expected a grain_ladder() result, got ", class(ladder)[1L], ".", call. = FALSE)
   }
-  parts <- strsplit(arm, "|", fixed = TRUE)[[1L]]
-  if (length(parts) == 2L) {
-    grain <- parts[1L]
-    learner <- parts[2L]
+  # An arm is matched whole against the labels the ladder carries rather than split at a `|`, so
+  # a grain or a learner whose own name holds one is still found.
+  label <- paste(ladder$grain, ladder$learner, sep = "|")
+  if (arm %in% label) {
+    rows <- ladder[label == arm, , drop = FALSE]
   } else {
-    learner <- parts[1L]
     s <- summary(ladder)
-    s <- s[s$learner == learner & !is.na(s$score), , drop = FALSE]
+    s <- s[s$learner == arm & !is.na(s$score), , drop = FALSE]
     if (!nrow(s)) {
-      stop("no learner called \"", learner, "\" in this ladder.", call. = FALSE)
+      stop("no arm or learner called \"", arm, "\" in this ladder.", call. = FALSE)
     }
     grain <- s$grain[which.max(s$score)]
+    rows <- ladder[ladder$grain == grain & ladder$learner == arm, , drop = FALSE]
   }
-  rows <- ladder[ladder$grain == grain & ladder$learner == learner, , drop = FALSE]
-  if (!nrow(rows)) {
-    stop("no arm \"", grain, "|", learner, "\" in this ladder.", call. = FALSE)
-  }
-  structure(rows, label = paste(grain, learner, sep = "|"))
+  structure(rows, label = paste(rows$grain[1L], rows$learner[1L], sep = "|"),
+            grain = rows$grain[1L], learner = rows$learner[1L])
 }
 
 #' How much a self-selected threshold inflates the reported level

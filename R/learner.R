@@ -406,19 +406,15 @@ print.timesift_models <- function(x, ...) {
   switch(family, binomial = stats::binomial(), gaussian = stats::gaussian())
 }
 
-# Scaling belongs to the fold it is computed on. A per-column scaler is what a linear model wants
-# over the bin-by-channel columns; the same scaler over the channels, each read across every unit
-# and bin, is what a sequence encoder wants, because it puts every channel on a workable scale
-# while preserving the differences between units and between bins that carry the signal. Both are
-# computed on the fitting units alone.
-.scaler <- function(m, per_column = TRUE) {
-  if (per_column) {
-    centre <- colMeans(m)
-    scale <- apply(m, 2L, stats::sd)
-  } else {
-    centre <- rep(mean(m), ncol(m))
-    scale <- rep(stats::sd(as.numeric(m)), ncol(m))
-  }
+# Scaling belongs to the fold it is computed on: each column is centred on its mean and divided by
+# its sample standard deviation, both taken over the fitting units alone. A linear model reads the
+# bin-by-channel columns through it; a sequence encoder reads the channels through the same scaler,
+# each channel laid out as one column over every unit and bin, which puts every channel on a
+# workable scale while preserving the differences between units and between bins that carry the
+# signal.
+.scaler <- function(m) {
+  centre <- colMeans(m)
+  scale <- apply(m, 2L, stats::sd)
   scale[!is.finite(scale) | scale < 1e-8] <- 1
   list(centre = centre, scale = scale)
 }
