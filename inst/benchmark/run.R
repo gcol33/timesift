@@ -38,7 +38,7 @@ out_dir <- file.path(if (is.na(opt$out)) file.path(getwd(), BENCH$results) else 
                      cell$cell_id)
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-candidates <- bench_candidates(cell$block)
+candidates <- bench_candidates()
 learner <- bench_learner(cell$block)
 
 

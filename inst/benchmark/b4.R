@@ -84,7 +84,7 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
   }
   cell <- list(cell_id = stamp$cell_id, block = stamp$block, mechanism = stamp$mechanism,
                n_unit = stamp$n_unit, inner = stamp$inner)
-  candidates <- bench_candidates(cell$block)
+  candidates <- bench_candidates()
   declared <- .bench_digest(paste(candidates$candidate, collapse = ","))
   if (!identical(declared, stamp$candidate_digest)) {
     stop("replicate ", stamp$replicate, " searched candidate set ", stamp$candidate_digest,

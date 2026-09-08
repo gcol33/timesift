@@ -45,12 +45,10 @@ bench_block <- function(block) {
   if (is.na(alias)) block else unname(alias)
 }
 
-# A candidate is a (grain, summary) pair. The penalised block searches both summaries, the neural
-# block the grain mean alone, which is what the sizing in the plan assumes.
-bench_candidates <- function(block) {
-  block <- bench_block(block)
-  summaries <- if (block == "elasticnet") list(mean = "mean", mmm = c("min", "mean", "max"))
-               else list(mean = "mean")
+# A candidate is a (grain, summary) pair. Every block searches the same set over the same inner
+# folds, so a selection rate is read against the same alternatives whichever learner produced it.
+bench_candidates <- function() {
+  summaries <- list(mean = "mean", mmm = c("min", "mean", "max"))
   out <- expand.grid(stat = names(summaries), grain = BENCH$grains,
                      KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
   out <- out[order(match(out$grain, BENCH$grains), out$stat), c("grain", "stat")]
@@ -66,10 +64,11 @@ bench_cells <- function() {
   elasticnet_cells <- expand.grid(mechanism = BENCH$mechanisms, n_unit = sizes,
                               KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
   elasticnet_cells$block <- "elasticnet"
-  elasticnet_cells$inner <- if (smoke) 2L else 5L
+  inner <- if (smoke) 2L else 5L
+  elasticnet_cells$inner <- inner
   elasticnet_cells$replicates <- if (smoke) 3L else 200L
   cnn_cells <- data.frame(mechanism = BENCH$mechanisms, n_unit = max(sizes), block = "cnn",
-                          inner = if (smoke) 2L else 3L,
+                          inner = inner,
                           replicates = if (smoke) 2L else 100L, stringsAsFactors = FALSE)
   out <- rbind(elasticnet_cells, cnn_cells)
   out$cell_id <- sprintf("%s%s-%s-n%d", if (smoke) "smoke-" else "", out$block, out$mechanism,
