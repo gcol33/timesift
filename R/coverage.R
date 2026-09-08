@@ -35,7 +35,7 @@ coverage <- function(data, id, time, grain = "day", year_start = "09-01") {
   }
   ys <- .parse_year_start(year_start)
 
-  unit <- as.character(data[[id_col]])
+  unit <- .unit_names(data[[id_col]], id_col)
   when <- data[[time_col]]
   if (!inherits(when, "POSIXct")) {
     stop("`", time_col, "` must be POSIXct, not ", class(when)[1L], ".", call. = FALSE)

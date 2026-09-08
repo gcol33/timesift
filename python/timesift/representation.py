@@ -43,6 +43,9 @@ class TimesiftMatrix:
     unit carrying several targets cannot name a row on its own. ``span`` and ``lag`` are set by a
     lookback alone, and are what rebuilding one for new targets reads. ``static`` names the
     channels holding the same number in every bin, which :func:`flatten` reads once each.
+
+    ``bin_start``, ``bin_end`` and ``bin_partial`` are the calendar's, and are ``None`` on a
+    representation the calendar did not bin.
     """
 
     values: np.ndarray
@@ -51,10 +54,10 @@ class TimesiftMatrix:
     stats: tuple[str, ...]
     grain: str
     year_start: str | None
-    bin_start: np.ndarray
-    bin_end: np.ndarray
+    bin_start: np.ndarray | None
+    bin_end: np.ndarray | None
     bin_n: np.ndarray = field(repr=False)
-    bin_partial: np.ndarray = field(repr=False)
+    bin_partial: np.ndarray | None = field(repr=False)
     span: int | None = None
     lag: int | None = None
     static: tuple[str, ...] = ()
@@ -312,7 +315,7 @@ def lookback_matrix(data=None, id=None, time=None, value=None, at=None, span=Non
     read two different stretches of the same series, so the bins are relative to the target rather
     than to a month or a week.
 
-    ``at`` is a mapping with an ``"id"`` array of units and a ``"time"`` array of anchor instants,
+    ``at`` is a mapping with an ``"id"`` array of units and an ``"at"`` array of anchor instants,
     one row per target; a unit may carry any number of them. Bin ``b`` of a target anchored at
     ``a`` covers ``[a - lag - span + b * step, a - lag - span + (b + 1) * step)``, with ``step`` the
     span divided by ``bins`` and ``b`` counted from zero. Only the readings of the target's own
@@ -345,23 +348,26 @@ def lookback_matrix(data=None, id=None, time=None, value=None, at=None, span=Non
         span, lag, bins, list(stats))
 
     n_t = len(labels)
-    nat = np.full(bins, np.datetime64("NaT"), dtype="datetime64[s]")
+    # No bin_start, bin_end or bin_partial: a bin is a position relative to an anchor rather than
+    # a span of the calendar, and a cell the record does not cover is an error rather than a
+    # verdict. R carries no such attribute here, and a column of NaT beside a column of zeros
+    # would read as an answer.
     return TimesiftMatrix(
         values=np.ascontiguousarray(values.reshape(len(stats), bins, n_t).transpose(2, 1, 0)),
         units=labels, bins=_bin_offsets(span, lag, bins), stats=tuple(stats),
-        grain="lookback", year_start=None, bin_start=nat, bin_end=nat,
-        bin_n=bin_n.reshape(bins, n_t).T, bin_partial=np.zeros(bins, dtype=bool),
-        span=span, lag=lag)
+        grain="lookback", year_start=None, bin_start=None, bin_end=None,
+        bin_n=bin_n.reshape(bins, n_t).T, bin_partial=None, span=span, lag=lag)
 
 
 def _targets(at, units, zone):
     """A target is a unit and an instant, and its identity is its position in ``at``: a unit may
     carry several targets, so the unit cannot name a row. The anchors go through the same boundary
     the readings do, so both are read as a clock in the series' own calendar."""
-    if at is None or "id" not in at or "time" not in at:
-        raise ValueError('`at` must give an "id" and a "time" for every target')
-    who = np.asarray([str(v) for v in at["id"]])
-    anchor = np.asarray(at["time"], dtype="datetime64[s]")
+    if at is None or "id" not in at or "at" not in at:
+        raise ValueError('`at` must give an "id" naming the unit and an "at" anchor instant for '
+                         "every target")
+    who = _unit_names(at["id"], "id")
+    anchor = np.asarray(at["at"], dtype="datetime64[s]")
     if len(who) != len(anchor):
         raise ValueError("`at` must give one anchor per target")
     if not len(who):
@@ -549,6 +555,37 @@ def _sampling_step(instant: np.ndarray) -> int:
 
 # ---- checks ----------------------------------------------------------------------------------
 
+def _unit_names(values, column) -> np.ndarray:
+    """The names an identifier column gives its units, under the one rule both languages read it
+    by.
+
+    A string id is itself and a category is its label; a whole number is its digits, with no
+    exponent and no decimal point, so an id read as 100000 from a file is ``100000`` rather than
+    Python's ``100000.0`` beside R's ``1e+05``. A number that is not whole has no such writing and
+    is refused, as is a value of any other type: a response aligned by name against a
+    representation built in the other language would otherwise match none of its units.
+    """
+    out = []
+    for v in values:
+        if isinstance(v, (str, np.str_)):
+            out.append(str(v))
+        elif isinstance(v, (bool, np.bool_)):
+            raise ValueError(f"`{column}` identifies a unit by {v!r}, which is not text, a "
+                             "category or a whole number.")
+        elif isinstance(v, (int, np.integer)):
+            out.append(str(int(v)))
+        elif isinstance(v, (float, np.floating)) and float(v).is_integer():
+            out.append(str(int(v)))
+        elif isinstance(v, (float, np.floating)):
+            raise ValueError(f"`{column}` identifies a unit by {float(v)!r}, which is not a whole "
+                             "number. An identifier is a name; round it or write it as text "
+                             "before naming it.")
+        else:
+            raise ValueError(f"`{column}` must identify a unit by text, a category or a whole "
+                             f"number, not {type(v).__name__}.")
+    return np.asarray(out, dtype=object).astype(str)
+
+
 def _columns(data, id, time, value):
     """The unit, instant and reading columns, and the zone the time column was carrying.
 
@@ -559,7 +596,7 @@ def _columns(data, id, time, value):
     if any(v is None or (isinstance(v, float) and v != v) for v in raw):
         raise ValueError("missing values in the readings. "
                          "Fill or drop them before building a representation.")
-    unit = np.asarray([str(v) for v in raw])
+    unit = _unit_names(raw, id)
     column = data[time]
     zone = _column_zone(column)
     with warnings.catch_warnings():

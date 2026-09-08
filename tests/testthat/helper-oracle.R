@@ -192,8 +192,8 @@ oracle_lookback_matrix <- function(data, id, time, value, at, span, lag = "0 day
   unit <- as.character(data[[id]])
   when <- as.numeric(data[[time]])
   reading <- as.numeric(data[[value]])
-  who <- as.character(at[[1L]])
-  anchor <- as.numeric(at[[2L]])
+  who <- as.character(at$id)
+  anchor <- as.numeric(at$at)
   n_t <- length(anchor)
 
   # A day-level statistic is defined only where every calendar day lies whole inside one bin,

@@ -25,8 +25,8 @@ from .select import column_names, select_columns
 # A candidate is named for the learner and the representation it pairs, and the ensemble reads the
 # pair back out of that name, so the two share one separator rather than agreeing on one.
 from .stack import SEPARATOR, run_ensemble
-from .specs import (Representation, Sift, TimesiftSpec, as_sift, build_representation, expand_sift,
-                    grains, resolve_folds, target_labels)
+from .specs import (Representation, Sift, TimesiftSpec, _needs_target_time, as_sift,
+                    build_representation, expand_sift, grains, resolve_folds, target_labels)
 
 __all__ = ["CandidateFit", "Timesift", "timesift"]
 
@@ -164,6 +164,7 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
 
     members = _members(sift, series, spec)
     learners = [get_learner(m) for m in (models if models is not None else _default_models())]
+    _check_anchored(members, learners, spec)
     pairs = _pair(members, learners)
 
     representations, used = {}, {}
@@ -271,19 +272,29 @@ def _members(sift, series, spec) -> Sift:
         raise ValueError("with `target_time` every representation is anchored on the target, and "
                          "there is no defensible default set of spans. Give `sift` as "
                          "lookbacks(...).")
-    members = expand_sift(as_sift(sift) if sift is not None else grains("auto"), series, spec)
-    anchored = [k for k, v in members.items() if v.kind == "lookback"]
+    return expand_sift(as_sift(sift) if sift is not None else grains("auto"), series, spec)
+
+
+def _check_anchored(members: Sift, learners, spec) -> None:
+    """Whether the targets are anchored in time and whether a representation is has to be one
+    answer, over every representation the run will build: the members of the sift and the ones
+    learners pinned themselves to through ``data``. A lookback left without ``target_time``
+    reaches the builder with no anchor to place its bins against."""
+    reps = list(members.values()) + [one.data for one in learners if one.data is not None]
     if spec.target_time is None:
-        if anchored:
-            raise ValueError(f"{', '.join(anchored)} reads a lookback ending at each target's own "
-                             "instant, so `target_time` has to name the column holding it.")
-        return members
-    calendar = [k for k in members if k not in anchored]
-    if calendar:
+        wrong = _labels(r for r in reps if r.kind == "lookback")
+        if wrong:
+            _needs_target_time(wrong)
+        return
+    wrong = _labels(r for r in reps if r.kind != "lookback")
+    if wrong:
         raise ValueError(f"with `target_time` every representation must be anchored on the "
-                         f"target, so {', '.join(calendar)} cannot be used. Give `sift` as "
-                         "lookbacks(...).")
-    return members
+                         f"target, so {wrong} cannot be used. Give `sift` as lookbacks(...).")
+
+
+def _labels(reps) -> str:
+    seen = list(dict.fromkeys(r.label for r in reps))
+    return ", ".join(seen)
 
 
 def _pair(members: Sift, learners) -> list:

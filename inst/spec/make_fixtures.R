@@ -72,6 +72,21 @@ astronomical <- function(name) {
   function(when) edges[findInterval(as.numeric(when), as.numeric(edges))]
 }
 
+# Two calendars that break what a supplied one has to satisfy, each named so both suites build the
+# same function. `late` gives every reading the midnight after it, which is what a calendar shifted
+# by one boundary returns and what an interval lookup wraps to below its first edge; `alternate`
+# sends consecutive readings to two bins an hour apart, which interleaves them.
+BAD_CALENDARS <- list(
+  late = function(when) {
+    as.POSIXct((floor(as.numeric(when) / 86400) + 1) * 86400, origin = "1970-01-01", tz = "UTC")
+  },
+  alternate = function(when) {
+    t0 <- min(as.numeric(when))
+    as.POSIXct(t0 + 3600 * (((as.numeric(when) - t0) / 3600) %% 2), origin = "1970-01-01",
+               tz = "UTC")
+  }
+)
+
 # The three-channel schemes a caller asks for by name in the literature this package serves: the
 # grain's own extremes, its typical day, and its coldest and warmest day.
 schemes <- list(
@@ -285,6 +300,27 @@ for (guard in WINDOW_GUARDS) {
 write.csv(do.call(rbind, lapply(WINDOW_GUARDS, as.data.frame, stringsAsFactors = FALSE)),
           file.path(out_dir, "lookback_guards.csv"), row.names = FALSE, quote = FALSE)
 cat("wrote", length(lookback_rows), "lookback digests and", length(WINDOW_GUARDS), "guards\n")
+
+# What a supplied calendar refuses, pinned the same way: the series, the calendar that breaks it,
+# and the part of the message both languages must raise.
+GRAIN_GUARDS <- list(
+  list(series = "aligned", calendar = "late", message = "beginning after it"),
+  list(series = "offset", calendar = "alternate", message = "interleaves two of its bins")
+)
+for (guard in GRAIN_GUARDS) {
+  raised <- tryCatch({
+    grain_matrix(SERIES[[guard$series]], id, time, value,
+                 grain = BAD_CALENDARS[[guard$calendar]], stats = "mean")
+    ""
+  }, error = function(e) conditionMessage(e))
+  if (!grepl(guard$message, raised, fixed = TRUE)) {
+    stop("the ", guard$calendar, " calendar raised \"", raised, "\", not \"", guard$message, "\"",
+         call. = FALSE)
+  }
+}
+write.csv(do.call(rbind, lapply(GRAIN_GUARDS, as.data.frame, stringsAsFactors = FALSE)),
+          file.path(out_dir, "grain_guards.csv"), row.names = FALSE, quote = FALSE)
+cat("wrote", length(GRAIN_GUARDS), "grain guards\n")
 
 # ---- what crosses the boundary above the representation ----------------------------------------
 # The three artifacts, in the format the contract defines, plus the numbers read off them that are

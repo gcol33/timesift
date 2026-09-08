@@ -47,7 +47,7 @@ def series_of(name):
 def anchors_of(name):
     rows = [r for r in TARGETS if r["set"] == name]
     return {"id": [r["id"] for r in rows],
-            "time": np.asarray([r["at"].replace("Z", "") for r in rows], dtype="datetime64[s]")}
+            "at": np.asarray([r["at"].replace("Z", "") for r in rows], dtype="datetime64[s]")}
 
 
 def record(days=200, seed=20260904):
@@ -61,7 +61,7 @@ def record(days=200, seed=20260904):
 
 
 ANCHORS = {"id": ["p1", "p2", "p1", "p2"],
-           "time": np.asarray(["2022-01-01", "2022-02-10", "2022-03-05", "2022-03-15"],
+           "at": np.asarray(["2022-01-01", "2022-02-10", "2022-03-05", "2022-03-15"],
                               dtype="datetime64[s]")}
 
 SCHEMES = ["mean", "min", "max", "cold_day", "warm_day", "mean_daily_min", "mean_daily_max",
@@ -143,7 +143,7 @@ def test_both_guards_fire_with_the_message_the_fixtures_pin(series, row):
 
 def test_a_cell_the_record_cannot_fill_names_the_target_and_the_interval():
     d = record(days=30)
-    at = {"id": ["p1"], "time": np.asarray(["2021-09-20"], dtype="datetime64[s]")}
+    at = {"id": ["p1"], "at": np.asarray(["2021-09-20"], dtype="datetime64[s]")}
     with pytest.raises(ValueError) as raised:
         lookback_matrix(d, "id", "time", "value", at, "30 days", bins=3, stats="mean")
     assert "1 (target, bin) cell hold no readings, first: target 1 over " in str(raised.value)
@@ -152,7 +152,7 @@ def test_a_cell_the_record_cannot_fill_names_the_target_and_the_interval():
 
 def test_a_day_level_statistic_needs_every_day_whole_inside_one_bin():
     d = record(days=60)
-    at = {"id": ["p1"], "time": np.asarray(["2021-10-20"], dtype="datetime64[s]")}
+    at = {"id": ["p1"], "at": np.asarray(["2021-10-20"], dtype="datetime64[s]")}
     with pytest.raises(ValueError, match="cold_day needs bins of a calendar day or coarser"):
         lookback_matrix(d, "id", "time", "value", at, "7 days", bins=3, stats="cold_day")
     with pytest.raises(ValueError, match="cold_day and warm_day need bins of a calendar day"):
@@ -160,7 +160,7 @@ def test_a_day_level_statistic_needs_every_day_whole_inside_one_bin():
                       stats=["cold_day", "warm_day"])
     lookback_matrix(d, "id", "time", "value", at, "7 days", bins=3, stats=["min", "mean", "max"])
 
-    hour = {"id": ["p1"], "time": np.asarray(["2021-10-20T05:00:00"], dtype="datetime64[s]")}
+    hour = {"id": ["p1"], "at": np.asarray(["2021-10-20T05:00:00"], dtype="datetime64[s]")}
     with pytest.raises(ValueError, match="warm_day needs bins that open on a day boundary"):
         lookback_matrix(d, "id", "time", "value", hour, "7 days", bins=7, stats="warm_day")
     lookback_matrix(d, "id", "time", "value", hour, "7 days", bins=7, stats="mean")
@@ -199,7 +199,7 @@ def test_a_bin_is_named_by_where_it_opens_relative_to_the_anchor():
 def test_a_lookback_states_what_it_was_built_from():
     d = record(days=60)
     at = {"id": ["p1", "p2"],
-          "time": np.asarray(["2021-10-20", "2021-10-21"], dtype="datetime64[s]")}
+          "at": np.asarray(["2021-10-20", "2021-10-21"], dtype="datetime64[s]")}
     x = lookback_matrix(d, "id", "time", "value", at, "30 days", lag="12 hours", bins=3,
                       stats=["min", "mean", "max"])
 
@@ -216,7 +216,7 @@ def test_a_lookback_states_what_it_was_built_from():
 def test_a_lookback_reads_only_the_targets_own_unit_and_only_its_own_stretch():
     d = record(days=60)
     at = {"id": ["p1", "p2"],
-          "time": np.asarray(["2021-10-20", "2021-10-20"], dtype="datetime64[s]")}
+          "at": np.asarray(["2021-10-20", "2021-10-20"], dtype="datetime64[s]")}
     x = lookback_matrix(d, "id", "time", "value", at, "10 days", stats="mean")
 
     unit = np.asarray(d["id"])
@@ -231,7 +231,7 @@ def test_a_lookback_reads_only_the_targets_own_unit_and_only_its_own_stretch():
     # is the whole reason the reduction exists.
     pair = lookback_matrix(d, "id", "time", "value",
                          {"id": ["p1", "p1"],
-                          "time": np.asarray(["2021-10-06", "2021-10-20"],
+                          "at": np.asarray(["2021-10-06", "2021-10-20"],
                                              dtype="datetime64[s]")},
                          "10 days", stats="mean")
     assert pair.values[0, 0, 0] != pair.values[1, 0, 0]
@@ -239,7 +239,7 @@ def test_a_lookback_reads_only_the_targets_own_unit_and_only_its_own_stretch():
 
 def test_a_lookback_refuses_an_input_it_cannot_answer_for():
     d = record(days=60)
-    at = {"id": ["p1"], "time": np.asarray(["2021-10-20"], dtype="datetime64[s]")}
+    at = {"id": ["p1"], "at": np.asarray(["2021-10-20"], dtype="datetime64[s]")}
 
     with pytest.raises(ValueError, match="does not divide into 11 bins"):
         lookback_matrix(d, "id", "time", "value", at, "7 days", bins=11, stats="mean")
@@ -249,15 +249,15 @@ def test_a_lookback_refuses_an_input_it_cannot_answer_for():
         lookback_matrix(d, "id", "time", "value", at, "7 days", stats="warmest")
     with pytest.raises(ValueError, match="name a unit the series does not carry, first: p9"):
         lookback_matrix(d, "id", "time", "value",
-                      {"id": ["p9"], "time": at["time"]}, "7 days", stats="mean")
-    with pytest.raises(ValueError, match='must give an "id" and a "time"'):
+                      {"id": ["p9"], "at": at["at"]}, "7 days", stats="mean")
+    with pytest.raises(ValueError, match='must give an "id" naming the unit'):
         lookback_matrix(d, "id", "time", "value", {"unit": ["p1"]}, "7 days", stats="mean")
 
 
 def test_the_anchors_are_read_as_a_clock_in_the_series_own_calendar():
     d = record(days=60)
     # An instant that opens a Vienna day, which is 23:00 the evening before in UTC.
-    at = {"id": ["p1"], "time": np.asarray(["2021-10-19T22:00:00"], dtype="datetime64[s]")}
+    at = {"id": ["p1"], "at": np.asarray(["2021-10-19T22:00:00"], dtype="datetime64[s]")}
     vienna = lookback_matrix(d, "id", "time", "value", at, "7 days", bins=7, stats="cold_day",
                            tz="Europe/Vienna")
 
@@ -265,7 +265,7 @@ def test_the_anchors_are_read_as_a_clock_in_the_series_own_calendar():
     # the same answer: the zone is the whole of the difference and it is resolved once, at the edge.
     relabelled = dict(d, time=np.asarray(d["time"], dtype="datetime64[s]")
                       + np.timedelta64(2, "h"))
-    shifted = {"id": ["p1"], "time": at["time"] + np.timedelta64(2, "h")}
+    shifted = {"id": ["p1"], "at": at["at"] + np.timedelta64(2, "h")}
     naive = lookback_matrix(relabelled, "id", "time", "value", shifted, "7 days", bins=7,
                           stats="cold_day")
     np.testing.assert_array_equal(vienna.values, naive.values)
@@ -275,3 +275,16 @@ def test_the_anchors_are_read_as_a_clock_in_the_series_own_calendar():
     # that opens a Vienna day opens no UTC one, and the day-level four are refused there.
     with pytest.raises(ValueError, match="open on a day boundary"):
         lookback_matrix(d, "id", "time", "value", at, "7 days", bins=7, stats="cold_day")
+
+
+def test_the_target_table_is_read_by_name_and_carries_no_calendar_attribute():
+    d = record(days=60)
+    at = {"id": ["p1"], "at": np.asarray(["2021-10-20"], dtype="datetime64[s]")}
+    x = lookback_matrix(d, "id", "time", "value", at, "10 days", stats="mean")
+    # A bin is a position relative to an anchor rather than a span of the calendar, so the three
+    # attributes the calendar owns are absent here as they are in R.
+    assert x.bin_start is None and x.bin_end is None and x.bin_partial is None
+
+    with pytest.raises(ValueError, match='must give an "id" naming the unit'):
+        lookback_matrix(d, "id", "time", "value", {"id": ["p1"], "time": at["at"]},
+                      "10 days", stats="mean")

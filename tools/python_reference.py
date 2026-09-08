@@ -34,9 +34,10 @@ SECTIONS = (
         desc="What a representation is before any record has been read, and the array it becomes.",
         names=("native", "grain", "multigrain", "lookback", "grains", "lookbacks",
                "Representation", "Sift", "as_sift", "expand_sift", "auto_grains",
-               "build_representation", "grain_matrix", "lookback_matrix", "timesift_set",
-               "calendar_channels", "bind_channels", "feature_matrix", "TimesiftMatrix",
-               "TimesiftSet", "GRAINS", "STATS", "DAY_LEVEL_STATS"),
+               "build_representation", "grain_matrix", "lookback_matrix", "coverage",
+               "timesift_set", "calendar_channels", "bind_channels", "feature_matrix",
+               "TimesiftMatrix", "TimesiftSet", "Coverage", "GRAINS", "STATS",
+               "DAY_LEVEL_STATS"),
     ),
     dict(
         slug="python-split",

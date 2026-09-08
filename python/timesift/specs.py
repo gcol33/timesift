@@ -18,7 +18,8 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from .learners import flatten
-from .representation import (DAY_LEVEL_STATS, GRAINS, TimesiftMatrix, bind_channels, grain_matrix,
+from .representation import (DAY_LEVEL_STATS, GRAINS, TimesiftMatrix, _check_stats,
+                             _parse_year_start, _unit_names, bind_channels, grain_matrix,
                              lookback_matrix)
 from .response import Folds, fold_map
 from .select import column_names, select_columns
@@ -59,8 +60,9 @@ def native(stats="mean", year_start="09-01") -> Representation:
 
 def grain(g: str, stats="mean", year_start="09-01") -> Representation:
     """One calendar grain."""
-    return Representation(label=_check_grain(g), kind="grain", grain=g, stats=_stats(stats),
-                          year_start=year_start)
+    name = _check_grain(g)
+    return Representation(label=name, kind="grain", grain=g, stats=_stats(stats, name),
+                          year_start=_year_start(year_start))
 
 
 def multigrain(grains=None, stats="mean", year_start="09-01") -> Representation:
@@ -71,15 +73,17 @@ def multigrain(grains=None, stats="mean", year_start="09-01") -> Representation:
     """
     named = None if grains is None else tuple(_check_grain(g) for g in _flatten(grains))
     label = "multigrain" if named is None else f"multigrain({'+'.join(named)})"
-    return Representation(label=label, kind="multigrain", grains=named, stats=_stats(stats),
-                          sequence=False, year_start=year_start)
+    for one in named if named is not None else ("day",):
+        _stats(stats, one)
+    return Representation(label=label, kind="multigrain", grains=named, stats=_stats(stats, "day"),
+                          sequence=False, year_start=_year_start(year_start))
 
 
 def lookback(span, lag="0 days", bins=1, stats="mean") -> Representation:
     """A stretch of record of fixed length, ending a fixed lag before each target's own instant."""
     bins = _check_bins(bins)
     return Representation(label=_lookback_label(span, lag, bins), kind="lookback", span=span,
-                          lag=lag, bins=bins, stats=_stats(stats), sequence=bins > 1)
+                          lag=lag, bins=bins, stats=_stats(stats, "lookback"), sequence=bins > 1)
 
 
 class Sift(Mapping):
@@ -116,10 +120,16 @@ def grains(*g, stats="mean", year_start="09-01") -> Sift:
     named = [str(one) for one in _flatten(g)]
     if not named:
         raise ValueError("grains() names no grain")
+    if "auto" in named:
+        if len(named) > 1:
+            raise ValueError('"auto" is the whole set the record supports and cannot be named '
+                             "beside a grain.")
+        return Sift({"auto": Representation(label="auto", kind="auto",
+                                            stats=_stats(stats, "day"),
+                                            year_start=_year_start(year_start))})
     parts = {}
     for one in named:
-        rep = Representation(label="auto", kind="auto", stats=_stats(stats)) if one == "auto" \
-            else grain(one, stats)
+        rep = grain(one, stats, year_start)
         parts[rep.label] = rep
     return Sift(parts)
 
@@ -240,7 +250,7 @@ def target_labels(targets, spec: TimesiftSpec) -> tuple[str, ...]:
     what :func:`~timesift.representation.lookback_matrix` already names its targets by.
     """
     if spec.id is not None and spec.target_time is None:
-        return tuple(str(v) for v in targets[spec.id])
+        return tuple(_unit_names(targets[spec.id], spec.id))
     return tuple(str(i + 1) for i in range(n_targets(targets, spec)))
 
 
@@ -322,9 +332,19 @@ def _multigrain_block(rep, series, spec, labels) -> TimesiftMatrix:
                     bin_start=built[0].bin_start[:1], bin_end=built[0].bin_end[-1:])
 
 
+def _needs_target_time(labels) -> None:
+    """What a representation anchored on the target needs, said in one place: the run raises it
+    before anything is fitted, and the builder raises it at the one door that reaches a lookback
+    without going through that check."""
+    raise ValueError(f"{labels} reads a stretch of record ending at each target's own instant, so "
+                     "`target_time` has to name the column of `targets` holding it.")
+
+
 def _lookback_block(rep, series, targets, spec, labels) -> TimesiftMatrix:
-    at = {"id": [str(v) for v in targets[spec.id]],
-          "time": np.asarray(targets[spec.target_time], dtype="datetime64[s]")}
+    if spec.target_time is None:
+        _needs_target_time(rep.label)
+    at = {"id": _unit_names(targets[spec.id], spec.id),
+          "at": np.asarray(targets[spec.target_time], dtype="datetime64[s]")}
     parts = []
     for v in spec.x:
         w = lookback_matrix(series, spec.id, spec.time, v, at=at, span=rep.span, lag=rep.lag,
@@ -416,8 +436,15 @@ def _probe(series, spec) -> dict:
 
 # ---- checks ------------------------------------------------------------------------------------
 
-def _stats(stats) -> tuple[str, ...]:
-    return (stats,) if isinstance(stats, str) else tuple(str(s) for s in stats)
+def _stats(stats, grain) -> tuple[str, ...]:
+    """The statistics, refused here rather than when the array is built: a specification that
+    names a statistic the grain has no definition for is wrong before any record is read."""
+    return tuple(_check_stats(stats, grain))
+
+
+def _year_start(year_start: str) -> str:
+    _parse_year_start(year_start)
+    return year_start
 
 
 def _check_grain(g) -> str:

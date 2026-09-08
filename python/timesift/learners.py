@@ -55,6 +55,12 @@ class Learner:
             raise ValueError(f"`reads` is one of {', '.join(READS)}, got {self.reads!r}")
         if self.multi not in MULTI:
             raise ValueError(f"`multi` is one of {', '.join(MULTI)}, got {self.multi!r}")
+        # A representation, never the name of one: what a learner is pinned to is read for its
+        # kind and its label long before anything is built, and a string carries neither.
+        from .specs import Representation
+        if self.data is not None and not isinstance(self.data, Representation):
+            raise ValueError(f"the {self.name} learner's `data` must be a representation, such as "
+                             f"grain(\"week\"), or None, got {type(self.data).__name__}.")
 
     def require(self) -> None:
         """Error, naming the install, unless what the learner needs is importable."""

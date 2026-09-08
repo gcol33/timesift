@@ -182,6 +182,59 @@ Grouping group_by_search(const seconds* start, std::size_t n) {
   return out;
 }
 
+// What a guard calls one reading of the record. The unit index is read here, so it is checked
+// here too rather than trusted from a wrapper.
+std::string reading_label(const Request& req, std::size_t i) {
+  const std::int32_t u = req.unit[i];
+  if (u < 0 || static_cast<std::size_t>(u) >= req.n_unit) {
+    throw Error("a reading carries a unit index outside the units given.");
+  }
+  return "unit " + label_of(req.unit_name, static_cast<std::size_t>(u)) + " at " +
+         iso8601(req.local[i]);
+}
+
+// A supplied calendar is a function of the reading instants, and two things have to hold of what
+// it returns before anything below reads its bins as bins. A bin cannot begin after a reading it
+// holds: that is what a calendar shifted by one boundary returns, and what an interval lookup
+// wraps to below its first boundary, where NumPy's `searchsorted() - 1` gives the last edge of
+// all. And a bin's readings have to be a stretch of the record: a calendar sending alternate
+// readings to two bins interleaves them, and the array then carries two bins the record never
+// had. Neither is visible to the empty-cell or the contiguity guard, which read the bins the
+// calendar declared and can only ask whether every unit reaches each of them.
+void check_supplied(const Request& req, const Grouping& grid) {
+  for (std::size_t i = 0; i < req.n; ++i) {
+    if (req.custom[i] > req.local[i]) {
+      throw Error("the supplied calendar puts a reading in a bin beginning after it: " +
+                  reading_label(req, i) + " is given the bin beginning " +
+                  iso8601(req.custom[i]) +
+                  ". A bin begins at or before every reading it holds; a calendar read with an "
+                  "interval lookup has to say where the readings below its first boundary go.");
+    }
+  }
+
+  const std::size_t n_bin = grid.bins.size();
+  if (n_bin < 2) return;
+  std::vector<seconds> first(n_bin, std::numeric_limits<seconds>::max());
+  std::vector<seconds> last(n_bin, std::numeric_limits<seconds>::min());
+  std::vector<std::size_t> opens(n_bin, 0);
+  for (std::size_t i = 0; i < req.n; ++i) {
+    const std::size_t b = static_cast<std::size_t>(grid.bin_of[i]);
+    if (req.local[i] < first[b]) {
+      first[b] = req.local[i];
+      opens[b] = i;
+    }
+    if (req.local[i] > last[b]) last[b] = req.local[i];
+  }
+  for (std::size_t k = 0; k + 1 < n_bin; ++k) {
+    if (last[k] < first[k + 1]) continue;
+    throw Error("the supplied calendar interleaves two of its bins: " +
+                reading_label(req, opens[k + 1]) + " opens the bin beginning " +
+                iso8601(grid.bins[k + 1]) + ", and the bin beginning " + iso8601(grid.bins[k]) +
+                " reaches to " + iso8601(last[k]) +
+                ". A bin holds a stretch of the record, not readings taken from within another.");
+  }
+}
+
 // Bin membership is a function of the slot alone, so the calendar is read once per slot the record
 // touches and every reading is then an array lookup.
 Grouping group_by_grain(const seconds* local, std::size_t n, Grain w, YearStart ys) {
@@ -255,9 +308,14 @@ Grouping group(const Request& req) {
   if (req.grain == Grain::custom && req.custom == nullptr) {
     throw Error("a supplied calendar must give a bin start for every reading.");
   }
-  return req.grain == Grain::custom ? group_by_search(req.custom, req.n)
-         : req.grain == Grain::native ? group_by_search(req.local, req.n)
-                                      : group_by_grain(req.local, req.n, req.grain, req.year_start);
+  if (req.grain == Grain::custom) {
+    const Grouping grid = group_by_search(req.custom, req.n);
+    check_supplied(req, grid);
+    return grid;
+  }
+  return req.grain == Grain::native
+             ? group_by_search(req.local, req.n)
+             : group_by_grain(req.local, req.n, req.grain, req.year_start);
 }
 
 // How many readings each unit has in each bin of a grouping.

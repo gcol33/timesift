@@ -176,7 +176,7 @@ test_that("a reading that is not a finite number is refused, and named", {
   t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 8)
   d <- data.frame(id = rep(c("p1", "p2"), each = length(t)), t = rep(t, 2),
                   v = rnorm(2 * length(t)))
-  at <- data.frame(id = c("p1", "p2"), time = rep(max(t), 2))
+  at <- data.frame(id = c("p1", "p2"), at = rep(max(t), 2))
 
   for (hole in list(NA_real_, NaN, Inf, -Inf)) {
     bad <- d

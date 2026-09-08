@@ -269,7 +269,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 }
 
 .check_series_reaches <- function(tf, series, spec) {
-  missing <- setdiff(unique(tf$id), unique(as.character(series[[spec$id]])))
+  missing <- setdiff(unique(tf$id), unique(.unit_names(series[[spec$id]], spec$id)))
   if (length(missing)) {
     stop(.plural(length(missing), "target"), " name a unit `series` does not carry: ",
          .listing(missing), ".", call. = FALSE)
@@ -314,8 +314,19 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
   timesift_sift(sift)
 }
 
+# Whether the targets are anchored in time and whether a representation is has to be one answer,
+# and the check sees every representation the run will build: the members of the sift and the ones
+# learners pinned themselves to through `data`. A lookback left without `target_time` reaches the
+# builder with no anchor to place its bins against, which is a row count that does not add up
+# rather than a message.
 .check_anchored <- function(sift, learners, spec) {
+  pinned <- Filter(Negate(is.null), lapply(learners, function(l) l$data))
+  reps <- c(unclass(sift), pinned)
   if (is.null(spec$target_time)) {
+    wrong <- Filter(function(r) identical(r$kind, "lookback"), reps)
+    if (length(wrong)) {
+      .needs_target_time(vapply(wrong, function(r) r$label, character(1L)))
+    }
     return(invisible(TRUE))
   }
   if (isTRUE(attr(sift, "auto"))) {
@@ -323,8 +334,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
          "lookback and there is no default set of spans. Give `sift = lookbacks(...)`.",
          call. = FALSE)
   }
-  pinned <- Filter(Negate(is.null), lapply(learners, function(l) l$data))
-  wrong <- Filter(function(r) !identical(r$kind, "lookback"), c(unclass(sift), pinned))
+  wrong <- Filter(function(r) !identical(r$kind, "lookback"), reps)
   if (length(wrong)) {
     labels <- vapply(wrong, function(r) r$label, character(1L))
     stop("`target_time` needs a target-anchored representation, and ", .listing(unique(labels)),

@@ -41,6 +41,27 @@ def read_edges(name):
     return np.asarray(rows, dtype="datetime64[s]")
 
 
+def read_guards(name):
+    with (FIXTURES / name).open(newline="") as fh:
+        return list(csv.DictReader(fh))
+
+
+def calendar(name):
+    """The two calendars the guard fixture names, built from the name so that both suites build
+    the same function rather than each writing one that happens to break the same rule."""
+    if name == "late":
+        def late(when):
+            t = when.astype("datetime64[s]").astype(np.int64)
+            return ((t // 86400 + 1) * 86400).astype("datetime64[s]")
+        return late
+    if name == "alternate":
+        def alternate(when):
+            t = when.astype("datetime64[s]").astype(np.int64)
+            return (t.min() + 3600 * ((t - t.min()) // 3600 % 2)).astype("datetime64[s]")
+        return alternate
+    raise KeyError(f"no calendar called {name}")
+
+
 def binning(name, grain):
     if grain != "astronomical":
         return grain
@@ -206,3 +227,12 @@ def test_the_scorable_mask_orders_its_variables_by_c_collation_too():
                  units=("u1", "u2", "u3", "u4"), variables=("a1", "P9", "_x"))
     cells = scorable_cells(y, {"u1": 1, "u2": 1, "u3": 2, "u4": 2})
     assert list(dict.fromkeys(cells.variable)) == ["P9", "_x", "a1"]
+
+
+@pytest.mark.parametrize("row", read_guards("grain_guards.csv"),
+                         ids=lambda r: f"{r['series']}-{r['calendar']}")
+def test_a_supplied_calendar_that_breaks_its_guarantees_is_refused(series, row):
+    with pytest.raises(ValueError) as raised:
+        grain_matrix(series[row["series"]], "id", "time", "value",
+                     grain=calendar(row["calendar"]), stats="mean")
+    assert row["message"] in str(raised.value)

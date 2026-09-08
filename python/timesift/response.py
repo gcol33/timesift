@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .representation import _unit_names
+
 
 @dataclass(frozen=True)
 class Response:
@@ -24,7 +26,7 @@ class Response:
     @classmethod
     def from_columns(cls, data, id: str, variables=None) -> "Response":
         """A response from a table of one unit column and one column per variable."""
-        units = [str(v) for v in data[id]]
+        units = list(_unit_names(data[id], id))
         variables = list(variables) if variables is not None else \
             [k for k in data.keys() if k != id]
         values = np.column_stack([np.asarray(data[v], dtype=np.float64) for v in variables])

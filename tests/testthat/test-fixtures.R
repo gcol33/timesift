@@ -15,6 +15,21 @@ fixture_binning <- function(dir, name, grain) {
   function(when) edges[findInterval(as.numeric(when), as.numeric(edges))]
 }
 
+# The two calendars the guard fixture names, built from the name so that both suites build the
+# same function rather than each writing one that happens to break the same rule.
+fixture_calendar <- function(name) {
+  switch(name,
+    late = function(when) {
+      as.POSIXct((floor(as.numeric(when) / 86400) + 1) * 86400, origin = "1970-01-01", tz = "UTC")
+    },
+    alternate = function(when) {
+      t0 <- min(as.numeric(when))
+      as.POSIXct(t0 + 3600 * (((as.numeric(when) - t0) / 3600) %% 2), origin = "1970-01-01",
+                 tz = "UTC")
+    },
+    stop("no calendar called ", name))
+}
+
 test_that("every representation matches the digest the Python side reads", {
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
@@ -131,4 +146,19 @@ test_that("the scorable mask orders its variables by C collation too", {
               dimnames = list(paste0("u", 1:4), c("a1", "P9", "_x")))
   cells <- scorable_cells(y, c(u1 = 1L, u2 = 1L, u3 = 2L, u4 = 2L))
   expect_identical(unique(cells$variable), c("P9", "_x", "a1"))
+})
+
+test_that("a supplied calendar that breaks its guarantees is refused, as the fixtures pin", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures are not in the built package")
+  guards <- read.csv(file.path(dir, "grain_guards.csv"), stringsAsFactors = FALSE)
+  expect_gte(nrow(guards), 2L)
+
+  for (i in seq_len(nrow(guards))) {
+    row <- guards[i, ]
+    record <- fixture_series(dir, row$series)
+    expect_error(grain_matrix(record, id, time, value,
+                              grain = fixture_calendar(row$calendar), stats = "mean"),
+                 row$message, fixed = TRUE)
+  }
 })

@@ -319,7 +319,7 @@ build_representation <- function(rep, series, targets, spec) {
   if (!n) {
     stop("`targets` holds no row.", call. = FALSE)
   }
-  id <- if (is.null(spec$id)) NULL else as.character(targets[[spec$id]])
+  id <- if (is.null(spec$id)) NULL else .unit_names(targets[[spec$id]], spec$id)
   rn <- attr(targets, "row.names")
   # A target row is named by its unit where it is the only one that unit has, because that is what
   # the row of a calendar representation is named by; an anchored row is named by its position,
@@ -350,7 +350,18 @@ build_representation <- function(rep, series, targets, spec) {
   .align_targets(x, tf$label)
 }
 
+# What a representation anchored on the target needs, said in one place: the run raises it before
+# anything is fitted, and the builder raises it at the one door that reaches a lookback without
+# going through that check.
+.needs_target_time <- function(labels) {
+  stop(.listing(unique(labels)), " reads a stretch of record ending at each target's own instant, ",
+       "so `target_time` has to name the column of `targets` holding it.", call. = FALSE)
+}
+
 .lookback_block <- function(rep, series, tf, spec) {
+  if (is.null(tf$at)) {
+    .needs_target_time(rep$label)
+  }
   at <- data.frame(id = tf$id, at = tf$at, stringsAsFactors = FALSE)
   rownames(at) <- tf$label
   parts <- lapply(spec$value, function(v) {

@@ -140,7 +140,7 @@ grain_matrix <- function(data,
   stats <- .check_stats(stats, grain)
   ys <- .parse_year_start(year_start)
 
-  unit <- as.character(data[[id_col]])
+  unit <- .unit_names(data[[id_col]], id_col)
   when <- data[[time_col]]
   reading <- as.numeric(data[[value_col]])
 
@@ -303,6 +303,35 @@ print.timesift_matrix <- function(x, ...) {
          call. = FALSE)
   }
   list(month = parts[1L], day = parts[2L])
+}
+
+# An identifier is a name, and every place one decides a position it is written by one rule, here.
+# A character id is itself and a factor is its label; a whole number is its digits, with no
+# exponent and no decimal point, so an id read as 100000 from a file is `100000` rather than R's
+# `1e+05` beside Python's `100000.0`. A number that is not whole has no such writing and is
+# refused, as is a column of any other type: a response aligned by name against a representation
+# built in the other language would otherwise match none of its units.
+.unit_names <- function(x, column) {
+  if (is.factor(x)) {
+    return(as.character(x))
+  }
+  if (is.character(x)) {
+    return(x)
+  }
+  if (is.numeric(x)) {
+    bad <- !is.na(x) & (!is.finite(x) | x != floor(x))
+    if (any(bad)) {
+      stop("`", column, "` identifies a unit by ", format(x[which(bad)[1L]]),
+           ", which is not a whole number. An identifier is a name; round it or write it as ",
+           "text before naming it.", call. = FALSE)
+    }
+    out <- rep(NA_character_, length(x))
+    kept <- !is.na(x)
+    out[kept] <- sub("^-0$", "0", sprintf("%.0f", x[kept]))
+    return(out)
+  }
+  stop("`", column, "` must identify a unit by text, a factor level or a whole number, not ",
+       class(x)[1L], ".", call. = FALSE)
 }
 
 # The readings the core cannot see for itself: it is handed unit indices and whole seconds, so a

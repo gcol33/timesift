@@ -9,8 +9,9 @@
 #' @param id Column identifying the unit carrying the sensor. A bare column name or a string.
 #' @param time Column of reading instants, `POSIXct`. A bare column name or a string.
 #' @param value Column of readings, numeric. A bare column name or a string.
-#' @param at A data frame of targets, whose first column is the unit and whose second is the
-#'   anchor instant, `POSIXct`. One row per target; a unit may carry any number of them.
+#' @param at A data frame of targets with an `id` column naming the unit and an `at` column of
+#'   anchor instants, `POSIXct`. One row per target; a unit may carry any number of them. The
+#'   columns are read by name, as every alignment in the package is.
 #' @param span The lookback's length, as a duration. See Durations.
 #' @param lag The gap between the anchor and the end of the lookback, as a duration. Defaults to
 #'   `"0 days"`, which ends the lookback at the anchor itself.
@@ -68,8 +69,8 @@
 #' d <- data.frame(plot = rep(c("a", "b"), each = length(t)),
 #'                 t = rep(t, 2),
 #'                 temp = c(sin(seq_along(t) / 24), cos(seq_along(t) / 24)))
-#' at <- data.frame(plot = c("a", "b"),
-#'                  when = as.POSIXct(c("2021-10-20", "2021-10-25"), tz = "UTC"))
+#' at <- data.frame(id = c("a", "b"),
+#'                  at = as.POSIXct(c("2021-10-20", "2021-10-25"), tz = "UTC"))
 #' x <- lookback_matrix(d, plot, t, temp, at = at, span = "30 days", bins = 3L,
 #'                    stats = c("cold_day", "mean", "warm_day"))
 #' dim(x)
@@ -94,7 +95,7 @@ lookback_matrix <- function(data,
   bins <- .check_bins(bins)
   stats <- .check_stats(stats, "lookback")
 
-  unit <- as.character(data[[id_col]])
+  unit <- .unit_names(data[[id_col]], id_col)
   when <- data[[time_col]]
   reading <- as.numeric(data[[value_col]])
 
@@ -133,17 +134,17 @@ lookback_matrix <- function(data,
 # several targets, so the unit cannot name a row. The anchors are instants and go through the same
 # boundary the readings do, so both are read as a clock in the series' own calendar.
 .check_targets <- function(at, units, tz) {
-  if (!is.data.frame(at) || ncol(at) < 2L) {
-    stop("`at` must be a data frame whose first column is the unit and whose second is the ",
-         "anchor instant.", call. = FALSE)
+  if (!is.data.frame(at) || !all(c("id", "at") %in% names(at))) {
+    stop("`at` must be a data frame with an `id` column naming the unit and an `at` column of ",
+         "anchor instants.", call. = FALSE)
   }
   if (!nrow(at)) {
     stop("`at` holds no target.", call. = FALSE)
   }
-  who <- as.character(at[[1L]])
-  anchor <- at[[2L]]
+  who <- .unit_names(at$id, "id")
+  anchor <- at$at
   if (!inherits(anchor, "POSIXct")) {
-    stop("the second column of `at` must be POSIXct, not ", class(anchor)[1L], ".", call. = FALSE)
+    stop("the `at` column of `at` must be POSIXct, not ", class(anchor)[1L], ".", call. = FALSE)
   }
   if (anyNA(who) || anyNA(anchor)) {
     stop("missing values in `at`. Fill or drop them before building a representation.",

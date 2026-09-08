@@ -274,3 +274,20 @@ def test_coverage_lays_a_refused_records_gaps_out_as_zeros():
     assert coverage(d, "id", "time", grain="native").count.shape == (2, 24 * 40)
     with pytest.raises(ValueError, match="one grain at a time"):
         coverage(d, "id", "time", grain=["day", "week"])
+
+
+def test_a_numeric_identifier_is_written_by_its_digits():
+    t = np.arange(np.datetime64("2021-09-01T00:00:00"),
+                  np.datetime64("2021-09-04T00:00:00"), np.timedelta64(1, "h"))
+    named = [100000, 9, 10]
+    d = {"id": np.repeat(np.asarray(named, dtype=np.float64), len(t)),
+         "time": np.tile(t, 3), "value": np.zeros(3 * len(t))}
+    # The same three names R writes: not 100000.0, and not 1e+05 either.
+    assert grain_matrix(d, "id", "time", "value", grain="day").units == ("10", "100000", "9")
+    whole = dict(d, id=np.repeat(np.asarray(named, dtype=np.int64), len(t)))
+    assert grain_matrix(whole, "id", "time", "value", grain="day").units == ("10", "100000", "9")
+
+    with pytest.raises(ValueError, match="not a whole number"):
+        grain_matrix(dict(d, id=d["id"] + 0.5), "id", "time", "value", grain="day")
+    with pytest.raises(ValueError, match="must identify a unit by text"):
+        grain_matrix(dict(d, id=np.tile(t, 3)), "id", "time", "value", grain="day")

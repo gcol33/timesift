@@ -151,7 +151,9 @@ and must return the start of each reading's bin.
 expressed in that calendar, which is what a zone-free `datetime64` says and what the R side
 does for a series carried in UTC. Given a zone name, the instants are read as UTC and binned by
 that zone's clock, which is what the R side does for a series carrying a `tzone`: the same
-instants and the same zone give the same answer in both languages.
+instants and the same zone give the same answer in both languages. A time column that carries
+a zone of its own names the calendar the same way, so a zone-aware column bins by its own
+clock without being told to; naming a different one in `tz` beside it is an error.
 
 `partial` says what becomes of a bin the record does not cover for its whole calendar span,
 which is what a record beginning or ending away from a bin boundary produces. `"keep"`, the
@@ -184,7 +186,7 @@ It is the reduction a calendar cannot express: two targets on the same unit a fo
 read two different stretches of the same series, so the bins are relative to the target rather
 than to a month or a week.
 
-`at` is a mapping with an `"id"` array of units and a `"time"` array of anchor instants,
+`at` is a mapping with an `"id"` array of units and an `"at"` array of anchor instants,
 one row per target; a unit may carry any number of them. Bin `b` of a target anchored at
 `a` covers `[a - lag - span + b * step, a - lag - span + (b + 1) * step)`, with `step` the
 span divided by `bins` and `b` counted from zero. Only the readings of the target's own
@@ -197,6 +199,21 @@ here, because a lookback of a fixed length is a fixed length rather than a calen
 
 `tz` names the calendar, as it does for `grain_matrix`. The anchors are instants and
 are read as a clock in that same calendar, so one record is binned by one calendar.
+
+## `coverage()`
+
+```python
+coverage(data=None, id=None, time=None, *, grain='day', year_start='09-01', tz=None)
+```
+
+Which units reach which bins.
+
+A representation needs every unit in every bin, and `grain_matrix` refuses a record
+where one is missing rather than pad it. This is the same binning laid out so the gaps can be
+read: how many readings each unit has in each bin, over every bin the calendar tiles the
+record with from the first bin any unit touches to the last. What to do about a gap is the
+analyst's decision, and this is the table it is made on; nothing here fills a cell. `grain`
+and `tz` read as they do for `grain_matrix`.
 
 ## `timesift_set()`
 
@@ -251,6 +268,7 @@ TimesiftMatrix(
     bin_partial,
     span,
     lag,
+    static,
 )
 ```
 
@@ -258,7 +276,11 @@ A `[row, bin, channel]` representation and the reduction that produced it.
 
 A row is a unit where the calendar did the binning and a target where a lookback did, since a
 unit carrying several targets cannot name a row on its own. `span` and `lag` are set by a
-lookback alone, and are what rebuilding one for new targets reads.
+lookback alone, and are what rebuilding one for new targets reads. `static` names the
+channels holding the same number in every bin, which `flatten` reads once each.
+
+`bin_start`, `bin_end` and `bin_partial` are the calendar's, and are `None` on a
+representation the calendar did not bin.
 
 Attributes:
 
@@ -268,12 +290,13 @@ Attributes:
 - `stats` - tuple[str, ...]
 - `grain` - str
 - `year_start` - str | None
-- `bin_start` - np.ndarray
-- `bin_end` - np.ndarray
+- `bin_start` - np.ndarray | None
+- `bin_end` - np.ndarray | None
 - `bin_n` - np.ndarray
-- `bin_partial` - np.ndarray
+- `bin_partial` - np.ndarray | None
 - `span` - int | None
 - `lag` - int | None
+- `static` - tuple[str, ...]
 
 ### `shape`
 
@@ -306,6 +329,44 @@ same units, differing only in how coarsely the record was read. It is what
 ### `units`
 
 The units the set covers, which every grain in it shares.
+
+## `Coverage`
+
+```python
+Coverage(count, units, bins, grain, bin_start)
+```
+
+How many readings each unit has in each bin, over every bin the calendar tiles the record
+with. `count` is `[unit, bin]`; a unit that started late, stopped early or lost a month is
+a row with zeros in it, and a bin the whole record skips is a column of zeros.
+
+Attributes:
+
+- `count` - np.ndarray
+- `units` - tuple[str, ...]
+- `bins` - tuple[str, ...]
+- `grain` - str
+- `bin_start` - np.ndarray
+
+### `empty`
+
+The `[unit, bin]` mask of cells holding no reading.
+
+### `units_with_gaps()`
+
+```python
+units_with_gaps(self)
+```
+
+The units that do not reach every bin.
+
+### `bins_no_unit_reaches()`
+
+```python
+bins_no_unit_reaches(self)
+```
+
+The bins the whole record skips.
 
 ## `GRAINS`
 

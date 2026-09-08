@@ -186,7 +186,7 @@ def test_a_reading_that_is_not_a_finite_number_is_refused_and_named():
     base = {"id": np.repeat(np.asarray(["p1", "p2"]), len(when)),
             "t": np.tile(when, 2),
             "v": rng.normal(size=2 * len(when))}
-    at = {"id": ["p1", "p2"], "time": [when[-1], when[-1]]}
+    at = {"id": ["p1", "p2"], "at": [when[-1], when[-1]]}
 
     for hole in (np.nan, np.inf, -np.inf):
         data = dict(base, v=base["v"].copy())

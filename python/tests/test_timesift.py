@@ -12,7 +12,8 @@ import pytest
 
 from timesift.fit import SEPARATOR, timesift
 from timesift.learners import Learner, flatten
-from timesift.specs import grain, grains, grouped_cv, lookbacks, multigrain, native
+from timesift.specs import (grain, grains, grouped_cv, lookback, lookbacks, multigrain,
+                            native)
 
 PLOTS = tuple(f"p{i:02d}" for i in range(1, 13))
 START = np.datetime64("2021-09-01T00:00:00", "s")
@@ -167,6 +168,10 @@ def test_there_is_no_default_set_of_spans():
 def test_a_lookback_needs_the_column_holding_each_targets_instant():
     with pytest.raises(ValueError, match="`target_time` has to name the column"):
         fitted(sift=lookbacks("10 days"))
+
+    # The same check sees a representation a learner pinned itself to, which no sift carries.
+    with pytest.raises(ValueError, match="`target_time` has to name the column"):
+        fitted(models=[learner(data=lookback("10 days"))], sift=grains("day"))
 
 
 def test_a_lookback_fits_on_repeated_targets_grouped_by_their_unit():

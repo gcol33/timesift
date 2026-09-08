@@ -13,6 +13,7 @@ from timesift.learners import (Learner, elasticnet, fit_learner, flatten, forest
 from timesift.metrics import roc_auc
 from timesift.representation import grain_matrix
 from timesift.response import Response
+from timesift.specs import grain
 
 needs_sklearn = pytest.mark.skipif(importlib.util.find_spec("sklearn") is None,
                                    reason="scikit-learn is not installed")
@@ -178,7 +179,11 @@ def test_every_learner_declares_what_it_reads_and_how_it_covers_the_responses():
         learner = build()
         assert (learner.reads, learner.multi) == declared[learner.name]
         assert learner.data is None
-        assert build(data="week").data == "week"
+        # What a learner is pinned to is a representation, never the name of one: the layer above
+        # reads its kind and its label before anything is built, and a string carries neither.
+        assert build(data=grain("week")).data == grain("week")
+        with pytest.raises(ValueError, match="must be a representation"):
+            build(data="week")
 
 
 def test_a_learner_can_only_declare_what_the_layer_above_knows_how_to_read():

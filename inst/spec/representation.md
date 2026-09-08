@@ -9,9 +9,17 @@ A long table of readings with three columns of interest:
 
 | column | type | meaning |
 |---|---|---|
-| id | character or factor | the unit carrying the sensor (a plot, a site, a device) |
+| id | character, factor, or a whole number | the unit carrying the sensor (a plot, a site, a device) |
 | time | POSIXct, UTC | the instant of the reading |
 | value | numeric | the reading |
+
+An identifier is a name, and the two languages have to write the same name for the same value.
+A character id is itself and a factor is its label. A whole number is its digits, with no exponent
+and no decimal point, so a plot read as `100000` from a file is `100000` in both, rather than R's
+`1e+05` beside Python's `100000.0`. A number that is not whole has no such writing and is refused,
+naming the column, as is a column of any other type. This holds wherever an identifier names
+something: the id column of the readings, of the targets, of the target table a lookback is
+anchored by, and of a response.
 
 Requirements, each checked and each an error rather than a warning:
 
@@ -196,9 +204,21 @@ judged as any other.
 The function must return a bin start for every reading, including any that precede its first
 boundary. Deciding that with an interval lookup is the natural way to write one and the two
 languages disagree below the first boundary, where R's `findInterval()` gives 0 and NumPy's
-`searchsorted() - 1` gives -1: the first silently shortens the result, which is an error, and the
-second silently wraps to the last boundary, which is not. Either put the first boundary at or
-before the record's first reading, as the fixtures do, or handle the readings below it explicitly.
+`searchsorted() - 1` gives -1: the first silently shortens the result, and the second silently
+wraps to the last boundary. Either put the first boundary at or before the record's first reading,
+as the fixtures do, or handle the readings below it explicitly.
+
+Two things have to hold of what the function returns, and both are checked before its bins are
+read as bins, naming the first reading that breaks them:
+
+- A bin begins at or before every reading it holds. A calendar shifted by one boundary breaks it,
+  and so does the wrap above, whose bin start is the last edge of all and therefore later than the
+  reading it was asked about.
+- A bin's readings are a stretch of the record. A calendar sending alternate readings to two bins
+  breaks it, and the two bins the array then carries are not bins the record ever had.
+
+Neither is visible to the empty-cell guard or to the contiguity rule, which read the bins the
+calendar declared and can only ask whether every unit reaches each of them.
 
 ## Output
 
@@ -234,8 +254,11 @@ or a week.
 
 | column | type | meaning |
 |---|---|---|
-| id | character or factor | the unit, which the readings must carry |
+| id | as the readings' id | the unit, which the readings must carry |
 | at | POSIXct | the instant the target is anchored at |
+
+Both columns are read **by name**, as every alignment in the package is, and a table missing either
+is refused. A table carrying more columns than these two is read for these two.
 
 A target's identity is its position in that table. A unit may carry any number of targets, so the
 unit cannot name a row, and the output is in the table's own row order rather than in a sorted one.
@@ -317,7 +340,9 @@ Attributes carried on the array:
 
 There is no `bin_start`, no `bin_end` and no `bin_partial`. A bin is a position relative to an
 anchor rather than a span of the calendar, and a cell the record does not cover is an error rather
-than a verdict.
+than a verdict. R carries no such attribute and Python carries them as `None`; a column of
+not-a-time beside a column of `FALSE` would read as an answer to a question the reduction does not
+ask.
 
 ## What crosses the language boundary, and what does not
 
@@ -414,6 +439,13 @@ and the zone: every grain of the aligned series read as a `Europe/Vienna` clock,
 inside that record, and the short series read as an `America/Sao_Paulo` clock, which moves at
 midnight inside it, including a `year_start` landing on the night it moves. Each row carries `n_unit`, `n_bin`, the first and last bin start, how many bins are
 partial, and the digest.
+
+`grain_guards.csv` holds one case per guard on a supplied calendar, each naming the series and the
+calendar that breaks it beside the substring of the message both implementations must raise. The
+calendars are named rather than written out, so both suites build the same function: `late` gives
+every reading the midnight after it, `(floor(t / 86400) + 1) * 86400`, and `alternate` sends
+consecutive readings to two bins an hour apart, `t0 + 3600 * (((t - t0) / 3600) mod 2)` with `t0`
+the record's first reading.
 
 The lookback reads the same three series and three files of its own. `lookback_targets.csv`
 holds the anchors, in named sets rather than one set per series, because an anchor that is a local
@@ -538,6 +570,14 @@ call site.
 
 - Naming one grain returns the representation and naming two or more returns a set, whether the
   one is named as a string or as a sequence of one.
+- A representation refuses a statistic its grain has no definition for, and a `year_start` that is
+  not a month and a day, when it is constructed rather than when it is built. `"auto"` is the whole
+  set the record supports and is refused beside a named grain, and the `stats` and `year_start`
+  given to `grains()` reach every member of the set it returns.
+- A representation anchored on the target and a run without `target_time` are refused against each
+  other in both directions, over the members of the sift and the representations learners pinned
+  themselves to alike. A learner's `data` is a representation or nothing; the name of a grain is
+  not one.
 - `grain_ladder()` and `select_grain()` left without a fold map build one with the defaults of
   `fold_map()`. The two languages draw different maps from the same seed, so where both must see
   one split, write it and read it back as the section above describes.

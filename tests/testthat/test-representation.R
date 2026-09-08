@@ -68,6 +68,16 @@ test_that("a sift is keyed by label, whichever way it was written", {
   expect_true(isTRUE(attr(grains("auto"), "auto")))
 })
 
+test_that("a set of grains hands every member its statistics and its year start", {
+  named <- grains("week", "year", stats = c("cold_day", "mean"), year_start = "01-01")
+  expect_equal(vapply(named, function(r) r$year_start, character(1L)),
+               c(week = "01-01", year = "01-01"))
+  expect_equal(vapply(named, function(r) paste(r$stats, collapse = "+"), character(1L)),
+               c(week = "cold_day+mean", year = "cold_day+mean"))
+  expect_identical(attr(grains("auto", year_start = "01-01"), "year_start"), "01-01")
+  expect_error(grains("week", year_start = "13-01"), "month 01-12")
+})
+
 test_that("a sift refuses what it cannot key", {
   expect_error(grains(), "at least one grain")
   expect_error(grains("auto", "week"), "whole set")
@@ -120,6 +130,13 @@ test_that("a lookback block keeps the targets' own order and one row each", {
   expect_equal(dim(x)[2L], 2L)
   expect_equal(attr(x, "span"), 30 * 86400)
   expect_equal(dimnames(x)[[1L]], as.character(1:4))
+})
+
+test_that("a lookback without an anchor names the representation and target_time", {
+  sim <- sim_series(n_unit = 2L, days = 60L)
+  targets <- rep_targets(sim$units)
+  expect_error(build_representation(lookback("30 days"), sim$readings, targets, rep_spec()),
+               "`target_time` has to name the column", fixed = TRUE)
 })
 
 test_that("static columns enter as channels that do not move across the bins", {

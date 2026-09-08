@@ -360,3 +360,21 @@ test_that("coverage lays a refused record's gaps out as zeros, unit by unit and 
   expect_equal(dim(coverage(d, plot, t, grain = "native")), c(2L, 24L * 40L))
   expect_error(coverage(d, plot, t, grain = c("day", "week")), "one grain at a time")
 })
+
+test_that("a numeric identifier is written by its digits", {
+  t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 3)
+  named <- c(100000, 9, 10)
+  d <- data.frame(id = rep(named, each = length(t)), t = rep(t, 3),
+                  v = rep(0, 3 * length(t)))
+  # The same three names Python writes: not 1e+05, and not 100000.0 either.
+  expect_identical(dimnames(grain_matrix(d, id, t, v, grain = "day"))[[1L]],
+                   c("10", "100000", "9"))
+  whole <- transform(d, id = as.integer(d$id))
+  expect_identical(dimnames(grain_matrix(whole, id, t, v, grain = "day"))[[1L]],
+                   c("10", "100000", "9"))
+
+  expect_error(grain_matrix(transform(d, id = d$id + 0.5), id, t, v, grain = "day"),
+               "not a whole number")
+  expect_error(grain_matrix(transform(d, id = d$t), id, t, v, grain = "day"),
+               "must identify a unit by text")
+})

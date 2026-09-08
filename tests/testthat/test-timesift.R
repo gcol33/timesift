@@ -229,6 +229,21 @@ test_that("an anchored fit refuses a calendar representation and a default set o
     "follows the calendar")
 })
 
+test_that("a lookback without `target_time` is refused, in the sift and pinned alike", {
+  case <- toy_case(n_unit = 6L, days = 120L)
+  expect_error(
+    timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+             models = list(toy()), sift = lookbacks("30 days"), ensemble = FALSE,
+             control = NULL, verbose = FALSE),
+    "`target_time` has to name the column", fixed = TRUE)
+  # The same check sees a representation a learner pinned itself to, which no sift carries.
+  expect_error(
+    timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+             models = list(toy(data = lookback("30 days"))), sift = grains("week"),
+             ensemble = FALSE, control = NULL, verbose = FALSE),
+    "`target_time` has to name the column", fixed = TRUE)
+})
+
 test_that("an anchored fit runs across lookback spans", {
   case <- toy_case(n_unit = 8L, days = 150L)
   case$targets$when <- as.POSIXct(rep("2021-12-01", 8L), tz = "UTC")

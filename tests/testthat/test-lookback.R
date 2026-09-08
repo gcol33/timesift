@@ -7,7 +7,7 @@ lookback_record <- function(days = 200L, seed = 20260904L) {
 
 lookback_anchors <- function() {
   data.frame(id = c("p1", "p2", "p1", "p2"),
-             when = as.POSIXct(c("2022-01-01", "2022-02-10", "2022-03-05", "2022-03-15"),
+             at = as.POSIXct(c("2022-01-01", "2022-02-10", "2022-03-05", "2022-03-15"),
                                tz = "UTC"),
              stringsAsFactors = FALSE)
 }
@@ -57,7 +57,7 @@ test_that("the core reproduces the pure-R oracle over the lookback grid", {
 test_that("a lookback reads only the target's own unit and only its own stretch", {
   d <- lookback_record(days = 60L)
   at <- data.frame(id = c("p1", "p2"),
-                   when = as.POSIXct(c("2021-10-20", "2021-10-20"), tz = "UTC"),
+                   at = as.POSIXct(c("2021-10-20", "2021-10-20"), tz = "UTC"),
                    stringsAsFactors = FALSE)
   x <- lookback_matrix(d, id, t, v, at = at, span = "10 days", stats = "mean")
 
@@ -76,7 +76,7 @@ test_that("a lookback reads only the target's own unit and only its own stretch"
   # the whole reason the reduction exists.
   pair <- lookback_matrix(d, id, t, v,
                         at = data.frame(id = c("p1", "p1"),
-                                        when = as.POSIXct(c("2021-10-06", "2021-10-20"),
+                                        at = as.POSIXct(c("2021-10-06", "2021-10-20"),
                                                           tz = "UTC")),
                         span = "10 days", stats = "mean")
   expect_false(isTRUE(all.equal(pair[1L, 1L, 1L], pair[2L, 1L, 1L])))
@@ -157,7 +157,7 @@ test_that("both guards fire with the message the fixtures pin", {
 
 test_that("a cell the record cannot fill names the target and the interval", {
   d <- lookback_record(days = 30L)
-  at <- data.frame(id = "p1", when = as.POSIXct("2021-09-20", tz = "UTC"),
+  at <- data.frame(id = "p1", at = as.POSIXct("2021-09-20", tz = "UTC"),
                    stringsAsFactors = FALSE)
   expect_error(lookback_matrix(d, id, t, v, at = at, span = "30 days", bins = 3L, stats = "mean"),
                "1 (target, bin) cell hold no readings, first: target 1 over ", fixed = TRUE)
@@ -172,7 +172,7 @@ test_that("a cell the record cannot fill names the target and the interval", {
 
 test_that("a day-level statistic is refused where a calendar day would fall in two bins", {
   d <- lookback_record(days = 60L)
-  at <- data.frame(id = "p1", when = as.POSIXct("2021-10-20", tz = "UTC"),
+  at <- data.frame(id = "p1", at = as.POSIXct("2021-10-20", tz = "UTC"),
                    stringsAsFactors = FALSE)
   expect_error(lookback_matrix(d, id, t, v, at = at, span = "7 days", bins = 3L, stats = "cold_day"),
                "cold_day needs bins of a calendar day or coarser: target 1", fixed = TRUE)
@@ -182,7 +182,7 @@ test_that("a day-level statistic is refused where a calendar day would fall in t
   expect_silent(lookback_matrix(d, id, t, v, at = at, span = "7 days", bins = 3L,
                               stats = c("min", "mean", "max")))
 
-  hour <- data.frame(id = "p1", when = as.POSIXct("2021-10-20 05:00:00", tz = "UTC"),
+  hour <- data.frame(id = "p1", at = as.POSIXct("2021-10-20 05:00:00", tz = "UTC"),
                      stringsAsFactors = FALSE)
   expect_error(lookback_matrix(d, id, t, v, at = hour, span = "7 days", bins = 7L,
                              stats = "warm_day"),
@@ -220,7 +220,7 @@ test_that("a bin is named by where it opens relative to the anchor", {
 test_that("a lookback states what it was built from", {
   d <- lookback_record(days = 60L)
   at <- data.frame(id = c("p1", "p2"),
-                   when = as.POSIXct(c("2021-10-20", "2021-10-21"), tz = "UTC"),
+                   at = as.POSIXct(c("2021-10-20", "2021-10-21"), tz = "UTC"),
                    stringsAsFactors = FALSE)
   x <- lookback_matrix(d, id, t, v, at = at, span = "30 days", lag = "12 hours", bins = 3L,
                      stats = c("min", "mean", "max"))
@@ -238,7 +238,7 @@ test_that("a lookback states what it was built from", {
 
 test_that("a lookback refuses an input it cannot answer for", {
   d <- lookback_record(days = 60L)
-  at <- data.frame(id = "p1", when = as.POSIXct("2021-10-20", tz = "UTC"),
+  at <- data.frame(id = "p1", at = as.POSIXct("2021-10-20", tz = "UTC"),
                    stringsAsFactors = FALSE)
 
   expect_error(lookback_matrix(d, id, t, v, at = at, span = "7 days", bins = 11L, stats = "mean"),
@@ -247,12 +247,12 @@ test_that("a lookback refuses an input it cannot answer for", {
                "`bins` must be a positive whole number")
   expect_error(lookback_matrix(d, id, t, v, at = at, span = "7 days", stats = "warmest"),
                "unknown statistic")
-  expect_error(lookback_matrix(d, id, t, v, at = data.frame(id = "p9", when = at$when),
+  expect_error(lookback_matrix(d, id, t, v, at = data.frame(id = "p9", at = at$at),
                              span = "7 days", stats = "mean"),
                "1 target name a unit the series does not carry, first: p9", fixed = TRUE)
   expect_error(lookback_matrix(d, id, t, v, at = at$id, span = "7 days", stats = "mean"),
                "`at` must be a data frame")
-  expect_error(lookback_matrix(d, id, t, v, at = data.frame(id = "p1", when = "2021-10-20"),
+  expect_error(lookback_matrix(d, id, t, v, at = data.frame(id = "p1", at = "2021-10-20"),
                              span = "7 days", stats = "mean"),
                "must be POSIXct")
 })
@@ -262,7 +262,7 @@ test_that("the anchors are read as a clock in the series' own calendar", {
   t <- seq(as.POSIXct("2021-12-01", tz = "UTC"), by = "hour", length.out = 24 * 40)
   d <- data.frame(id = "p1", t = t, v = stats::rnorm(length(t)), stringsAsFactors = FALSE)
   # An instant that opens a Vienna day, which is 23:00 the evening before in UTC.
-  at <- data.frame(id = "p1", when = as.POSIXct("2021-12-20", tz = "Europe/Vienna"),
+  at <- data.frame(id = "p1", at = as.POSIXct("2021-12-20", tz = "Europe/Vienna"),
                    stringsAsFactors = FALSE)
 
   attr(d$t, "tzone") <- "Europe/Vienna"
@@ -276,7 +276,7 @@ test_that("the anchors are read as a clock in the series' own calendar", {
     v = d$v, stringsAsFactors = FALSE)
   shifted <- data.frame(
     id = "p1",
-    when = as.POSIXct(format(at$when, "%Y-%m-%d %H:%M:%S", tz = "Europe/Vienna"), tz = "UTC"),
+    at = as.POSIXct(format(at$at, "%Y-%m-%d %H:%M:%S", tz = "Europe/Vienna"), tz = "UTC"),
     stringsAsFactors = FALSE)
   naive <- lookback_matrix(relabelled, id, t, v, at = shifted, span = "7 days", bins = 7L,
                          stats = "cold_day")
@@ -292,4 +292,20 @@ test_that("the anchors are read as a clock in the series' own calendar", {
                                                    stats = "mean"))),
                    as.vector(unclass(lookback_matrix(relabelled, id, t, v, at = shifted,
                                                    span = "7 days", stats = "mean"))))
+})
+
+test_that("the target table is read by name", {
+  d <- lookback_record(days = 60L)
+  at <- data.frame(id = "p1", at = as.POSIXct("2021-10-20", tz = "UTC"),
+                   stringsAsFactors = FALSE)
+  x <- lookback_matrix(d, id, t, v, at = at, span = "10 days", stats = "mean")
+  # A bin is a position relative to an anchor rather than a span of the calendar, so the three
+  # attributes the calendar owns are absent here as they are in Python.
+  expect_null(attr(x, "bin_start"))
+  expect_null(attr(x, "bin_end"))
+  expect_null(attr(x, "bin_partial"))
+
+  named <- data.frame(unit = at$id, when = at$at, stringsAsFactors = FALSE)
+  expect_error(lookback_matrix(d, id, t, v, at = named, span = "10 days", stats = "mean"),
+               "an `id` column naming the unit and an `at` column", fixed = TRUE)
 })

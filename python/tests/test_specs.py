@@ -132,6 +132,32 @@ def test_auto_leaves_out_the_grains_a_day_level_statistic_is_undefined_at():
     assert auto_grains(series(), spec(), stats=("cold_day",)) == ("day", "week", "month")
 
 
+def test_a_set_of_grains_hands_every_member_its_statistics_and_its_year_start():
+    named = grains("week", "year", stats=("cold_day", "mean"), year_start="01-01")
+    assert [one.year_start for one in named.values()] == ["01-01", "01-01"]
+    assert [one.stats for one in named.values()] == [("cold_day", "mean")] * 2
+    auto = grains("auto", stats="cold_day", year_start="01-01")["auto"]
+    assert (auto.year_start, auto.stats) == ("01-01", ("cold_day",))
+
+
+def test_auto_is_the_whole_set_and_cannot_be_named_beside_a_grain():
+    with pytest.raises(ValueError, match="cannot be named beside a grain"):
+        grains("week", "auto")
+
+
+def test_a_representation_refuses_what_its_grain_cannot_carry_when_it_is_named():
+    with pytest.raises(ValueError, match="not defined there"):
+        grain("halfday", stats="cold_day")
+    with pytest.raises(ValueError, match="unknown statistic"):
+        grains("week", stats="warmest")
+    with pytest.raises(ValueError, match="month 01-12"):
+        grains("week", year_start="13-01")
+    with pytest.raises(ValueError, match='must look like "MM-DD"'):
+        multigrain(year_start="0101")
+    with pytest.raises(ValueError, match="unknown statistic"):
+        lookback("10 days", stats="warmest")
+
+
 def test_expanding_a_sift_replaces_auto_and_leaves_everything_else():
     expanded = expand_sift(grains("auto"), series(days=3), spec())
     assert list(expanded) == ["native", "halfday", "day"]
@@ -221,6 +247,11 @@ def test_a_lookback_reads_one_row_per_target_in_the_tables_own_order():
     assert m.units == ("1", "2", "3")
     assert target_labels(anchors, settings) == ("1", "2", "3")
     assert n_targets(anchors, settings) == 3
+
+
+def test_a_lookback_without_an_anchor_names_the_representation_and_target_time():
+    with pytest.raises(ValueError, match="`target_time` has to name the column"):
+        build_representation(lookback("10 days"), series(), targets(), spec())
 
 
 def test_the_rows_are_named_by_the_unit_where_a_unit_carries_one_target():

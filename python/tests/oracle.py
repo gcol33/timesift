@@ -191,7 +191,7 @@ def oracle_lookback_matrix(data, id, time, value, at, span, lag="0 days", bins=1
     when = np.asarray(data[time], dtype="datetime64[s]").astype(np.int64)
     reading = np.asarray(data[value], dtype=np.float64)
     who = np.asarray([str(v) for v in at["id"]])
-    anchor = np.asarray(at["time"], dtype="datetime64[s]").astype(np.int64)
+    anchor = np.asarray(at["at"], dtype="datetime64[s]").astype(np.int64)
     n_t = len(anchor)
 
     # A day-level statistic is defined only where every calendar day lies whole inside one bin,
