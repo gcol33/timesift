@@ -608,6 +608,9 @@ call site.
 - `grain_ladder()` and `select_grain()` take a `control` as a run does, and hand it to every
   learner that declares one. A selection hands the same one to the inner search and to the refit.
 - Held-out predictions are placed by unit and by variable, never by position.
+- A prediction that is not a number on a scorable cell is refused where it is scored, naming the
+  arm, the cell and how many there are, rather than scored as the `NA` a one-class cell gives. The
+  combiner is fitted on every scorable cell and refuses to drop one for the same reason.
 - A setting given at fit time overrides the one the learner carries, and a setting the learner does
   not have is refused rather than ignored.
 - The response head and the metric are registry entries. `metric` takes a registered name or a

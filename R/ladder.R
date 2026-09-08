@@ -96,15 +96,18 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
 # so the column is named for the general case and a grain ladder relabels it below.
 .score_arm <- function(representation, learner, y, p, f, levels, cells, score) {
   cbind(representation = representation, learner = learner,
-        .score_cells(y, p, f, levels, cells, score), stringsAsFactors = FALSE)
+        .score_cells(y, p, f, levels, cells, score,
+                     arm = paste(representation, learner, sep = "|")),
+        stringsAsFactors = FALSE)
 }
 
-.score_cells <- function(y, p, f, levels, cells, score) {
+.score_cells <- function(y, p, f, levels, cells, score, arm = NULL) {
   grid <- expand.grid(variable = colnames(y), fold = levels,
                       KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
   key <- paste(grid$variable, grid$fold)
   ok <- cells$scorable[match(key, paste(cells$variable, cells$fold))]
   ok[is.na(ok)] <- FALSE
+  .check_finite(p, f, grid, ok, arm)
   value <- rep(NA_real_, nrow(grid))
   for (i in which(ok)) {
     rows <- f == grid$fold[i]
@@ -112,6 +115,26 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
   }
   data.frame(variable = grid$variable, fold = grid$fold, score = value, scorable = ok,
              stringsAsFactors = FALSE)
+}
+
+# A scorable cell is one every candidate has to carry a prediction for. A threshold metric returns
+# NA on a cell holding a prediction that is not a number, which is the same NA a cell with no
+# score in it returns, so a network whose training diverged would be reported as an unscorable
+# cell and dropped from the combiner without a word. It is a fit that did not settle, and it stops
+# the run where it happened.
+.check_finite <- function(p, f, grid, ok, arm) {
+  hit <- which(ok)
+  bad <- hit[vapply(hit, function(i) {
+    !all(is.finite(p[f == grid$fold[i], grid$variable[i]]))
+  }, logical(1L))]
+  if (!length(bad)) {
+    return(invisible(TRUE))
+  }
+  stop(if (is.null(arm)) "the predictions hold" else paste0("the ", arm, " arm holds"),
+       " no number on ", .plural(length(bad), "scorable cell"), ", first ",
+       grid$variable[bad[1L]], " in fold ", grid$fold[bad[1L]],
+       ". A scorable cell is one every candidate carries, so this is a fit that did not settle ",
+       "rather than a cell with no score in it.", call. = FALSE)
 }
 
 #' Score held-out predictions on the cells the mask allows

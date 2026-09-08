@@ -342,3 +342,12 @@ test_that("occlusion refuses a run that kept no fits and a candidate that was ne
   expect_error(occlusion(kept, "nope / month"), "no candidate called")
   expect_error(occlusion(structure(list(), class = "list"), "a"), "expected a timesift")
 })
+
+test_that("the combiner refuses to drop a scorable cell rather than fitting on fewer", {
+  f <- stack_fixture()
+  mask <- .scorable_matrix(f$y, f$cells, f$folds)
+  hit <- which(mask, arr.ind = TRUE)[1L, ]
+  f$oof$noise[hit[1L], hit[2L]] <- NaN
+  expect_error(ensemble_fit(f$oof, f$y, f$cells, f$folds), "did not settle")
+  expect_error(ensemble_fit(f$oof, f$y, f$cells, f$folds), "noise (1)", fixed = TRUE)
+})

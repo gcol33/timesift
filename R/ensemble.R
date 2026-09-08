@@ -349,16 +349,21 @@ ensemble_weights <- function(fit) {
   matrix(ok, nrow = nrow(y), ncol = ncol(y), dimnames = dimnames(y))
 }
 
+# Every scorable cell, and no other: the mask says which cells every candidate was scored on, and
+# the combiner is fitted on exactly those. Dropping the ones a candidate left without a number
+# would fit the stack on fewer cells than the report says it was, and the report would not show it.
 .stacking_block <- function(oof, y, mask) {
   P <- vapply(oof, function(p) as.numeric(p[mask]), numeric(sum(mask)))
   P <- matrix(P, nrow = sum(mask), ncol = length(oof), dimnames = list(NULL, names(oof)))
-  target <- as.numeric(y[mask])
-  keep <- is.finite(target) & apply(P, 1L, function(r) all(is.finite(r)))
-  if (!any(keep)) {
-    stop("no scorable cell carries a prediction from every candidate, so there is nothing to ",
-         "fit the combiner on.", call. = FALSE)
+  bad <- vapply(seq_len(ncol(P)), function(j) sum(!is.finite(P[, j])), integer(1L))
+  if (any(bad > 0L)) {
+    stop("the combiner is fitted on every scorable cell, and ",
+         .listing(paste0(colnames(P)[bad > 0L], " (", bad[bad > 0L], ")")),
+         " hold no number on some of them. A candidate that cannot predict a scorable cell is a ",
+         "fit that did not settle; drop it from the run rather than from the cells.",
+         call. = FALSE)
   }
-  list(predictions = P[keep, , drop = FALSE], response = target[keep])
+  list(predictions = P, response = as.numeric(y[mask]))
 }
 
 # A candidate is reported as "learner / representation", which is what makes a scope readable off

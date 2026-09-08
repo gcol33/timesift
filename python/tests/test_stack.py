@@ -472,3 +472,16 @@ def test_roc_auc_is_the_metric_the_profile_was_asked_for():
     # A guard on the fixture rather than on the code: the profile above is read at roc_auc, so a
     # constant prediction has to leave it undefined rather than at some level.
     assert np.isnan(roc_auc([1, 1, 1], [0.5, 0.5, 0.5]))
+
+
+def test_the_combiner_refuses_to_drop_a_scorable_cell_rather_than_fitting_on_fewer():
+    oof, y, cells, folds = board()
+    admits = {(v, int(k)): bool(ok)
+              for v, k, ok in zip(cells.variable, cells.fold, cells.scorable)}
+    f = align_folds(folds, y.units)
+    inside = np.array([[admits[(v, int(k))] for v in y.variables] for k in f])
+    a, b = np.argwhere(inside)[0]
+    spoiled = {name: p.copy() for name, p in oof.items()}
+    spoiled["forest / month"][a, b] = np.nan
+    with pytest.raises(ValueError, match="did not settle"):
+        ensemble_fit(spoiled, y, cells, folds, ensemble(), score_table(oof, y, folds, cells))

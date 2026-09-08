@@ -172,3 +172,27 @@ test_that("a learner's own control overrides the ladder's on the settings it nam
   expect_true(all(vapply(seen$got, function(c) c$epochs, integer(1L)) == 11L))
   expect_true(all(vapply(seen$got, function(c) c$batch_size, integer(1L)) == 8L))
 })
+
+test_that("an arm that holds no number on a scorable cell stops the run", {
+  f <- ladder_fixture(v = 2L)
+  diverged <- learner(
+    "diverged",
+    fit = function(x, y, ...) list(rate = colMeans(y)),
+    predict = function(model, x) {
+      p <- outer(seq_len(dim(x)[1L]) / dim(x)[1L], model$rate, function(a, b) a)
+      p[1L, 1L] <- NaN
+      p
+    })
+  expect_error(grain_ladder(f$x, f$y, diverged, folds = f$folds, verbose = FALSE),
+               "did not settle")
+  expect_error(grain_ladder(f$x, f$y, diverged, folds = f$folds, verbose = FALSE),
+               "day|diverged", fixed = TRUE)
+})
+
+test_that("score_predictions() refuses a prediction that is not a number on a scorable cell", {
+  f <- ladder_fixture(v = 2L)
+  p <- matrix(stats::runif(length(f$y)), nrow = nrow(f$y), dimnames = dimnames(f$y))
+  expect_silent(score_predictions(f$y, p, f$folds))
+  p[1L, 1L] <- Inf
+  expect_error(score_predictions(f$y, p, f$folds), "the predictions hold no number")
+})

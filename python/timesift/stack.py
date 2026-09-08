@@ -255,12 +255,27 @@ def simplex_weights(p: np.ndarray, y: np.ndarray, loss: dict, iterations: int = 
 
 
 def _stacking_block(oof: dict, y, cells, folds):
-    """The cells every candidate is weighted on: one column per member, one row per scorable cell
-    that carries a prediction from all of them."""
+    """The cells every candidate is weighted on: one column per member, one row per scorable cell.
+
+    Every scorable cell, and no other. The mask says which cells every candidate was scored on and
+    the combiner is fitted on exactly those; dropping the ones a candidate left without a number
+    would fit the stack on fewer cells than the report says it was, and the report would not show
+    it.
+    """
     read = np.stack([_matrix(p, y, name) for name, p in oof.items()])
-    keep = _scorable_mask(cells, y, align_folds(folds, y.units)) & np.isfinite(read).all(axis=0)
+    keep = _scorable_mask(cells, y, align_folds(folds, y.units))
     if not keep.any():
-        raise ValueError("no scorable cell carries a prediction from every candidate")
+        raise ValueError("no cell of this design is scorable, so there is nothing to fit the "
+                         "combiner on")
+    missing = [(name, int((~np.isfinite(read[j][keep])).sum()))
+               for j, name in enumerate(oof)]
+    missing = [one for one in missing if one[1]]
+    if missing:
+        raise ValueError("the combiner is fitted on every scorable cell, and "
+                         + ", ".join(f"{name} ({n})" for name, n in missing)
+                         + " hold no number on some of them. A candidate that cannot predict a "
+                         "scorable cell is a fit that did not settle; drop it from the run rather "
+                         "than from the cells.")
     return read[:, keep].T, y.values[keep]
 
 

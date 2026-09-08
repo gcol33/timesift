@@ -141,17 +141,39 @@ def score_arm(grain, learner, y: Response, p: np.ndarray, f: np.ndarray, levels,
     computed the same way rather than each computing it.
     """
     rows = dict(grain=[], learner=[], variable=[], fold=[], score=[], scorable=[])
+    unsettled = []
     for k in levels:
         take = f == k
         for j, v in enumerate(y.variables):
             ok = cells.is_scorable(v, int(k))
+            if ok and not np.isfinite(p[take, j]).all():
+                unsettled.append((v, int(k)))
             rows["grain"].append(grain)
             rows["learner"].append(learner)
             rows["variable"].append(v)
             rows["fold"].append(int(k))
             rows["scorable"].append(ok)
             rows["score"].append(score(y.values[take, j], p[take, j]) if ok else np.nan)
+    _check_finite(unsettled, grain, learner)
     return rows
+
+
+def _check_finite(unsettled, grain, learner) -> None:
+    """A scorable cell is one every candidate has to carry a prediction for.
+
+    A threshold metric returns NaN on a cell holding a prediction that is not a number, which is
+    the same NaN a cell with no score in it returns, so a network whose training diverged would be
+    reported as an unscorable cell and dropped from the combiner without a word. It is a fit that
+    did not settle, and it stops the run where it happened.
+    """
+    if not unsettled:
+        return
+    arm = "the predictions hold" if grain is None and learner is None         else f"the {grain}|{learner} arm holds"
+    plural = "s" if len(unsettled) > 1 else ""
+    raise ValueError(f"{arm} no number on {len(unsettled)} scorable cell{plural}, first "
+                     f"{unsettled[0][0]} in fold {unsettled[0][1]}. A scorable cell is one every "
+                     "candidate carries, so this is a fit that did not settle rather than a cell "
+                     "with no score in it.")
 
 
 def score_predictions(y, p, folds, cells=None, metric: str = "tss") -> dict:

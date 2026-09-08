@@ -7,8 +7,8 @@ import pytest
 
 from timesift._stats import norm_ppf, wilcoxon_p
 from timesift.control import CONTROL_SETTINGS, as_control, train_control
-from timesift.ladder import (grain_ladder, paired_contrast, per_variable, tss_inflation,
-                             variable_means)
+from timesift.ladder import (grain_ladder, paired_contrast, per_variable,
+                             score_predictions, tss_inflation, variable_means)
 from timesift.learners import Learner, fit_learner
 from timesift.metrics import kappa_score, model_agreement, roc_auc, tss
 from timesift.representation import grain_matrix
@@ -255,3 +255,30 @@ def test_a_learner_carrying_a_setting_overrides_the_ladders_control_on_it():
                  control=train_control(epochs=3, batch_size=8), verbose=False)
     assert {c.epochs for c in seen} == {11}
     assert {c.batch_size for c in seen} == {8}
+
+
+def test_an_arm_that_holds_no_number_on_a_scorable_cell_stops_the_run():
+    readings, y, _ = sim(n_unit=30, days=40, noise=1.0)
+    x = grain_matrix(readings, "id", "time", "value", grain="week")
+
+    def predict(model, x):
+        p = np.tile(model["level"], (x.values.shape[0], 1))
+        p[0, 0] = np.nan
+        return p
+
+    diverged = Learner(name="diverged", fit=lambda x, y, **_: dict(level=y.mean(axis=0)),
+                       predict=predict)
+    with pytest.raises(ValueError, match="did not settle"):
+        grain_ladder(x, y, [diverged], folds=fold_map(y, v=2, seed=4), verbose=False)
+
+
+def test_score_predictions_refuses_a_prediction_that_is_not_a_number():
+    readings, y, _ = sim(n_unit=30, days=40, noise=1.0)
+    folds = fold_map(y, v=2, seed=4)
+    rng = np.random.default_rng(5)
+    p = rng.random(y.values.shape)
+    rows = score_predictions(y, p, folds)
+    assert len(rows["score"]) == len(y.variables) * 2
+    p[0, 0] = np.inf
+    with pytest.raises(ValueError, match="the predictions hold no number"):
+        score_predictions(y, p, folds)

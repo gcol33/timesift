@@ -26,6 +26,12 @@
 
 ## Fitting
 
+* A candidate that holds no number on a scorable cell stops the run and names itself. A threshold
+  metric returns `NA` on a cell whose predictions are `NaN` or infinite, which is the same `NA` a
+  one-class cell returns, so a network whose training diverged was reported as an unscorable cell
+  and dropped from the combiner without a word; the stack was then fitted on fewer cells than the
+  mask said and nothing showed it. The combiner is now fitted on every scorable cell and refuses to
+  drop one. `score_predictions()` refuses the same predictions on both sides.
 * `grain_ladder()` and `select_grain()` take a `control`, so the training settings of a ladder are
   given once for the run rather than restated on every neural learner in it. A selection hands the
   same control to the inner search and to the refit, and a learner carrying settings of its own
