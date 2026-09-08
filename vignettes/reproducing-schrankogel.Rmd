@@ -57,11 +57,11 @@ dim(y)
 ## The split and the cells
 
 The fold map is an artifact rather than an algorithm: it is built once and read by everything that
-scores, so no arm can regenerate its own. The study wrote one to `folds.csv`, and reading that file
-back reproduces its splits exactly.
+scores, so no arm can regenerate its own. The study wrote one to `folds.csv`, the package ships it
+beside the reproduction script, and reading that file back reproduces its splits exactly.
 
 ```{r folds}
-f <- read.csv("folds.csv")
+f <- read.csv(system.file("reproduce", "folds.csv", package = "timesift"))
 folds <- setNames(as.integer(f$fold), as.character(f$logger_ID))
 
 cells <- scorable_cells(y, folds)
