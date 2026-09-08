@@ -238,6 +238,25 @@ def test_the_forest_carries_its_own_seed_and_repeats_itself():
 
 
 @needs_sklearn
+def test_each_response_draws_its_own_bootstrap_from_a_seed_of_its_own_name():
+    # Two responses with the same observations under different names would otherwise be the
+    # same forest, and a response fitted alone would differ from the same response fitted beside
+    # others.
+    x, y = planted(n_unit=24, days=28)
+    twin = Response(values=np.column_stack([y.values[:, 0], y.values[:, 0]]), units=y.units,
+                    variables=("sp_a", "sp_b"))
+    both = fit_learner(forest(trees=30, seed=4), x, twin).predict(x)
+    assert not np.allclose(both[:, 0], both[:, 1])
+    alone = fit_learner(forest(trees=30, seed=4), x,
+                        Response(values=y.values[:, :1], units=y.units,
+                                 variables=("sp_a",))).predict(x)
+    assert np.allclose(both[:, 0], alone[:, 0])
+    from timesift.learners import _variable_seeds
+    # The offsets R's `.name_offset()` gives the same two names.
+    assert _variable_seeds(1, ("sp_a", "sp_b")) == [1 + 80582, 1 + 80583]
+
+
+@needs_sklearn
 def test_a_response_with_one_outcome_is_its_share_whichever_model_covers_it():
     x, y = planted(n_unit=24, days=28)
     flat = Response(np.column_stack([y.values[:, 0], np.ones(len(y.units))]),

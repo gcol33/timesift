@@ -114,7 +114,7 @@ is one model per candidate rather than a fold's worth of them.
 ## `TimesiftSpec`
 
 ```python
-TimesiftSpec(y, x, id, time, target_time, static, tz, response, metric)
+TimesiftSpec(y, x, id, time, target_time, static, response, metric)
 ```
 
 How a fit was asked for: the columns each table plays, and the calendar they are read in.
@@ -127,7 +127,6 @@ Attributes:
 - `time` - str | None
 - `target_time` - str | None
 - `static` - tuple[str, ...]
-- `tz` - object
 - `response` - str
 - `metric` - object
 

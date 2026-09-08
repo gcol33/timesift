@@ -139,13 +139,23 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
 
     representations, used = {}, {}
     for pair in pairs:
-        if pair["reason"] or pair["representation"] in representations:
+        if pair["reason"]:
+            continue
+        label = pair["representation"]
+        if label in representations:
+            # Two representations under one name would be one array fitted by both: the one
+            # built first, whichever of the two a pinned learner asked for.
+            if used[label]["spec"] != pair["spec"]:
+                pinned = pair if pair["learner"].data is not None else used[label]
+                raise ValueError(f'two representations are reported under the name "{label}": '
+                                 f"the one the {pinned['learner'].name} learner is pinned to and "
+                                 f"the one in the sift. Name the sift to tell them apart.")
             continue
         if verbose:
             print(f"building the {pair['representation']} representation")
         representations[pair["representation"]] = build_representation(pair["spec"], series,
                                                                        targets, spec)
-        used[pair["representation"]] = pair["spec"]
+        used[pair["representation"]] = pair
     _refuse_one_bin(pairs, representations)
     if all(pair["reason"] for pair in pairs):
         raise ValueError("no learner can read any of the representations:\n  "
@@ -185,7 +195,9 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
     stack, weights = _combine(ensemble, oof, y_mat, cells, folds, scores, verbose)
 
     return Timesift(candidates=_candidate_table(pairs, representations), scores=scores, oof=oof,
-                    representations=representations, sift=Sift(used), stack=stack, weights=weights,
+                    representations=representations,
+                    sift=Sift({k: v["spec"] for k, v in used.items()}), stack=stack,
+                    weights=weights,
                     models=fitted, folds=folds, cells=cells, y=y_mat, metric=metric_name,
                     scorer=score, response=response, spec=spec, fits=fits, control=control)
 

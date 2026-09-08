@@ -10,7 +10,7 @@ dynamic = ["version"]
 description = "Learn predictive representations of time-varying data"
 readme = "python/README.md"
 license = { text = "MIT" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{ name = "Gilles Colling", email = "gilles.colling051@gmail.com" }]
 # Windows ships no IANA database for zoneinfo, and a zone is what the binning of a zoned
 # record is read through.
@@ -23,7 +23,9 @@ torch = ["torch>=2.0"]
 # so `alpha` would silently do nothing and the learner would fit an L2-only logistic. Branching
 # on the version would be two paths to keep true; the floor is one.
 sklearn = ["scikit-learn>=1.8"]
-test = ["pytest>=8.0"]
+# pandas is what a user's table is, so the suite reads one through `timesift()`; the package
+# itself never imports it.
+test = ["pytest>=8.0", "pandas>=2.0"]
 
 [project.urls]
 Homepage = "https://gillescolling.com/timesift/"

@@ -141,3 +141,9 @@ def ranker() -> Learner:
     """Every unit predicted the mean of the fitting units, which the profile reads as no weight."""
     return Learner(name="a", fit=lambda x, y, **k: y.mean(axis=0),
                    predict=lambda m, x: np.tile(m, (x.values.shape[0], 1)))
+
+
+def test_an_unnamed_feature_matrix_names_its_rows_from_one_as_every_other_unit_label_does():
+    from timesift.occlusion import feature_matrix
+    m = feature_matrix(np.zeros((3, 2)))
+    assert m.units == ("1", "2", "3")

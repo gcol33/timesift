@@ -19,8 +19,9 @@ import numpy as np
 
 from .learners import flatten
 from .representation import (DAY_LEVEL_STATS, GRAINS, TimesiftMatrix, _check_bins, _check_grain,
-                             _check_stats, _parse_duration, _parse_year_start, _unit_names,
-                             bind_channels, grain_matrix, lookback_matrix)
+                             _check_stats, _columns, _format_duration, _parse_duration,
+                             _parse_year_start, _unit_names, bind_channels, grain_matrix,
+                             lookback_matrix)
 from .response import Folds, fold_map
 from .select import column_names, select_columns
 
@@ -44,7 +45,7 @@ class Representation:
     label: str
     kind: str
     stats: tuple[str, ...] = ("mean",)
-    grain: str | None = None
+    grain: object = None
     grains: tuple[str, ...] | None = None
     span: object = None
     lag: object = "0 days"
@@ -58,9 +59,10 @@ def native(stats="mean", year_start="09-01") -> Representation:
     return grain("native", stats, year_start)
 
 
-def grain(g: str, stats="mean", year_start="09-01") -> Representation:
-    """One calendar grain."""
-    name = _check_grain(g)
+def grain(g, stats="mean", year_start="09-01") -> Representation:
+    """One calendar grain, named, or supplied as a function of the reading instants returning
+    each reading's bin start, which is reported as ``custom``."""
+    name = "custom" if callable(g) else _check_grain(g)
     return Representation(label=name, kind="grain", grain=g, stats=_stats(stats, name),
                           year_start=_year_start(year_start))
 
@@ -71,6 +73,12 @@ def multigrain(grains=None, stats="mean", year_start="09-01") -> Representation:
     Left at ``None`` the grains are the ones the record supports, the set :func:`auto_grains`
     names. A caller who does not want the record unreduced among them names the grains instead.
     """
+    if grains is not None and any(callable(g) for g in _flatten(grains)):
+        raise ValueError("multigrain() binds named grains; a supplied calendar is one grain, so "
+                         "pass it to grain().")
+    if grains is not None and any(callable(g) for g in _flatten(grains)):
+        raise ValueError("multigrain() binds named grains; a supplied calendar is one grain, so "
+                         "pass it to grain().")
     named = None if grains is None else tuple(_check_grain(g) for g in _flatten(grains))
     label = "multigrain" if named is None else f"multigrain({'+'.join(named)})"
     for one in named if named is not None else ("day",):
@@ -82,6 +90,8 @@ def multigrain(grains=None, stats="mean", year_start="09-01") -> Representation:
 def lookback(span, lag="0 days", bins=1, stats="mean") -> Representation:
     """A stretch of record of fixed length, ending a fixed lag before each target's own instant."""
     bins = _check_bins(bins)
+    if _parse_duration(span, "span") <= 0:
+        raise ValueError("`span` must be a positive length of record.")
     return Representation(label=_lookback_label(span, lag, bins), kind="lookback", span=span,
                           lag=lag, bins=bins, stats=_stats(stats, "lookback"), sequence=bins > 1)
 
@@ -193,7 +203,7 @@ def grouped_cv(group, v: int = 10, seed: int = 1) -> Resampling:
     not two independent held-out units, and splitting them across folds scores a model on a unit
     it has already read.
     """
-    return Resampling(kind="grouped_cv", v=_whole(v, "v"), seed=seed, group=group)
+    return Resampling(kind="grouped_cv", v=_whole(v, "v"), seed=seed, strata=1, group=group)
 
 
 def as_resampling(x) -> Resampling:
@@ -232,7 +242,6 @@ class TimesiftSpec:
     time: str | None = None
     target_time: str | None = None
     static: tuple[str, ...] = ()
-    tz: object = None
     response: str = "presence_absence"
     metric: object = None
 
@@ -260,16 +269,17 @@ def auto_grains(series, spec: TimesiftSpec, stats=("mean",),
 
     The count comes from the calendar in the core rather than from arithmetic here, so a grain is
     admitted on the same rule that will bin it. It is read off one reading per distinct instant,
-    which carries the record's whole span and its gaps at the cost of a single unit's memory.
+    which carries the record's whole span and its gaps at the cost of a single unit's memory, in
+    the zone the time column carries, so a grain is counted on the clock it will be binned by.
     """
-    probe = _probe(series, spec)
+    probe, zone = _probe(series, spec)
     day_level = any(s in DAY_LEVEL_STATS for s in stats)
     out = []
     for g in GRAINS:
         if day_level and g in ("native", "halfday"):
             continue
         counted = grain_matrix(probe, "id", "time", "value", grain=g, stats=("mean",),
-                               year_start=year_start, tz=spec.tz)
+                               year_start=year_start, tz=zone)
         if counted.values.shape[1] >= 2:
             out.append(g)
     return tuple(out)
@@ -311,7 +321,7 @@ def build_representation(rep: Representation, series, targets, spec: TimesiftSpe
 
 def _grain_block(name, stats, year_start, series, spec, labels) -> TimesiftMatrix:
     parts = [_channels(grain_matrix(series, spec.id, spec.time, v, grain=name, stats=stats,
-                                    year_start=year_start, tz=spec.tz), v, spec)
+                                    year_start=year_start), v, spec)
              for v in spec.x]
     return _order(parts[0] if len(parts) == 1 else bind_channels(*parts), labels)
 
@@ -348,7 +358,7 @@ def _lookback_block(rep, series, targets, spec, labels) -> TimesiftMatrix:
     parts = []
     for v in spec.x:
         w = lookback_matrix(series, spec.id, spec.time, v, at=at, span=rep.span, lag=rep.lag,
-                            bins=rep.bins, stats=rep.stats, tz=spec.tz)
+                            bins=rep.bins, stats=rep.stats)
         parts.append(_channels(replace(w, units=tuple(labels)), v, spec))
     return parts[0] if len(parts) == 1 else bind_channels(*parts)
 
@@ -429,9 +439,10 @@ def _derived(values, labels, bins, stats, name, spec, bin_n=None, bin_start=None
         bin_partial=np.zeros(n_b, dtype=bool))
 
 
-def _probe(series, spec) -> dict:
-    when = np.unique(np.asarray(series[spec.time], dtype="datetime64[s]"))
-    return {"id": ["probe"] * len(when), "time": when, "value": np.zeros(len(when))}
+def _probe(series, spec) -> tuple[dict, object]:
+    _, when, _, zone = _columns(series, spec.id, spec.time, None)
+    when = np.unique(when)
+    return {"id": ["probe"] * len(when), "time": when, "value": np.zeros(len(when))}, zone
 
 
 # ---- checks ------------------------------------------------------------------------------------
@@ -454,12 +465,15 @@ def _whole(x, arg) -> int:
 
 
 def _lookback_label(span, lag, bins) -> str:
-    parts = [str(span)]
+    """A lookback is named by what distinguishes it from its neighbours in a set, in the form R
+    names it: the span, then ``x<bins>`` where it is cut, then ``lag <lag>`` where it ends early."""
+    out = span if isinstance(span, str) else _format_duration(_parse_duration(span, "span"))
+    if bins > 1:
+        out += f" x{bins}"
     if _parse_duration(lag, "lag") != 0:
-        parts.append(f"lag {lag}")
-    if bins != 1:
-        parts.append(f"{bins} bins")
-    return " ".join(parts)
+        out += " lag " + (lag if isinstance(lag, str)
+                          else _format_duration(_parse_duration(lag, "lag")))
+    return out
 
 
 def _flatten(args) -> list:

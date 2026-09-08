@@ -23,7 +23,7 @@ def feature_matrix(m, units=None, features=None, label: str = "features") -> Tim
     """
     m = np.asarray(m, dtype=np.float64)
     n_u, n_f = m.shape
-    units = tuple(units) if units is not None else tuple(str(i) for i in range(n_u))
+    units = tuple(units) if units is not None else tuple(str(i + 1) for i in range(n_u))
     features = tuple(features) if features is not None else tuple(f"f{j}" for j in range(n_f))
     empty = np.full(n_f, np.datetime64("NaT"), dtype="datetime64[s]")
     return TimesiftMatrix(values=m.reshape(n_u, n_f, 1), units=units, bins=features,

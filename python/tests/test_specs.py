@@ -104,12 +104,33 @@ def test_an_unknown_grain_is_named_where_it_is_asked_for():
 
 
 def test_a_lookback_carries_its_lag_and_its_bins_in_its_label():
+    # The label is the one R builds, because it is what a candidate is keyed by on either side.
     assert lookback("30 days").label == "30 days"
     assert lookback("30 days", lag="7 days").label == "30 days lag 7 days"
     assert lookback("30 days", lag="0 hours").label == "30 days"
-    assert lookback("30 days", bins=3).label == "30 days 3 bins"
+    assert lookback("30 days", bins=3).label == "30 days x3"
+    assert lookback("30 days", lag="7 days", bins=2).label == "30 days x2 lag 7 days"
+    assert lookback(2592000, lag=3600, bins=2).label == "30 days x2 lag 1 hour"
     with pytest.raises(ValueError, match="positive whole number"):
         lookback("30 days", bins=0)
+
+
+def test_a_lookback_refuses_a_span_that_is_not_positive_when_it_is_built():
+    for span in ("0 days", -86400):
+        with pytest.raises(ValueError, match="positive length of record"):
+            lookback(span)
+
+
+def test_a_supplied_calendar_is_one_grain_called_custom():
+    def midnights(when):
+        return when.astype("datetime64[D]").astype("datetime64[s]")
+
+    rep = grain(midnights)
+    assert rep.label == "custom" and rep.kind == "grain" and rep.grain is midnights
+    built = build_representation(rep, series(days=3), targets(), spec())
+    assert built.values.shape[1] == 3
+    with pytest.raises(ValueError, match="pass it to grain"):
+        multigrain([midnights])
 
 
 def test_a_sift_reads_grain_names_representations_or_a_single_one():
@@ -127,6 +148,18 @@ def test_a_sift_reads_grain_names_representations_or_a_single_one():
 def test_auto_names_the_grains_the_record_gives_more_than_one_bin():
     assert auto_grains(series(), spec()) == ("native", "halfday", "day", "week", "month")
     assert auto_grains(series(days=3), spec()) == ("native", "halfday", "day")
+
+
+def test_auto_counts_the_bins_on_the_clock_the_column_carries():
+    # One local day in Vienna, 00:30 to 23:30, is two UTC days. Counted in UTC the day grain
+    # would be offered on a record the day grain then bins into one.
+    from zoneinfo import ZoneInfo
+    from datetime import datetime, timedelta
+    zone = ZoneInfo("Europe/Vienna")
+    t = [datetime(2021, 6, 2, 0, 30, tzinfo=zone) + timedelta(hours=h) for h in range(24)]
+    record = {"plot": ["p1"] * 24, "when": t, "temp": np.zeros(24)}
+    assert "day" not in auto_grains(record, spec())
+    assert grain_matrix(record, "plot", "when", "temp", grain="day").values.shape[1] == 1
 
 
 def test_auto_leaves_out_the_grains_a_day_level_statistic_is_undefined_at():
@@ -276,6 +309,10 @@ def test_a_fold_map_given_directly_is_read_in_the_row_order_of_the_response():
     assert folds.fold.tolist() == [1, 2, 1, 2]
 
 
+def test_grouped_cv_deals_the_groups_unstratified_as_r_does():
+    assert grouped_cv("plot").strata == 1
+
+
 def test_grouped_cv_keeps_every_target_of_a_group_in_one_fold():
     units = tuple(str(i + 1) for i in range(12))
     values = np.zeros((12, 2))
@@ -317,3 +354,11 @@ def test_a_sift_is_a_mapping_of_representations_and_nothing_else():
         Sift({"day": "day"})
     with pytest.raises(ValueError, match="non-empty"):
         Sift({})
+
+
+def test_a_fold_map_prints_every_level_it_holds():
+    f = as_resampling([0, 1, 2] * 4)
+    text = repr(resolve_folds(f, Response(values=np.zeros((12, 1)),
+                                          units=tuple(str(i) for i in range(12)),
+                                          variables=("y",)), None, spec()))
+    assert "0: 4" in text and "1: 4" in text and "2: 4" in text

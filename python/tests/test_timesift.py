@@ -230,6 +230,26 @@ def test_the_columns_of_each_table_are_named_where_they_are_wrong():
                  resampling=FOLDS, ensemble=False, verbose=False)
 
 
+def test_a_run_reads_a_pandas_frame_as_it_reads_a_mapping_of_arrays():
+    # A user's table: a categorical identifier, a nullable-integer response and a zone-aware time
+    # column. Each is a pandas type the mapping-of-arrays tests never carry.
+    pd = pytest.importorskip("pandas")
+    t = pd.DataFrame(targets())
+    t["plot"] = t["plot"].astype("category")
+    t["sp_a"] = t["sp_a"].astype("Int64")
+    s = pd.DataFrame(series())
+    s["when"] = pd.to_datetime(s["when"]).dt.tz_localize("UTC").dt.tz_convert("Europe/Vienna")
+    fit = timesift(t, s, y="sp_*", id="plot", time="when", models=[learner()],
+                   sift=grains("day", "week"), resampling=FOLDS, ensemble=False, verbose=False)
+    plain = fitted()
+    assert fit.y.units == plain.y.units and fit.y.variables == plain.y.variables
+    assert np.array_equal(fit.y.values, plain.y.values)
+    # The Vienna clock puts the record's first day one hour earlier than UTC does, so the day
+    # bins differ, and the run has read the column's own zone rather than dropped it.
+    assert fit.representations["day"].values.shape[1] !=         plain.representations["day"].values.shape[1] or         not np.allclose(fit.representations["day"].values, plain.representations["day"].values)
+    assert set(fit.oof) == set(plain.oof)
+
+
 # ---- what can read what --------------------------------------------------------------------------
 
 def test_a_tabular_learner_is_refused_the_unreduced_record():
@@ -261,6 +281,18 @@ def test_a_learner_pinned_to_a_representation_runs_on_that_one_alone():
     assert list(fit.candidates["candidate"]) == [f"pinned{SEPARATOR}month",
                                                  f"free{SEPARATOR}day", f"free{SEPARATOR}week"]
     assert fit.representations["month"].values.shape[1] == 2
+
+
+def test_a_pinned_representation_sharing_a_sift_members_label_but_not_its_definition_is_refused():
+    with pytest.raises(ValueError, match='reported under the name "week"'):
+        fitted(models=[learner("free"),
+                       learner("pinned", data=grain("week", stats=("min", "max")))],
+               sift=grains("week"))
+    # The same representation under the same name is one array, whichever order it is asked in.
+    fit = fitted(models=[learner("pinned", data=grain("week")), learner("free")],
+                 sift=grains("week"))
+    assert list(fit.candidates["candidate"]) == [f"pinned{SEPARATOR}week",
+                                                 f"free{SEPARATOR}week"]
 
 
 def test_a_fit_with_nothing_left_to_read_says_so():

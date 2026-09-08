@@ -103,7 +103,7 @@ def fit_learner(learner, x: TimesiftMatrix, y, response: str = "presence_absence
     learner.require()
     head = RESPONSES.get(response)
     y = head["prepare"](as_response(y)).align(x.units)
-    given = _declared(learner.fit, head=head, control=control)
+    given = _declared(learner.fit, head=head, control=control, variables=y.variables)
     model = learner.fit(x, y.values, **{**learner.params, **kwargs, **given})
     return Fit(learner=learner, model=model, variables=y.variables, response=response)
 
@@ -112,10 +112,10 @@ def _declared(fit, **given) -> dict:
     """The arguments a fit is handed because it declares them by name.
 
     A learner that trains under a control declares one, and the resolved control reaches it through
-    that argument and through nothing else; the response head reaches a fit the same way. A fit
-    that declares neither is called with neither, whatever the run carries, so a two-argument
-    ``fit(x, y)`` is a learner like any other rather than one that has to absorb keywords it never
-    asked for.
+    that argument and through nothing else; the response head reaches a fit the same way, and so
+    do the names of the response's variables. A fit that declares none is called with none,
+    whatever the run carries, so a two-argument ``fit(x, y)`` is a learner like any other rather
+    than one that has to absorb keywords it never asked for.
     """
     parameters = inspect.signature(fit).parameters
     return {name: value for name, value in given.items() if name in parameters}
@@ -568,12 +568,26 @@ def rescnn(data=None, channels=(32, 64, 128, 256), blocks_per_stage=2, kernel=7,
 # matrix is put back together, so the difference between them is the model and nothing else. A
 # response with one outcome among the fitting units has no model to fit and is predicted its own
 # share, which is the level a fitted model would collapse to.
-def _fit_columns(m: np.ndarray, y: np.ndarray, make) -> list:
+def _fit_columns(m: np.ndarray, y: np.ndarray, make, seeds) -> list:
     out = []
     for j in range(y.shape[1]):
         yj = y[:, j]
-        out.append(float(yj.mean()) if len(np.unique(yj)) < 2 else make(m, yj))
+        out.append(float(yj.mean()) if len(np.unique(yj)) < 2 else make(m, yj, seeds[j]))
     return out
+
+
+def _variable_seeds(seed: int, variables) -> list:
+    """One seed per response, offset from the learner's by a hash of the response's name, as the R
+    side derives them: the model of one response is then the same model whether it was fitted on
+    its own or beside others, and in whatever order, and two responses never share a draw."""
+    return [int(seed) + _name_offset(name) for name in variables]
+
+
+def _name_offset(name: str) -> int:
+    code = 0
+    for b in name.encode("utf-8"):
+        code = (code * 31 + b) % 104729
+    return code
 
 
 def _same_columns(m: np.ndarray, n_col: int) -> np.ndarray:
@@ -617,7 +631,7 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, weight_positives=T
                                weight_positives=weight_positives, seed=seed))
 
 
-def _elasticnet_fit(x, y, alpha, n_inner, squares, weight_positives, seed, head, **_):
+def _elasticnet_fit(x, y, alpha, n_inner, squares, weight_positives, seed, head, variables, **_):
     from sklearn.linear_model import ElasticNetCV, LogisticRegressionCV
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
@@ -629,18 +643,18 @@ def _elasticnet_fit(x, y, alpha, n_inner, squares, weight_positives, seed, head,
     # were a different predictor from the readings themselves. Standardising is what glmnet does
     # by default on the R side, and the scaler travels with the fit so new units are mapped
     # through the centre and the spread the model was fitted at rather than through their own.
-    def make(design, yj):
+    def make(design, yj, seed_j):
         if family == "binomial":
             return make_pipeline(StandardScaler(), LogisticRegressionCV(
                 Cs=10, cv=n_inner, solver="saga", l1_ratios=[alpha],
                 class_weight="balanced" if weight_positives else None,
-                max_iter=5000, random_state=seed)).fit(design, yj)
+                max_iter=5000, random_state=seed_j)).fit(design, yj)
         return make_pipeline(StandardScaler(),
                              ElasticNetCV(l1_ratio=alpha, cv=n_inner, max_iter=5000,
-                                          random_state=seed)).fit(design, yj)
+                                          random_state=seed_j)).fit(design, yj)
 
-    return dict(models=_fit_columns(m, y, make), squares=squares, n_col=m.shape[1],
-                family=family)
+    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables)),
+                squares=squares, n_col=m.shape[1], family=family)
 
 
 def _elasticnet_predict(model, x):
@@ -662,18 +676,19 @@ def forest(data=None, trees=500, mtry=None, min_node=1, seed=1) -> Learner:
                    params=dict(trees=trees, mtry=mtry, min_node=min_node, seed=seed))
 
 
-def _rf_fit(x, y, trees, mtry, min_node, seed, head, **_):
+def _rf_fit(x, y, trees, mtry, min_node, seed, head, variables, **_):
     from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
     family = _family(head)
     m = flatten(x)
     forest_of = RandomForestClassifier if family == "binomial" else RandomForestRegressor
 
-    def make(design, yj):
+    def make(design, yj, seed_j):
         return forest_of(
             n_estimators=trees, max_features="sqrt" if mtry is None else mtry,
-            min_samples_leaf=min_node, random_state=seed, n_jobs=-1).fit(design, yj)
+            min_samples_leaf=min_node, random_state=seed_j, n_jobs=-1).fit(design, yj)
 
-    return dict(models=_fit_columns(m, y, make), n_col=m.shape[1], family=family)
+    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables)),
+                n_col=m.shape[1], family=family)
 
 
 def _rf_predict(model, x):

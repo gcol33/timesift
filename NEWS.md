@@ -156,6 +156,20 @@
 
 ## Fixes
 
+* Python: a learner pinned to a representation that shares a sift member's label but not its
+  definition is refused, as R refuses it, rather than fitted on the sift's array.
+* Python: `auto_grains()` counts the bins in the zone the time column carries, the clock the
+  representation is then binned by. It used to probe in UTC, so a zoned record could be offered a
+  grain it does not support or denied one it does.
+* Python: `grain()` takes a supplied calendar as R does, reported as `custom`; `multigrain()`
+  refuses one on both sides.
+* Four differences between the languages are gone rather than recorded. `grouped_cv()` deals the
+  groups unstratified on both sides. A lookback is labelled `<span> x<bins> lag <lag>` on both,
+  and a numeric span as a duration. `lookback()` refuses a span that is not positive when it is
+  built. `forest()` and `elasticnet()` derive one seed per response from the response's name in
+  Python as in R, so two species no longer share their bootstrap draws.
+* Python: `feature_matrix()` names unnamed rows from 1, as every other unit label does, and a
+  fold map prints every fold level it holds.
 * A response given as a data frame with two or more non-numeric columns is refused, naming them,
   rather than read through the first and silently stripped of the rest.
 * A presence-absence response holding a missing value says so on the Python side, rather than
@@ -167,6 +181,11 @@
 
 ## Packaging
 
+* The Python floor is 3.11. The `sklearn` extra pins the scikit-learn release where the mixing
+  parameter alone selects the elastic net, and that release has no build for 3.10, so the 3.10
+  job had failed at install on every push. The `test` extra carries pandas, so the suite runs
+  `timesift()` on a data frame with a categorical identifier, a nullable-integer response and a
+  zone-aware time column rather than skipping that test on every runner.
 * `DESCRIPTION` is where the version is written, and `pyproject.toml` reads it from there.
 * `.gitattributes` holds the repository to one line ending.
 * The wheel ships `py.typed`.
@@ -349,8 +368,7 @@ call site.
   sources must not be vendored into a second copy. The Python build is scikit-build-core and
   nanobind; the wheel carries `python/timesift` as `timesift`.
 * The wheel depends on `tzdata` on Windows, which ships no IANA database of its own, so a
-  zoned record bins there as it does everywhere else. The `sklearn` extra asks for a version
-  that the declared floor of Python 3.10 can install.
+  zoned record bins there as it does everywhere else.
 * `R-CMD-check`, `pytest` and `contract` run on push and on pull requests, the last of them
   running both fixture suites against one `inst/spec/fixtures/` in a single job.
 

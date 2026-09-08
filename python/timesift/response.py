@@ -160,9 +160,9 @@ class Folds:
         return self.fold if dtype is None else self.fold.astype(dtype)
 
     def __repr__(self) -> str:  # pragma: no cover - display only
-        counts = np.bincount(self.fold)[1:]
+        levels, counts = np.unique(self.fold, return_counts=True)
         return (f"<timesift folds> {len(self.fold)} units in {self.v} folds\n"
-                + "  ".join(f"{k + 1}: {n}" for k, n in enumerate(counts)))
+                + "  ".join(f"{k}: {n}" for k, n in zip(levels.tolist(), counts.tolist())))
 
 
 def fold_map(y: Response, v: int = 10, seed: int = 1, strata: int = 5, by=None,
