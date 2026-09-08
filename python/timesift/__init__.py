@@ -11,6 +11,8 @@ That document's last section says what each language carries, so a difference be
 decision recorded there rather than something to be discovered at the call site.
 """
 
+from importlib.metadata import version as _installed_version
+
 from .artifacts import (read_cells, read_folds, read_response, write_cells,
                         write_folds, write_response)
 from .control import TrainControl, train_control
@@ -40,7 +42,9 @@ from .specs import (Representation, Resampling, Sift, TimesiftSpec, as_resamplin
                     resolve_folds, target_labels)
 from .stack import EnsembleSpec, Stack, ensemble, ensemble_combine, ensemble_fit
 
-__version__ = "0.1.0"
+# The version the wheel was built with, which `pyproject.toml` reads from `DESCRIPTION`. It is
+# not written here as well: two literals are two versions the moment one bump misses one.
+__version__ = _installed_version("timesift")
 
 # The learners, response heads and metrics that ship are registered here, through the same public
 # calls a user registers their own with. There is no second, privileged path into the registries.

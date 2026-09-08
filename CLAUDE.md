@@ -203,8 +203,9 @@ to do with neural networks.
 
 ## Status
 
-Version 0.1.0, 2026-09-04. Not on CRAN or PyPI yet. The version went down at the rename: this is a
-first release under a new name and a general contract, not a fourth release of `climgrain`.
+Version 0.1.1. Not on CRAN or PyPI yet. The version went down at the rename: 0.1.0 was a first
+release under a new name and a general contract, not a fourth release of `climgrain`. `DESCRIPTION`
+is where the string is written and `pyproject.toml` reads it from there, so a bump is one edit.
 
 The build order is done on both sides: the representation and the fixtures, the lookback, the fold
 map and the scorable-cell mask, the ladder and its plot, the learner registry, the torch learners,

@@ -4,7 +4,9 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "timesift"
-version = "0.1.0"
+# The version is `DESCRIPTION`'s. A wheel and a tarball built from one commit carry one
+# version, and a bump is one edit rather than three that can disagree.
+dynamic = ["version"]
 description = "Learn predictive representations of time-varying data"
 readme = "python/README.md"
 license = { text = "MIT" }
@@ -40,6 +42,9 @@ sdist.include = [
   "python/tests/**",
   "inst/spec/**",
   "LICENSE",
+  # The version is read from it at build time, so a wheel built from the tarball
+  # resolves the same one the tarball was cut with.
+  "DESCRIPTION",
 ]
 sdist.exclude = [
   "R/",
@@ -53,13 +58,17 @@ sdist.exclude = [
   "docs/",
   "src/cpp11.cpp",
   "src/ts_r.cpp",
-  "DESCRIPTION",
   "NAMESPACE",
   "NEWS.md",
   "CLAUDE.md",
   "_pkgdown.yml",
   ".Rbuildignore",
 ]
+
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "DESCRIPTION"
+regex = '(?im)^Version: *(?P<value>\S+)'
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
