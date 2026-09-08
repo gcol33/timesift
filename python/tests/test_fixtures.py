@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from timesift import Response, digest_array, scorable_cells, grain_matrix
+from timesift import Response, coverage, digest_array, scorable_cells, grain_matrix
 
 FIXTURES = Path(__file__).resolve().parents[2] / "inst" / "spec" / "fixtures"
 
@@ -39,6 +39,11 @@ def read_edges(name):
     with (FIXTURES / "seasons.csv").open(newline="") as fh:
         rows = [r["edge"].replace("Z", "") for r in csv.DictReader(fh) if r["series"] == name]
     return np.asarray(rows, dtype="datetime64[s]")
+
+
+def read_coverage():
+    with (FIXTURES / "coverage.csv").open(newline="") as fh:
+        return list(csv.DictReader(fh))
 
 
 def read_guards(name):
@@ -218,8 +223,62 @@ def test_the_row_order_is_c_collation_and_not_the_locales(series):
     assert seen == ["a1", "P9", "_x", "A1", "P10"]
     order = np.argsort(np.asarray(record["value"]), kind="stable")
     shuffled = {k: [record[k][i] for i in order] for k in ("id", "time", "value")}
-    assert digest_array(grain_matrix(shuffled, "id", "time", "value", grain="day"))         == digest_array(x)
+    assert (digest_array(grain_matrix(shuffled, "id", "time", "value", grain="day"))
+            == digest_array(x))
 
+
+def coverage_input(row):
+    """The readings a coverage case takes out, named in the fixture so that both suites build the
+    same record rather than each writing one that happens to have a hole in it."""
+    record = read_series(row["series"])
+    if not row["unit"]:
+        return record
+    when = np.asarray(record["time"], dtype="datetime64[s]")
+    lost = ((when >= np.datetime64(row["from"].replace("Z", ""), "s"))
+            & (when < np.datetime64(row["to"].replace("Z", ""), "s")))
+    if row["unit"] != "all":
+        lost &= np.asarray(record["id"]) == row["unit"]
+    keep = ~lost
+    return {k: [v for v, take in zip(record[k], keep) if take]
+            for k in ("id", "time", "value")}
+
+
+@pytest.mark.parametrize("row", read_coverage(), ids=lambda r: r["case"])
+def test_coverage_counts_the_readings_the_fixtures_pin(row):
+    got = coverage(coverage_input(row), "id", "time",
+                   grain=binning(row["series"], row["grain"]))
+    assert got.count.shape == (int(row["n_unit"]), int(row["n_bin"]))
+    assert got.bins[0] == row["first_bin"]
+    assert got.bins[-1] == row["last_bin"]
+    assert int(got.empty.sum()) == int(row["n_empty"])
+    assert len(got.units_with_gaps()) == int(row["n_unit_gap"])
+    assert len(got.bins_no_unit_reaches()) == int(row["n_bin_skipped"])
+    assert digest_array(got.count.astype(float)) == row["digest"]
+
+
+def test_the_coverage_fixtures_carry_a_gap_and_a_record_without_one():
+    rows = read_coverage()
+    assert any(int(r["n_bin_skipped"]) > 0 for r in rows)
+    assert any(int(r["n_empty"]) == 0 for r in rows)
+    assert any(r["grain"] == "astronomical" for r in rows)
+
+
+def test_the_reduction_reads_the_same_record_however_its_rows_are_ordered(series):
+    # Addition is not associative, so a reduction that accumulated in the order the caller wrote
+    # its rows in would move in its last bits under this. The digest is a statement about the
+    # representation, so the two are the same bytes and not merely close.
+    record = series["aligned"]
+    order = np.random.default_rng(11).permutation(len(record["id"]))
+    shuffled = {k: [record[k][i] for i in order] for k in ("id", "time", "value")}
+    for grain in ("native", "halfday", "day", "week", "month", "season", "year"):
+        schemes = [["min", "mean", "max"]]
+        if grain not in ("native", "halfday"):
+            schemes += [["cold_day", "mean", "warm_day"],
+                        ["mean_daily_min", "mean", "mean_daily_max"]]
+        for stats in schemes:
+            plain = grain_matrix(record, "id", "time", "value", grain=grain, stats=stats)
+            mixed = grain_matrix(shuffled, "id", "time", "value", grain=grain, stats=stats)
+            assert digest_array(mixed) == digest_array(plain), f"{grain} {'+'.join(stats)}"
 
 def test_the_scorable_mask_orders_its_variables_by_c_collation_too():
     y = Response(values=np.array([[1.0, 1.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0],

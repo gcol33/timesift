@@ -211,8 +211,8 @@ The build order is done on both sides: the representation and the fixtures, the 
 map and the scorable-cell mask, the ladder and its plot, the learner registry, the torch learners,
 the stack, and above them the paired contrast, the mixed-model grain contrast, the occlusion
 profile and the inflation of a self-selected threshold. The Python side carries the same except the
-mixed model, and reproduces every one of the 234 representation digests, sixteen of which pin a zone other than
-UTC.
+mixed model, and reproduces every one of the 257 representation digests, 29 of which pin a zone
+other than UTC.
 
 Both sides run on one C++ core. The implementations that used to be compared are kept as oracles
 the suites check the core against. The last section of `inst/spec/representation.md` says what each

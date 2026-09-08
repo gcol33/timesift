@@ -21,6 +21,33 @@ struct Grouping {
   std::vector<std::int32_t> bin_of;   // one per reading
 };
 
+// The order both reductions walk a record in: by unit, then by instant.
+struct ReadingOrder {
+  const std::int32_t* unit;
+  const seconds* local;
+  bool operator()(std::size_t a, std::size_t b) const {
+    if (unit[a] != unit[b]) return unit[a] < unit[b];
+    return local[a] < local[b];
+  }
+};
+
+// The permutation that puts the record in that order, empty where it already is in it. Addition is
+// not associative, so a sum accumulated in the order the caller happened to write its rows in
+// depends on that order in its last bits, and a digest is a statement about the representation
+// rather than about the table it was read from. A record given by unit and then by time is the
+// common case and pays the scan that finds that out.
+std::vector<std::size_t> reading_order(const ReadingOrder& before, std::size_t n) {
+  for (std::size_t i = 1; i < n; ++i) {
+    if (!before(i - 1, i)) {
+      std::vector<std::size_t> order(n);
+      for (std::size_t k = 0; k < n; ++k) order[k] = k;
+      std::sort(order.begin(), order.end(), before);
+      return order;
+    }
+  }
+  return {};
+}
+
 // What a guard calls a unit or a target: the name the caller gave it, or its position where the
 // caller gave none.
 std::string label_of(const char* const* names, std::size_t i) {
@@ -424,7 +451,12 @@ Result reduce(const Request& req) {
   if (need_min) low.assign(n_cell, kInf);
   if (need_max) high.assign(n_cell, -kInf);
 
-  for (std::size_t i = 0; i < n; ++i) {
+  const ReadingOrder before{req.unit, req.local};
+  const std::vector<std::size_t> order = reading_order(before, n);
+  const auto walk = [&](std::size_t k) { return order.empty() ? k : order[k]; };
+
+  for (std::size_t k = 0; k < n; ++k) {
+    const std::size_t i = walk(k);
     const std::size_t c = static_cast<std::size_t>(bin_of[i]) * n_unit +
                           static_cast<std::size_t>(req.unit[i]);
     const double v = req.value[i];
@@ -445,7 +477,8 @@ Result reduce(const Request& req) {
     const std::size_t n_dcell = n_unit * n_days;
     DayTable table(n_dcell, need);
 
-    for (std::size_t i = 0; i < n; ++i) {
+    for (std::size_t k = 0; k < n; ++k) {
+      const std::size_t i = walk(k);
       const std::int32_t d = calendar.bin_of[i];
       if (day_bin[d] < 0) {
         day_bin[d] = bin_of[i];
@@ -569,14 +602,13 @@ LookbackResult reduce_lookbacks(const LookbackRequest& req) {
                 " seconds long.");
   }
 
-  // Sorted once by (unit, local), so each target's readings are a range found by binary search
-  // rather than a pass over the record.
-  std::vector<std::size_t> order(n);
-  for (std::size_t i = 0; i < n; ++i) order[i] = i;
-  std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
-    if (req.unit[a] != req.unit[b]) return req.unit[a] < req.unit[b];
-    return req.local[a] < req.local[b];
-  });
+  // Put in the same order the calendar reduction walks, so each target's readings are a range found
+  // by binary search rather than a pass over the record. This one needs the permutation itself.
+  std::vector<std::size_t> order = reading_order(ReadingOrder{req.unit, req.local}, n);
+  if (order.empty()) {
+    order.resize(n);
+    for (std::size_t i = 0; i < n; ++i) order[i] = i;
+  }
 
   std::vector<seconds> when(n);
   std::vector<double> reading(n);

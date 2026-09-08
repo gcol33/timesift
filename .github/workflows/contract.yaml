@@ -56,12 +56,26 @@ jobs:
                                 unname(tools::md5sum(file.path(inst, files)))))
             cat("the installed spec matches the repository copy,", length(files), "files\n")'
 
+      # The files each side runs are the files that read the fixtures, found by what they call
+      # rather than named in a list a new fixture test can be left out of. A lookback digest moved
+      # without this job seeing it while the list said "fixtures" and nothing else.
       - name: The R side against the fixtures
         run: |
           Rscript -e '
             library(testthat); library(timesift)
-            test_dir("tests/testthat", package = "timesift", filter = "fixtures",
+            files <- list.files("tests/testthat", pattern = "^test-.*[.]R$")
+            reads <- vapply(files, function(f) {
+              any(grepl("fixture_dir()", readLines(file.path("tests/testthat", f)), fixed = TRUE))
+            }, logical(1L))
+            stopifnot(sum(reads) >= 3L)
+            filter <- paste(sub("[.]R$", "", sub("^test-", "", files[reads])), collapse = "|")
+            cat("the R files that read the fixtures:", filter, "\n")
+            test_dir("tests/testthat", package = "timesift", filter = filter,
                      stop_on_failure = TRUE)'
 
       - name: The Python side against the same fixtures
-        run: python -m pytest python/tests/test_fixtures.py -q
+        run: |
+          files=$(grep -l '"inst" / "spec" / "fixtures"' python/tests/test_*.py)
+          test "$(echo "$files" | wc -l)" -ge 3
+          echo "the Python files that read the fixtures: $files"
+          python -m pytest $files -q

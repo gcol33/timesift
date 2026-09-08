@@ -18,10 +18,11 @@ write_fixture <- function(x, file) {
   write.csv(x, con, row.names = FALSE, quote = FALSE, eol = "\n")
 }
 
-# Two series, because a record that starts on a bin boundary cannot tell two binning rules apart.
-# The first begins at midnight on the default year_start, so every coarse grain is in phase with
-# it from the first reading. The second begins at an arbitrary hour of an arbitrary day, which is
-# what a logger deployed when someone could walk to it gives, and puts every grain out of phase.
+# Four series. The first begins at midnight on the default year_start, so every coarse grain is in
+# phase with it from the first reading. The second begins at an arbitrary hour of an arbitrary day,
+# which is what a logger deployed when someone could walk to it gives, and puts every grain out of
+# phase: a record that starts on a bin boundary cannot tell two binning rules apart. The third and
+# the fourth are described where they are built.
 make_series <- function(from, units, days, seed) {
   t <- seq(as.POSIXct(from, tz = "UTC"), by = "hour", length.out = 24 * days)
   set.seed(seed)
@@ -158,8 +159,13 @@ for (name in c("aligned", "offset")) {
       add(name, w, "mean", partial = "drop")
     }
   }
-  for (stats in list("mean", c("cold_day", "mean", "warm_day"))) {
-    add(name, "astronomical", stats)
+  # A calendar the package does not carry takes the same statistics a named grain does, so it is
+  # pinned over the same grid rather than over the two schemes it happened to be introduced with.
+  for (s in c("mean", "min", "max", "cold_day", "warm_day", "mean_daily_min", "mean_daily_max")) {
+    add(name, "astronomical", s)
+  }
+  for (scheme in schemes) {
+    add(name, "astronomical", scheme)
   }
 }
 
@@ -172,6 +178,7 @@ for (w in grains) {
   add("aligned", w, "mean", tz = "Europe/Vienna")
 }
 add("aligned", "week", c("cold_day", "mean", "warm_day"), tz = "Europe/Vienna")
+add("aligned", "week", c("mean_daily_min", "mean", "mean_daily_max"), tz = "Europe/Vienna")
 add("aligned", "day", c("min", "mean", "max"), tz = "Europe/Vienna")
 add("zoned", "day", "mean")
 for (w in c("native", "halfday", "day", "week")) {
@@ -179,6 +186,7 @@ for (w in c("native", "halfday", "day", "week")) {
 }
 add("zoned", "day", c("min", "mean", "max"), tz = "America/Sao_Paulo")
 add("zoned", "day", c("cold_day", "mean", "warm_day"), tz = "America/Sao_Paulo")
+add("zoned", "day", c("mean_daily_min", "mean", "mean_daily_max"), tz = "America/Sao_Paulo")
 add("zoned", "year", "mean", year_start = "11-04", tz = "America/Sao_Paulo")
 
 # The row order. Every unit holds a different level, so reading the units in the wrong order moves
@@ -327,6 +335,53 @@ for (guard in GRAIN_GUARDS) {
 write_fixture(do.call(rbind, lapply(GRAIN_GUARDS, as.data.frame, stringsAsFactors = FALSE)),
           "grain_guards.csv")
 cat("wrote", length(GRAIN_GUARDS), "grain guards\n")
+
+# ---- what reaches which bin ---------------------------------------------------------------------
+# `coverage()` lays the same binning out as a count of readings per (unit, bin), and it is the one
+# reduction no digest above reaches: every series here is complete, and a gap is what the table
+# exists to show. Each case names the readings it takes out, by unit and by span, so both suites
+# build the same input rather than each writing a record that happens to have a hole in it.
+COVERAGE_CASES <- list(
+  list(case = "complete", series = "aligned", unit = "", from = "", to = "", grain = "month"),
+  list(case = "custom", series = "aligned", unit = "", from = "", to = "",
+       grain = "astronomical"),
+  list(case = "late_start", series = "aligned", unit = "p02", from = "2021-09-01T00:00:00Z",
+       to = "2021-10-01T00:00:00Z", grain = "week"),
+  list(case = "lost_month", series = "offset", unit = "p01", from = "2021-12-01T00:00:00Z",
+       to = "2021-12-11T00:00:00Z", grain = "day"),
+  # Every unit loses the same span, so the calendar tiles over a bin no unit reaches at all, which
+  # is the case a count of readings per cell cannot report as a row of zeros.
+  list(case = "skipped_bin", series = "aligned", unit = "all", from = "2022-02-01T00:00:00Z",
+       to = "2022-03-01T00:00:00Z", grain = "month")
+)
+
+coverage_input <- function(spec) {
+  series <- SERIES[[spec$series]]
+  if (!nzchar(spec$unit)) {
+    return(series)
+  }
+  from <- as.POSIXct(spec$from, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  to <- as.POSIXct(spec$to, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  lost <- series$time >= from & series$time < to &
+    (spec$unit == "all" | series$id == spec$unit)
+  series[!lost, , drop = FALSE]
+}
+
+coverage_rows <- lapply(COVERAGE_CASES, function(spec) {
+  got <- coverage(coverage_input(spec), id, time,
+                  grain = if (spec$grain == "astronomical") astronomical(spec$series)
+                          else spec$grain)
+  empty <- got == 0L
+  data.frame(case = spec$case, series = spec$series, unit = spec$unit, from = spec$from,
+             to = spec$to, grain = spec$grain, n_unit = nrow(got), n_bin = ncol(got),
+             first_bin = colnames(got)[1L], last_bin = colnames(got)[ncol(got)],
+             n_empty = sum(empty), n_unit_gap = sum(rowSums(empty) > 0L),
+             n_bin_skipped = sum(colSums(empty) == nrow(got)),
+             digest = digest_array(array(as.numeric(got), dim = c(dim(got), 1L))),
+             stringsAsFactors = FALSE)
+})
+write_fixture(do.call(rbind, coverage_rows), "coverage.csv")
+cat("wrote", length(COVERAGE_CASES), "coverage cases\n")
 
 # ---- what crosses the boundary above the representation ----------------------------------------
 # The three artifacts, in the format the contract defines, plus the numbers read off them that are

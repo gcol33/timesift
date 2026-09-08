@@ -33,8 +33,13 @@ Requirements, each checked and each an error rather than a warning:
 - Every id spans the same set of bins once binned. A record that stops early is not silently
   padded; it is reported with the ids and the bins concerned.
 
-Ordering of the input rows carries no meaning and is not relied on. The output is ordered by
-sorted unique id and by bin start.
+Ordering of the input rows carries no meaning, exactly and not approximately: both reductions walk
+the record by unit and then by instant rather than in the order the caller wrote it, so a record
+and any permutation of its rows reduce to the same bytes and reach the same digest. Addition is not
+associative, and a reduction that accumulated in the caller's order would move in its last bits
+under a permutation that changed nothing about the record. A record already in that order is the
+common case and pays the scan that establishes it. The output is ordered by sorted unique id and by
+bin start.
 
 ## Ordering identifiers
 
@@ -419,26 +424,45 @@ thing to read a subset of.
 
 ## Fixtures
 
-Three series, because a record that starts on a bin boundary cannot tell two binning rules apart
-and a record in UTC cannot tell two readings of a zone apart.
+Four series, because a record that starts on a bin boundary cannot tell two binning rules apart,
+a record in UTC cannot tell two readings of a zone apart, and identifiers that agree under every
+collation rule cannot tell two row orders apart.
 `spec/fixtures/series.csv` is a synthetic three-unit, 400-day hourly series beginning at midnight
 on the default anniversary, so every coarse grain is in phase with it from the first reading.
 `series_offset.csv` is a two-unit, 200-day series beginning at 05:00 on 17 October, which is what
 a logger deployed when someone could walk to it gives, and puts every grain out of phase.
 `series_zoned.csv` is a two-unit, 10-day series across 4 November 2018, the night
 `America/Sao_Paulo` moved its clock at midnight, which is the record that tells a calendar read by
-arithmetic apart from one read by writing a local midnight and parsing it back. `seasons.csv` holds
+arithmetic apart from one read by writing a local midnight and parsing it back.
+`series_order.csv` is a five-unit, 30-day series whose identifiers C collation and an English
+locale order differently, `A1 P10 P9 _x a1` against `_x a1 A1 P10 P9`, and which arrive in a third
+order again. `seasons.csv` holds
 the equinox and solstice boundaries that make each series a caller-supplied calendar, which is the
 only path the manuscript's seasonal rung ever took.
+
+The digests are the core's own output: `inst/spec/make_fixtures.R` loads the R package and calls
+the same public functions a user calls. They pin a regression, not an agreement between two
+implementations. The evidence that the two agree is the oracles, checked against the core
+separately, on these fixtures and on random series.
 
 `digests.csv` holds one row per series, grain, time zone, `year_start`, `partial` setting and
 statistic, covering every grain-by-statistic combination, each of the three-channel schemes
 (`min+mean+max`, `mean_daily_min+mean+mean_daily_max`, `cold_day+mean+warm_day`), the coarse
-grains at anniversaries other than the default, both `partial` settings, the supplied calendar,
+grains at anniversaries other than the default, both `partial` settings, the supplied calendar over
+the same grid of statistics a named grain is read at,
 and the zone: every grain of the aligned series read as a `Europe/Vienna` clock, which moves twice
 inside that record, and the short series read as an `America/Sao_Paulo` clock, which moves at
 midnight inside it, including a `year_start` landing on the night it moves. Each row carries `n_unit`, `n_bin`, the first and last bin start, how many bins are
 partial, and the digest.
+
+`coverage.csv` holds what `coverage()` reports, which is the same binning laid out as a count of
+readings per `(unit, bin)` and the one reduction no digest above reaches: every series here is
+complete, and a gap is what that table exists to show. Each case names the readings it takes out,
+by unit and by span, so both suites build the same record; a case takes none, a case takes a
+month from one unit, a case takes a span from every unit so that the calendar tiles over a bin no
+unit reaches at all, and a case reads a supplied calendar. Each row carries the shape, the first
+and last bin, how many cells are empty, how many units have a gap, how many bins no unit reaches,
+and the digest of the count matrix.
 
 `grain_guards.csv` holds one case per guard on a supplied calendar, each naming the series and the
 calendar that breaks it beside the substring of the message both implementations must raise. The
@@ -447,7 +471,7 @@ every reading the midnight after it, `(floor(t / 86400) + 1) * 86400`, and `alte
 consecutive readings to two bins an hour apart, `t0 + 3600 * (((t - t0) / 3600) mod 2)` with `t0`
 the record's first reading.
 
-The lookback reads the same three series and three files of its own. `lookback_targets.csv`
+The lookback reads the same series and three files of its own. `lookback_targets.csv`
 holds the anchors, in named sets rather than one set per series, because an anchor that is a local
 midnight in one zone is not one in another and an anchor on the hour rules out the day-level
 statistics that a midnight allows: `aligned` and `offset` sit on day boundaries in UTC, `hourly`

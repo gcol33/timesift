@@ -15,6 +15,19 @@ fixture_binning <- function(dir, name, grain) {
   function(when) edges[findInterval(as.numeric(when), as.numeric(edges))]
 }
 
+# The readings a coverage case takes out, named in the fixture so that both suites build the same
+# record rather than each writing one that happens to have a hole in it.
+coverage_input <- function(dir, row) {
+  series <- fixture_series(dir, row$series)
+  if (!nzchar(row$unit)) {
+    return(series)
+  }
+  from <- as.POSIXct(row$from, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  to <- as.POSIXct(row$to, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  lost <- series$time >= from & series$time < to & (row$unit == "all" | series$id == row$unit)
+  series[!lost, , drop = FALSE]
+}
+
 # The two calendars the guard fixture names, built from the name so that both suites build the
 # same function rather than each writing one that happens to break the same rule.
 fixture_calendar <- function(name) {
@@ -121,6 +134,59 @@ test_that("a digest is refused over an array that is not finite", {
   expect_error(digest_array(array(c(1, -Inf), dim = c(2L, 1L, 1L))), "not finite")
   expect_error(digest_array(array(c(1, NaN), dim = c(2L, 1L, 1L))), "not finite")
   expect_error(digest_array(array(c(1, NA_real_), dim = c(2L, 1L, 1L))), "1 of 2")
+})
+
+test_that("coverage() counts the readings the fixtures pin, gaps and all", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures are not in the built package")
+  expected <- read.csv(file.path(dir, "coverage.csv"), stringsAsFactors = FALSE,
+                       colClasses = c(unit = "character", from = "character", to = "character"))
+  expected[is.na(expected)] <- ""
+  expect_true(any(expected$n_bin_skipped > 0L))
+  expect_true(any(expected$n_empty == 0L))
+
+  for (i in seq_len(nrow(expected))) {
+    row <- expected[i, ]
+    got <- coverage(coverage_input(dir, row), id, time,
+                    grain = fixture_binning(dir, row$series, row$grain))
+    empty <- got == 0L
+    expect_equal(nrow(got), row$n_unit, info = row$case)
+    expect_equal(ncol(got), row$n_bin, info = row$case)
+    expect_identical(colnames(got)[1L], row$first_bin, info = row$case)
+    expect_identical(colnames(got)[ncol(got)], row$last_bin, info = row$case)
+    expect_equal(sum(empty), row$n_empty, info = row$case)
+    expect_equal(sum(rowSums(empty) > 0L), row$n_unit_gap, info = row$case)
+    expect_equal(sum(colSums(empty) == nrow(got)), row$n_bin_skipped, info = row$case)
+    expect_identical(digest_array(array(as.numeric(got), dim = c(dim(got), 1L))),
+                     row$digest, info = row$case)
+  }
+})
+
+test_that("the reduction reads the same record however its rows are ordered", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures are not in the built package")
+  record <- fixture_series(dir, "aligned")
+  set.seed(11)
+  shuffled <- record[sample(nrow(record)), , drop = FALSE]
+
+  # Addition is not associative, so a reduction that accumulated in the order the caller wrote its
+  # rows in would move in its last bits under this. The digest is a statement about the
+  # representation, so the two are the same bytes and not merely close.
+  for (g in c("native", "halfday", "day", "week", "month", "season", "year")) {
+    day_level <- !g %in% c("native", "halfday")
+    schemes <- list(c("min", "mean", "max"))
+    if (day_level) {
+      schemes <- c(schemes, list(c("cold_day", "mean", "warm_day"),
+                                 c("mean_daily_min", "mean", "mean_daily_max")))
+    }
+    for (s in schemes) {
+      label <- paste(g, paste(s, collapse = "+"))
+      expect_identical(
+        digest_array(grain_matrix(shuffled, id, time, value, grain = g, stats = s)),
+        digest_array(grain_matrix(record, id, time, value, grain = g, stats = s)),
+        info = label)
+    }
+  }
 })
 
 test_that("the row order is C collation and not the session's", {
