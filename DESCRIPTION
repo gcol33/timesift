@@ -20,6 +20,7 @@ Description: Fits and compares representations of time-varying data against a
     microclimate loggers.
 License: MIT + file LICENSE
 Encoding: UTF-8
+Language: en-GB
 Roxygen: list(markdown = TRUE)
 URL: https://gillescolling.com/timesift/, https://github.com/gcol33/timesift
 BugReports: https://github.com/gcol33/timesift/issues

@@ -254,6 +254,11 @@
 
 ## Packaging
 
+* `inst/CITATION` cites the package, and `citation("timesift")` prints it; the methods article's
+  entry is added once it has a DOI. `codemeta.json` is generated from `DESCRIPTION` with
+  codemetar and regenerated at a release. `DESCRIPTION` declares `Language: en-GB`, and
+  `inst/WORDLIST` holds the proper nouns and API names the spell check would otherwise flag, so
+  `spelling::spell_check_package()` runs clean.
 * The Python floor is 3.11. The `sklearn` extra pins the scikit-learn release where the mixing
   parameter alone selects the elastic net, and that release has no build for 3.10, so the 3.10
   job had failed at install on every push. The `test` extra carries pandas, so the suite runs

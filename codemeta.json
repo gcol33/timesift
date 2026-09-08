@@ -1,0 +1,249 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "identifier": "timesift",
+  "description": "Fits and compares representations of time-varying data against a prediction target. Given a table of targets and a table of time-stamped series belonging to them, it builds each candidate representation, from the record unreduced through a calendar grain such as a week or a month to a lookback anchored on each target, fits the requested learners on each, scores every candidate on one set of held-out folds, and stacks the out-of-fold predictions into an ensemble. Calendar-aware binning keeps a bin a real week or month rather than a fixed block of hours. Learners, response heads and metrics are registered rather than hard-coded, so adding one is a registration and not a fork of the fitting code. The shipped default is presence-absence with a joint multi-label head scored by the true skill statistic, the setting used for species distribution modelling from microclimate loggers.",
+  "name": "timesift: Learn Predictive Representations of Time-Varying Data",
+  "relatedLink": "https://gillescolling.com/timesift/",
+  "codeRepository": "https://github.com/gcol33/timesift",
+  "issueTracker": "https://github.com/gcol33/timesift/issues",
+  "license": "https://spdx.org/licenses/MIT",
+  "version": "0.1.1",
+  "programmingLanguage": {
+    "@type": "ComputerLanguage",
+    "name": "R",
+    "url": "https://r-project.org"
+  },
+  "runtimePlatform": "R version 4.6.1 (2026-06-24 ucrt)",
+  "author": [
+    {
+      "@type": "Person",
+      "givenName": "Gilles",
+      "familyName": "Colling",
+      "email": "gilles.colling051@gmail.com",
+      "@id": "https://orcid.org/0000-0003-3070-6066"
+    }
+  ],
+  "copyrightHolder": [
+    {
+      "@type": "Person",
+      "givenName": "Gilles",
+      "familyName": "Colling",
+      "email": "gilles.colling051@gmail.com",
+      "@id": "https://orcid.org/0000-0003-3070-6066"
+    }
+  ],
+  "maintainer": [
+    {
+      "@type": "Person",
+      "givenName": "Gilles",
+      "familyName": "Colling",
+      "email": "gilles.colling051@gmail.com",
+      "@id": "https://orcid.org/0000-0003-3070-6066"
+    }
+  ],
+  "softwareSuggestions": [
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "testthat",
+      "name": "testthat",
+      "version": ">= 3.0.0",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=testthat"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "torch",
+      "name": "torch",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=torch"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "glmnet",
+      "name": "glmnet",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=glmnet"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "ranger",
+      "name": "ranger",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=ranger"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "lme4",
+      "name": "lme4",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=lme4"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "lmerTest",
+      "name": "lmerTest",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=lmerTest"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "emmeans",
+      "name": "emmeans",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=emmeans"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "knitr",
+      "name": "knitr",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=knitr"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "rmarkdown",
+      "name": "rmarkdown",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=rmarkdown"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "withr",
+      "name": "withr",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=withr"
+    }
+  ],
+  "softwareRequirements": {
+    "1": {
+      "@type": "SoftwareApplication",
+      "identifier": "R",
+      "name": "R",
+      "version": ">= 4.1"
+    },
+    "2": {
+      "@type": "SoftwareApplication",
+      "identifier": "grDevices",
+      "name": "grDevices"
+    },
+    "3": {
+      "@type": "SoftwareApplication",
+      "identifier": "graphics",
+      "name": "graphics"
+    },
+    "4": {
+      "@type": "SoftwareApplication",
+      "identifier": "rlang",
+      "name": "rlang",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=rlang"
+    },
+    "5": {
+      "@type": "SoftwareApplication",
+      "identifier": "stats",
+      "name": "stats"
+    },
+    "6": {
+      "@type": "SoftwareApplication",
+      "identifier": "tidyselect",
+      "name": "tidyselect",
+      "version": ">= 1.2.0",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=tidyselect"
+    },
+    "7": {
+      "@type": "SoftwareApplication",
+      "identifier": "tools",
+      "name": "tools"
+    },
+    "8": {
+      "@type": "SoftwareApplication",
+      "identifier": "utils",
+      "name": "utils"
+    },
+    "SystemRequirements": null
+  },
+  "fileSize": "8488.607KB",
+  "citation": [
+    {
+      "@type": "SoftwareSourceCode",
+      "datePublished": "2026",
+      "author": [
+        {
+          "@type": "Person",
+          "givenName": "Gilles",
+          "familyName": "Colling",
+          "@id": "https://orcid.org/0000-0003-3070-6066"
+        }
+      ],
+      "name": "timesift: Learn Predictive Representations of Time-Varying Data",
+      "url": "https://gillescolling.com/timesift/",
+      "description": "R package version 0.1.1"
+    }
+  ],
+  "releaseNotes": "https://github.com/gcol33/timesift/blob/main/NEWS.md",
+  "readme": "https://github.com/gcol33/timesift/blob/master/README.md",
+  "contIntegration": ["https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml", "https://github.com/gcol33/timesift/actions/workflows/pytest.yaml", "https://github.com/gcol33/timesift/actions/workflows/contract.yaml"],
+  "keywords": ["microclimate", "python", "r-package", "species-distribution-modelling", "time-series"]
+}
