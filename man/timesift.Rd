@@ -106,6 +106,7 @@ an error.
 }
 
 \examples{
+\dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 90)
 units <- sprintf("p\%02d", 1:30)
@@ -122,7 +123,7 @@ fit <- timesift(plots, logger, y = starts_with("sp_"), id = plot, time = datetim
                 ensemble = FALSE, verbose = FALSE)
 fit
 }
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=build_representation]{build_representation()}} for the array a candidate reads, \code{\link[=fold_map]{fold_map()}} for the splits.

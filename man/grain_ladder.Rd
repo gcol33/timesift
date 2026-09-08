@@ -60,6 +60,7 @@ Every arm sees identical splits and is restricted to identical cells, so the arm
 denominator and any two of them can be compared cell by cell with \code{\link[=paired_contrast]{paired_contrast()}}.
 }
 \examples{
+\dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
 units <- sprintf("p\%02d", 1:60)
@@ -73,5 +74,5 @@ y <- matrix(rbinom(120, 1, plogis(c(warmth, -warmth))), nrow = 60,
 x <- grain_matrix(d, plot, t, temp, grain = c("week", "month"))
 lad <- grain_ladder(x, y, elasticnet(), folds = fold_map(y, v = 3), verbose = FALSE)
 summary(lad)
-
+\dontshow{\}) # examplesIf}
 }

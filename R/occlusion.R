@@ -35,7 +35,7 @@
 #' @return A data frame of one row per held-back part and variable, carrying the mean weight over
 #'   folds and the score with and without the part.
 #'
-#' @examples
+#' @examplesIf requireNamespace("glmnet", quietly = TRUE)
 #' set.seed(1)
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 120)
 #' units <- sprintf("p%02d", 1:40)

@@ -31,6 +31,7 @@ bias on the same cell, and it cancels in the difference. That is why the levels 
 are upper bounds while the differences between arms are read at face value.
 }
 \examples{
+\dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
 units <- sprintf("p\%02d", 1:60)
@@ -44,5 +45,5 @@ y <- matrix(rbinom(120, 1, plogis(c(warmth, -warmth))), nrow = 60,
 x <- grain_matrix(d, plot, t, temp, grain = c("week", "month"))
 lad <- grain_ladder(x, y, elasticnet(), folds = fold_map(y, v = 3), verbose = FALSE)
 paired_contrast(lad, "week|elasticnet", "month|elasticnet")
-
+\dontshow{\}) # examplesIf}
 }

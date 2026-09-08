@@ -21,7 +21,7 @@
 #' @return A data frame of one row per grain: the estimated marginal mean difference from the
 #'   reference, its interval, and the adjusted p-value. Needs `lme4`, `lmerTest` and `emmeans`.
 #'
-#' @examples
+#' @examplesIf all(vapply(c("glmnet", "lme4", "lmerTest", "emmeans"), requireNamespace, logical(1), quietly = TRUE))
 #' \donttest{
 #' set.seed(1)
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
@@ -35,7 +35,7 @@
 #'             ncol = 6, dimnames = list(units, paste0("sp", 1:6)))
 #' x <- grain_matrix(d, plot, t, temp, grain = c("day", "week", "month"))
 #' lad <- grain_ladder(x, y, elasticnet(), folds = fold_map(y, v = 5), verbose = FALSE)
-#' if (requireNamespace("emmeans", quietly = TRUE)) grain_contrasts(lad)
+#' grain_contrasts(lad)
 #' }
 #'
 #' @export

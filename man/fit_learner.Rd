@@ -34,6 +34,7 @@ A \code{timesift_fit}, which \code{\link[stats:predict]{stats::predict()}} takes
 Fit one learner at one grain
 }
 \examples{
+\dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 120)
 units <- sprintf("p\%02d", 1:40)
@@ -43,5 +44,5 @@ x <- grain_matrix(d, plot, t, temp, grain = "month")
 y <- matrix(rbinom(80, 1, 0.4), nrow = 40, dimnames = list(units, c("sp1", "sp2")))
 fit <- fit_learner(elasticnet(), x, y)
 dim(stats::predict(fit, x))
-
+\dontshow{\}) # examplesIf}
 }

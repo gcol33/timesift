@@ -130,12 +130,10 @@ test_that("a fitted encoder survives saveRDS() and predicts the same after readR
 test_that("the encoders train under the loss the response head names", {
   skip_if_no_torch()
   f <- torch_fixture(n_unit = 40L, days = 60L)
-  withr::defer(.responses_reg$remove("continuous_test"))
-  register_response("continuous_test", list(
+  local_response("continuous_test", list(
     prepare = function(y) .as_response(y), activation = "identity",
     loss = "squared_error", metric = "roc_auc",
-    cells = function(y, folds) scorable_cells(y > stats::median(y), folds)),
-    overwrite = TRUE)
+    cells = function(y, folds) scorable_cells(y > stats::median(y), folds)))
   level <- 3 * scale(rowMeans(f$x[, , "mean"]))[, 1L]
   y <- matrix(level, ncol = 1L, dimnames = list(dimnames(f$x)[[1L]], "height"))
   fit <- fit_learner(mlp(epochs = 80L, learning_rate = 0.01, seed = 3L, val_frac = 0), f$x, y,
@@ -149,11 +147,9 @@ test_that("the encoders train under the loss the response head names", {
 test_that("a loss the encoders do not know is refused by name", {
   skip_if_no_torch()
   f <- torch_fixture(n_unit = 20L, days = 40L)
-  withr::defer(.responses_reg$remove("poisson_test"))
-  register_response("poisson_test", list(
+  local_response("poisson_test", list(
     prepare = function(y) .as_response(y), activation = "exp", loss = "poisson",
-    metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)),
-    overwrite = TRUE)
+    metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)))
   expect_error(fit_learner(cnn(epochs = 1L), f$x, f$y, response = "poisson_test"),
                "do not train under the poisson loss")
 })

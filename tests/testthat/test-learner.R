@@ -99,12 +99,10 @@ test_that("forward selection stops at its budget and is non-monotone in a predic
 })
 
 test_that("a column holding one value is not offered to the forward search", {
-  withr::defer(.responses_reg$remove("constant_continuous_test"))
-  register_response("constant_continuous_test", list(
+  local_response("constant_continuous_test", list(
     prepare = function(y) .as_response(y), activation = "identity",
     loss = "squared_error", metric = "roc_auc",
-    cells = function(y, folds) scorable_cells(y > stats::median(y), folds)),
-    overwrite = TRUE)
+    cells = function(y, folds) scorable_cells(y > stats::median(y), folds)))
 
   sim <- sim_series(n_unit = 40L, days = 60L, seed = 37L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "month",
@@ -264,12 +262,10 @@ test_that("predicting a single unit returns one row and not one column", {
 test_that("the per-response learners fit the family the response head's loss names", {
   skip_if_not_installed("glmnet")
   skip_if_not_installed("ranger")
-  withr::defer(.responses_reg$remove("continuous_test"))
-  register_response("continuous_test", list(
+  local_response("continuous_test", list(
     prepare = function(y) .as_response(y), activation = "identity",
     loss = "squared_error", metric = "roc_auc",
-    cells = function(y, folds) scorable_cells(y > stats::median(y), folds)),
-    overwrite = TRUE)
+    cells = function(y, folds) scorable_cells(y > stats::median(y), folds)))
   sim <- sim_series(n_unit = 40L, days = 60L, seed = 91L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
   level <- 10 + 3 * scale(rowMeans(x[, , 1L]))[, 1L]
@@ -285,11 +281,9 @@ test_that("the per-response learners fit the family the response head's loss nam
   expect_equal(fit_learner(stepwise(max_terms = 1L), x, y, response = "continuous_test")$model$family,
                "gaussian")
 
-  withr::defer(.responses_reg$remove("poisson_test"))
-  register_response("poisson_test", list(
+  local_response("poisson_test", list(
     prepare = function(y) .as_response(y), activation = "exp", loss = "poisson",
-    metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)),
-    overwrite = TRUE)
+    metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)))
   expect_error(fit_learner(stepwise(), x, y, response = "poisson_test"), "no family for the poisson")
 })
 

@@ -85,6 +85,7 @@ one a mechanism acts at; it says that grain predicted best on the units the sele
 The cost is the ladder's, multiplied by the number of inner folds: \code{v_outer * (v_inner * candidates + 1)} fits. With a neural learner that is where an overnight run goes.
 }
 \examples{
+\dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
 units <- sprintf("p\%02d", 1:60)
@@ -100,7 +101,7 @@ sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), inner = 3,
                     verbose = FALSE)
 sel
 sel$estimate
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=grain_ladder]{grain_ladder()}} for the grid this selects from, and \code{\link[=paired_contrast]{paired_contrast()}} for the

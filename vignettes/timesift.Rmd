@@ -8,8 +8,11 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE}
+# Every fitted chunk here runs the shipped default learner, which is `glmnet`, and `glmnet` is a
+# Suggests. Where it is absent the code is shown and not run.
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5, fig.height = 4.5,
-                      dev.args = list(pointsize = 14))
+                      dev.args = list(pointsize = 14),
+                      eval = requireNamespace("glmnet", quietly = TRUE))
 set.seed(1)
 library(timesift)
 ```
@@ -285,7 +288,7 @@ Where the whole curve is the question rather than one step of it, `grain_contras
 model on the per-cell scores and compares every grain against the best one, correcting for the
 comparisons made and no others.
 
-```{r grain-contrasts, eval = requireNamespace("emmeans", quietly = TRUE) && requireNamespace("lmerTest", quietly = TRUE)}
+```{r grain-contrasts, eval = all(vapply(c("glmnet", "lme4", "lmerTest", "emmeans"), requireNamespace, logical(1), quietly = TRUE))}
 grain_contrasts(lad)
 ```
 

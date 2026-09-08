@@ -143,7 +143,7 @@ learners <- function() .learners_reg$names()
 #'
 #' @return A `timesift_fit`, which [stats::predict()] takes a new representation.
 #'
-#' @examples
+#' @examplesIf requireNamespace("glmnet", quietly = TRUE)
 #' set.seed(1)
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 120)
 #' units <- sprintf("p%02d", 1:40)

@@ -46,9 +46,16 @@ brute_tss <- function(y, p) {
   }, numeric(1L)))
 }
 
-# A directory that lives for one test. withr would do this and is not worth an entry in Suggests
-# for three lines; test_that() runs its block in a function, so on.exit() there is the whole
-# lifetime.
+# Register a response head for one test and take it out again afterwards, so the registry the next
+# test sees is the one that ships. The Python suite's `temporary_response` fixture is this.
+local_response <- function(name, spec, env = parent.frame()) {
+  register_response(name, spec, overwrite = TRUE)
+  withr::defer(.responses_reg$remove(name), envir = env)
+  invisible(name)
+}
+
+# A directory that lives for one test: test_that() runs its block in a function, so on.exit()
+# there is the whole lifetime.
 temp_dir <- function() {
   dir <- tempfile("timesift")
   dir.create(dir)

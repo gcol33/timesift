@@ -24,6 +24,7 @@ with an interval from its standard error across variables. An open circle marks 
 best grain, which is where the curve says the record stops paying for being read more finely.
 }
 \examples{
+\dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
 units <- sprintf("p\%02d", 1:60)
@@ -37,5 +38,5 @@ y <- matrix(rbinom(120, 1, plogis(c(warmth, -warmth))), nrow = 60,
 x <- grain_matrix(d, plot, t, temp, grain = c("day", "week", "month"))
 lad <- grain_ladder(x, y, elasticnet(), folds = fold_map(y, v = 3), verbose = FALSE)
 plot(lad)
-
+\dontshow{\}) # examplesIf}
 }

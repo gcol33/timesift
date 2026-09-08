@@ -81,6 +81,7 @@ models the run was told to keep, so every bin is held back from a model that nev
 it is rescored on. The candidate is named as \code{summary()} reports it.
 }
 \examples{
+\dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 120)
 units <- sprintf("p\%02d", 1:40)
@@ -95,5 +96,5 @@ x <- grain_matrix(d, plot, t, temp, grain = "month")
 lad <- grain_ladder(x, y, elasticnet(), folds = fold_map(y, v = 3),
                      keep_fits = TRUE, verbose = FALSE)
 head(occlusion(lad, x, y, "month|elasticnet", permutations = 3))
-
+\dontshow{\}) # examplesIf}
 }

@@ -23,6 +23,7 @@ its circles in one column; one that wanders says the grid is flat enough that th
 arbitrary, which is worth seeing beside the estimate rather than after it.
 }
 \examples{
+\dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
 units <- sprintf("p\%02d", 1:60)
@@ -37,5 +38,5 @@ x <- grain_matrix(d, plot, t, temp, grain = c("week", "month"))
 sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), inner = 3,
                     verbose = FALSE)
 plot(sel)
-
+\dontshow{\}) # examplesIf}
 }

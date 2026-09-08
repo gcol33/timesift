@@ -34,6 +34,7 @@ Taking the best-observed grain as the reference is a choice that favours the ref
 this beside the paired differences \code{\link[=paired_contrast]{paired_contrast()}} gives, which single out no grain.
 }
 \examples{
+\dontshow{if (all(vapply(c("glmnet", "lme4", "lmerTest", "emmeans"), requireNamespace, logical(1), quietly = TRUE))) withAutoprint(\{ # examplesIf}
 \donttest{
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
@@ -47,7 +48,7 @@ y <- matrix(rbinom(60 * 6, 1, plogis(3 * as.numeric(outer(warmth, rep(c(1, -1), 
             ncol = 6, dimnames = list(units, paste0("sp", 1:6)))
 x <- grain_matrix(d, plot, t, temp, grain = c("day", "week", "month"))
 lad <- grain_ladder(x, y, elasticnet(), folds = fold_map(y, v = 5), verbose = FALSE)
-if (requireNamespace("emmeans", quietly = TRUE)) grain_contrasts(lad)
+grain_contrasts(lad)
 }
-
+\dontshow{\}) # examplesIf}
 }

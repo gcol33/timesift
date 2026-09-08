@@ -333,10 +333,9 @@ test_that("a split without names is read against the targets as they were given"
 })
 
 test_that("the combiner minimises the loss of the head the run was fitted under", {
-  withr::defer(.responses_reg$remove("gauss_test"))
-  register_response("gauss_test", list(
+  local_response("gauss_test", list(
     prepare = function(y) .as_response(y), activation = "identity", loss = "squared_error",
-    metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)), overwrite = TRUE)
+    metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)))
   case <- toy_case(n_unit = 24L, days = 60L)
   run <- function(...) {
     timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
