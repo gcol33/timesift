@@ -9,6 +9,15 @@ if (!file.exists("DESCRIPTION")) {
 suppressMessages(pkgload::load_all(".", quiet = TRUE))
 out_dir <- "inst/spec/fixtures"
 
+# Every fixture is written through here, over a binary connection: a text one translates the line
+# feed to CRLF on Windows, which would make a regeneration there a diff of every byte rather than
+# of the digests that moved.
+write_fixture <- function(x, file) {
+  con <- file(file.path(out_dir, file), open = "wb")
+  on.exit(close(con), add = TRUE)
+  write.csv(x, con, row.names = FALSE, quote = FALSE, eol = "\n")
+}
+
 # Two series, because a record that starts on a bin boundary cannot tell two binning rules apart.
 # The first begins at midnight on the default year_start, so every coarse grain is in phase with
 # it from the first reading. The second begins at an arbitrary hour of an arbitrary day, which is
@@ -26,11 +35,11 @@ make_series <- function(from, units, days, seed) {
 }
 
 write_series <- function(series, file) {
-  write.csv(
+  write_fixture(
     data.frame(id = series$id,
                time = format(series$time, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
                value = sprintf("%.6f", series$value)),
-    file.path(out_dir, file), row.names = FALSE, quote = FALSE
+    file
   )
 }
 
@@ -61,10 +70,10 @@ EDGES <- list(
   aligned = c("2021-09-01", "2021-09-22", "2021-12-21", "2022-03-20", "2022-06-21", "2022-09-23"),
   offset = c("2021-10-17", "2021-12-21", "2022-03-20")
 )
-write.csv(
+write_fixture(
   data.frame(series = rep(names(EDGES), lengths(EDGES)),
              edge = paste0(unlist(EDGES, use.names = FALSE), "T00:00:00Z")),
-  file.path(out_dir, "seasons.csv"), row.names = FALSE, quote = FALSE
+  "seasons.csv"
 )
 
 astronomical <- function(name) {
@@ -180,8 +189,7 @@ for (w in c("day", "week", "month")) {
 }
 add("order", "day", c("cold_day", "mean", "warm_day"))
 
-write.csv(do.call(rbind, rows), file.path(out_dir, "digests.csv"),
-          row.names = FALSE, quote = FALSE)
+write_fixture(do.call(rbind, rows), "digests.csv")
 cat("wrote", length(rows), "digests\n")
 
 # ---- the lookback -----------------------------------------------------------------------
@@ -208,8 +216,7 @@ lookback_targets <- do.call(rbind, lapply(names(TARGETS), function(name) {
              at = format(as.POSIXct(grid$at, tz = spec$tz), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
              stringsAsFactors = FALSE)
 }))
-write.csv(lookback_targets, file.path(out_dir, "lookback_targets.csv"),
-          row.names = FALSE, quote = FALSE)
+write_fixture(lookback_targets, "lookback_targets.csv")
 
 lookback_at <- function(set) {
   taken <- lookback_targets[lookback_targets$set == set, ]
@@ -271,8 +278,7 @@ add_lookback("zoned", "2 days", "1 day", 1L, c("cold_day", "mean", "warm_day"),
            tz = "America/Sao_Paulo")
 add_lookback("zoned", "2 days", "0 days", 2L, "mean")
 
-write.csv(do.call(rbind, lookback_rows), file.path(out_dir, "lookback_digests.csv"),
-          row.names = FALSE, quote = FALSE)
+write_fixture(do.call(rbind, lookback_rows), "lookback_digests.csv")
 
 # What a lookback refuses. A digest cannot carry a case that errors, so each guard is pinned by the
 # input that fires it and the part of the message both languages must raise.
@@ -297,8 +303,8 @@ for (guard in WINDOW_GUARDS) {
          call. = FALSE)
   }
 }
-write.csv(do.call(rbind, lapply(WINDOW_GUARDS, as.data.frame, stringsAsFactors = FALSE)),
-          file.path(out_dir, "lookback_guards.csv"), row.names = FALSE, quote = FALSE)
+write_fixture(do.call(rbind, lapply(WINDOW_GUARDS, as.data.frame, stringsAsFactors = FALSE)),
+          "lookback_guards.csv")
 cat("wrote", length(lookback_rows), "lookback digests and", length(WINDOW_GUARDS), "guards\n")
 
 # What a supplied calendar refuses, pinned the same way: the series, the calendar that breaks it,
@@ -318,8 +324,8 @@ for (guard in GRAIN_GUARDS) {
          call. = FALSE)
   }
 }
-write.csv(do.call(rbind, lapply(GRAIN_GUARDS, as.data.frame, stringsAsFactors = FALSE)),
-          file.path(out_dir, "grain_guards.csv"), row.names = FALSE, quote = FALSE)
+write_fixture(do.call(rbind, lapply(GRAIN_GUARDS, as.data.frame, stringsAsFactors = FALSE)),
+          "grain_guards.csv")
 cat("wrote", length(GRAIN_GUARDS), "grain guards\n")
 
 # ---- what crosses the boundary above the representation ----------------------------------------
@@ -361,12 +367,12 @@ METRIC_CASES <- list(
   perfect = list(y = c(0, 0, 1, 1), p = c(0.1, 0.2, 0.8, 0.9)),
   reversed = list(y = c(1, 1, 0, 0), p = c(0.1, 0.2, 0.8, 0.9))
 )
-write.csv(
+write_fixture(
   do.call(rbind, lapply(names(METRIC_CASES), function(nm) {
     d <- METRIC_CASES[[nm]]
     data.frame(case = nm, y = d$y, p = sprintf("%.12g", d$p), stringsAsFactors = FALSE)
   })),
-  file.path(out_dir, "metric_cases.csv"), row.names = FALSE, quote = FALSE
+  "metric_cases.csv"
 )
 
 METRIC_FNS <- list(
@@ -379,7 +385,7 @@ METRIC_FNS <- list(
 )
 # A case a metric defines no value on is written NA rather than left out, so a suite that quietly
 # skipped it would fail rather than pass.
-write.csv(
+write_fixture(
   do.call(rbind, lapply(names(METRIC_CASES), function(nm) {
     d <- METRIC_CASES[[nm]]
     data.frame(case = nm, metric = names(METRIC_FNS),
@@ -389,7 +395,7 @@ write.csv(
                }, character(1L)),
                stringsAsFactors = FALSE)
   })),
-  file.path(out_dir, "metrics.csv"), row.names = FALSE, quote = FALSE
+  "metrics.csv"
 )
 
 # The paired contrast, from a fixed table of per-cell scores rather than from a fit: the pairing,
@@ -408,12 +414,12 @@ contrast_cells$b <- round(contrast_cells$a - stats::rnorm(nrow(contrast_cells), 
 contrast_cells$a[c(2L, 17L)] <- NA_real_
 contrast_cells$b[c(5L, 17L, 23L)] <- NA_real_
 rownames(contrast_cells) <- NULL
-write.csv(
+write_fixture(
   data.frame(variable = contrast_cells$variable, fold = contrast_cells$fold,
              a = ifelse(is.na(contrast_cells$a), "NA", sprintf("%.12g", contrast_cells$a)),
              b = ifelse(is.na(contrast_cells$b), "NA", sprintf("%.12g", contrast_cells$b)),
              stringsAsFactors = FALSE),
-  file.path(out_dir, "contrast_cells.csv"), row.names = FALSE, quote = FALSE
+  "contrast_cells.csv"
 )
 
 as_ladder <- function(cells) {
@@ -426,12 +432,12 @@ as_ladder <- function(cells) {
 }
 QUANTITIES <- c("diff", "lower", "upper", "n_variable", "n_cell", "n_favour", "p_value")
 contrast <- paired_contrast(as_ladder(contrast_cells), "week|a", "week|b")
-write.csv(
+write_fixture(
   data.frame(quantity = QUANTITIES,
              value = vapply(QUANTITIES, function(nm) sprintf("%.12g", contrast[[nm]]),
                             character(1L)),
              stringsAsFactors = FALSE),
-  file.path(out_dir, "contrast.csv"), row.names = FALSE, quote = FALSE
+  "contrast.csv"
 )
 
 # The one number here that cannot be a digest: it draws replicates, from each language's own random
@@ -439,12 +445,12 @@ write.csv(
 # map. What is pinned is this side's value, and what the contract requires is that the other side
 # lands within the band the document states.
 inflation <- tss_inflation(y_fix, f_fix, skill = c(0.6, 0.7, 0.9), replicates = 200L, seed = 1L)
-write.csv(
+write_fixture(
   data.frame(skill = sprintf("%.12g", inflation$skill),
              reported = sprintf("%.12g", inflation$reported),
              inflation = sprintf("%.12g", inflation$inflation),
              replicates = 200L, tolerance = 0.02, stringsAsFactors = FALSE),
-  file.path(out_dir, "inflation.csv"), row.names = FALSE, quote = FALSE
+  "inflation.csv"
 )
 
 cat("wrote the response, the fold map, the mask,",
