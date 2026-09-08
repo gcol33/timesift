@@ -53,7 +53,7 @@ class Selection:
 
 
 def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_absence",
-                 metric=None, compare: Ladder | None = None, seed: int = 1,
+                 metric=None, compare: Ladder | None = None, control=None, seed: int = 1,
                  verbose: bool = True) -> Selection:
     """Choose the grain inside each outer fold's training units, then score the whole procedure.
 
@@ -69,6 +69,9 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
 
     The cost is the ladder's, multiplied by the number of inner folds: ``v_outer * (v_inner *
     candidates + 1)`` fits.
+
+    ``control`` is the ``train_control`` every neural learner trains under, in the inner search and
+    in the refit alike; a learner carrying settings of its own overrides it on the ones it names.
     """
     grains = timesift_set(x)
     units = grains.units
@@ -112,7 +115,7 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
         # them, and the representation it searches over is cut to them before any fitting happens.
         lad = grain_ladder(_subset(grains, train), y_train, learners,
                             folds=split(y_train, seed + i), response=response, metric=metric,
-                            verbose=False)
+                            control=control, verbose=False)
         grid = _join_candidates(candidates, lad.summary(), int(k))
         if not any(np.isfinite(g["score"]) for g in grid):
             raise ValueError(f"no candidate scored inside the training data of fold {k}. Widen "
@@ -120,7 +123,7 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
         won = _first_best(grid)
 
         fit = fit_learner(learners[won["learner"]], grains[won["grain"]].take_units(train),
-                          y_train, response=response)
+                          y_train, response=response, control=control)
         held = grains[won["grain"]].take_units(test)
         predicted = fit.predict(held)
         for a, unit in enumerate(held.units):

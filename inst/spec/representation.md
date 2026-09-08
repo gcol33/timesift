@@ -605,6 +605,8 @@ call site.
 - `grain_ladder()` and `select_grain()` left without a fold map build one with the defaults of
   `fold_map()`. The two languages draw different maps from the same seed, so where both must see
   one split, write it and read it back as the section above describes.
+- `grain_ladder()` and `select_grain()` take a `control` as a run does, and hand it to every
+  learner that declares one. A selection hands the same one to the inner search and to the refit.
 - Held-out predictions are placed by unit and by variable, never by position.
 - A setting given at fit time overrides the one the learner carries, and a setting the learner does
   not have is refused rather than ignored.

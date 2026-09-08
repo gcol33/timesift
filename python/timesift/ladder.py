@@ -72,7 +72,7 @@ class Ladder:
 
 
 def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence", metric=None,
-                  keep_fits: bool = False, verbose: bool = True) -> Ladder:
+                  control=None, keep_fits: bool = False, verbose: bool = True) -> Ladder:
     """Cross-validate every learner at every grain, on one fold map and one mask of cells.
 
     Every arm sees identical splits and is restricted to identical cells, so the arms' means share
@@ -80,6 +80,9 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
 
     ``folds`` left at ``None`` builds one with the defaults of ``fold_map``. Where both languages
     must see the same splits, build it once and read it in the other with ``read_folds``.
+
+    ``control`` is the ``train_control`` every neural learner of the ladder trains under; a learner
+    carrying settings of its own overrides it on the ones it names.
     """
     grains = timesift_set(x)
     units = grains.units
@@ -107,7 +110,7 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
                 train = np.flatnonzero(f != k)
                 held = m.take_units(np.flatnonzero(f == k))
                 fit = fit_learner(ln, m.take_units(train), y.take_units(train),
-                                  response=response)
+                                  response=response, control=control)
                 predicted = fit.predict(held)
                 # Keyed on both axes rather than positional: a learner returning its variables in
                 # another order would otherwise scramble which prediction belongs to which one,

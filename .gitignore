@@ -24,3 +24,7 @@ benchmark-*.log
 _skbuild/
 .cmake/
 CMakeUserPresets.json
+
+# An in-place build drops the compiled core beside the sources.
+python/timesift/_core*.pyd
+python/timesift/_core*.so

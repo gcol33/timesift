@@ -36,6 +36,9 @@
 #'   response's own. The estimate is reported under every registered metric whichever this is.
 #' @param compare A [grain_ladder()] result on the same units, response and outer fold map, whose
 #'   arms the selected procedure is contrasted against cell by cell. `NULL` for no contrast.
+#' @param control [train_control()], the training settings every neural learner reads, in the
+#'   inner search and in the refit alike. A learner carrying a control of its own overrides it on
+#'   the settings that control names.
 #' @param seed Seed for the inner splits. Each outer fold splits under `seed` plus its own number,
 #'   so no two outer folds inherit the same inner partition.
 #' @param verbose Report each outer fold and what it selected as it runs.
@@ -71,7 +74,7 @@
 #' @export
 select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
                          response = "presence_absence", metric = NULL, compare = NULL,
-                         seed = 1L, verbose = TRUE) {
+                         control = train_control(), seed = 1L, verbose = TRUE) {
   set <- .as_set(x)
   units <- dimnames(set[[1L]])[[1L]]
   spec <- .responses_reg$get(response)
@@ -115,7 +118,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     # and the representation it searches over is cut to them before any fitting happens.
     lad <- grain_ladder(.subset_set(set, train), y_train, learners,
                          folds = inner_split(y_train, seed + i), response = response,
-                         metric = metric, verbose = FALSE)
+                         metric = metric, control = control, verbose = FALSE)
     grid <- .join_candidates(candidates, summary(lad), k)
     if (all(!is.finite(grid$score))) {
       stop("no candidate scored inside the training data of fold ", k,
@@ -127,7 +130,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     # the ones its chosen candidate would have made rather than a second fitting path's.
     fit <- .fit_candidate_once(learners[[grid$learner[won]]],
                                .subset_units(set[[grid$grain[won]]], train), y_train,
-                               response = response, control = NULL)
+                               response = response, control = control)
     held_out <- stats::predict(fit, .subset_units(set[[grid$grain[won]]], test))
     p[rownames(held_out), colnames(held_out)] <- held_out
 

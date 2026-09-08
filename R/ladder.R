@@ -18,6 +18,9 @@
 #' @param metric Name of a registered metric, or a function of `(y, p)`, or `NULL` for the
 #'   response head's own. Whichever it is, it travels with the fit and is what every later
 #'   rescoring reads; a function is reported as `<function>`.
+#' @param control [train_control()], the training settings every neural learner of the ladder
+#'   reads. A learner carrying a control of its own overrides it on the settings that control
+#'   names.
 #' @param keep_fits Keep every per-fold fitted model, which is what lets [occlusion()] read a
 #'   fitted model without refitting it.
 #' @param verbose Report each arm and each fold as it runs.
@@ -44,7 +47,8 @@
 #'
 #' @export
 grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_absence",
-                          metric = NULL, keep_fits = FALSE, verbose = TRUE) {
+                          metric = NULL, control = train_control(), keep_fits = FALSE,
+                          verbose = TRUE) {
   set <- .as_set(x)
   units <- dimnames(set[[1L]])[[1L]]
   spec <- .responses_reg$get(response)
@@ -71,7 +75,7 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
       # One fold loop for the package: a learner declaring one model per response is fitted that
       # way whichever door it came in by, and the ladder and a whole run cannot drift apart on
       # what a declared field means.
-      run <- .fit_candidate(learners[[ln]], set[[w]], y, f, levels, response, control = NULL,
+      run <- .fit_candidate(learners[[ln]], set[[w]], y, f, levels, response, control = control,
                             keep_fits = keep_fits, verbose = verbose)
       preds[[arm]] <- run$oof
       for (k in names(run$fits)) {

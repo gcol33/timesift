@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from timesift._stats import norm_ppf, wilcoxon_p
+from timesift.control import CONTROL_SETTINGS, as_control, train_control
 from timesift.ladder import (grain_ladder, paired_contrast, per_variable, tss_inflation,
                              variable_means)
 from timesift.learners import Learner, fit_learner
@@ -219,3 +220,38 @@ def constant_learner():
     return Learner(name="constant",
                    fit=lambda x, y, **_: dict(level=y.mean(axis=0)),
                    predict=lambda model, x: np.tile(model["level"], (x.values.shape[0], 1)))
+
+
+def control_learner(seen, **own):
+    """A learner that records the control it was trained under, so a test can read it back.
+
+    Settings the learner carries are applied on top of the run's control by the fitter itself,
+    which is what the encoders do, so both halves of the resolution are visible here.
+    """
+    def fit(x, y, *, control, **passed):
+        seen.append(as_control(control).override(
+            {k: v for k, v in passed.items() if k in CONTROL_SETTINGS}))
+        return dict(level=y.mean(axis=0))
+
+    return Learner(name="trained", fit=fit, params=dict(**own), multi="joint",
+                   predict=lambda model, x: np.tile(model["level"], (x.values.shape[0], 1)))
+
+
+def test_a_ladder_hands_its_control_to_every_learner_that_declares_one():
+    readings, y, _ = sim(n_unit=30, days=40, noise=1.0)
+    x = grain_matrix(readings, "id", "time", "value", grain=["week", "month"])
+    seen = []
+    grain_ladder(x, y, [control_learner(seen)], folds=fold_map(y, v=2, seed=4),
+                 control=train_control(epochs=3), verbose=False)
+    assert len(seen) == 2 * 2
+    assert {c.epochs for c in seen} == {3}
+
+
+def test_a_learner_carrying_a_setting_overrides_the_ladders_control_on_it():
+    readings, y, _ = sim(n_unit=30, days=40, noise=1.0)
+    x = grain_matrix(readings, "id", "time", "value", grain="week")
+    seen = []
+    grain_ladder(x, y, [control_learner(seen, epochs=11)], folds=fold_map(y, v=2, seed=4),
+                 control=train_control(epochs=3, batch_size=8), verbose=False)
+    assert {c.epochs for c in seen} == {11}
+    assert {c.batch_size for c in seen} == {8}

@@ -7,6 +7,7 @@ import pytest
 
 from timesift import (Learner, Response, fold_map, metrics, paired_contrast, select_grain,
                        tss_inflation, grain_ladder, grain_matrix)
+from timesift.control import train_control
 from timesift.ladder import per_variable
 from timesift.learners import _logistic
 from timesift.selection import SELECTED_ARM, _inner_splitter
@@ -236,3 +237,21 @@ def test_a_contrast_needs_both_arms_to_have_scored_a_shared_cell():
     lad = grain_ladder(x, y, linear_learner(), folds=folds, verbose=False)
     with pytest.raises(KeyError, match="no arm"):
         paired_contrast(lad, SELECTED_ARM, "week|linear")
+
+
+def test_a_selection_hands_its_control_to_the_inner_search_and_to_the_refit_alike():
+    x, y, folds = fixture(n_unit=40, days=40, v=2)
+    seen = []
+
+    def fit(x, y, *, control, **_):
+        seen.append(control)
+        return dict(rate=y.mean(axis=0))
+
+    trained = Learner(name="trained", fit=fit, multi="joint",
+                      predict=lambda model, x: np.tile(model["rate"], (x.values.shape[0], 1)))
+    select_grain(x, y, [trained], folds=folds, inner=2,
+                 control=train_control(epochs=7), verbose=False)
+    # Two outer folds, each running an inner ladder over three grains at two inner folds and one
+    # refit: nothing in that chain may reach a learner without the control the caller gave.
+    assert len(seen) == 2 * (3 * 2 + 1)
+    assert {c.epochs for c in seen} == {7}

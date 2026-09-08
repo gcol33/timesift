@@ -14,6 +14,7 @@ select_grain(
   response = "presence_absence",
   metric = NULL,
   compare = NULL,
+  control = train_control(),
   seed = 1L,
   verbose = TRUE
 )
@@ -42,6 +43,10 @@ response's own. The estimate is reported under every registered metric whichever
 
 \item{compare}{A \code{\link[=grain_ladder]{grain_ladder()}} result on the same units, response and outer fold map, whose
 arms the selected procedure is contrasted against cell by cell. \code{NULL} for no contrast.}
+
+\item{control}{\code{\link[=train_control]{train_control()}}, the training settings every neural learner reads, in the
+inner search and in the refit alike. A learner carrying a control of its own overrides it on
+the settings that control names.}
 
 \item{seed}{Seed for the inner splits. Each outer fold splits under \code{seed} plus its own number,
 so no two outer folds inherit the same inner partition.}

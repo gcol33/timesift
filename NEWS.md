@@ -26,6 +26,10 @@
 
 ## Fitting
 
+* `grain_ladder()` and `select_grain()` take a `control`, so the training settings of a ladder are
+  given once for the run rather than restated on every neural learner in it. A selection hands the
+  same control to the inner search and to the refit, and a learner carrying settings of its own
+  still overrides it on the ones it names.
 * A response is fitted under a seed of its own, taken from its name. A learner that covers the
   responses one at a time is handed one column per call, so a seed spent from one shared stream
   made a response's fit depend on which responses were fitted before it, and a seed read off the

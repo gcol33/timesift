@@ -12,6 +12,7 @@ grain_ladder(
   folds = NULL,
   response = "presence_absence",
   metric = NULL,
+  control = train_control(),
   keep_fits = FALSE,
   verbose = TRUE
 )
@@ -34,6 +35,10 @@ of \code{\link[=fold_map]{fold_map()}} when not given.}
 \item{metric}{Name of a registered metric, or a function of \verb{(y, p)}, or \code{NULL} for the
 response head's own. Whichever it is, it travels with the fit and is what every later
 rescoring reads; a function is reported as \verb{<function>}.}
+
+\item{control}{\code{\link[=train_control]{train_control()}}, the training settings every neural learner of the ladder
+reads. A learner carrying a control of its own overrides it on the settings that control
+names.}
 
 \item{keep_fits}{Keep every per-fold fitted model, which is what lets \code{\link[=occlusion]{occlusion()}} read a
 fitted model without refitting it.}

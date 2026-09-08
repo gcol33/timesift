@@ -269,3 +269,26 @@ test_that("with no signal at any grain the procedure scores at the design's own 
   own <- sel$estimate$score[sel$estimate$metric == "tss"]
   expect_lt(own, floor + 0.12)
 })
+
+test_that("a selection hands its control to the inner search and to the refit alike", {
+  f <- selection_fixture(v = 2L)
+  seen <- new.env(parent = emptyenv())
+  seen$epochs <- integer()
+  trained <- learner(
+    "trained",
+    fit = function(x, y, control, ...) {
+      seen$epochs <- c(seen$epochs, control$epochs)
+      list(coef = colMeans(y))
+    },
+    predict = function(model, x) {
+      outer(rank(apply(x[, , 1, drop = FALSE], 1L, mean)) / dim(x)[1L], model$coef,
+            function(a, b) a)
+    },
+    multi = "joint")
+  suppressWarnings(select_grain(f$x, f$y, trained, folds = f$folds, inner = 2L,
+                                control = train_control(epochs = 7L), verbose = FALSE))
+  # Two outer folds, each running an inner ladder over three grains at two inner folds and one
+  # refit: nothing in that chain may reach a learner without the control the caller gave.
+  expect_equal(length(seen$epochs), 2L * (3L * 2L + 1L))
+  expect_true(all(seen$epochs == 7L))
+})

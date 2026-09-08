@@ -130,3 +130,45 @@ test_that("a ladder on which nothing was scorable reports no level rather than f
   expect_named(out, c("learner", "grain", "score", "n_variable", "best"))
   expect_output(print(lad), "timesift ladder")
 })
+
+test_that("a ladder hands its control to every learner that declares one", {
+  f <- ladder_fixture(v = 2L)
+  seen <- new.env(parent = emptyenv())
+  seen$epochs <- integer()
+  trained <- learner(
+    "trained",
+    fit = function(x, y, control, ...) {
+      seen$epochs <- c(seen$epochs, control$epochs)
+      list(rate = colMeans(y))
+    },
+    predict = function(model, x) {
+      outer(rank(apply(x[, , 1, drop = FALSE], 1L, mean)) / dim(x)[1L], model$rate,
+            function(a, b) a)
+    },
+    control = train_control(batch_size = 8L))
+  grain_ladder(f$x, f$y, trained, folds = f$folds, control = train_control(epochs = 3L),
+                verbose = FALSE)
+  expect_true(length(seen$epochs) > 0L)
+  expect_true(all(seen$epochs == 3L))
+})
+
+test_that("a learner's own control overrides the ladder's on the settings it names", {
+  f <- ladder_fixture(v = 2L)
+  seen <- new.env(parent = emptyenv())
+  seen$got <- list()
+  trained <- learner(
+    "trained",
+    fit = function(x, y, control, ...) {
+      seen$got[[length(seen$got) + 1L]] <- control
+      list(rate = colMeans(y))
+    },
+    predict = function(model, x) {
+      outer(rank(apply(x[, , 1, drop = FALSE], 1L, mean)) / dim(x)[1L], model$rate,
+            function(a, b) a)
+    },
+    control = train_control(epochs = 11L))
+  grain_ladder(f$x, f$y, trained, folds = f$folds,
+                control = train_control(epochs = 3L, batch_size = 8L), verbose = FALSE)
+  expect_true(all(vapply(seen$got, function(c) c$epochs, integer(1L)) == 11L))
+  expect_true(all(vapply(seen$got, function(c) c$batch_size, integer(1L)) == 8L))
+})
