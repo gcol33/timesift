@@ -47,12 +47,18 @@ per_cell <- lapply(split(rows, rows$cell_id), function(d) {
   nested_true <- bench_by_replicate(d, "nested", "true")
   single_rep <- bench_by_replicate(d, "single_loop", "reported")
 
-  covered <- (bench_by_replicate(d, "nested", "reported_lower") <= nested_true) &
-    (bench_by_replicate(d, "nested", "reported_upper") >= nested_true)
+  # Every quantity below pairs two arms of the cell, and each pairing is made on the replicate the
+  # two rows were written under rather than on the order they came back in.
+  covered <- bench_align(
+    bench_paired(d, c("nested", "reported_lower"), c("nested", "true"), `<=`),
+    bench_paired(d, c("nested", "reported_upper"), c("nested", "true"), `>=`),
+    `&`, paste(d$cell_id[1L], c("the lower interval", "the upper interval")))
   cov <- bench_proportion(covered)
-  nested_bias <- nested_rep - nested_true
-  single_bias <- single_rep - bench_by_replicate(d, "single_loop", "true")
-  regret <- bench_by_replicate(d, "oracle", "true") - nested_true
+  nested_bias <- bench_paired(d, c("nested", "reported"), c("nested", "true"))
+  single_bias <- bench_paired(d, c("single_loop", "reported"), c("single_loop", "true"))
+  regret <- bench_paired(d, c("oracle", "true"), c("nested", "true"))
+  optimism <- bench_align(single_bias, nested_bias, `-`,
+                          paste(d$cell_id[1L], c("the single-loop bias", "the nested bias")))
 
   data.frame(
     cell_id = d$cell_id[1L], scale = d$scale[1L], block = d$block[1L],
@@ -66,8 +72,7 @@ per_cell <- lapply(split(rows, rows$cell_id), function(d) {
     nested_bias = mean(nested_bias), nested_bias_mc = bench_margin(nested_bias),
     single_reported = mean(single_rep), single_bias = mean(single_bias),
     single_bias_mc = bench_margin(single_bias),
-    optimism_gap = mean(single_bias) - mean(nested_bias),
-    optimism_gap_mc = bench_margin(single_bias - nested_bias),
+    optimism_gap = mean(optimism), optimism_gap_mc = bench_margin(optimism),
     coverage = cov[["p"]], coverage_mc = cov[["mc"]],
     regret = mean(regret), regret_mc = bench_margin(regret),
     secs = mean(tapply(bench_pick(d, "stage", "secs", NA)$value,

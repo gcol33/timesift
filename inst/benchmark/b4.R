@@ -74,6 +74,17 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
   stamp
 }
 
+# Which build of the package the refits came from. Two libraries can declare the same version, so
+# the path a package was loaded from and the date it was built are what tell them apart, and a
+# replay whose numbers disagree with the run is most often reading a different one.
+.b4_build <- function() {
+  lib <- tryCatch(dirname(find.package("timesift")), error = function(e) NA_character_)
+  built <- tryCatch(utils::packageDescription("timesift")$Built, error = function(e) NA_character_)
+  parts <- if (is.na(built)) character() else strsplit(built, "; ", fixed = TRUE)[[1L]]
+  paste0("timesift ", utils::packageVersion("timesift"), " from ", lib,
+         if (length(parts) >= 3L) paste0(", built ", parts[3L]) else "")
+}
+
 .b4_replay <- function(path) {
   d <- utils::read.csv(gzfile(path), stringsAsFactors = FALSE)
   stamp <- .b4_stamp(d)
@@ -148,7 +159,9 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
     stop("replicate ", stamp$replicate, " did not replay: the stored fold areas are ",
          paste(format(stored$value, digits = 15), collapse = ", "), " and the refits give ",
          paste(format(auc_replayed, digits = 15), collapse = ", "), " (largest gap ",
-         format(max(gap), digits = 3), " > ", tol, ").", call. = FALSE)
+         format(max(gap), digits = 3), " > ", tol, "). The run was fitted at ",
+         substr(as.character(stamp$pkg_commit), 1L, 12L), " and these refits come from ",
+         .b4_build(), ".", call. = FALSE)
   }
 
   # Every fold's units carry a held-out probability now, so a cut can be learned on the folds a

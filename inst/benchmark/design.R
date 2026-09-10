@@ -302,6 +302,32 @@ bench_by_replicate <- function(d, arm, quantity, metric = BENCH$metric) {
   stats::setNames(picked$value[order(picked$replicate)], sort(picked$replicate))
 }
 
+# Two quantities of one cell, combined replicate by replicate. Arithmetic on two named vectors
+# pairs them by position and drops the second one's names, so two arms holding different replicates
+# would be differenced across replicates without a word: equal lengths give a wrong answer and
+# unequal lengths that divide give a recycled one. The keys are held to each other here, and every
+# paired quantity the summary reports comes through this.
+bench_align <- function(left, right, op = `-`, what = c("the first", "the second")) {
+  if (!identical(names(left), names(right))) {
+    only <- function(a, b) {
+      missing <- setdiff(names(a), names(b))
+      if (!length(missing)) "none" else paste(missing, collapse = ",")
+    }
+    stop(what[1L], " and ", what[2L], " are not the same replicates: ", what[1L], " alone holds {",
+         only(left, right), "} and ", what[2L], " alone holds {", only(right, left),
+         "}. Rerun the cell rather than pairing them.", call. = FALSE)
+  }
+  stats::setNames(op(unname(left), unname(right)), names(left))
+}
+
+# The same, for the two quantities named by their arm: the pair the summary asks for most.
+bench_paired <- function(d, left, right, op = `-`, metric = BENCH$metric) {
+  label <- function(pair) paste0(d$cell_id[1L], " ", pair[1L], "/", pair[2L])
+  bench_align(bench_by_replicate(d, left[1L], left[2L], metric),
+              bench_by_replicate(d, right[1L], right[2L], metric),
+              op, c(label(left), label(right)))
+}
+
 bench_margin <- function(v) 1.96 * stats::sd(v) / sqrt(length(v))
 
 bench_proportion <- function(hit) {
