@@ -99,7 +99,8 @@ which is continuous across the turn of the year where the fraction itself is not
 
 
 <dl><dt id="arg-x">x<a class="anchor" aria-label="anchor" href="#arg-x"></a></dt>
-<dd><p>A <code><a href="grain_matrix.html">grain_matrix()</a></code> result.</p></dd>
+<dd><p>A <code><a href="grain_matrix.html">grain_matrix()</a></code> result. A <code><a href="lookback_matrix.html">lookback_matrix()</a></code> result has no place in the calendar
+and is refused.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -111,6 +112,9 @@ identical across units. Combine it with the readings using <code><a href="bind_c
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>They are the time index of each bin, not a summary of the readings, so adding them introduces no
 hand-built thermal feature: whatever a model does with them it could have done with a calendar.</p>
+<p>The position is read at the midpoint of the record each bin holds, on the Gregorian calendar in
+UTC, so a bin the record only partly covers sits at the phase it was actually measured over.
+<code>inst/spec/representation.md</code> is the normative description.</p>
     </div>
 
     <div class="section level2">

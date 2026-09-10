@@ -19,7 +19,9 @@ calendar_channels(x)
 
   A
   [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
-  result.
+  result. A
+  [`lookback_matrix()`](https://gillescolling.com/timesift/reference/lookback_matrix.md)
+  result has no place in the calendar and is refused.
 
 ## Value
 
@@ -32,6 +34,11 @@ An array of the same units and bins with two channels, `year_sin` and
 They are the time index of each bin, not a summary of the readings, so
 adding them introduces no hand-built thermal feature: whatever a model
 does with them it could have done with a calendar.
+
+The position is read at the midpoint of the record each bin holds, on
+the Gregorian calendar in UTC, so a bin the record only partly covers
+sits at the phase it was actually measured over.
+`inst/spec/representation.md` is the normative description.
 
 ## Examples
 

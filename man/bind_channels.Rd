@@ -7,10 +7,13 @@
 bind_channels(...)
 }
 \arguments{
-\item{...}{Two or more arrays of shape \verb{[unit, bin, channel]}, agreeing on their units and bins.}
+\item{...}{Two or more representations of shape \verb{[unit, bin, channel]}, agreeing on their units
+and bins.}
 }
 \value{
-One array carrying every channel, with the attributes of the first argument.
+One array carrying every channel, in the order the arguments are given and, inside each
+argument, in its own channel order. The attributes are the first argument's, with \code{stats} the
+joined names.
 }
 \description{
 Joins representations of the same units and bins into one array, in the order given. It is how

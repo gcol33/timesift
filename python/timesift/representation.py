@@ -422,32 +422,47 @@ def _format_duration(x: int) -> str:
 
 
 def calendar_channels(x: TimesiftMatrix) -> TimesiftMatrix:
-    """Where in the year each bin sits, as the sine and cosine of its fractional position."""
-    mid = x.bin_start + (x.bin_end - x.bin_start) / 2
-    year = mid.astype("datetime64[Y]")
-    length = (year + 1).astype("datetime64[s]").astype(np.int64) \
-        - year.astype("datetime64[s]").astype(np.int64)
-    frac = (mid.astype("datetime64[s]").astype(np.int64)
-            - year.astype("datetime64[s]").astype(np.int64)) / length
+    """Where in the year each bin sits, as the sine and cosine of its fractional position.
+
+    The position is read at the midpoint of the record each bin holds, on the Gregorian calendar
+    in UTC. ``inst/spec/representation.md`` is the normative description.
+    """
+    if not isinstance(x, TimesiftMatrix):
+        raise ValueError(f"expected a grain_matrix() result, got {type(x).__name__}.")
+    if x.bin_start is None:
+        raise ValueError("a lookback's bins are placed relative to a target rather than on the "
+                         "calendar, so they have no position in the year. calendar_channels() "
+                         "reads a grain_matrix().")
+    year_sin, year_cos = _core.year_phase(
+        np.ascontiguousarray(x.bin_start.astype("datetime64[s]").astype(np.int64)),
+        np.ascontiguousarray(x.bin_end.astype("datetime64[s]").astype(np.int64)))
 
     n_u = x.values.shape[0]
-    out = np.empty((n_u, len(frac), 2), dtype=np.float64)
-    out[:, :, 0] = np.sin(2 * np.pi * frac)
-    out[:, :, 1] = np.cos(2 * np.pi * frac)
+    out = np.empty((n_u, len(year_sin), 2), dtype=np.float64)
+    out[:, :, 0] = year_sin
+    out[:, :, 1] = year_cos
     return replace(x, values=out, stats=("year_sin", "year_cos"))
 
 
 def bind_channels(*parts: TimesiftMatrix) -> TimesiftMatrix:
-    """Put the channels of several representations of the same units and bins side by side."""
+    """Put the channels of several representations of the same units and bins side by side.
+
+    The channels come back in the order the arguments are given and, inside each argument, in its
+    own channel order. Everything else is the first argument's.
+    """
     if len(parts) < 2:
-        raise ValueError("bind_channels() needs at least two representations")
+        raise ValueError("`bind_channels()` needs at least two representations.")
     first = parts[0]
-    for k, p in enumerate(parts[1:], start=1):
+    for k, p in enumerate(parts, start=1):
+        if not isinstance(p, TimesiftMatrix):
+            raise ValueError(f"argument {k} is a {type(p).__name__}, not a representation.")
         if p.units != first.units or p.bins != first.bins:
-            raise ValueError(f"argument {k} covers different units or bins from the first")
+            raise ValueError(f"argument {k} covers different units or bins from the first.")
     names = tuple(s for p in parts for s in p.stats)
     if len(set(names)) != len(names):
-        raise ValueError("two representations carry a channel of the same name")
+        twice = sorted({s for s in names if names.count(s) > 1})
+        raise ValueError("two representations carry a channel of the same name: "
+                         + ", ".join(twice) + ".")
     return replace(first, values=np.concatenate([p.values for p in parts], axis=2), stats=names)
 
 

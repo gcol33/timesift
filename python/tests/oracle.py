@@ -290,3 +290,17 @@ def oracle_grain_matrix(data, id, time, value, *, grain="day", stats=("mean",),
             "bin_end": oracle_bin_extent(when, bin_ix, n_b),
             "bin_n": count.reshape(n_b, n_u).T,
             "bin_partial": oracle_bin_partial(clock, when, bins, grain, ys)}
+
+
+def oracle_year_fraction(bin_start: np.ndarray, bin_end: np.ndarray) -> np.ndarray:
+    """Where in the year a bin sits, from the instants a representation carries: the midpoint of
+    the record the bin holds, floored to the second it began on, over the calendar year in UTC
+    that midpoint falls in. It reads the year by truncating a datetime64, where the core counts
+    days from the civil epoch, so the two arrive by different routes."""
+    opens = bin_start.astype("datetime64[s]").astype(np.int64)
+    closes = bin_end.astype("datetime64[s]").astype(np.int64)
+    mid = opens + (closes - opens) // 2
+    year = mid.astype("datetime64[s]").astype("datetime64[Y]")
+    first = year.astype("datetime64[s]").astype(np.int64)
+    length = (year + 1).astype("datetime64[s]").astype(np.int64) - first
+    return (mid - first) / length

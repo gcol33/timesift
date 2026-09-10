@@ -135,6 +135,30 @@
 
 ### The representation boundary
 
+- [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
+  reads the shared core. The year fraction, the midpoint of the record a
+  bin holds and the calendar the year is read on used to be written once
+  per language, and the two were written differently at the two points
+  that decide the number: R took the phase through
+  [`sinpi()`](https://rdrr.io/r/base/Trig.html) and the midpoint as a
+  double, Python took `sin(2 * pi * x)` and truncated the midpoint on
+  `datetime64`. `inst/spec/representation.md` now defines all of it, and
+  `channels_digests.csv` and `channels_guards.csv` pin it: what is
+  digested is the year fraction, which is arithmetic on the calendar,
+  with a stated tolerance of 1e-12 on the sine and the cosine, which are
+  the platform’s library. Both suites read the fixtures.
+
+- [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
+  refuses a lookback, whose bins are placed relative to a target rather
+  than on the calendar and have no position in the year. It used to
+  reach for a `bin_start` that is not there.
+
+- [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md)
+  reads every argument as a representation rather than only the first,
+  and both languages number the arguments from one and raise the same
+  message. A bare array reached the R side and came back carrying
+  attributes describing a binning it had never been through.
+
 - A supplied calendar is checked before its bins are read as bins: a bin
   begins at or before every reading it holds, and a bin’s readings are a
   stretch of the record. A calendar shifted by one boundary, and one

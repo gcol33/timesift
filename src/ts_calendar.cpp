@@ -1,6 +1,7 @@
 #include "ts_core.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace timesift {
@@ -196,6 +197,40 @@ void bin_nexts(const seconds* bin_start, std::size_t n, Grain w, YearStart ys, s
       default:
         throw Error("a supplied calendar declares its own bins; bin_nexts() does not apply.");
     }
+  }
+}
+
+// Where in the year a bin sits. The midpoint of the record the bin holds is read on the Gregorian
+// calendar in UTC, and its position in the year that midpoint falls in becomes an angle: a bin is
+// a span of the calendar, and the turn of the year is where the fraction itself jumps and the sine
+// and the cosine do not.
+//
+// The instants are read in UTC rather than on the clock the bins were placed on, because the phase
+// is a place on the orbit rather than a reading of a clock, and a zone moves it by its offset:
+// under a day on a cycle of a year, the same shift for every bin of the record.
+void year_fraction(const seconds* bin_start, const seconds* bin_end, std::size_t n, double* out) {
+  for (std::size_t i = 0; i < n; ++i) {
+    // A bin spanning an odd number of seconds has its midpoint on a half second, and the second it
+    // began is the one it is read at. Every calendar grain spans whole hours; a supplied calendar
+    // need not.
+    const seconds mid = bin_start[i] + floor_div(bin_end[i] - bin_start[i], 2);
+    std::int64_t y;
+    unsigned m, d;
+    civil_from_days(floor_div(mid, kDay), y, m, d);
+    const seconds opens = days_from_civil(y, 1, 1) * kDay;
+    const seconds length = days_from_civil(y + 1, 1, 1) * kDay - opens;
+    out[i] = static_cast<double>(mid - opens) / static_cast<double>(length);
+  }
+}
+
+void year_phase(const seconds* bin_start, const seconds* bin_end, std::size_t n, double* year_sin,
+                double* year_cos) {
+  constexpr double kTwoPi = 6.283185307179586476925286766559;
+  std::vector<double> frac(n);
+  year_fraction(bin_start, bin_end, n, frac.data());
+  for (std::size_t i = 0; i < n; ++i) {
+    year_sin[i] = std::sin(kTwoPi * frac[i]);
+    year_cos[i] = std::cos(kTwoPi * frac[i]);
   }
 }
 

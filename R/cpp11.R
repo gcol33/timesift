@@ -19,3 +19,11 @@ ts_bin_starts_ <- function(local, grain, year_month, year_day) {
 ts_bin_nexts_ <- function(bins, grain, year_month, year_day) {
   .Call(`_timesift_ts_bin_nexts_`, bins, grain, year_month, year_day)
 }
+
+ts_year_fraction_ <- function(bin_start, bin_end) {
+  .Call(`_timesift_ts_year_fraction_`, bin_start, bin_end)
+}
+
+ts_year_phase_ <- function(bin_start, bin_end) {
+  .Call(`_timesift_ts_year_phase_`, bin_start, bin_end)
+}

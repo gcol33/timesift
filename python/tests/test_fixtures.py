@@ -14,7 +14,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from timesift import Response, coverage, digest_array, scorable_cells, grain_matrix
+from timesift import (Response, bind_channels, calendar_channels, coverage, digest_array,
+                      grain_matrix, lookback_matrix, scorable_cells)
+from timesift import _core
 
 FIXTURES = Path(__file__).resolve().parents[2] / "inst" / "spec" / "fixtures"
 
@@ -39,6 +41,11 @@ def read_edges(name):
     with (FIXTURES / "seasons.csv").open(newline="") as fh:
         rows = [r["edge"].replace("Z", "") for r in csv.DictReader(fh) if r["series"] == name]
     return np.asarray(rows, dtype="datetime64[s]")
+
+
+def read_channels():
+    with (FIXTURES / "channels_digests.csv").open(newline="") as fh:
+        return list(csv.DictReader(fh))
 
 
 def read_coverage():
@@ -324,3 +331,71 @@ def test_every_zoned_digest_has_the_oracle_as_its_independent_witness():
         label = " ".join(r[k] for k in ("series", "grain", "tz", "year_start", "partial", "stat"))
         assert values.shape[1] == int(r["n_bin"]), label
         assert digest_array(values) == r["digest"], label
+
+
+def _seconds(x):
+    return np.ascontiguousarray(x.astype("datetime64[s]").astype(np.int64))
+
+
+# The channels a learner reads beside the readings. What is pinned is the fraction of the year each
+# bin sits at, which is arithmetic on the calendar; the sine and the cosine of it are the
+# platform's library, and the contract states a tolerance on them rather than hashing them.
+@pytest.mark.parametrize(
+    "row", read_channels(),
+    ids=lambda r: (f"{r['series']}-{r['grain']}-{r['tz'].replace('/', '_')}"
+                   f"-{r['year_start']}-{r['partial']}-{r['kind']}"))
+def test_the_calendar_channels_match_the_fraction_the_r_side_reads(series, row):
+    x = grain_matrix(series[row["series"]], "id", "time", "value",
+                      grain=binning(row["series"], row["grain"]),
+                      stats=row["stat"].split("+"), year_start=row["year_start"],
+                      partial=row["partial"], tz=row["tz"])
+    got = bind_channels(x, calendar_channels(x)) if row["kind"] == "bound" \
+        else calendar_channels(x)
+
+    assert got.values.shape[0] == int(row["n_unit"])
+    assert got.values.shape[1] == int(row["n_bin"])
+    assert "+".join(got.stats) == row["channels"]
+    assert got.bins[0] == row["first_bin"]
+    assert got.bins[-1] == row["last_bin"]
+
+    from oracle import oracle_year_fraction
+
+    frac = _core.year_fraction(_seconds(got.bin_start), _seconds(got.bin_end))
+    assert digest_array(frac) == row["digest"]
+    assert np.array_equal(frac, oracle_year_fraction(got.bin_start, got.bin_end))
+
+    tolerance = float(row["tolerance"])
+    assert np.max(np.abs(got.channel("year_sin")[0] - np.sin(2 * np.pi * frac))) < tolerance
+    assert np.max(np.abs(got.channel("year_cos")[0] - np.cos(2 * np.pi * frac))) < tolerance
+    # The calendar is where a bin sits, not something a unit has, so every unit reads the same two
+    # channels; a bound array carries its readings unchanged beside them.
+    for name in ("year_sin", "year_cos"):
+        assert np.array_equal(got.channel(name), np.tile(got.channel(name)[0],
+                                                         (got.values.shape[0], 1)))
+    if row["kind"] == "bound":
+        for name in x.stats:
+            assert np.array_equal(got.channel(name), x.channel(name))
+        assert np.array_equal(got.bin_start, x.bin_start)
+        assert np.array_equal(got.bin_n, x.bin_n)
+        assert np.array_equal(got.bin_partial, x.bin_partial)
+
+
+@pytest.mark.parametrize("row", read_guards("channels_guards.csv"),
+                          ids=lambda r: r["case"])
+def test_what_the_two_channel_functions_refuse_is_what_the_r_side_refuses(series, row):
+    record = series["aligned"]
+    x = grain_matrix(record, "id", "time", "value", grain="week")
+    other = grain_matrix(record, "id", "time", "value", grain="month")
+    at = {"id": sorted(set(record["id"])),
+          "at": [max(record["time"])] * len(set(record["id"]))}
+    back = lookback_matrix(record, "id", "time", "value", at=at, span="30 days")
+    case = {
+        "lookback": lambda: calendar_channels(back),
+        "not_a_representation": lambda: bind_channels(x, 1),
+        "one_argument": lambda: bind_channels(x),
+        "duplicate": lambda: bind_channels(x, x),
+        "different_bins": lambda: bind_channels(x, other),
+    }[row["case"]]
+    with pytest.raises(ValueError) as raised:
+        case()
+    assert row["message"] in str(raised.value)

@@ -15,13 +15,14 @@ bind_channels(...)
 
 - ...:
 
-  Two or more arrays of shape `[unit, bin, channel]`, agreeing on their
-  units and bins.
+  Two or more representations of shape `[unit, bin, channel]`, agreeing
+  on their units and bins.
 
 ## Value
 
-One array carrying every channel, with the attributes of the first
-argument.
+One array carrying every channel, in the order the arguments are given
+and, inside each argument, in its own channel order. The attributes are
+the first argument's, with `stats` the joined names.
 
 ## Examples
 

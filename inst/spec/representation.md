@@ -371,6 +371,73 @@ than a verdict. R carries no such attribute and Python carries them as `None`; a
 not-a-time beside a column of `FALSE` would read as an answer to a question the reduction does not
 ask.
 
+## The channels
+
+An array of readings is not the only thing a learner is handed. Two more reductions put a channel
+beside those readings, and both return an array a model reads, so both are normative here.
+
+### Where a bin sits in the year
+
+`calendar_channels()` reads a representation and returns an array of the same units and bins with
+two channels, `year_sin` and `year_cos`, identical across units. An encoder that ends in global
+pooling discards when in the record a thermal event happened, so the position of a bin in the year
+is given to it as an input or it is not used at all; it is the time index of each bin rather than a
+summary of the readings, and a sine and a cosine rather than the fraction itself because the two
+are continuous across the turn of the year where the fraction jumps.
+
+For each bin, with `bin_start` and `bin_end` the instants the representation carries:
+
+    mid  = bin_start + floor((bin_end - bin_start) / 2)
+    y    = the calendar year mid falls in, on the proleptic Gregorian calendar in UTC
+    frac = (mid - first instant of y) / (length of y in seconds)
+
+    year_sin = sin(2 pi frac)
+    year_cos = cos(2 pi frac)
+
+Four things in that are decisions rather than consequences.
+
+The position is read at the **midpoint of the record the bin holds** -- `bin_end` is the last
+reading assigned to the bin, not the end of its calendar span -- so a bin the record only partly
+covers sits at the phase it was actually measured over rather than at the phase of a whole one.
+
+A bin spanning an **odd number of seconds** has its midpoint on a half second, and the second it
+began on is the one it is read at. Every named grain spans a whole number of hours, so nothing
+reaches that today; a supplied calendar need not, and the rule is written down rather than left to
+whichever language happens to round.
+
+The year is read **in UTC**, on the instants, whatever clock the bins were placed on. The phase is
+a place on the orbit rather than a reading of a clock, and a zone moves it by its offset: under a
+day on a cycle of a year, the same shift for every bin of the record.
+
+`frac` is **exact arithmetic on the calendar** and the same bits on every platform. The sine and
+the cosine of it are the platform's library, accurate to about an ulp and no further, so the
+contract pins `frac` and states a tolerance of **1e-12** on the two channels. Both suites read the
+fraction back and assert the channels against it.
+
+The result carries every attribute of its input, with `stats` replaced by `year_sin, year_cos`. A
+lookback is refused: its bins are placed relative to a target rather than on the calendar, so they
+have no position in the year, and it carries no `bin_start` to read one from.
+
+### Putting channels side by side
+
+`bind_channels()` takes two or more representations of the same units and bins and returns one
+array carrying every channel, in the order the arguments are given and, inside each argument, in
+its own channel order. It is how a temperature reading, an external product such as snow cover, and
+the calendar position of each bin reach a model as one input.
+
+The result carries the **first argument's** attributes, with `stats` the joined channel names.
+Every other argument is read for its channels alone; nothing of its own binning survives, which is
+why the units and the bins have to agree in the first place.
+
+Four inputs are refused, and the three that concern one argument name its position from one:
+
+| what | the message both raise |
+|---|---|
+| fewer than two arguments | `` `bind_channels()` needs at least two representations `` |
+| an argument that is not a representation | `argument 2 is a ..., not a representation` |
+| an argument covering other units or bins | `argument 2 covers different units or bins from the first` |
+| two arguments carrying a channel of one name | `two representations carry a channel of the same name: mean` |
+
 ## What crosses the language boundary, and what does not
 
 The binning and the reduction are one implementation: `src/ts_core.cpp` and `src/ts_calendar.cpp`,
@@ -509,6 +576,20 @@ past the record, a day-level statistic over bins shorter than a day, and one ove
 open on a day boundary -- with the substring of the message the two implementations must both
 raise.
 
+`channels_digests.csv` and `channels_guards.csv` pin the two channel functions the way the
+reductions are pinned rather than each side testing itself. A `calendar` row is a representation's
+two channels and a `bound` row is its readings with those channels beside them, over the grains
+whose bins are a day, a week, a month, a season, a year and a supplied calendar's, a record out of
+phase with all of them, both anniversaries of the two grains that count from one, both `partial`
+settings, the two zones, and the two bin widths no other row reaches: the `native` bin, whose
+start and end are one instant, and the `halfday` bin, which is narrower than a day. What
+each row digests is the year fraction, not the sine and the cosine of it, for the reason **The
+channels** gives; the row carries the tolerance the two channels are then asserted against.
+`channels_guards.csv` names each refused input and the substring of the message both
+implementations must raise, and both suites build the input from the case name: `x` at the weekly
+grain of the aligned series, `other` at its monthly one, and `back` a 30-day lookback anchored on
+its last reading.
+
 Both test suites read the series, rebuild every row and assert all of it. The shape is asserted
 before the digest, so two implementations that put the record into a different number of bins are
 reported as that rather than as an unexplained hash mismatch. A contract that carried one series
@@ -603,7 +684,7 @@ call site.
 | an already-reduced feature table | `feature_matrix()`, a one-channel array with no time axis, so a published set of aggregates can be an arm beside a grain |
 | which units reach which bins | `coverage()`, the count of readings per unit and bin over every bin the calendar tiles the record with, which is where a refused record's gaps are read off |
 | building one representation | `build_representation()` |
-| a channel added to an array | `bind_channels()`, and `calendar_channels()` for the sine and cosine of each bin's position in the year |
+| a channel added to an array | `bind_channels()`, and `calendar_channels()` for the sine and cosine of each bin's position in the year, both as **The channels** defines them |
 | the penalised learner | `elasticnet()` |
 | the forward selector | `stepwise()` |
 | the forest | `forest()` |

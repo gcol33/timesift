@@ -65,6 +65,17 @@ void bin_nexts(const seconds* bin_start, std::size_t n, Grain w, YearStart ys, s
 seconds grain_granularity(Grain w);
 seconds slot_bin_start(std::int64_t slot, Grain w, YearStart ys) noexcept;
 
+// Where in the year each bin sits, read at the midpoint of the record the bin holds. Instants
+// here, not naive local seconds: the phase is a place on the orbit, and the calendar it is read on
+// is UTC whatever clock the bins were placed on.
+//
+// The fraction is exact arithmetic on the calendar and the same bits on every platform; the sine
+// and the cosine of it are the platform's. The two are separate so the contract can pin the first
+// and state a tolerance on the second.
+void year_fraction(const seconds* bin_start, const seconds* bin_end, std::size_t n, double* out);
+void year_phase(const seconds* bin_start, const seconds* bin_end, std::size_t n, double* year_sin,
+                double* year_cos);
+
 struct Request {
   const std::int32_t* unit = nullptr;   // 0-based unit index, one per reading
   const double* value = nullptr;        // one per reading

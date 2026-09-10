@@ -260,3 +260,79 @@ test_that("every zoned digest has the oracle as its independent witness", {
     expect_identical(digest_array(values), row$digest, info = label)
   }
 })
+
+# The channels a learner reads beside the readings. What is pinned is the fraction of the year each
+# bin sits at, which is arithmetic on the calendar; the sine and the cosine of it are the
+# platform's library, and the contract states a tolerance on them rather than hashing them.
+test_that("the calendar channels match the fraction the Python side reads", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures are not in the built package")
+
+  expected <- read.csv(file.path(dir, "channels_digests.csv"), stringsAsFactors = FALSE)
+  series <- lapply(stats::setNames(nm = unique(expected$series)), fixture_series, dir = dir)
+
+  for (i in seq_len(nrow(expected))) {
+    row <- expected[i, ]
+    label <- paste(row$series, row$grain, row$tz, row$year_start, row$partial, row$kind)
+    record <- series[[row$series]]
+    attr(record$time, "tzone") <- row$tz
+    x <- grain_matrix(record, id, time, value,
+                       grain = fixture_binning(dir, row$series, row$grain),
+                       stats = strsplit(row$stat, "+", fixed = TRUE)[[1L]],
+                       year_start = row$year_start, partial = row$partial)
+    got <- if (row$kind == "bound") bind_channels(x, calendar_channels(x)) else calendar_channels(x)
+
+    start <- attr(got, "bin_start")
+    expect_equal(dim(got)[1], row$n_unit, info = label)
+    expect_equal(dim(got)[2], row$n_bin, info = label)
+    expect_identical(paste(dimnames(got)[[3L]], collapse = "+"), row$channels, info = label)
+    expect_equal(format(start[1], "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"), row$first_bin, info = label)
+    expect_equal(format(start[length(start)], "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+                 row$last_bin, info = label)
+
+    frac <- ts_year_fraction_(as.numeric(start), as.numeric(attr(got, "bin_end")))
+    expect_identical(digest_array(frac), row$digest, info = label)
+    expect_equal(frac, oracle_year_fraction(start, attr(got, "bin_end")), info = label)
+
+    expect_lt(max(abs(as.numeric(got[1, , "year_sin"]) - sin(2 * pi * frac))), row$tolerance)
+    expect_lt(max(abs(as.numeric(got[1, , "year_cos"]) - cos(2 * pi * frac))), row$tolerance)
+    # The calendar is where a bin sits, not something a unit has, so every unit reads the same two
+    # channels; a bound array carries its readings unchanged beside them.
+    for (u in seq_len(dim(got)[1])) {
+      expect_identical(got[u, , "year_sin"], got[1L, , "year_sin"], info = label)
+      expect_identical(got[u, , "year_cos"], got[1L, , "year_cos"], info = label)
+    }
+    if (row$kind == "bound") {
+      expect_identical(as.numeric(got[, , dimnames(x)[[3L]]]), as.numeric(x), info = label)
+      expect_identical(attr(got, "bin_start"), attr(x, "bin_start"), info = label)
+      expect_identical(attr(got, "bin_n"), attr(x, "bin_n"), info = label)
+      expect_identical(attr(got, "bin_partial"), attr(x, "bin_partial"), info = label)
+    }
+  }
+})
+
+test_that("what the two channel functions refuse is what the Python side refuses", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures are not in the built package")
+
+  expected <- read.csv(file.path(dir, "channels_guards.csv"), stringsAsFactors = FALSE)
+  record <- fixture_series(dir, "aligned")
+  x <- grain_matrix(record, id, time, value, grain = "week")
+  other <- grain_matrix(record, id, time, value, grain = "month")
+  at <- data.frame(id = unique(record$id), at = max(record$time), stringsAsFactors = FALSE)
+  back <- lookback_matrix(record, id, time, value, at = at, span = "30 days")
+
+  for (i in seq_len(nrow(expected))) {
+    row <- expected[i, ]
+    raised <- switch(row$case,
+      lookback = function() calendar_channels(back),
+      not_a_representation = function() bind_channels(x, 1),
+      one_argument = function() bind_channels(x),
+      duplicate = function() bind_channels(x, x),
+      different_bins = function() bind_channels(x, other),
+      stop("no channel guard called ", row$case))
+    expect_error(raised(), row$message, fixed = TRUE, info = row$case)
+  }
+  expect_setequal(expected$case, c("lookback", "not_a_representation", "one_argument",
+                                   "duplicate", "different_bins"))
+})

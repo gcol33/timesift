@@ -400,6 +400,108 @@ coverage_rows <- lapply(COVERAGE_CASES, function(spec) {
 write_fixture(do.call(rbind, coverage_rows), "coverage.csv")
 cat("wrote", length(COVERAGE_CASES), "coverage cases\n")
 
+# ---- where a bin sits in the year ---------------------------------------------------------------
+# `calendar_channels()` and `bind_channels()` return an array a learner reads, so they are pinned
+# the way the reductions are rather than tested on each side alone. A `calendar` row is a
+# representation's two channels; a `bound` row is its readings with those channels beside them,
+# which is what pins the order the two are joined in and the attributes the joined array keeps.
+#
+# What is digested is the fraction of the year each bin sits at, not the sine and the cosine of it.
+# The fraction is exact arithmetic on the calendar and the same bits wherever it is computed; the
+# sine and the cosine are the platform's library, accurate to about an ulp and no further, and
+# twelve decimal places is close enough to that to make a hash of them a statement about the
+# machine. The suites assert the two channels against the fraction to the tolerance the contract
+# states, which is what the fraction is pinned here for.
+channel_rows <- list()
+channel_row <- function(name, w, stats = "mean", kind = "calendar", year_start = "09-01",
+                        partial = "keep", tz = "UTC") {
+  series <- SERIES[[name]]
+  attr(series$time, "tzone") <- tz
+  binning <- if (w == "astronomical") astronomical(name) else w
+  x <- grain_matrix(series, id, time, value, grain = binning, stats = stats,
+                     year_start = year_start, partial = partial)
+  got <- if (kind == "bound") bind_channels(x, calendar_channels(x)) else calendar_channels(x)
+  start <- attr(got, "bin_start")
+  frac <- ts_year_fraction_(as.numeric(attr(got, "bin_start")),
+                            as.numeric(attr(got, "bin_end")))
+  data.frame(series = name, grain = w, tz = tz, year_start = year_start, partial = partial,
+             stat = paste(stats, collapse = "+"), kind = kind, n_unit = dim(got)[1],
+             n_bin = dim(got)[2],
+             channels = paste(dimnames(got)[[3L]], collapse = "+"),
+             first_bin = format(start[1], "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+             last_bin = format(start[length(start)], "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+             tolerance = 1e-12, digest = digest_array(frac), stringsAsFactors = FALSE)
+}
+add_channels <- function(...) channel_rows[[length(channel_rows) + 1L]] <<- channel_row(...)
+
+# The grain sets the width of a bin and so the midpoint the phase is read at, and a supplied
+# calendar's bins are neither a month nor a week wide.
+for (w in c("day", "week", "month", "season", "year", "astronomical")) {
+  add_channels("aligned", w)
+}
+# A record out of phase with every grain, where a bin the record only partly covers is read at the
+# phase it was measured over rather than at the phase of a whole one.
+for (w in c("day", "week", "month")) {
+  add_channels("offset", w)
+}
+# The anniversary moves the bins of the two grains that count from it, and the phase with them.
+for (w in c("season", "year")) {
+  add_channels("aligned", w, year_start = "03-01")
+}
+add_channels("aligned", "week", partial = "drop")
+# The zone. The bins move by the offset and the phase moves with them, so a zone row is what says
+# the two languages read the same instants off the same bins.
+add_channels("aligned", "week", tz = "Europe/Vienna")
+# `native` is the bin whose start and end are one instant, and `halfday` the one narrower than the
+# day the four day-level statistics need: two bin widths no other row reaches.
+for (w in c("native", "halfday", "day")) {
+  add_channels("zoned", w, tz = "America/Sao_Paulo")
+}
+add_channels("aligned", "week", stats = c("cold_day", "mean", "warm_day"), kind = "bound")
+add_channels("offset", "week", stats = c("min", "mean", "max"), kind = "bound")
+add_channels("zoned", "day", kind = "bound", tz = "America/Sao_Paulo")
+
+write_fixture(do.call(rbind, channel_rows), "channels_digests.csv")
+cat("wrote", length(channel_rows), "channel digests\n")
+
+# What the two refuse. Each case is named rather than written out, so both suites build the same
+# input: every one reads the aligned series, `x` at the weekly grain, `other` at the monthly one,
+# and `back` a 30-day lookback anchored on the last reading of each unit.
+CHANNEL_GUARDS <- list(
+  list(case = "lookback", message = "no position in the year"),
+  list(case = "not_a_representation", message = "not a representation"),
+  list(case = "one_argument", message = "at least two representations"),
+  list(case = "duplicate", message = "carry a channel of the same name: mean"),
+  list(case = "different_bins", message = "argument 2 covers different units or bins")
+)
+channel_guard <- function(case) {
+  series <- SERIES$aligned
+  x <- grain_matrix(series, id, time, value, grain = "week")
+  switch(case,
+    lookback = {
+      at <- data.frame(id = unique(series$id), at = max(series$time), stringsAsFactors = FALSE)
+      calendar_channels(lookback_matrix(series, id, time, value, at = at, span = "30 days"))
+    },
+    not_a_representation = bind_channels(x, 1),
+    one_argument = bind_channels(x),
+    duplicate = bind_channels(x, x),
+    different_bins = bind_channels(x, grain_matrix(series, id, time, value, grain = "month")),
+    stop("no channel guard called ", case))
+}
+for (guard in CHANNEL_GUARDS) {
+  raised <- tryCatch({
+    channel_guard(guard$case)
+    ""
+  }, error = function(e) conditionMessage(e))
+  if (!grepl(guard$message, raised, fixed = TRUE)) {
+    stop("the ", guard$case, " guard raised \"", raised, "\", not \"", guard$message, "\"",
+         call. = FALSE)
+  }
+}
+write_fixture(do.call(rbind, lapply(CHANNEL_GUARDS, as.data.frame, stringsAsFactors = FALSE)),
+          "channels_guards.csv")
+cat("wrote", length(CHANNEL_GUARDS), "channel guards\n")
+
 # ---- what crosses the boundary above the representation ----------------------------------------
 # The three artifacts, in the format the contract defines, plus the numbers read off them that are
 # deterministic: the scorable mask, every threshold metric, and a paired contrast. None of these

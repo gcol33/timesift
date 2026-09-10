@@ -7,7 +7,8 @@
 calendar_channels(x)
 }
 \arguments{
-\item{x}{A \code{\link[=grain_matrix]{grain_matrix()}} result.}
+\item{x}{A \code{\link[=grain_matrix]{grain_matrix()}} result. A \code{\link[=lookback_matrix]{lookback_matrix()}} result has no place in the calendar
+and is refused.}
 }
 \value{
 An array of the same units and bins with two channels, \code{year_sin} and \code{year_cos},
@@ -22,6 +23,10 @@ which is continuous across the turn of the year where the fraction itself is not
 \details{
 They are the time index of each bin, not a summary of the readings, so adding them introduces no
 hand-built thermal feature: whatever a model does with them it could have done with a calendar.
+
+The position is read at the midpoint of the record each bin holds, on the Gregorian calendar in
+UTC, so a bin the record only partly covers sits at the phase it was actually measured over.
+\code{inst/spec/representation.md} is the normative description.
 }
 \examples{
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 400)

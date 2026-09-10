@@ -96,12 +96,15 @@ bin reach a model as one input.</p>
 
 
 <dl><dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Two or more arrays of shape <code>[unit, bin, channel]</code>, agreeing on their units and bins.</p></dd>
+<dd><p>Two or more representations of shape <code>[unit, bin, channel]</code>, agreeing on their units
+and bins.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>One array carrying every channel, with the attributes of the first argument.</p>
+    <p>One array carrying every channel, in the order the arguments are given and, inside each
+argument, in its own channel order. The attributes are the first argument's, with <code>stats</code> the
+joined names.</p>
     </div>
 
     <div class="section level2">

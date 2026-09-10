@@ -265,6 +265,10 @@ calendar_channels(x: TimesiftMatrix)
 Where in the year each bin sits, as the sine and cosine of its
 fractional position.
 
+The position is read at the midpoint of the record each bin holds, on
+the Gregorian calendar in UTC. `inst/spec/representation.md` is the
+normative description.
+
 ## `bind_channels()`
 
 ``` python
@@ -273,6 +277,10 @@ bind_channels(*parts: TimesiftMatrix)
 
 Put the channels of several representations of the same units and bins
 side by side.
+
+The channels come back in the order the arguments are given and, inside
+each argument, in its own channel order. Everything else is the first
+argument’s.
 
 ## `feature_matrix()`
 

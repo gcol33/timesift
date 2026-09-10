@@ -300,3 +300,16 @@ oracle_grain_matrix <- function(data, id, time, value, grain = "day", stats = "m
        bin_n = matrix(count, nrow = n_u, ncol = n_b),
        bin_partial = oracle_bin_partial(clock, when, bins, grain, ys))
 }
+
+# Where in the year a bin sits, from the instants a representation carries: the midpoint of the
+# record the bin holds, floored to the second it began on, over the calendar year in UTC that
+# midpoint falls in. It reads the year by writing it and parsing it back, where the core counts
+# days from the civil epoch, so the two arrive by different routes.
+oracle_year_fraction <- function(bin_start, bin_end) {
+  opens <- as.numeric(bin_start)
+  mid <- opens + floor((as.numeric(bin_end) - opens) / 2)
+  year <- as.integer(format(.POSIXct(mid, tz = "UTC"), "%Y", tz = "UTC"))
+  first <- as.numeric(as.POSIXct(paste0(year, "-01-01"), tz = "UTC"))
+  length <- as.numeric(as.POSIXct(paste0(year + 1L, "-01-01"), tz = "UTC")) - first
+  (mid - first) / length
+}

@@ -793,6 +793,107 @@ reduction does not ask.</p>
 </div>
 </div>
 <div class="section level2">
+<h2 id="the-channels">The channels<a class="anchor" aria-label="anchor" href="#the-channels"></a>
+</h2>
+<p>An array of readings is not the only thing a learner is handed. Two
+more reductions put a channel beside those readings, and both return an
+array a model reads, so both are normative here.</p>
+<div class="section level3">
+<h3 id="where-a-bin-sits-in-the-year">Where a bin sits in the year<a class="anchor" aria-label="anchor" href="#where-a-bin-sits-in-the-year"></a>
+</h3>
+<p><code><a href="../reference/calendar_channels.html">calendar_channels()</a></code> reads a representation and returns
+an array of the same units and bins with two channels,
+<code>year_sin</code> and <code>year_cos</code>, identical across units.
+An encoder that ends in global pooling discards when in the record a
+thermal event happened, so the position of a bin in the year is given to
+it as an input or it is not used at all; it is the time index of each
+bin rather than a summary of the readings, and a sine and a cosine
+rather than the fraction itself because the two are continuous across
+the turn of the year where the fraction jumps.</p>
+<p>For each bin, with <code>bin_start</code> and <code>bin_end</code>
+the instants the representation carries:</p>
+<pre><code>mid  = bin_start + floor((bin_end - bin_start) / 2)
+y    = the calendar year mid falls in, on the proleptic Gregorian calendar in UTC
+frac = (mid - first instant of y) / (length of y in seconds)
+
+year_sin = sin(2 pi frac)
+year_cos = cos(2 pi frac)</code></pre>
+<p>Four things in that are decisions rather than consequences.</p>
+<p>The position is read at the <strong>midpoint of the record the bin
+holds</strong> – <code>bin_end</code> is the last reading assigned to
+the bin, not the end of its calendar span – so a bin the record only
+partly covers sits at the phase it was actually measured over rather
+than at the phase of a whole one.</p>
+<p>A bin spanning an <strong>odd number of seconds</strong> has its
+midpoint on a half second, and the second it began on is the one it is
+read at. Every named grain spans a whole number of hours, so nothing
+reaches that today; a supplied calendar need not, and the rule is
+written down rather than left to whichever language happens to
+round.</p>
+<p>The year is read <strong>in UTC</strong>, on the instants, whatever
+clock the bins were placed on. The phase is a place on the orbit rather
+than a reading of a clock, and a zone moves it by its offset: under a
+day on a cycle of a year, the same shift for every bin of the
+record.</p>
+<p><code>frac</code> is <strong>exact arithmetic on the
+calendar</strong> and the same bits on every platform. The sine and the
+cosine of it are the platform’s library, accurate to about an ulp and no
+further, so the contract pins <code>frac</code> and states a tolerance
+of <strong>1e-12</strong> on the two channels. Both suites read the
+fraction back and assert the channels against it.</p>
+<p>The result carries every attribute of its input, with
+<code>stats</code> replaced by <code>year_sin, year_cos</code>. A
+lookback is refused: its bins are placed relative to a target rather
+than on the calendar, so they have no position in the year, and it
+carries no <code>bin_start</code> to read one from.</p>
+</div>
+<div class="section level3">
+<h3 id="putting-channels-side-by-side">Putting channels side by side<a class="anchor" aria-label="anchor" href="#putting-channels-side-by-side"></a>
+</h3>
+<p><code><a href="../reference/bind_channels.html">bind_channels()</a></code> takes two or more representations of the
+same units and bins and returns one array carrying every channel, in the
+order the arguments are given and, inside each argument, in its own
+channel order. It is how a temperature reading, an external product such
+as snow cover, and the calendar position of each bin reach a model as
+one input.</p>
+<p>The result carries the <strong>first argument’s</strong> attributes,
+with <code>stats</code> the joined channel names. Every other argument
+is read for its channels alone; nothing of its own binning survives,
+which is why the units and the bins have to agree in the first
+place.</p>
+<p>Four inputs are refused, and the three that concern one argument name
+its position from one:</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>what</th>
+<th>the message both raise</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>fewer than two arguments</td>
+<td><code>`bind_channels()` needs at least two representations</code></td>
+</tr>
+<tr class="even">
+<td>an argument that is not a representation</td>
+<td><code>argument 2 is a ..., not a representation</code></td>
+</tr>
+<tr class="odd">
+<td>an argument covering other units or bins</td>
+<td><code>argument 2 covers different units or bins from the first</code></td>
+</tr>
+<tr class="even">
+<td>two arguments carrying a channel of one name</td>
+<td><code>two representations carry a channel of the same name: mean</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="section level2">
 <h2 id="what-crosses-the-language-boundary-and-what-does-not">What crosses the language boundary, and what does not<a class="anchor" aria-label="anchor" href="#what-crosses-the-language-boundary-and-what-does-not"></a>
 </h2>
 <p>The binning and the reduction are one implementation:
@@ -1002,6 +1103,25 @@ lookback reaching past the record, a day-level statistic over bins
 shorter than a day, and one over bins that do not open on a day boundary
 – with the substring of the message the two implementations must both
 raise.</p>
+<p><code>channels_digests.csv</code> and
+<code>channels_guards.csv</code> pin the two channel functions the way
+the reductions are pinned rather than each side testing itself. A
+<code>calendar</code> row is a representation’s two channels and a
+<code>bound</code> row is its readings with those channels beside them,
+over the grains whose bins are a day, a week, a month, a season, a year
+and a supplied calendar’s, a record out of phase with all of them, both
+anniversaries of the two grains that count from one, both
+<code>partial</code> settings, the two zones, and the two bin widths no
+other row reaches: the <code>native</code> bin, whose start and end are
+one instant, and the <code>halfday</code> bin, which is narrower than a
+day. What each row digests is the year fraction, not the sine and the
+cosine of it, for the reason <strong>The channels</strong> gives; the
+row carries the tolerance the two channels are then asserted against.
+<code>channels_guards.csv</code> names each refused input and the
+substring of the message both implementations must raise, and both
+suites build the input from the case name: <code>x</code> at the weekly
+grain of the aligned series, <code>other</code> at its monthly one, and
+<code>back</code> a 30-day lookback anchored on its last reading.</p>
 <p>Both test suites read the series, rebuild every row and assert all of
 it. The shape is asserted before the digest, so two implementations that
 put the record into a different number of bins are reported as that
@@ -1168,7 +1288,8 @@ record’s gaps are read off</td>
 <td>a channel added to an array</td>
 <td>
 <code><a href="../reference/bind_channels.html">bind_channels()</a></code>, and <code><a href="../reference/calendar_channels.html">calendar_channels()</a></code>
-for the sine and cosine of each bin’s position in the year</td>
+for the sine and cosine of each bin’s position in the year, both as
+<strong>The channels</strong> defines them</td>
 </tr>
 <tr class="even">
 <td>the penalised learner</td>

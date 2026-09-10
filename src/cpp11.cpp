@@ -40,6 +40,20 @@ extern "C" SEXP _timesift_ts_bin_nexts_(SEXP bins, SEXP grain, SEXP year_month, 
     return cpp11::as_sexp(ts_bin_nexts_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bins), cpp11::as_cpp<cpp11::decay_t<std::string>>(grain), cpp11::as_cpp<cpp11::decay_t<int>>(year_month), cpp11::as_cpp<cpp11::decay_t<int>>(year_day)));
   END_CPP11
 }
+// ts_r.cpp
+cpp11::doubles ts_year_fraction_(cpp11::doubles bin_start, cpp11::doubles bin_end);
+extern "C" SEXP _timesift_ts_year_fraction_(SEXP bin_start, SEXP bin_end) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_year_fraction_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_start), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_end)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::doubles ts_year_phase_(cpp11::doubles bin_start, cpp11::doubles bin_end);
+extern "C" SEXP _timesift_ts_year_phase_(SEXP bin_start, SEXP bin_end) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_year_phase_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_start), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_end)));
+  END_CPP11
+}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
@@ -48,6 +62,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_coverage_",         (DL_FUNC) &_timesift_ts_coverage_,          8},
     {"_timesift_ts_reduce_",           (DL_FUNC) &_timesift_ts_reduce_,           11},
     {"_timesift_ts_reduce_lookbacks_", (DL_FUNC) &_timesift_ts_reduce_lookbacks_, 12},
+    {"_timesift_ts_year_fraction_",    (DL_FUNC) &_timesift_ts_year_fraction_,     2},
+    {"_timesift_ts_year_phase_",       (DL_FUNC) &_timesift_ts_year_phase_,        2},
     {NULL, NULL, 0}
 };
 }

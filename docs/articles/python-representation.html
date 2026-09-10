@@ -370,6 +370,9 @@ repeats the three cases.</p>
 <div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>calendar_channels(x: TimesiftMatrix)</span></code></pre></div>
 <p>Where in the year each bin sits, as the sine and cosine of its
 fractional position.</p>
+<p>The position is read at the midpoint of the record each bin holds, on
+the Gregorian calendar in UTC. <code>inst/spec/representation.md</code>
+is the normative description.</p>
 </div>
 <div class="section level2">
 <h2 id="bind_channels">
@@ -378,6 +381,9 @@ fractional position.</p>
 <div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>bind_channels(<span class="op">*</span>parts: TimesiftMatrix)</span></code></pre></div>
 <p>Put the channels of several representations of the same units and
 bins side by side.</p>
+<p>The channels come back in the order the arguments are given and,
+inside each argument, in its own channel order. Everything else is the
+first argument’s.</p>
 </div>
 <div class="section level2">
 <h2 id="feature_matrix">

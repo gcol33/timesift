@@ -156,6 +156,24 @@ NB_MODULE(_core, m) {
         },
         nb::arg("local"), nb::arg("grain"), nb::arg("year_month"), nb::arg("year_day"));
 
+  m.def("year_fraction",
+        [](ConstI64 bin_start, ConstI64 bin_end) {
+          std::vector<double> frac(bin_start.size());
+          timesift::year_fraction(bin_start.data(), bin_end.data(), bin_start.size(),
+                                   frac.data());
+          return give(std::move(frac));
+        },
+        nb::arg("bin_start"), nb::arg("bin_end"));
+
+  m.def("year_phase",
+        [](ConstI64 bin_start, ConstI64 bin_end) {
+          std::vector<double> year_sin(bin_start.size()), year_cos(bin_start.size());
+          timesift::year_phase(bin_start.data(), bin_end.data(), bin_start.size(),
+                                year_sin.data(), year_cos.data());
+          return nb::make_tuple(give(std::move(year_sin)), give(std::move(year_cos)));
+        },
+        nb::arg("bin_start"), nb::arg("bin_end"));
+
   m.def("bin_nexts",
         [](ConstI64 bins, const std::string& grain, int year_month, int year_day) {
           std::vector<timesift::seconds> out(bins.size());
