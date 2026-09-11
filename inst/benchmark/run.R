@@ -65,46 +65,52 @@ bench_replicate <- function(cell, replicate, candidates, learner, pkg_dir) {
                                      metric = BENCH$metric, verbose = FALSE))
   bench_assert_candidates(sel, stamp)
   lad <- tick("ladder", grain_ladder(set, sim$y, learner, folds = folds, metric = BENCH$metric,
-                                      verbose = FALSE))
+                                      keep_fits = TRUE, verbose = FALSE))
 
   f <- attr(sel, "folds")
   levels <- sort(unique(f))
-  train1 <- names(f)[f != levels[1L]]
+  fits <- attr(lad, "fits")
 
-  # The oracle arm: every candidate fitted on one outer training set and scored on units the
-  # procedure never saw, which is the only place a regret can be read from.
-  truth <- tick("oracle", vapply(candidates$candidate, function(cc) {
-    fit <- fit_learner(learner, timesift:::.subset_units(set[[cc]], which(f != levels[1L])),
-                       sim$y[train1, , drop = FALSE])
-    mean(.bench_deploy_score(fit, dep$set[[cc]], dep$y, BENCH$metric))
-  }, numeric(1L)))
+  # Every candidate scored on the deployment sample after each outer training set, through the
+  # ladder's own per-fold fits: a [fold, candidate] grid of true scores. The oracle, the
+  # single-loop reading and the procedure are read off this one grid, each averaged over the same
+  # outer training sets; the oracle is defined in design.R.
+  deployed <- tick("deploy", vapply(candidates$candidate, function(cc) {
+    vapply(levels, function(k) {
+      fit <- fits[[paste(cc, learner$name, k, sep = "|")]]
+      if (is.null(fit)) {
+        stop("the ladder kept no fit for ", cc, " on outer fold ", k, ".", call. = FALSE)
+      }
+      mean(.bench_deploy_score(fit, dep$set[[cc]], dep$y, BENCH$metric))
+    }, numeric(1L))
+  }, numeric(length(levels))))
+  truth <- colMeans(deployed)
 
-  # The same refit the procedure makes at line 12 of its own algorithm, scored on the deployment
-  # sample instead of on the outer fold, so the reported number has something to be honest about.
-  true_fold <- tick("procedure", vapply(seq_along(levels), function(i) {
-    cc <- sel$selected$grain[match(levels[i], sel$selected$fold)]
-    idx <- which(f != levels[i])
-    fit <- fit_learner(learner, timesift:::.subset_units(set[[cc]], idx),
-                       sim$y[names(f)[idx], , drop = FALSE])
-    mean(.bench_deploy_score(fit, dep$set[[cc]], dep$y, BENCH$metric))
-  }, numeric(1L)))
+  # The refit the procedure makes at each outer fold, at line 12 of its own algorithm, is the
+  # ladder's fit of the candidate it selected there. Scored on the deployment sample instead of on
+  # the outer fold, it gives the reported number something to be honest about.
+  picked <- sel$selected$grain[match(levels, sel$selected$fold)]
+  true_fold <- deployed[cbind(seq_along(levels), match(picked, colnames(deployed)))]
 
   grid <- summary(lad)
   single <- grid$grain[which.max(grid$score)]
   est <- sel$estimate
   sel_est <- est[est$metric == BENCH$metric, ]
+  # The interval read off the estimate and its standard error across variables, on Student's t
+  # with one degree of freedom fewer than there are variables, as the package takes every interval
+  # across variables.
+  half <- stats::qt(0.975, sel_est$n_variable - 1) * sel_est$se
 
   rows <- list(
     .bench_row(stamp, "nested", NA_character_, NA_integer_, est$metric, "reported", est$score),
     .bench_row(stamp, "nested", NA_character_, NA_integer_, est$metric, "reported_se", est$se),
     .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "reported_lower",
-               sel_est$score - 1.96 * sel_est$se),
+               sel_est$score - half),
     .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "reported_upper",
-               sel_est$score + 1.96 * sel_est$se),
+               sel_est$score + half),
     .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "true",
                mean(true_fold)),
-    .bench_row(stamp, "nested", sel$selected$grain, sel$selected$fold, BENCH$metric, "true_fold",
-               true_fold),
+    .bench_row(stamp, "nested", picked, levels, BENCH$metric, "true_fold", true_fold),
     .bench_row(stamp, "nested", sel$selected$grain, sel$selected$fold, BENCH$metric, "selected",
                sel$selected$inner_score),
     .bench_row(stamp, "single_loop", single, NA_integer_, BENCH$metric, "reported",
@@ -115,6 +121,9 @@ bench_replicate <- function(cell, replicate, candidates, learner, pkg_dir) {
                max(truth)),
     .bench_row(stamp, "candidate", names(truth), NA_integer_, BENCH$metric, "true",
                unname(truth)),
+    .bench_row(stamp, "candidate", rep(colnames(deployed), each = length(levels)),
+               rep(levels, times = ncol(deployed)), BENCH$metric, "true_fold",
+               as.vector(deployed)),
     .bench_row(stamp, "candidate", grid$grain, NA_integer_, BENCH$metric, "ladder", grid$score),
     .bench_row(stamp, "candidate", sel$inner$grain, sel$inner$fold, BENCH$metric, "inner",
                sel$inner$score),

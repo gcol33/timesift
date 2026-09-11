@@ -2,6 +2,17 @@
 # identity stamp each replicate is written with, and the simulate-represent-deploy machinery every
 # replicate runs. Sourced by run.R and by anything reading the results, so a cell is defined in one
 # place and no launcher carries its own copy.
+#
+# The oracle every regret is read against. Each candidate is fitted on each outer training set,
+# the fits being the ladder's own, and scored on the deployment sample. Its truth is the mean over
+# the outer folds, which is the mean the procedure's own truth is taken over, and the oracle is the
+# candidate whose mean is highest. The regret is then what the procedure gives up against the best
+# fixed candidate under the same training draws: both legs are read on the same draws, so neither
+# carries the variance of a draw the other did not see, and the single-loop truth is the fold mean
+# of the candidate it names, over the same five draws its reported score is read across. What
+# remains in the oracle leg is the deployment sample's own noise, which a maximum over the
+# candidates turns into an upward term. It shrinks as `n_deploy` grows, and the per-fold rows every
+# replicate writes (`candidate`, `true_fold`) are what a check of it reads.
 
 BENCH <- list(
   scale        = "full",
