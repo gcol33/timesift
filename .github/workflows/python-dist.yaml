@@ -1,0 +1,112 @@
+name: python-dist
+
+# The Python side as a distribution rather than as a checkout. pytest.yaml installs from the
+# repository and proves the sources compile; this builds the artefacts a user would receive,
+# installs them somewhere the checkout cannot help, and runs the shipped suite against them. The
+# source distribution is checked on every change, because it is what holds the manifest in
+# pyproject.toml to the sources. The wheels are built on pushes to master, on request, and for a
+# release, which is also the only event that publishes.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  release:
+    types: [published]
+
+permissions: read-all
+
+jobs:
+  sdist:
+    runs-on: ubuntu-latest
+    name: the source distribution installs and passes its own suite
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build the source distribution
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build --sdist --outdir dist
+          python -m twine check --strict dist/*
+
+      # Unpacked away from the checkout and installed from the tarball into a fresh environment,
+      # so a source or a fixture the manifest leaves out fails here rather than at a user. The
+      # wheel pip builds on the way is built from the tarball, which is what reading the version
+      # from DESCRIPTION at build time is for.
+      - name: Install from the tarball and run the suite it ships
+        run: |
+          tarball="$(ls "$GITHUB_WORKSPACE"/dist/*.tar.gz)"
+          python -m venv "$RUNNER_TEMP/venv"
+          . "$RUNNER_TEMP/venv/bin/activate"
+          python -m pip install --upgrade pip
+          python -m pip install "${tarball}[test,sklearn]"
+          mkdir "$RUNNER_TEMP/unpacked"
+          tar -xzf "$tarball" -C "$RUNNER_TEMP/unpacked"
+          cd "$RUNNER_TEMP"/unpacked/timesift-*
+          python -c "import timesift, sys; sys.exit(0 if 'site-packages' in timesift.__file__ else timesift.__file__)"
+          declared="$(sed -n 's/^Version: *//p' DESCRIPTION)"
+          installed="$(python -c 'import timesift; print(timesift.__version__)')"
+          test "$declared" = "$installed" || { echo "installed $installed, DESCRIPTION $declared"; exit 1; }
+          python -m pytest python/tests -q -p no:cacheprovider
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-sdist
+          path: dist/*.tar.gz
+
+  wheels:
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ matrix.os }}
+    name: wheels on ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # What is built and how each wheel is tested is set in [tool.cibuildwheel] in pyproject.toml.
+      - name: Build and test the wheels
+        run: |
+          python -m pip install --upgrade pip cibuildwheel==4.2.1 twine
+          python -m cibuildwheel --output-dir wheelhouse
+          python -m twine check --strict wheelhouse/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  publish:
+    if: github.event_name == 'release'
+    needs: [sdist, wheels]
+    runs-on: ubuntu-latest
+    name: publish to PyPI
+    # Trusted publishing: PyPI accepts the upload on this workflow's identity, so no token is
+    # stored. The project has to name this repository, this workflow and this environment as a
+    # trusted publisher on PyPI before the first release.
+    environment: pypi
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

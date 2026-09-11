@@ -72,5 +72,15 @@ provider = "scikit_build_core.metadata.regex"
 input = "DESCRIPTION"
 regex = '(?im)^Version: *(?P<value>\S+)'
 
+# The wheels a release publishes, one per interpreter and platform the pytest workflow runs on.
+# Each is installed on a clean interpreter and the suite run against it from the checkout, which
+# is where the fixtures it reads live, so a wheel that imports only on the machine that built it
+# fails here.
+[tool.cibuildwheel]
+build = "cp311-* cp312-* cp313-*"
+skip = "*-musllinux_* *-win32 *_i686"
+test-extras = ["test", "sklearn"]
+test-command = "pytest {project}/python/tests -q -p no:cacheprovider"
+
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
