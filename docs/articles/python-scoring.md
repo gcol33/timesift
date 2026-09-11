@@ -86,6 +86,15 @@ a difference between the arms. Pairing also cancels what a
 threshold-selected metric carries in its level, since both arms carry
 the same bias on the same cell.
 
+Each arm is named whole, `grain|learner`. A learner named alone would
+take its best grain, chosen on the scores the contrast is then read off,
+and pairing does not cancel that choice; `select_grain` chooses a grain
+on inner folds instead and contrasts the selection through `compare`.
+The interval is Student’s t on one degree of freedom fewer than there
+are variables, and `p_method` says whether the signed-rank p-value is
+`"exact"` or the `"normal"` approximation, which it is when the
+per-variable differences hold a zero or a tie or number fifty or more.
+
 ## `tss_inflation()`
 
 ``` python

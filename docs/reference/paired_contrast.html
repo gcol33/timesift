@@ -106,15 +106,18 @@ independent replicates.</p>
 
 
 <dt id="arg-a-b">a, b<a class="anchor" aria-label="anchor" href="#arg-a-b"></a></dt>
-<dd><p>The two arms, each given as <code>"learner"</code> or <code>"grain|learner"</code>. Naming a learner alone
-takes its best grain.</p></dd>
+<dd><p>The two arms, each named <code>"grain|learner"</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A one-row data frame: the mean per-variable difference, a 95 percent interval from its
-standard error across variables, the number of variables the difference favours, the paired
-cells and variables it rests on, and a Wilcoxon signed-rank p-value.</p>
+    <p>A one-row data frame: the mean per-variable difference; a 95 percent interval from its
+standard error across variables, on Student's t with one degree of freedom fewer than there
+are variables; the number of variables the difference favours; the paired cells and variables
+it rests on; a Wilcoxon signed-rank p-value; and <code>p_method</code>, <code>"exact"</code> where the p-value is
+read off the exact distribution and <code>"normal"</code> where it is the normal approximation with
+continuity and tie corrections, which it is when the per-variable differences hold a zero or
+a tie or number fifty or more.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -122,6 +125,13 @@ cells and variables it rests on, and a Wilcoxon signed-rank p-value.</p>
 threshold that maximises it is biased upward where presences are thin, both arms carry the same
 bias on the same cell, and it cancels in the difference. That is why the levels a ladder reports
 are upper bounds while the differences between arms are read at face value.</p>
+<p>An arm is named whole, by its grain and its learner. A learner named alone would have to take
+its best grain, and that grain is chosen on the held-out scores the contrast is then read off:
+the difference becomes one between two maxima, favouring whichever learner ran across more
+grains, and neither the interval nor the p-value accounts for the choice. It is the mechanism
+<code><a href="tss_inflation.html">tss_inflation()</a></code> measures one level down, and here pairing does not cancel it.
+<code><a href="select_grain.html">select_grain()</a></code> chooses a grain on inner folds instead, and its <code>compare</code> argument contrasts
+the selection with the arms of a ladder on matched cells.</p>
     </div>
 
     <div class="section level2">

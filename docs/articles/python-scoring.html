@@ -188,6 +188,16 @@ the same set of defined cells, so a difference of two marginal means is
 not a difference between the arms. Pairing also cancels what a
 threshold-selected metric carries in its level, since both arms carry
 the same bias on the same cell.</p>
+<p>Each arm is named whole, <code>grain|learner</code>. A learner named
+alone would take its best grain, chosen on the scores the contrast is
+then read off, and pairing does not cancel that choice;
+<code>select_grain</code> chooses a grain on inner folds instead and
+contrasts the selection through <code>compare</code>. The interval is
+Student’s t on one degree of freedom fewer than there are variables, and
+<code>p_method</code> says whether the signed-rank p-value is
+<code>"exact"</code> or the <code>"normal"</code> approximation, which
+it is when the per-variable differences hold a zero or a tie or number
+fifty or more.</p>
 </div>
 <div class="section level2">
 <h2 id="tss_inflation">

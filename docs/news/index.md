@@ -14,6 +14,37 @@
   bin the whole record skips is a column of zeros. Nothing here fills a
   cell. On both sides, and pinned by `inst/spec/fixtures/coverage.csv`.
 
+### Paired contrasts
+
+- [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md)
+  takes each arm whole, as `"grain|learner"`. A learner named alone used
+  to take its best grain, chosen on the held-out scores the contrast was
+  then read off, so the difference was one between two maxima and its
+  p-value optimistic by an amount nothing in the output recorded. It is
+  refused now, with a message naming the whole arm;
+  [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+  chooses a grain on inner folds and contrasts the selection through
+  `compare`.
+  [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md)
+  still reads a learner named alone at its best grain, since it
+  describes a fitted model rather than testing a difference. On both
+  sides ([\#67](https://github.com/gcol33/timesift/issues/67)).
+- The interval on a contrast is Student’s t on one degree of freedom
+  fewer than there are variables, in place of the normal quantile, which
+  made it about a quarter too narrow at six variables and more than six
+  times too narrow at two. The ladder plot draws its interval the same
+  way ([\#68](https://github.com/gcol33/timesift/issues/68)).
+- The signed-rank p-value is read by a method chosen rather than fallen
+  back on, and the row says which: `p_method` is `"exact"` below fifty
+  per-variable differences holding no zero and no tie, and `"normal"`,
+  the approximation with continuity and tie corrections, otherwise. The
+  Python side took the exact distribution where the differences held a
+  zero and R the approximation; both take the approximation now.
+  `inst/spec/fixtures/contrast.csv` pins the interval and the method,
+  and the Python side carries its own Student’s t quantile, which agrees
+  with [`qt()`](https://rdrr.io/r/stats/TDist.html) to within about
+  1e-14 ([\#68](https://github.com/gcol33/timesift/issues/68)).
+
 ### The response head
 
 - A head carries a `loss` and an `activation`, and they are what every
@@ -37,6 +68,24 @@
 
 ### Fitting
 
+- [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+  deals its inner folds for each response and stratified on it, so a
+  rare outcome is spread over them as evenly as its count allows rather
+  than wherever a plain deal dropped it. A presence-absence response
+  whose inner training sets cannot each hold two of each outcome, the
+  fewest a logistic path is fitted to, is predicted its share among the
+  fitting units, as a response holding one outcome already was, and the
+  fit names it in `unfitted`. Such a response used to stop the whole run
+  from inside `cv.glmnet()`, which cost a benchmark cell a replicate it
+  could not recover by rerunning. The inner fold draw is not the one
+  before, so a penalised fit’s chosen penalty can differ from an earlier
+  run’s. On both sides
+  ([\#72](https://github.com/gcol33/timesift/issues/72)).
+- On the Python side the elastic net chooses its penalty on the held-out
+  log loss, weighted by the head’s case weights, as `cv.glmnet()`
+  chooses on the weighted deviance. It was choosing on accuracy,
+  scikit-learn’s default, a step function of the penalty whose choice
+  moved by orders of magnitude with the fold draw.
 - Predicting from a fit whose new targets are missing a static predictor
   names the column that is missing. An absent column read as one that is
   not numeric, and the message sent the reader to encode something their
@@ -410,16 +459,42 @@
   `inner` is checked before it is coerced, so a value that is not a
   count is named in the error rather than printed as `NA`.
 
+### The selection benchmark
+
+- The oracle and the single-loop truth are averaged over the outer
+  training sets, as the procedure’s truth always was. Every candidate is
+  scored on the deployment sample through the ladder’s own per-fold
+  fits, and the three arms are read off that one grid, so the regret
+  compares the procedure with the best fixed candidate under the same
+  training draws. The oracle used to be fitted on the first outer
+  training set alone, so the regret carried a maximum over twelve
+  one-draw estimates, and the single-loop bias a truth read on one fold
+  against a score read on five. `inst/benchmark/design.R` states the
+  definition and what of the selection term remains. The interval whose
+  coverage is read is Student’s t, as the package’s are
+  ([\#65](https://github.com/gcol33/timesift/issues/65)).
+
 ### Packaging
 
 - `inst/CITATION` cites the package, and `citation("timesift")` prints
   it; the methods article’s entry is added once it has a DOI.
-  `codemeta.json` is generated from `DESCRIPTION` with codemetar and
+  `codemeta.json` is generated from `DESCRIPTION` with `codemetar` and
   regenerated at a release. `DESCRIPTION` declares `Language: en-GB`,
   and `inst/WORDLIST` holds the proper nouns and API names the spell
-  check would otherwise flag, so
-  [`spelling::spell_check_package()`](https://docs.ropensci.org/spelling//reference/spell_check_package.html)
-  runs clean.
+  check would otherwise flag. `tests/spelling.R` runs the check against
+  it and fails on a word it does not know, and the `R-CMD-check`
+  workflow sets `NOT_CRAN` so it runs there; it is skipped on CRAN,
+  whose dictionaries are not this machine’s
+  ([\#70](https://github.com/gcol33/timesift/issues/70)).
+- The Python side is checked as a distribution. The `python-dist`
+  workflow builds the source distribution, installs it into a clean
+  environment, and runs the suite it ships from the unpacked tarball,
+  which is what holds the manifest in `pyproject.toml` to the sources.
+  It builds wheels for Python 3.11 to 3.13 on Linux, Windows and macOS
+  with `cibuildwheel`, each tested on an interpreter that did not build
+  it, and passes every artefact through `twine check`. A published
+  GitHub release uploads them to PyPI by trusted publishing
+  ([\#69](https://github.com/gcol33/timesift/issues/69)).
 - The committed site is held to its sources. `build_site.R` writes a
   digest over everything the site is rendered from into
   `docs/site-digest.txt`, and the `site` workflow recomputes it from the

@@ -788,9 +788,12 @@ so a suite that quietly skipped it fails rather than passes.
 `contrast_cells.csv` and `contrast.csv` hold a fixed table of per-cell
 scores for two arms, with cells one arm scored and the other did not,
 and the paired contrast read off it. No model is involved: the pairing,
-the per-variable mean and the signed-rank p-value are what the two
-languages own, and a fitted model is what they are not required to
-share.
+the per-variable mean, the interval on Student’s t with one degree of
+freedom fewer than there are variables, and the signed-rank p-value with
+the method it was read by are what the two languages own, and a fitted
+model is what they are not required to share. The p-value is exact below
+fifty per-variable differences holding no zero and no tie, and the
+normal approximation with continuity and tie corrections otherwise.
 
 ### How exactly
 

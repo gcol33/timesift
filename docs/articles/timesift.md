@@ -61,12 +61,12 @@ fit
 #> timesift  60 targets, 6 responses, 5-fold random CV, tss
 #> 
 #> candidate                    mean    won  responses
-#> elasticnet / week           0.753      3  separate
-#> elasticnet / month          0.753      0  separate
-#> elasticnet / day            0.760      3  separate
-#> ensemble                    0.759      -
+#> elasticnet / day            0.749      2  separate
+#> elasticnet / week           0.750      2  separate
+#> elasticnet / month          0.759      2  separate
+#> ensemble                    0.756      -
 #> 
-#> weights  elasticnet / month 0.62   elasticnet / week 0.31   elasticnet / day 0.06
+#> weights  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.01
 ```
 
 Every representation named in `sift` was built, and `models` defaulting
@@ -110,9 +110,9 @@ built with, and combines them through the ensemble.
 p <- predict(fit, targets, series)
 round(p[1:3, 1:4], 3)
 #>        sp1   sp2   sp3   sp4
-#> p001 0.221 0.938 0.321 0.867
-#> p002 0.548 0.655 0.581 0.669
-#> p003 0.050 0.959 0.201 0.928
+#> p001 0.180 0.884 0.304 0.879
+#> p002 0.566 0.576 0.584 0.694
+#> p003 0.040 0.924 0.185 0.949
 ```
 
 ## Representations
@@ -302,11 +302,11 @@ summary(both)
 #> candidate                    mean    won  responses
 #> 1nn / week                  0.446      0  separate
 #> 1nn / month                 0.546      0  separate
-#> elasticnet / week           0.758      4  separate
-#> elasticnet / month          0.767      2  separate
-#> ensemble                    0.767      -
+#> elasticnet / week           0.752      3  separate
+#> elasticnet / month          0.777      3  separate
+#> ensemble                    0.760      -
 #> 
-#> weights  elasticnet / month 0.96   1nn / month 0.02   elasticnet / week 0.02
+#> weights  elasticnet / month 0.63   elasticnet / week 0.32   1nn / month 0.05
 ```
 
 ## The combination
@@ -321,7 +321,7 @@ without fitting anything.
 
 ensemble_weights(fit)
 #>   elasticnet / day  elasticnet / week elasticnet / month 
-#>         0.06361574         0.31413520         0.62224906
+#>         0.01476295         0.30154490         0.68369215
 ```
 
 The weights say how much of the combination each candidate carries, and
@@ -427,9 +427,9 @@ set <- grain_matrix(series, plot, t, temp, grain = c("day", "week", "month"))
 lad <- grain_ladder(set, fit$y, elasticnet(), folds = fit$folds, verbose = FALSE)
 summary(lad)
 #>      learner grain     score n_variable  best
-#> 1 elasticnet   day 0.7600661          6 FALSE
-#> 2 elasticnet  week 0.7580820          6 FALSE
-#> 3 elasticnet month 0.7669444          6  TRUE
+#> 1 elasticnet   day 0.7492328          6 FALSE
+#> 2 elasticnet  week 0.7520106          6 FALSE
+#> 3 elasticnet month 0.7766667          6  TRUE
 ```
 
 A claim about one step of that curve rests on the paired contrast. The
@@ -441,10 +441,10 @@ test behind `p_value` has few values to work with.
 ``` r
 
 paired_contrast(lad, "month|elasticnet", "day|elasticnet")
-#>                  a              b        diff      lower      upper n_variable
-#> 1 month|elasticnet day|elasticnet 0.006878307 -0.0333819 0.04713851          6
-#>   n_cell n_favour p_value
-#> 1     30        5  0.4375
+#>                  a              b       diff       lower     upper n_variable
+#> 1 month|elasticnet day|elasticnet 0.02743386 -0.03813488 0.0930026          6
+#>   n_cell n_favour p_value p_method
+#> 1     30        5  0.3125    exact
 ```
 
 Where the whole curve is the question rather than one step of it,
@@ -455,9 +455,9 @@ against the best one, correcting for the comparisons made and no others.
 ``` r
 
 grain_contrasts(lad)
-#>      learner grain reference         diff       lower      upper   p_value
-#> 1 elasticnet   day     month -0.006878307 -0.08968085 0.07592423 0.9746602
-#> 2 elasticnet  week     month -0.008862434 -0.09166497 0.07394010 0.9583672
+#>      learner grain reference        diff      lower      upper   p_value
+#> 1 elasticnet   day     month -0.02743386 -0.1117228 0.05685503 0.6848011
+#> 2 elasticnet  week     month -0.02465608 -0.1089450 0.05963281 0.7347945
 ```
 
 ## What was read
@@ -475,10 +475,10 @@ kept <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
 weight <- occlusion(kept, "elasticnet / month", permutations = 5)
 head(aggregate(weight ~ part, weight, mean), 4)
 #>                   part     weight
-#> 1 2021-09-01T00:00:00Z 0.08493122
-#> 2 2021-10-01T00:00:00Z 0.11823016
-#> 3 2021-11-01T00:00:00Z 0.08207407
-#> 4 2021-12-01T00:00:00Z 0.06296561
+#> 1 2021-09-01T00:00:00Z 0.10539947
+#> 2 2021-10-01T00:00:00Z 0.12886508
+#> 3 2021-11-01T00:00:00Z 0.08716138
+#> 4 2021-12-01T00:00:00Z 0.07247354
 ```
 
 Holding a channel back instead asks what each statistic of a grain

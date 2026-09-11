@@ -168,12 +168,12 @@ hour-to-hour noise an order of magnitude larger.</p>
 <span><span class="co">#&gt; timesift  60 targets, 6 responses, 5-fold random CV, tss</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; candidate                    mean    won  responses</span></span>
-<span><span class="co">#&gt; elasticnet / week           0.753      3  separate</span></span>
-<span><span class="co">#&gt; elasticnet / month          0.753      0  separate</span></span>
-<span><span class="co">#&gt; elasticnet / day            0.760      3  separate</span></span>
-<span><span class="co">#&gt; ensemble                    0.759      -</span></span>
+<span><span class="co">#&gt; elasticnet / day            0.749      2  separate</span></span>
+<span><span class="co">#&gt; elasticnet / week           0.750      2  separate</span></span>
+<span><span class="co">#&gt; elasticnet / month          0.759      2  separate</span></span>
+<span><span class="co">#&gt; ensemble                    0.756      -</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; weights  elasticnet / month 0.62   elasticnet / week 0.31   elasticnet / day 0.06</span></span></code></pre></div>
+<span><span class="co">#&gt; weights  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.01</span></span></code></pre></div>
 <p>Every representation named in <code>sift</code> was built, and
 <code>models</code> defaulting to <code>list(elasticnet())</code>, a
 penalised logistic regression was fitted on each of them over the same
@@ -232,19 +232,13 @@ held constant across the bins.</p>
   </clipPath>
 </defs>
 <g clip-path='url(#cpMC4wMHw0NjguMDB8MC4wMHwzMjQuMDA=)'>
-<line x1='68.88' y1='237.89' x2='68.88' y2='75.18' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='237.89' x2='60.48' y2='237.89' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='214.65' x2='60.48' y2='214.65' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='191.40' x2='60.48' y2='191.40' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='168.16' x2='60.48' y2='168.16' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='144.91' x2='60.48' y2='144.91' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='121.67' x2='60.48' y2='121.67' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='98.42' x2='60.48' y2='98.42' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='75.18' x2='60.48' y2='75.18' style='stroke-width: 0.75;' />
-<text transform='translate(48.72,237.89) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.68</text>
-<text transform='translate(48.72,191.40) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.72</text>
-<text transform='translate(48.72,144.91) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.76</text>
-<text transform='translate(48.72,98.42) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.80</text>
+<line x1='68.88' y1='200.07' x2='68.88' y2='107.62' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='200.07' x2='60.48' y2='200.07' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='153.84' x2='60.48' y2='153.84' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='107.62' x2='60.48' y2='107.62' style='stroke-width: 0.75;' />
+<text transform='translate(48.72,200.07) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.70</text>
+<text transform='translate(48.72,153.84) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.75</text>
+<text transform='translate(48.72,107.62) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.80</text>
 <polygon points='68.88,238.32 432.72,238.32 432.72,68.88 68.88,68.88 ' style='stroke-width: 0.75;' />
 <text x='250.80' y='302.16' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>representation</text>
 <text transform='translate(15.12,153.60) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>tss</text>
@@ -262,29 +256,24 @@ held constant across the bins.</p>
   </clipPath>
 </defs>
 <g clip-path='url(#cpNjguODh8NDMyLjcyfDY4Ljg4fDIzOC4zMg==)'>
-<line x1='68.88' y1='237.89' x2='432.72' y2='237.89' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='214.65' x2='432.72' y2='214.65' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='191.40' x2='432.72' y2='191.40' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='168.16' x2='432.72' y2='168.16' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='144.91' x2='432.72' y2='144.91' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='121.67' x2='432.72' y2='121.67' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='98.42' x2='432.72' y2='98.42' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='75.18' x2='432.72' y2='75.18' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='145.90' x2='432.72' y2='145.90' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
-<line x1='82.36' y1='193.22' x2='82.36' y2='96.45' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='80.20,193.22 82.36,193.22 84.52,193.22 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='84.52,96.45 82.36,96.45 80.20,96.45 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<line x1='68.88' y1='200.07' x2='432.72' y2='200.07' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='153.84' x2='432.72' y2='153.84' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='107.62' x2='432.72' y2='107.62' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='148.57' x2='432.72' y2='148.57' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
+<line x1='82.36' y1='209.69' x2='82.36' y2='99.42' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='80.20,209.69 82.36,209.69 84.52,209.69 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='84.52,99.42 82.36,99.42 80.20,99.42 ' style='stroke-width: 0.75; stroke: #E16A86;' />
 <line x1='250.80' y1='232.04' x2='250.80' y2='75.16' style='stroke-width: 0.75; stroke: #E16A86;' />
 <polyline points='248.64,232.04 250.80,232.04 252.96,232.04 ' style='stroke-width: 0.75; stroke: #E16A86;' />
 <polyline points='252.96,75.16 250.80,75.16 248.64,75.16 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<line x1='419.24' y1='209.67' x2='419.24' y2='96.12' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='417.08,209.67 419.24,209.67 421.40,209.67 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='421.40,96.12 419.24,96.12 417.08,96.12 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='82.36,144.84 250.80,153.60 419.24,152.89 ' style='stroke-width: 1.50; stroke: #E16A86;' />
-<circle cx='82.36' cy='144.84' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
+<line x1='419.24' y1='213.18' x2='419.24' y2='76.98' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='417.08,213.18 419.24,213.18 421.40,213.18 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='421.40,76.98 419.24,76.98 417.08,76.98 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='82.36,154.55 250.80,153.60 419.24,145.08 ' style='stroke-width: 1.50; stroke: #E16A86;' />
+<circle cx='82.36' cy='154.55' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
 <circle cx='250.80' cy='153.60' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
-<circle cx='419.24' cy='152.89' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
-<circle cx='82.36' cy='144.84' r='6.93' style='stroke-width: 1.50; stroke: #E16A86;' />
+<circle cx='419.24' cy='145.08' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
+<circle cx='419.24' cy='145.08' r='6.93' style='stroke-width: 1.50; stroke: #E16A86;' />
 <line x1='81.48' y1='204.72' x2='106.68' y2='204.72' style='stroke-width: 1.50; stroke: #E16A86;' />
 <line x1='81.48' y1='221.52' x2='106.68' y2='221.52' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
 <text x='119.28' y='209.73' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>elasticnet</text>
@@ -299,9 +288,9 @@ through the ensemble.</p>
 <code class="sourceCode R"><span><span class="va">p</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">targets</span>, <span class="va">series</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">p</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        sp1   sp2   sp3   sp4</span></span>
-<span><span class="co">#&gt; p001 0.221 0.938 0.321 0.867</span></span>
-<span><span class="co">#&gt; p002 0.548 0.655 0.581 0.669</span></span>
-<span><span class="co">#&gt; p003 0.050 0.959 0.201 0.928</span></span></code></pre></div>
+<span><span class="co">#&gt; p001 0.180 0.884 0.304 0.879</span></span>
+<span><span class="co">#&gt; p002 0.566 0.576 0.584 0.694</span></span>
+<span><span class="co">#&gt; p003 0.040 0.924 0.185 0.949</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="representations">Representations<a class="anchor" aria-label="anchor" href="#representations"></a>
@@ -452,11 +441,11 @@ that ship.</p>
 <span><span class="co">#&gt; candidate                    mean    won  responses</span></span>
 <span><span class="co">#&gt; 1nn / week                  0.446      0  separate</span></span>
 <span><span class="co">#&gt; 1nn / month                 0.546      0  separate</span></span>
-<span><span class="co">#&gt; elasticnet / week           0.758      4  separate</span></span>
-<span><span class="co">#&gt; elasticnet / month          0.767      2  separate</span></span>
-<span><span class="co">#&gt; ensemble                    0.767      -</span></span>
+<span><span class="co">#&gt; elasticnet / week           0.752      3  separate</span></span>
+<span><span class="co">#&gt; elasticnet / month          0.777      3  separate</span></span>
+<span><span class="co">#&gt; ensemble                    0.760      -</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; weights  elasticnet / month 0.96   1nn / month 0.02   elasticnet / week 0.02</span></span></code></pre></div>
+<span><span class="co">#&gt; weights  elasticnet / month 0.63   elasticnet / week 0.32   1nn / month 0.05</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="the-combination">The combination<a class="anchor" aria-label="anchor" href="#the-combination"></a>
@@ -470,7 +459,7 @@ fitting anything.</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/ensemble_weights.html">ensemble_weights</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   elasticnet / day  elasticnet / week elasticnet / month </span></span>
-<span><span class="co">#&gt;         0.06361574         0.31413520         0.62224906</span></span></code></pre></div>
+<span><span class="co">#&gt;         0.01476295         0.30154490         0.68369215</span></span></code></pre></div>
 <p>The weights say how much of the combination each candidate carries,
 and a weight at zero is one the combination reached past. Where the
 ensemble line of the plot above sits over every curve the candidates are
@@ -558,9 +547,9 @@ the ladder a run reports as a curve, reachable on its own.</p>
 <span><span class="va">lad</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_ladder.html">grain_ladder</a></span><span class="op">(</span><span class="va">set</span>, <span class="va">fit</span><span class="op">$</span><span class="va">y</span>, <span class="fu"><a href="../reference/elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, folds <span class="op">=</span> <span class="va">fit</span><span class="op">$</span><span class="va">folds</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">lad</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      learner grain     score n_variable  best</span></span>
-<span><span class="co">#&gt; 1 elasticnet   day 0.7600661          6 FALSE</span></span>
-<span><span class="co">#&gt; 2 elasticnet  week 0.7580820          6 FALSE</span></span>
-<span><span class="co">#&gt; 3 elasticnet month 0.7669444          6  TRUE</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 elasticnet   day 0.7492328          6 FALSE</span></span>
+<span><span class="co">#&gt; 2 elasticnet  week 0.7520106          6 FALSE</span></span>
+<span><span class="co">#&gt; 3 elasticnet month 0.7766667          6  TRUE</span></span></code></pre></div>
 <p>A claim about one step of that curve rests on the paired contrast.
 The difference is taken inside each cell both arms scored, averaged
 within a response, and summarised across the responses, which are the
@@ -569,19 +558,19 @@ and the rank test behind <code>p_value</code> has few values to work
 with.</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/paired_contrast.html">paired_contrast</a></span><span class="op">(</span><span class="va">lad</span>, <span class="st">"month|elasticnet"</span>, <span class="st">"day|elasticnet"</span><span class="op">)</span></span>
-<span><span class="co">#&gt;                  a              b        diff      lower      upper n_variable</span></span>
-<span><span class="co">#&gt; 1 month|elasticnet day|elasticnet 0.006878307 -0.0333819 0.04713851          6</span></span>
-<span><span class="co">#&gt;   n_cell n_favour p_value</span></span>
-<span><span class="co">#&gt; 1     30        5  0.4375</span></span></code></pre></div>
+<span><span class="co">#&gt;                  a              b       diff       lower     upper n_variable</span></span>
+<span><span class="co">#&gt; 1 month|elasticnet day|elasticnet 0.02743386 -0.03813488 0.0930026          6</span></span>
+<span><span class="co">#&gt;   n_cell n_favour p_value p_method</span></span>
+<span><span class="co">#&gt; 1     30        5  0.3125    exact</span></span></code></pre></div>
 <p>Where the whole curve is the question rather than one step of it,
 <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code> fits a mixed model on the per-cell scores
 and compares every grain against the best one, correcting for the
 comparisons made and no others.</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/grain_contrasts.html">grain_contrasts</a></span><span class="op">(</span><span class="va">lad</span><span class="op">)</span></span>
-<span><span class="co">#&gt;      learner grain reference         diff       lower      upper   p_value</span></span>
-<span><span class="co">#&gt; 1 elasticnet   day     month -0.006878307 -0.08968085 0.07592423 0.9746602</span></span>
-<span><span class="co">#&gt; 2 elasticnet  week     month -0.008862434 -0.09166497 0.07394010 0.9583672</span></span></code></pre></div>
+<span><span class="co">#&gt;      learner grain reference        diff      lower      upper   p_value</span></span>
+<span><span class="co">#&gt; 1 elasticnet   day     month -0.02743386 -0.1117228 0.05685503 0.6848011</span></span>
+<span><span class="co">#&gt; 2 elasticnet  week     month -0.02465608 -0.1089450 0.05963281 0.7347945</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="what-was-read">What was read<a class="anchor" aria-label="anchor" href="#what-was-read"></a>
@@ -596,10 +585,10 @@ fall in score as that bin’s weight. Nothing is refitted.</p>
 <span><span class="va">weight</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/occlusion.html">occlusion</a></span><span class="op">(</span><span class="va">kept</span>, <span class="st">"elasticnet / month"</span>, permutations <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span><span class="va">weight</span> <span class="op">~</span> <span class="va">part</span>, <span class="va">weight</span>, <span class="va">mean</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                   part     weight</span></span>
-<span><span class="co">#&gt; 1 2021-09-01T00:00:00Z 0.08493122</span></span>
-<span><span class="co">#&gt; 2 2021-10-01T00:00:00Z 0.11823016</span></span>
-<span><span class="co">#&gt; 3 2021-11-01T00:00:00Z 0.08207407</span></span>
-<span><span class="co">#&gt; 4 2021-12-01T00:00:00Z 0.06296561</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 2021-09-01T00:00:00Z 0.10539947</span></span>
+<span><span class="co">#&gt; 2 2021-10-01T00:00:00Z 0.12886508</span></span>
+<span><span class="co">#&gt; 3 2021-11-01T00:00:00Z 0.08716138</span></span>
+<span><span class="co">#&gt; 4 2021-12-01T00:00:00Z 0.07247354</span></span></code></pre></div>
 <p>Holding a channel back instead asks what each statistic of a grain
 carries, which is the question behind keeping a bin’s extremes at
 all.</p>

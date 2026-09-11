@@ -23,15 +23,19 @@ paired_contrast(ladder, a, b)
 
 - a, b:
 
-  The two arms, each given as `"learner"` or `"grain|learner"`. Naming a
-  learner alone takes its best grain.
+  The two arms, each named `"grain|learner"`.
 
 ## Value
 
-A one-row data frame: the mean per-variable difference, a 95 percent
-interval from its standard error across variables, the number of
-variables the difference favours, the paired cells and variables it
-rests on, and a Wilcoxon signed-rank p-value.
+A one-row data frame: the mean per-variable difference; a 95 percent
+interval from its standard error across variables, on Student's t with
+one degree of freedom fewer than there are variables; the number of
+variables the difference favours; the paired cells and variables it
+rests on; a Wilcoxon signed-rank p-value; and `p_method`, `"exact"`
+where the p-value is read off the exact distribution and `"normal"`
+where it is the normal approximation with continuity and tie
+corrections, which it is when the per-variable differences hold a zero
+or a tie or number fifty or more.
 
 ## Details
 
@@ -41,6 +45,18 @@ where presences are thin, both arms carry the same bias on the same
 cell, and it cancels in the difference. That is why the levels a ladder
 reports are upper bounds while the differences between arms are read at
 face value.
+
+An arm is named whole, by its grain and its learner. A learner named
+alone would have to take its best grain, and that grain is chosen on the
+held-out scores the contrast is then read off: the difference becomes
+one between two maxima, favouring whichever learner ran across more
+grains, and neither the interval nor the p-value accounts for the
+choice. It is the mechanism
+[`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
+measures one level down, and here pairing does not cancel it.
+[`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+chooses a grain on inner folds instead, and its `compare` argument
+contrasts the selection with the arms of a ladder on matched cells.
 
 ## Examples
 

@@ -436,7 +436,7 @@ arm(self, name: str)
 ```
 
 A mask over the rows of one grain-and-learner arm, named
-`grain/learner`.
+`grain|learner`.
 
 ### `summary()`
 
