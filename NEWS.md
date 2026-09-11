@@ -36,6 +36,16 @@
   folds, and not an interval for a new sample. On a simulated design with a measured truth
   (150 replicates, five outer folds, AUC) it covered 0.925 of the time with an error-SD to
   standard-error ratio of 1.23, where the nested interval covered 0.955 at one repetition (#73).
+* `inst/reproduce/schrankogel.R` runs the demonstration's own procedure through the public
+  interface: a `selection` stage searching the study's 33 candidates, a window and a summary each,
+  with `select_grain()` on the convolutional encoder, over the study's outer fold map and its own
+  inner partition, which ships beside the script as `inner_folds.csv`. Beside it a `series` arm
+  fits the penalised model on the weekly coldest-day, mean and warmest-day reading of the record
+  rather than on summaries of it, which is the comparison the demonstration is read against. Every
+  comparison with a published number states its tolerance before anything is fitted and lands in
+  `checks.csv`; `run.meta` now records the torch and libtorch versions and the device; and
+  `--smoke=<folds>,<species>` runs the stages on a few of each, names its output `smoke_` and
+  compares nothing (#74).
 * `grain_matrix()` documents what a day is in a zone that keeps daylight saving time: a
   wall-clock day, 23 hours on the day the clock goes forward and 25 on the day it goes back, with
   the week and the month holding them an hour shorter or longer, and 24-hour days on a record kept

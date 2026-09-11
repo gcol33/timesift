@@ -23,14 +23,64 @@ map every number below was checked against, and the default.
 |---|---|---|
 | `contract` | the species filter, the fold map, the mask of scorable cells | `cells.csv` |
 | `representation` | the record at all seven grains, with every bin count asserted | `representation.csv` |
-| `baseline` | the aggregated-feature arms on the deposit's 188 variables | `baseline.csv` |
+| `baseline` | the aggregated-feature arms on the deposit's 188 variables, and the penalised fit on the weekly three-channel series | `baseline.csv`, `baseline_series.csv` |
+| `selection` | the study's own procedure through `select_grain()`: 33 candidates, ten outer folds, the study's five inner folds, the convolutional encoder | `selection.csv`, `selection_inner.csv`, `selection_cells_auc.csv`, `selection_cells_tss.csv`, `selection_contrast.csv` |
 | `networks` | the encoders, and the eleven-member set, across the ladder | `networks_mean.csv`, `networks_extremeday.csv` |
 | `contrasts` | every pair of arms, paired inside each cell both scored | `contrasts.csv` |
 | `grains` | each grain against its architecture's best, from the mean-reading network grid | `grain_contrasts.csv` |
 | `inflation` | what the reported levels are upper bounds on, and the level each reported score implies | `inflation.csv`, `implied_skill.csv` |
 
 The contract stage always runs, since everything downstream reads its response and its folds. The
-default is every stage but `networks`.
+default is every stage but `networks` and `selection`, the two that fit encoders.
+
+## The selection stage
+
+The demonstration in the paper chooses one of 33 candidates inside each outer training set, on five
+inner folds, by the area under the curve, and refits the winner on the whole training set. That is
+what `select_grain()` does, so this stage is the demonstration rather than a description of it:
+
+```
+Rscript schrankogel.R <deposit_dir> <out_dir> --stages=contract,baseline,selection \
+  --baseline=series --epochs=60
+```
+
+A candidate is a window and a summary. The mean is defined at all seven windows, the reading-level
+minimum and maximum and their three-channel pair from the half-daily window up, and the two
+day-level pairs from the weekly window up, since they reduce to whole days first: 7 + 6 + 6 + 6 + 4
++ 4 = 33. Each is given the two calendar channels the encoders of the study read.
+
+The inner partition is the study's own, `inner_folds.csv` beside the script, which holds one inner
+fold per (outer fold, training plot). `--inner=build` deals five inner folds per outer training set
+with `fold_map()` instead, which is a different partition of the same design.
+
+It is 1,660 encoder fits at the full candidate set: ten outer folds by five inner folds by 33
+candidates, plus one refit per outer fold. The two finest windows are 26,304 and 2,192 steps per
+plot and want a graphics processor. `--grains` narrows the windows, and a narrowed run says how
+many candidates it searched rather than asserting 33.
+
+## Smoke runs
+
+`--smoke=<outer folds>,<species>` runs the stages on a few folds and the most frequent species, to
+see them run before an overnight one. It names every file it writes `smoke_`, records itself as a
+smoke run in `run.meta`, and compares nothing with the study. Its output is not the reproduction.
+
+## What each comparison is made at
+
+Every comparison with a published number states its tolerance in the script before anything is
+fitted, and `checks.csv` holds the table: the quantity, what this run got, what the study reported,
+the difference, the tolerance and whether it is inside. Nothing stops the run, so a number outside
+its tolerance is a finding rather than a crash.
+
+The selected window is compared exactly: the study's five-inner-fold selection chose a weekly
+candidate in all ten outer folds. Which weekly summary won is reported and not compared: in five of
+the ten folds the best and second-best inner scores differ by less than 0.0013, and in one by
+0.00001, which is inside the seed noise of a single encoder fit.
+
+## The environment on the output
+
+`run.meta` records the R version and platform, the package version, and the torch and libtorch
+versions and the device, since a network fitted under another libtorch or on another device does
+not return the same weights.
 
 ## Options
 
@@ -39,9 +89,13 @@ default is every stage but `networks`.
   five coarse grains; `native` and `halfday` are 26,304 and 2,192 steps per plot and want a
   graphics processor, as they had in the study.
 - `--learners` which encoders, plus `ensemble` for the eleven-member set. Default `cnn`.
-- `--baseline` which aggregated-feature arms: `elastic_net`, `stepwise`, or both. Default
-  `elastic_net`. Forward selection over 188 columns is one fit per candidate per step per species
-  per fold and takes many hours single-threaded.
+- `--baseline` which arms: `elastic_net` and `stepwise` on the deposit's 188 aggregated variables,
+  `series` for the penalised fit on the weekly coldest-day, mean and warmest-day reading of the
+  record itself, or several. Default `elastic_net`. Forward selection over 188 columns is one fit
+  per candidate per step per species per fold and takes many hours single-threaded.
+- `--inner` a CSV of `outer_fold`, `logger_ID` and `inner_fold`. Default `inner_folds.csv` beside
+  the script, the study's own inner partition; `--inner=build` deals its own.
+- `--smoke` `<outer folds>,<species>`, see Smoke runs.
 - `--folds` a CSV of `logger_ID` and `fold`. Default `folds.csv` beside the script, the study's
   own map. `--folds=build` draws a map with `fold_map()` instead, which is a different partition
   of the same design: `fold_map()` draws on R's random stream and the study's map came from

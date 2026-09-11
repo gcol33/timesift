@@ -223,6 +223,93 @@ combined <- ensemble_combine(stack, oof[arms])
 `combined` is then scored on the same cells and by the same metric as every other arm, which is
 what the driver appends to the grid under the name `ensemble`.
 
+## The procedure the demonstration reports
+
+The grid above is every candidate scored on the same folds, which is the measurement. The
+demonstration is one step above it: inside each outer training set the study chose one of 33
+candidates on five inner folds by the area under the curve, refitted the winner on the whole
+training set and predicted the held-out plots once. `select_grain()` is that procedure, so
+reproducing the demonstration is this call rather than a description of it.
+
+A candidate is a window and a summary. The mean is defined at all seven windows, the reading-level
+extremes and their three-channel pair from the half-daily window up, and the two day-level pairs
+from the weekly window up, since those reduce to whole days first.
+
+```{r candidates}
+summaries <- list(mean = "mean", min = "min", max = "max",
+                  minmeanmax = c("min", "mean", "max"),
+                  dailyextreme = c("mean_daily_min", "mean", "mean_daily_max"),
+                  extremeday = c("cold_day", "mean", "warm_day"))
+candidates <- timesift_set(unlist(lapply(names(summaries), function(s) {
+  windows <- if (s == "mean") names(binning)
+             else if (s %in% c("dailyextreme", "extremeday")) c("week", "month", "season", "year")
+             else setdiff(names(binning), "native")
+  setNames(lapply(windows, function(w) {
+    x <- grain_matrix(readings, logger_ID, date, temp, grain = binning[[w]], stats = summaries[[s]])
+    bind_channels(x, calendar_channels(x))
+  }), paste(windows, s, sep = "."))
+}), recursive = FALSE))
+length(candidates)
+#> [1] 33
+```
+
+The inner partition is an artifact too. The study wrote one inner fold per outer fold and training
+plot, and the package ships it beside the reproduction script; `select_grain()` takes `inner` as a
+function of the training response, so reading that file back is what makes the inner splits the
+study's own rather than a fresh deal.
+
+```{r inner}
+inner <- read.csv(system.file("reproduce", "inner_folds.csv", package = "timesift"))
+inner$logger_ID <- as.character(inner$logger_ID)
+
+inner_split <- function(y_train) {
+  # The fit is handed its training response and nothing else, so which outer fold it sits in is
+  # read off the plots it does not hold.
+  left_out <- unique(folds[setdiff(names(folds), rownames(y_train))])
+  rows <- inner[inner$outer_fold == left_out, ]
+  setNames(as.integer(rows$inner_fold), rows$logger_ID)[rownames(y_train)]
+}
+
+selection <- select_grain(candidates, y, cnn(epochs = 60, batch_size = 32),
+                          folds = folds, inner = inner_split, metric = "roc_auc")
+selection$selected
+```
+
+That is ten outer folds by five inner folds by 33 candidates, plus one refit per outer fold: 1,660
+encoder fits, which is an overnight run on a graphics processor and is why the stage is not on by
+default. What comes back is the score of the procedure, selection included, rather than the score
+of the window it happened to choose, and `selection$inner` holds every candidate's inner score in
+every outer fold, which is where a choice made on a hair's difference is visible.
+
+The arm that choice is read against is the penalised model on the same weekly three-channel
+series, which is the study's own comparison:
+
+```{r series}
+weekly <- grain_matrix(readings, logger_ID, date, temp, grain = "week",
+                        stats = c("cold_day", "mean", "warm_day"))
+series <- grain_ladder(timesift_set(list(series = weekly)), y,
+                       list(elastic_net = elasticnet(alpha = 0.5, n_inner = 5, squares = TRUE)),
+                       folds = folds)
+```
+
+157 weeks by three channels is 471 numbers per plot, and with their squares the penalised fit reads
+942 columns.
+
+## The environment a fitted encoder carries
+
+A representation is arithmetic on the record and reproduces exactly. A fitted network does not: its
+weights depend on the library that trained it and on the device it trained on. The reproduction
+script therefore records both beside every number it writes, in `run.meta`:
+
+```{r environment}
+torch::torch_config()$libtorch_version
+torch::cuda_is_available()
+```
+
+The study's grid ran on one CUDA device; a run on a processor gives the same shapes and not the
+same weights, which is why the network cells are compared to the seed noise the paper measures
+rather than to the digit.
+
 ## The grain contrast
 
 The table of every grain against its architecture's best is a mixed model on the per-cell scores,
