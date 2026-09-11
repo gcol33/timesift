@@ -119,9 +119,12 @@ fitted model read.</p>
 <h2 id="tss">
 <code>tss()</code><a class="anchor" aria-label="anchor" href="#tss"></a>
 </h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>tss(y, p)</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>tss(y, p, threshold<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
 <p>Sensitivity plus specificity minus one, at the threshold that
 maximises it.</p>
+<p>Given a <code>threshold</code> learned elsewhere, the score is read
+at that cut instead, presence being predicted at
+<code>p &gt;= threshold</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="roc_auc">
@@ -180,7 +183,7 @@ alone, never from a model, which is what keeps two arms comparable.</p>
 <h2 id="paired_contrast">
 <code>paired_contrast()</code><a class="anchor" aria-label="anchor" href="#paired_contrast"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>paired_contrast(ladder: Ladder, a: <span class="bu">str</span>, b: <span class="bu">str</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>paired_contrast(ladder: Ladder, a: <span class="bu">str</span>, b: <span class="bu">str</span>, interval: <span class="bu">str</span> <span class="op">=</span> <span class="st">'variables'</span>)</span></code></pre></div>
 <p>The difference between two arms, taken inside each cell both
 scored.</p>
 <p>Two arms scored on the same held-out units do not necessarily have
@@ -198,6 +201,11 @@ Student’s t on one degree of freedom fewer than there are variables, and
 <code>"exact"</code> or the <code>"normal"</code> approximation, which
 it is when the per-variable differences hold a zero or a tie or number
 fifty or more.</p>
+<p><code>interval="nested_cv"</code> replaces that interval with one for
+the difference in the two arms’ risk on a new sample, by the nested
+cross-validation of Bates, Hastie and Tibshirani (2024) read on the
+difference of the two arms’ cell scores, which needs a ladder fitted
+with <code>grain_ladder(interval="nested_cv")</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="tss_inflation">

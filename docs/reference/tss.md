@@ -7,7 +7,7 @@ one the shipped presence-absence response is scored by.
 ## Usage
 
 ``` r
-tss(y, p)
+tss(y, p, threshold = NULL)
 ```
 
 ## Arguments
@@ -20,6 +20,11 @@ tss(y, p)
 
   Predicted scores for the same units, in the same order. Higher means
   presence.
+
+- threshold:
+
+  `NULL` for the maximum over every cut, or one cut, presence being
+  predicted at `p >= threshold`.
 
 ## Value
 
@@ -39,7 +44,10 @@ defined here, and it inflates the level where presences are thin.
 measures that inflation for a given design, and it cancels in the paired
 differences
 [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md)
-takes.
+takes. Given a `threshold` learned elsewhere, the score is read at that
+cut instead, which is what
+[`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+reports under `threshold =` with a cut learned on the inner folds.
 
 ## Examples
 
@@ -47,4 +55,5 @@ takes.
 tss(c(0, 0, 1, 1), c(0.1, 0.2, 0.8, 0.9))
 tss(c(0, 0, 1, 1), c(0.9, 0.8, 0.2, 0.1))
 tss(c(0, 0, 0, 0), c(0.1, 0.2, 0.8, 0.9))
+tss(c(0, 0, 1, 1), c(0.1, 0.6, 0.8, 0.9), threshold = 0.5)
 ```

@@ -441,10 +441,10 @@ test behind `p_value` has few values to work with.
 ``` r
 
 paired_contrast(lad, "month|elasticnet", "day|elasticnet")
-#>                  a              b       diff       lower     upper n_variable
-#> 1 month|elasticnet day|elasticnet 0.02743386 -0.03813488 0.0930026          6
-#>   n_cell n_favour p_value p_method
-#> 1     30        5  0.3125    exact
+#>                  a              b       diff     center       lower     upper
+#> 1 month|elasticnet day|elasticnet 0.02743386 0.02743386 -0.03813488 0.0930026
+#>   n_variable n_cell n_favour p_value p_method  interval
+#> 1          6     30        5  0.3125    exact variables
 ```
 
 Where the whole curve is the question rather than one step of it,

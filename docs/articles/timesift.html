@@ -558,10 +558,10 @@ and the rank test behind <code>p_value</code> has few values to work
 with.</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/paired_contrast.html">paired_contrast</a></span><span class="op">(</span><span class="va">lad</span>, <span class="st">"month|elasticnet"</span>, <span class="st">"day|elasticnet"</span><span class="op">)</span></span>
-<span><span class="co">#&gt;                  a              b       diff       lower     upper n_variable</span></span>
-<span><span class="co">#&gt; 1 month|elasticnet day|elasticnet 0.02743386 -0.03813488 0.0930026          6</span></span>
-<span><span class="co">#&gt;   n_cell n_favour p_value p_method</span></span>
-<span><span class="co">#&gt; 1     30        5  0.3125    exact</span></span></code></pre></div>
+<span><span class="co">#&gt;                  a              b       diff     center       lower     upper</span></span>
+<span><span class="co">#&gt; 1 month|elasticnet day|elasticnet 0.02743386 0.02743386 -0.03813488 0.0930026</span></span>
+<span><span class="co">#&gt;   n_variable n_cell n_favour p_value p_method  interval</span></span>
+<span><span class="co">#&gt; 1          6     30        5  0.3125    exact variables</span></span></code></pre></div>
 <p>Where the whole curve is the question rather than one step of it,
 <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code> fits a mixed model on the per-cell scores
 and compares every grain against the best one, correcting for the

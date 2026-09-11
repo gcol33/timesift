@@ -1532,8 +1532,40 @@ has no name to be rebuilt from and travels whole.</li>
 <li>
 <code><a href="../reference/select_grain.html">select_grain()</a></code> searches the candidates in the order the
 grains and the learners were declared in, so which candidate an exact
-tie on the inner score falls to does not depend on how the names
-sort.</li>
+tie on the inner score falls to does not depend on how the names sort.
+Its <code>rule</code> is <code>"argmax"</code> by default.
+<code>"coarsest_adequate"</code> takes, among the candidates whose inner
+score is at least the highest minus that candidate’s standard error (the
+standard deviation over the inner folds of each fold’s mean over its
+scored variables, over the square root of the fold count), the one with
+the fewest bins, then the fewest channels, then the higher score, then
+the one declared first; a standard error that cannot be computed is
+zero. Each outer fold reports the chosen score, the highest score and
+that standard error. With a <code>threshold</code> rule, each outer fold
+learns one cut per variable by <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> on the
+selected candidate’s inner out-of-fold predictions of the outer training
+units, and the test fold is read at it by <code>tss(threshold =)</code>,
+presence at <code>p &gt;= threshold</code>; the estimate row is
+<code>tss_inner_cut</code>.</li>
+<li>Every estimate and every contrast names the interval it carries.
+<code>"variables"</code> is the spread across the response variables of
+the dataset, on Student’s t with one degree of freedom fewer than there
+are variables. <code>"nested_cv"</code> is the nested cross-validation
+interval of Bates, Hastie and Tibshirani (2024):
+<code><a href="../reference/select_grain.html">select_grain()</a></code> and <code><a href="../reference/grain_ladder.html">grain_ladder()</a></code> take it as
+<code>interval</code> with <code>repeats</code> fold maps, the first
+being the map already cross-validated on, and each repetition fits the
+procedure or the arm once per unordered pair of outer folds;
+<code><a href="../reference/paired_contrast.html">paired_contrast()</a></code> reads it on the difference of two arms of
+a ladder fitted with it. A fold’s score is the mean over the variables
+scorable in it, the inner estimate is averaged as the reported estimate
+is, the variance of a fold’s score is its delete-one jackknife variance
+over that fold’s units, the root mean squared error is rescaled by
+<code>(K - 1) / K</code> and held between the jackknife standard error
+of the estimate and <code>sqrt(K)</code> times it, and the centre
+carries the paper’s bias correction. Two tables whose contrast is read
+must carry the same response, maps, <code>repeats</code> and
+<code>seed</code>.</li>
 <li>
 <code>models</code> takes one learner, a set or list of them, or the
 name of a registered one, and <code>learners</code> on a ladder takes

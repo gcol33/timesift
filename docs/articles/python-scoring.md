@@ -7,11 +7,14 @@ model read.
 ## `tss()`
 
 ``` python
-tss(y, p)
+tss(y, p, threshold=None)
 ```
 
 Sensitivity plus specificity minus one, at the threshold that maximises
 it.
+
+Given a `threshold` learned elsewhere, the score is read at that cut
+instead, presence being predicted at `p >= threshold`.
 
 ## `roc_auc()`
 
@@ -75,7 +78,7 @@ alone, never from a model, which is what keeps two arms comparable.
 ## `paired_contrast()`
 
 ``` python
-paired_contrast(ladder: Ladder, a: str, b: str)
+paired_contrast(ladder: Ladder, a: str, b: str, interval: str = 'variables')
 ```
 
 The difference between two arms, taken inside each cell both scored.
@@ -94,6 +97,12 @@ The interval is Student’s t on one degree of freedom fewer than there
 are variables, and `p_method` says whether the signed-rank p-value is
 `"exact"` or the `"normal"` approximation, which it is when the
 per-variable differences hold a zero or a tie or number fifty or more.
+
+`interval="nested_cv"` replaces that interval with one for the
+difference in the two arms’ risk on a new sample, by the nested
+cross-validation of Bates, Hastie and Tibshirani (2024) read on the
+difference of the two arms’ cell scores, which needs a ladder fitted
+with `grain_ladder(interval="nested_cv")`.
 
 ## `tss_inflation()`
 

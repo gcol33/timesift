@@ -106,6 +106,10 @@ is what an ecologist applying it to a new site would run.</p>
 <span>  <span class="va">learners</span>,</span>
 <span>  folds <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  inner <span class="op">=</span> <span class="fl">5L</span>,</span>
+<span>  rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"argmax"</span>, <span class="st">"coarsest_adequate"</span><span class="op">)</span>,</span>
+<span>  threshold <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  interval <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"variables"</span>, <span class="st">"nested_cv"</span><span class="op">)</span>,</span>
+<span>  repeats <span class="op">=</span> <span class="fl">1L</span>,</span>
 <span>  response <span class="op">=</span> <span class="st">"presence_absence"</span>,</span>
 <span>  metric <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  compare <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -145,6 +149,31 @@ defaults of <code><a href="fold_map.html">fold_map()</a></code> when not given.<
 <dd><p>Number of inner folds the selection is made on, or a function of the outer training
 response returning a fold map for those units. A count deals the inner folds by the grouping
 the outer fold map carries, so what <code><a href="cv.html">grouped_cv()</a></code> kept whole outside stays whole inside.</p></dd>
+
+
+<dt id="arg-rule">rule<a class="anchor" aria-label="anchor" href="#arg-rule"></a></dt>
+<dd><p>How a candidate is chosen from its inner scores. <code>"argmax"</code> takes the highest.
+<code>"coarsest_adequate"</code> takes the coarsest candidate whose inner score lies within one standard
+error of the highest, the one-standard-error rule of Breiman, Friedman, Olshen and Stone
+(1984) and of Hastie, Tibshirani and Friedman (2009, section 7.10) with coarseness in place of
+model complexity. See Choosing a candidate.</p></dd>
+
+
+<dt id="arg-threshold">threshold<a class="anchor" aria-label="anchor" href="#arg-threshold"></a></dt>
+<dd><p><code>NULL</code>, or the rule of <code><a href="kappa_score.html">decision_threshold()</a></code> a presence-absence cut is learned
+by: <code>"youden"</code>, the cut that maximises TSS, <code>"kappa"</code> or <code>"prevalence"</code>. See A cut learned
+inside the training data.</p></dd>
+
+
+<dt id="arg-interval">interval<a class="anchor" aria-label="anchor" href="#arg-interval"></a></dt>
+<dd><p>Which interval to report beside the across-variable one, which is always
+reported: <code>"variables"</code> for that one alone, or <code>"nested_cv"</code> for an interval for the
+procedure's risk. See What the interval is for.</p></dd>
+
+
+<dt id="arg-repeats">repeats<a class="anchor" aria-label="anchor" href="#arg-repeats"></a></dt>
+<dd><p>Repetitions of the nested cross-validation, each on its own fold map. The first
+is the map the estimate was computed on.</p></dd>
 
 
 <dt id="arg-response">response<a class="anchor" aria-label="anchor" href="#arg-response"></a></dt>
@@ -187,12 +216,21 @@ so no two outer folds inherit the same inner partition.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <code>timesift_selection</code>: a list carrying <code>selected</code>, one row per outer fold with the
-candidate it chose and the inner score it chose on; <code>estimate</code>, the nested score under every
+candidate it chose, the inner score it chose on, the highest inner score in that fold
+(<code>inner_best</code>) and that score's standard error (<code>inner_se</code>); <code>estimate</code>, the nested score under every
 registered metric with its standard error across variables; <code>contrast</code>, one
 <code><a href="paired_contrast.html">paired_contrast()</a></code> row against each arm of <code>compare</code>, or <code>NULL</code>; <code>candidates</code>, the set that
 was searched; and <code>scores</code>, the per-cell rows of the selected procedure under the selection
 metric, in the layout <code><a href="grain_ladder.html">grain_ladder()</a></code> returns. The held-out prediction of every unit is in
-the <code>predictions</code> attribute and the scorable-cell mask in <code>cells</code>.</p>
+the <code>predictions</code> attribute and the scorable-cell mask in <code>cells</code>. <code>inner</code> holds every
+candidate's inner score and standard error in every outer fold. With <code>threshold</code> set, the
+estimate carries the score, its interval and the interval's name in <code>interval</code>, one row per
+metric and interval. With <code>interval = "nested_cv"</code> it also carries <code>nested_cv</code>, the same rows
+with the estimator's own quantities beside them, and <code>final</code>, the procedure fitted on every
+unit, whose risk that interval is for. With <code>threshold</code> set, the
+estimate carries one further row, <code>tss_inner_cut</code>, the procedure's TSS at the learned cuts;
+<code>thresholds</code> holds the cut of every outer fold and variable; and <code>cut_scores</code> the per-cell
+rows it is averaged from, in the layout of <code>scores</code>. Both are <code>NULL</code> otherwise.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -206,6 +244,75 @@ the amount selection buys itself, and the difference between the two is the quan
 function exists to keep out of a reported number. It also does not say the selected grain is the
 one a mechanism acts at; it says that grain predicted best on the units the selector saw.</p>
 <p>The cost is the ladder's, multiplied by the number of inner folds: <code>v_outer * (v_inner * candidates + 1)</code> fits. With a neural learner that is where an overnight run goes.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="choosing-a-candidate">Choosing a candidate<a class="anchor" aria-label="anchor" href="#choosing-a-candidate"></a></h2>
+
+
+<p>Inside each outer fold every candidate carries an inner score, the mean over variables of its
+per-variable mean over the inner folds, and a standard error, the standard deviation over the
+inner folds of the fold's own score (the mean over the variables scored in that fold) divided by
+the square root of the number of inner folds. <code>rule = "argmax"</code> takes the highest inner score,
+and on an exact tie the candidate declared first.</p>
+<p><code>rule = "coarsest_adequate"</code> first finds that highest score and its standard error, calls every
+candidate scoring at least the highest minus one standard error adequate, and takes the coarsest
+adequate one. Coarseness is read off the representation as the package holds it: fewer bins is
+coarser, and between two candidates with the same number of bins, fewer channels is coarser.
+A tie on both goes to the higher inner score, then to the candidate declared first. Where one
+candidate scores more than a standard error above every other, the two rules agree; where the
+inner profile is flat, this one returns the least storage the record can be kept at without a
+measured loss inside the training data. A standard error that cannot be computed, because a
+candidate was scored in fewer than two inner folds, is taken as zero, so the rule falls back to
+the candidates tied with the highest score.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="what-the-interval-is-for">What the interval is for<a class="anchor" aria-label="anchor" href="#what-the-interval-is-for"></a></h2>
+
+
+<p>The across-variable interval, the one every level of the package reports, is the estimate plus
+or minus a Student's t quantile times the standard error across the response variables. Its
+spread is the spread of true skill between variables, and it cannot see the error every
+variable shares, since all of them are fitted and scored on the same units and the same folds.
+It is an interval over the variables of this dataset, and not an interval for what the
+procedure would score on a new sample.</p>
+<p><code>interval = "nested_cv"</code> adds one that is, by the nested cross-validation of Bates, Hastie and
+Tibshirani (2024). Inside every repetition, each outer training set is cross-validated again
+over the remaining folds of the same map, which gives the mean squared error of a
+cross-validation estimate as the difference of two terms it can estimate: the squared gap
+between the inner estimate and the held-out fold's score, less the variance of that fold's
+score. The paper's error is a mean of per-unit losses; here a fold's score is the mean over the
+variables scorable in it, the inner estimate is averaged as the reported estimate is, and the
+variance of a fold's score is its delete-one jackknife variance over the units of the fold,
+which for a mean of per-unit losses is exactly the paper's <code>var(e) / |I_k|</code>. The square root of
+the estimated mean squared error is held between the jackknife standard error of the estimate
+and the square root of the fold count times it, as the paper's section 4.3.2 has it, and the
+centre carries its bias correction, so the interval is for the risk of the procedure fitted on
+a sample of this size, which is the fit <code>final</code> holds.</p>
+<p>The cost is the selection's, multiplied: one repetition fits the procedure once for every
+unordered pair of outer folds, <code>v_outer * (v_outer - 1) / 2</code> fits, and every repetition after
+the first refits the outer folds as well. More repetitions steady the estimate of the mean
+squared error; the paper uses two hundred random splits, which is affordable where a fit is
+cheap and is not where a fit is a neural network.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="a-cut-learned-inside-the-training-data">A cut learned inside the training data<a class="anchor" aria-label="anchor" href="#a-cut-learned-inside-the-training-data"></a></h2>
+
+
+<p>TSS read at the cut that maximises it on the scored units is biased upward, most where presences
+are few (<code><a href="tss_inflation.html">tss_inflation()</a></code>). With <code>threshold</code> set, each outer fold learns one cut per variable
+on the inner out-of-fold predictions of the candidate it selected, which the inner search has
+already made for every outer training unit, by <code><a href="kappa_score.html">decision_threshold()</a></code> under the rule named. The
+cut is then frozen and the outer test fold's predictions are read at it by <code><a href="tss.html">tss()</a></code>. No unit of
+an outer test fold enters the cut its own fold is read at. The inner out-of-fold predictions
+come from models fitted on part of the outer training set and the held-out predictions from
+the refit on all of it, so the cut is learned on predictions of the same candidate from slightly
+smaller training sets.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>Bates, S., Hastie, T. and Tibshirani, R. (2024). Cross-validation: what does it
+estimate and how well does it do it? <em>Journal of the American Statistical Association</em>
+<strong>119</strong>(546), 1434-1445. <a href="https://doi.org/10.1080/01621459.2023.2197686" class="external-link">doi:10.1080/01621459.2023.2197686</a></p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

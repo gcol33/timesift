@@ -10,7 +10,7 @@ being the independent replicates.
 ## Usage
 
 ``` r
-paired_contrast(ladder, a, b)
+paired_contrast(ladder, a, b, interval = c("variables", "nested_cv"))
 ```
 
 ## Arguments
@@ -25,15 +25,27 @@ paired_contrast(ladder, a, b)
 
   The two arms, each named `"grain|learner"`.
 
+- interval:
+
+  Which interval the row carries. `"variables"` is the spread across the
+  response variables of this dataset. `"nested_cv"` is an interval for
+  the difference in the two arms' risk on a new sample, by the nested
+  cross-validation of Bates, Hastie and Tibshirani (2024) read on the
+  difference of the two arms' cell scores, which needs a ladder fitted
+  with `grain_ladder(interval = "nested_cv")`. The paper gives the
+  estimator for one procedure's error and names the difference between
+  two as an extension; the identity its estimator rests on is on the
+  difference of two losses as much as on one.
+
 ## Value
 
-A one-row data frame: the mean per-variable difference; a 95 percent
-interval from its standard error across variables, on Student's t with
-one degree of freedom fewer than there are variables; the number of
-variables the difference favours; the paired cells and variables it
-rests on; a Wilcoxon signed-rank p-value; and `p_method`, `"exact"`
-where the p-value is read off the exact distribution and `"normal"`
-where it is the normal approximation with continuity and tie
+A one-row data frame: the mean per-variable difference; the centre of
+the interval and its bounds, on Student's t across variables or on
+nested cross-validation as `interval` names, which the row carries; the
+number of variables the difference favours; the paired cells and
+variables it rests on; a Wilcoxon signed-rank p-value; and `p_method`,
+`"exact"` where the p-value is read off the exact distribution and
+`"normal"` where it is the normal approximation with continuity and tie
 corrections, which it is when the per-variable differences hold a zero
 or a tie or number fifty or more.
 
@@ -57,6 +69,13 @@ measures one level down, and here pairing does not cancel it.
 [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
 chooses a grain on inner folds instead, and its `compare` argument
 contrasts the selection with the arms of a ladder on matched cells.
+
+## References
+
+Bates, S., Hastie, T. and Tibshirani, R. (2024). Cross-validation: what
+does it estimate and how well does it do it? *Journal of the American
+Statistical Association* **119**(546), 1434-1445.
+[doi:10.1080/01621459.2023.2197686](https://doi.org/10.1080/01621459.2023.2197686)
 
 ## Examples
 

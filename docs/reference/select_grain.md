@@ -20,6 +20,10 @@ select_grain(
   learners,
   folds = NULL,
   inner = 5L,
+  rule = c("argmax", "coarsest_adequate"),
+  threshold = NULL,
+  interval = c("variables", "nested_cv"),
+  repeats = 1L,
   response = "presence_absence",
   metric = NULL,
   compare = NULL,
@@ -70,6 +74,35 @@ summary(object, ...)
   [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md)
   kept whole outside stays whole inside.
 
+- rule:
+
+  How a candidate is chosen from its inner scores. `"argmax"` takes the
+  highest. `"coarsest_adequate"` takes the coarsest candidate whose
+  inner score lies within one standard error of the highest, the
+  one-standard-error rule of Breiman, Friedman, Olshen and Stone (1984)
+  and of Hastie, Tibshirani and Friedman (2009, section 7.10) with
+  coarseness in place of model complexity. See Choosing a candidate.
+
+- threshold:
+
+  `NULL`, or the rule of
+  [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+  a presence-absence cut is learned by: `"youden"`, the cut that
+  maximises TSS, `"kappa"` or `"prevalence"`. See A cut learned inside
+  the training data.
+
+- interval:
+
+  Which interval to report beside the across-variable one, which is
+  always reported: `"variables"` for that one alone, or `"nested_cv"`
+  for an interval for the procedure's risk. See What the interval is
+  for.
+
+- repeats:
+
+  Repetitions of the nested cross-validation, each on its own fold map.
+  The first is the map the estimate was computed on.
+
 - response:
 
   Name of the registered response head.
@@ -116,16 +149,28 @@ summary(object, ...)
 ## Value
 
 A `timesift_selection`: a list carrying `selected`, one row per outer
-fold with the candidate it chose and the inner score it chose on;
-`estimate`, the nested score under every registered metric with its
-standard error across variables; `contrast`, one
+fold with the candidate it chose, the inner score it chose on, the
+highest inner score in that fold (`inner_best`) and that score's
+standard error (`inner_se`); `estimate`, the nested score under every
+registered metric with its standard error across variables; `contrast`,
+one
 [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md)
 row against each arm of `compare`, or `NULL`; `candidates`, the set that
 was searched; and `scores`, the per-cell rows of the selected procedure
 under the selection metric, in the layout
 [`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md)
 returns. The held-out prediction of every unit is in the `predictions`
-attribute and the scorable-cell mask in `cells`.
+attribute and the scorable-cell mask in `cells`. `inner` holds every
+candidate's inner score and standard error in every outer fold. With
+`threshold` set, the estimate carries the score, its interval and the
+interval's name in `interval`, one row per metric and interval. With
+`interval = "nested_cv"` it also carries `nested_cv`, the same rows with
+the estimator's own quantities beside them, and `final`, the procedure
+fitted on every unit, whose risk that interval is for. With `threshold`
+set, the estimate carries one further row, `tss_inner_cut`, the
+procedure's TSS at the learned cuts; `thresholds` holds the cut of every
+outer fold and variable; and `cut_scores` the per-cell rows it is
+averaged from, in the layout of `scores`. Both are `NULL` otherwise.
 
 ## Details
 
@@ -148,6 +193,92 @@ that grain predicted best on the units the selector saw.
 The cost is the ladder's, multiplied by the number of inner folds:
 `v_outer * (v_inner * candidates + 1)` fits. With a neural learner that
 is where an overnight run goes.
+
+## Choosing a candidate
+
+Inside each outer fold every candidate carries an inner score, the mean
+over variables of its per-variable mean over the inner folds, and a
+standard error, the standard deviation over the inner folds of the
+fold's own score (the mean over the variables scored in that fold)
+divided by the square root of the number of inner folds.
+`rule = "argmax"` takes the highest inner score, and on an exact tie the
+candidate declared first.
+
+`rule = "coarsest_adequate"` first finds that highest score and its
+standard error, calls every candidate scoring at least the highest minus
+one standard error adequate, and takes the coarsest adequate one.
+Coarseness is read off the representation as the package holds it: fewer
+bins is coarser, and between two candidates with the same number of
+bins, fewer channels is coarser. A tie on both goes to the higher inner
+score, then to the candidate declared first. Where one candidate scores
+more than a standard error above every other, the two rules agree; where
+the inner profile is flat, this one returns the least storage the record
+can be kept at without a measured loss inside the training data. A
+standard error that cannot be computed, because a candidate was scored
+in fewer than two inner folds, is taken as zero, so the rule falls back
+to the candidates tied with the highest score.
+
+## What the interval is for
+
+The across-variable interval, the one every level of the package
+reports, is the estimate plus or minus a Student's t quantile times the
+standard error across the response variables. Its spread is the spread
+of true skill between variables, and it cannot see the error every
+variable shares, since all of them are fitted and scored on the same
+units and the same folds. It is an interval over the variables of this
+dataset, and not an interval for what the procedure would score on a new
+sample.
+
+`interval = "nested_cv"` adds one that is, by the nested
+cross-validation of Bates, Hastie and Tibshirani (2024). Inside every
+repetition, each outer training set is cross-validated again over the
+remaining folds of the same map, which gives the mean squared error of a
+cross-validation estimate as the difference of two terms it can
+estimate: the squared gap between the inner estimate and the held-out
+fold's score, less the variance of that fold's score. The paper's error
+is a mean of per-unit losses; here a fold's score is the mean over the
+variables scorable in it, the inner estimate is averaged as the reported
+estimate is, and the variance of a fold's score is its delete-one
+jackknife variance over the units of the fold, which for a mean of
+per-unit losses is exactly the paper's `var(e) / |I_k|`. The square root
+of the estimated mean squared error is held between the jackknife
+standard error of the estimate and the square root of the fold count
+times it, as the paper's section 4.3.2 has it, and the centre carries
+its bias correction, so the interval is for the risk of the procedure
+fitted on a sample of this size, which is the fit `final` holds.
+
+The cost is the selection's, multiplied: one repetition fits the
+procedure once for every unordered pair of outer folds,
+`v_outer * (v_outer - 1) / 2` fits, and every repetition after the first
+refits the outer folds as well. More repetitions steady the estimate of
+the mean squared error; the paper uses two hundred random splits, which
+is affordable where a fit is cheap and is not where a fit is a neural
+network.
+
+## A cut learned inside the training data
+
+TSS read at the cut that maximises it on the scored units is biased
+upward, most where presences are few
+([`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)).
+With `threshold` set, each outer fold learns one cut per variable on the
+inner out-of-fold predictions of the candidate it selected, which the
+inner search has already made for every outer training unit, by
+[`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+under the rule named. The cut is then frozen and the outer test fold's
+predictions are read at it by
+[`tss()`](https://gillescolling.com/timesift/reference/tss.md). No unit
+of an outer test fold enters the cut its own fold is read at. The inner
+out-of-fold predictions come from models fitted on part of the outer
+training set and the held-out predictions from the refit on all of it,
+so the cut is learned on predictions of the same candidate from slightly
+smaller training sets.
+
+## References
+
+Bates, S., Hastie, T. and Tibshirani, R. (2024). Cross-validation: what
+does it estimate and how well does it do it? *Journal of the American
+Statistical Association* **119**(546), 1434-1445.
+[doi:10.1080/01621459.2023.2197686](https://doi.org/10.1080/01621459.2023.2197686)
 
 ## See also
 

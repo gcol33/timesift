@@ -4,6 +4,87 @@
 
 ### New
 
+- `select_grain(rule = "coarsest_adequate")` takes, inside each outer
+  fold, the coarsest candidate whose inner score lies within one
+  standard error of the highest, where `"argmax"`, still the default,
+  takes the highest. Coarser is fewer bins, then fewer channels. The
+  standard error is the spread over the inner folds of each fold’s
+  score, so the rule reads nothing the selection did not already
+  compute. Where the inner profile is flat it returns the least storage
+  the record can be kept at without a measured loss inside the training
+  data; where one candidate separates by more than a standard error the
+  two rules agree. Every outer fold now reports the highest inner score
+  (`inner_best`) and its standard error (`inner_se`) beside the chosen
+  one, and `inner` carries each candidate’s standard error. On both
+  sides.
+
+- `select_grain(threshold = "youden")` learns a presence-absence cut
+  inside the training data. Each outer fold takes one cut per variable
+  from the inner out-of-fold predictions of the candidate it selected,
+  which the inner search already made for every outer training unit and
+  for no other, by
+  [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+  under the rule named, and reads its test fold at that cut, frozen. The
+  estimate gains a row `tss_inner_cut`, and the selection carries
+  `thresholds` and the per-cell `cut_scores`.
+  [`tss()`](https://gillescolling.com/timesift/reference/tss.md) takes
+  the cut it is read at as `threshold`, left `NULL` for the maximum over
+  cuts as before. On a binormal design with a planted skill of 0.60 the
+  learned cut reads it back within Monte Carlo error, where the maximum
+  over cuts on the same cells does not. On both sides.
+
+- An interval for the procedure’s risk, by the nested cross-validation
+  of Bates, Hastie and Tibshirani (2024).
+  `select_grain(interval = "nested_cv")` cross-validates each outer
+  training set again over the remaining folds of the same map, over
+  `repeats` maps, and reports the estimate’s mean squared error the way
+  the paper’s Algorithm 1 does, rescaled and bounded as its section
+  4.3.2 states and centred on its bias correction; `final` is then the
+  procedure fitted on every unit, whose risk the interval is for.
+  `grain_ladder(interval = "nested_cv")` does the same for every arm,
+  and `paired_contrast(interval = "nested_cv")` reads it on the
+  difference between two. The paper’s error is a mean of per-unit
+  losses, so a fold’s score here is the mean over the variables scorable
+  in it and the variance of that score is its delete-one jackknife
+  variance, which for a mean of per-unit losses is exactly the paper’s
+  `var(e) / |I_k|`.
+
+- The estimate and the contrast now name what their interval is for. The
+  across-variable interval is still reported and now carries
+  `interval = "variables"`, `lower` and `upper`: it is the spread across
+  the response variables of one dataset, all of them fitted and scored
+  on the same units and folds, and not an interval for a new sample. On
+  a simulated design with a measured truth (150 replicates, five outer
+  folds, AUC) it covered 0.925 of the time with an error-SD to
+  standard-error ratio of 1.23, where the nested interval covered 0.955
+  at one repetition
+  ([\#73](https://github.com/gcol33/timesift/issues/73)).
+
+- `inst/reproduce/schrankogel.R` runs the demonstration’s own procedure
+  through the public interface: a `selection` stage searching the
+  study’s 33 candidates, a window and a summary each, with
+  [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+  on the convolutional encoder, over the study’s outer fold map and its
+  own inner partition, which ships beside the script as
+  `inner_folds.csv`. Beside it a `series` arm fits the penalised model
+  on the weekly coldest-day, mean and warmest-day reading of the record
+  rather than on summaries of it, which is the comparison the
+  demonstration is read against. Every comparison with a published
+  number states its tolerance before anything is fitted and lands in
+  `checks.csv`; `run.meta` now records the torch and libtorch versions
+  and the device; and `--smoke=<folds>,<species>` runs the stages on a
+  few of each, names its output `smoke_` and compares nothing
+  ([\#74](https://github.com/gcol33/timesift/issues/74)).
+
+- [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
+  documents what a day is in a zone that keeps daylight saving time: a
+  wall-clock day, 23 hours on the day the clock goes forward and 25 on
+  the day it goes back, with the week and the month holding them an hour
+  shorter or longer, and 24-hour days on a record kept on a fixed offset
+  or carried in one such as `"Etc/GMT-1"`. Nothing in the binning
+  changed; a test on both sides pins the Europe/Vienna transitions of
+  2021 at both offsets.
+
 - [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
   lays the binning out as a count of readings per `(unit, bin)`, over
   every bin the calendar tiles the record with.

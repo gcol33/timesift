@@ -100,6 +100,9 @@ point where making the record finer stops paying.</p>
 <span>  metric <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  control <span class="op">=</span> <span class="fu"><a href="train_control.html">train_control</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  keep_fits <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  interval <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"variables"</span>, <span class="st">"nested_cv"</span><span class="op">)</span>,</span>
+<span>  repeats <span class="op">=</span> <span class="fl">1L</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">1L</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -148,6 +151,22 @@ names.</p></dd>
 <dt id="arg-keep-fits">keep_fits<a class="anchor" aria-label="anchor" href="#arg-keep-fits"></a></dt>
 <dd><p>Keep every per-fold fitted model, which is what lets <code><a href="occlusion.html">occlusion()</a></code> read a
 fitted model without refitting it.</p></dd>
+
+
+<dt id="arg-interval">interval<a class="anchor" aria-label="anchor" href="#arg-interval"></a></dt>
+<dd><p><code>"nested_cv"</code> refits every arm inside every outer training set, which is what
+<code><a href="paired_contrast.html">paired_contrast()</a></code> reads an interval for the difference in risk off. <code>"variables"</code>, the
+default, fits nothing further, and a contrast is then read across the response variables.</p></dd>
+
+
+<dt id="arg-repeats">repeats<a class="anchor" aria-label="anchor" href="#arg-repeats"></a></dt>
+<dd><p>Repetitions of the nested cross-validation, each on its own fold map. The first
+is the map the ladder was cross-validated on.</p></dd>
+
+
+<dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
+<dd><p>Seed the repetitions' fold maps are drawn under. Two tables whose contrast is to be
+read take the same <code>folds</code>, <code>repeats</code> and <code>seed</code>.</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>

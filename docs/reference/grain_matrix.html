@@ -192,6 +192,14 @@ zone is resolved once, at the edge: below it the binning works in local time, wh
 midnight to lose. A bin start is a local time, so reporting it back as an instant needs a rule:
 one the clock skipped resolves to the instant the clock jumped to, one the clock repeated to
 the first of the two. Instants are read at whole seconds.</p>
+<p>In a zone that keeps daylight saving time a day is therefore a wall-clock day: the day the clock
+goes forward spans 23 hours and the day it goes back 25, and the week and the month holding
+them one hour less or more. Hourly readings carried in <code>"Europe/Vienna"</code> give a 2021-03-28 day
+of 23 readings and a 2021-10-31 day of 25. A record kept on a fixed offset, as the Schrankogel
+deposit is (26,304 hourly readings, 1,096 days of 24), bins into days of 24 hours; a series
+carried in a daylight-saving zone bins that way too once its <code>tzone</code> is set to the fixed
+offset of standard time, such as <code>"Etc/GMT-1"</code> for Central European Time, whose days then run
+from 01:00 to 01:00 on the summer clock.</p>
 <p>The <code>"native"</code> grain is the one grain not read on that clock: its bin is the reading itself,
 so the two readings of an hour a zone repeats are two bins, and the record read at <code>"native"</code>
 is the same array whichever zone it is carried in.</p>

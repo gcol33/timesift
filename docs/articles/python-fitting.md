@@ -308,6 +308,9 @@ grain_ladder(
     metric=None,
     control=None,
     keep_fits: bool = False,
+    interval: str = 'variables',
+    repeats: int = 1,
+    seed: int = 1,
     verbose: bool = True,
 )
 ```
@@ -326,6 +329,12 @@ the other with `read_folds`.
 `control` is the `train_control` every neural learner of the ladder
 trains under; a learner carrying settings of its own overrides it on the
 ones it names.
+
+`interval="nested_cv"` refits every arm inside every outer training set
+of every repetition, which is what
+`paired_contrast(interval="nested_cv")` reads an interval for the
+difference in risk off. Two tables whose contrast is to be read take the
+same `folds`, `repeats` and `seed`.
 
 ## `fit_learner()`
 
@@ -358,6 +367,10 @@ select_grain(
     learners,
     folds=None,
     inner=5,
+    rule: str = 'argmax',
+    threshold: str | None = None,
+    interval: str = 'variables',
+    repeats: int = 1,
     response: str = 'presence_absence',
     metric=None,
     compare: Ladder | None = None,
@@ -390,6 +403,39 @@ The cost is the ladder’s, multiplied by the number of inner folds:
 the inner search and in the refit alike; a learner carrying settings of
 its own overrides it on the ones it names.
 
+Inside each outer fold every candidate carries an inner score, the mean
+over variables of its per-variable mean over the inner folds, and a
+standard error, the standard deviation over the inner folds of the
+fold’s own score divided by the square root of their number. `rule`
+chooses among them. `"argmax"` takes the highest score, and on an exact
+tie the candidate declared first. `"coarsest_adequate"` is the
+one-standard-error rule (Breiman, Friedman, Olshen and Stone 1984;
+Hastie, Tibshirani and Friedman 2009, section 7.10) with coarseness in
+place of complexity: every candidate scoring at least the highest minus
+its standard error is adequate, and the one with the fewest bins wins,
+then the fewest channels, then the higher score, then the one declared
+first. A standard error that cannot be computed is taken as zero.
+
+`threshold` names a rule of `decision_threshold` (`"youden"`, the cut
+that maximises TSS, `"kappa"` or `"prevalence"`). With it set, each
+outer fold learns one cut per variable on the inner out-of-fold
+predictions of the candidate it selected, which cover the outer training
+units and nothing else, freezes it, and reads the outer test fold’s
+predictions at it with `tss`. The estimate then carries a row
+`tss_inner_cut`, `thresholds` the cut of every outer fold and variable,
+and `cut_scores` the per-cell rows.
+
+The estimate carries the interval across the response variables, which
+is the spread between the variables of this dataset rather than an
+interval for what the procedure would score on a new sample.
+`interval="nested_cv"` adds one that is, by the nested cross-validation
+of Bates, Hastie and Tibshirani (2024): each outer training set is
+cross-validated again over the remaining folds of the same map, over
+`repeats` fold maps, which gives the mean squared error of a
+cross-validation estimate; `final` then holds the procedure fitted on
+every unit, whose risk the interval is for. One repetition costs one fit
+of the procedure per unordered pair of outer folds.
+
 ## `Ladder`
 
 ``` python
@@ -407,6 +453,7 @@ Ladder(
     scorer,
     response,
     fits,
+    ncv,
 )
 ```
 
@@ -428,6 +475,7 @@ Attributes:
 - `scorer` - object
 - `response` - str
 - `fits` - dict
+- `ncv` - dict \| None
 
 ### `arm()`
 
@@ -480,7 +528,23 @@ Predictions for a representation, as a `[unit, variable]` matrix.
 ## `Selection`
 
 ``` python
-Selection(selected, estimate, contrast, candidates, scores, inner, metric, response)
+Selection(
+    selected,
+    estimate,
+    contrast,
+    candidates,
+    scores,
+    inner,
+    metric,
+    response,
+    rule,
+    threshold,
+    thresholds,
+    cut_scores,
+    interval,
+    nested_cv,
+    final,
+)
 ```
 
 What a nested selection chose, what it scores, and what it was searched
@@ -496,3 +560,10 @@ Attributes:
 - `inner` - list\[dict\]
 - `metric` - str
 - `response` - str
+- `rule` - str
+- `threshold` - str \| None
+- `thresholds` - list\[dict\] \| None
+- `cut_scores` - Ladder \| None
+- `interval` - str
+- `nested_cv` - list\[dict\] \| None
+- `final` - dict \| None

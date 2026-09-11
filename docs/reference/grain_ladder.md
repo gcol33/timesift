@@ -18,6 +18,9 @@ grain_ladder(
   metric = NULL,
   control = train_control(),
   keep_fits = FALSE,
+  interval = c("variables", "nested_cv"),
+  repeats = 1L,
+  seed = 1L,
   verbose = TRUE
 )
 
@@ -76,6 +79,25 @@ summary(object, ...)
   Keep every per-fold fitted model, which is what lets
   [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md)
   read a fitted model without refitting it.
+
+- interval:
+
+  `"nested_cv"` refits every arm inside every outer training set, which
+  is what
+  [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md)
+  reads an interval for the difference in risk off. `"variables"`, the
+  default, fits nothing further, and a contrast is then read across the
+  response variables.
+
+- repeats:
+
+  Repetitions of the nested cross-validation, each on its own fold map.
+  The first is the map the ladder was cross-validated on.
+
+- seed:
+
+  Seed the repetitions' fold maps are drawn under. Two tables whose
+  contrast is to be read take the same `folds`, `repeats` and `seed`.
 
 - verbose:
 
