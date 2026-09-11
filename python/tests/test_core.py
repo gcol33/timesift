@@ -258,6 +258,45 @@ def test_the_two_readings_of_a_repeated_hour_are_two_native_bins():
     np.testing.assert_array_equal(day.values, o["values"])
 
 
+def test_a_day_in_a_daylight_saving_zone_is_a_wall_clock_day_and_a_fixed_offsets_is_24_hours():
+    # Hourly readings across both of Europe/Vienna's 2021 transitions, each record starting at
+    # local midnight of a Monday and running two weeks and one hour.
+    def record(start):
+        t0 = np.datetime64(start, "s")
+        t = t0 + np.arange(24 * 14 + 1) * np.timedelta64(1, "h")
+        return {"id": ["a"] * len(t) + ["b"] * len(t), "t": list(t) * 2,
+                "v": [1.0] * (2 * len(t))}
+
+    def n_of(x, zone, local):
+        at = [str(np.datetime64(b, "s").astype("datetime64[s]")) for b in x.bin_start]
+        from zoneinfo import ZoneInfo
+        from datetime import datetime, timezone
+        day = [datetime.fromisoformat(a).replace(tzinfo=timezone.utc).astimezone(ZoneInfo(zone))
+               .strftime("%Y-%m-%d") for a in at]
+        return [int(x.bin_n[0][day.index(d)]) for d in local]
+
+    def bins(data, grain, zone):
+        return grain_matrix(data, "id", "t", "v", grain=grain, stats="mean", tz=zone,
+                            partial="keep")
+
+    march, october = record("2021-03-21T23:00:00"), record("2021-10-24T22:00:00")
+    vienna = "Europe/Vienna"
+    assert n_of(bins(march, "day", vienna), vienna,
+                ["2021-03-27", "2021-03-28", "2021-03-29"]) == [24, 23, 24]
+    assert n_of(bins(october, "day", vienna), vienna,
+                ["2021-10-30", "2021-10-31", "2021-11-01"]) == [24, 25, 24]
+    assert n_of(bins(march, "week", vienna), vienna, ["2021-03-22", "2021-03-29"]) == [167, 168]
+    assert n_of(bins(october, "week", vienna), vienna, ["2021-10-25", "2021-11-01"]) == [169, 168]
+
+    # The same instants on the fixed offset of standard time: every whole day is 24 readings and
+    # every whole week 168.
+    for data in (march, october):
+        for grain, n in (("day", 24), ("week", 168)):
+            x = bins(data, grain, "Etc/GMT-1")
+            whole = ~np.asarray(x.bin_partial)
+            assert (np.asarray(x.bin_n)[:, whole] == n).all()
+
+
 def test_core_reproduces_the_oracle_on_a_series_carried_in_a_zone_that_moves_its_clock():
     from oracle import oracle_local_clock
 

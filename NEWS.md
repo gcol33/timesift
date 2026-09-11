@@ -20,6 +20,11 @@
   maximum over cuts as before. On a binormal design with a planted skill of 0.60 the learned cut
   reads it back within Monte Carlo error, where the maximum over cuts on the same cells does not.
   On both sides.
+* `grain_matrix()` documents what a day is in a zone that keeps daylight saving time: a
+  wall-clock day, 23 hours on the day the clock goes forward and 25 on the day it goes back, with
+  the week and the month holding them an hour shorter or longer, and 24-hour days on a record kept
+  on a fixed offset or carried in one such as `"Etc/GMT-1"`. Nothing in the binning changed; a
+  test on both sides pins the Europe/Vienna transitions of 2021 at both offsets.
 
 * `coverage()` lays the binning out as a count of readings per `(unit, bin)`, over every bin the
   calendar tiles the record with. `grain_matrix()` refuses a record where a unit misses a bin

@@ -248,6 +248,44 @@ test_that("the two readings of an hour a zone repeats are two `native` bins", {
   expect_identical(as.vector(unclass(day)), as.vector(o$values))
 })
 
+test_that("a day in a daylight-saving zone is a wall-clock day and a fixed offset's is 24 hours", {
+  # Hourly readings across both of Europe/Vienna's 2021 transitions: 28 March, when 02:00 CET
+  # jumps to 03:00 CEST, and 31 October, when 03:00 CEST falls back to 02:00 CET.
+  # Each record starts at local midnight of a Monday and runs two weeks and one hour.
+  record <- function(from, zone) {
+    t <- seq(as.POSIXct(from, tz = "UTC"), by = "hour", length.out = 24 * 14 + 1)
+    attr(t, "tzone") <- zone
+    data.frame(id = rep(c("a", "b"), each = length(t)), t = rep(t, 2), v = 1)
+  }
+  bins <- function(d, grain) grain_matrix(d, id, t, v, grain = grain, stats = "mean",
+                                          partial = "keep")
+  n_of <- function(x, local) {
+    at <- format(attr(x, "bin_start"), "%Y-%m-%d", tz = attr(attr(x, "bin_start"), "tzone"))
+    unname(attr(x, "bin_n")["a", match(local, at)])
+  }
+
+  march <- record("2021-03-21 23:00", "Europe/Vienna")
+  october <- record("2021-10-24 22:00", "Europe/Vienna")
+  expect_identical(n_of(bins(march, "day"), c("2021-03-27", "2021-03-28", "2021-03-29")),
+                   c(24L, 23L, 24L))
+  expect_identical(n_of(bins(october, "day"), c("2021-10-30", "2021-10-31", "2021-11-01")),
+                   c(24L, 25L, 24L))
+  expect_identical(n_of(bins(march, "week"), c("2021-03-22", "2021-03-29")), c(167L, 168L))
+  expect_identical(n_of(bins(october, "week"), c("2021-10-25", "2021-11-01")), c(169L, 168L))
+
+  # The same instants on the fixed offset of standard time: every whole day is 24 readings and
+  # every whole week 168, and a summer day starts at 01:00 on the Vienna clock.
+  for (d in list(record("2021-03-21 23:00", "Etc/GMT-1"), record("2021-10-24 22:00", "Etc/GMT-1"))) {
+    day <- bins(d, "day")
+    week <- bins(d, "week")
+    expect_true(all(attr(day, "bin_n")[, !attr(day, "bin_partial")] == 24L))
+    expect_true(all(attr(week, "bin_n")[, !attr(week, "bin_partial")] == 168L))
+  }
+  fixed <- attr(bins(record("2021-03-21 23:00", "Etc/GMT-1"), "day"), "bin_start")
+  expect_identical(format(fixed[format(fixed, "%Y-%m-%d", tz = "Etc/GMT-1") == "2021-03-29"],
+                          "%H:%M", tz = "Europe/Vienna"), "01:00")
+})
+
 test_that("the core reproduces the oracle on a series carried in a zone that moves its clock", {
   set.seed(20260908)
   # Across both of Europe/Vienna's transitions in 2021, at a sampling step that puts two readings
