@@ -21,11 +21,22 @@
 #'
 #' @param ladder A [grain_ladder()] result.
 #' @param a,b The two arms, each named `"grain|learner"`.
+#' @param interval Which interval the row carries. `"variables"` is the spread across the response
+#'   variables of this dataset. `"nested_cv"` is an interval for the difference in the two arms'
+#'   risk on a new sample, by the nested cross-validation of Bates, Hastie and Tibshirani (2024)
+#'   read on the difference of the two arms' cell scores, which needs a ladder fitted with
+#'   `grain_ladder(interval = "nested_cv")`. The paper gives the estimator for one procedure's
+#'   error and names the difference between two as an extension; the identity its estimator rests
+#'   on is on the difference of two losses as much as on one.
 #'
-#' @return A one-row data frame: the mean per-variable difference; a 95 percent interval from its
-#'   standard error across variables, on Student's t with one degree of freedom fewer than there
-#'   are variables; the number of variables the difference favours; the paired cells and variables
-#'   it rests on; a Wilcoxon signed-rank p-value; and `p_method`, `"exact"` where the p-value is
+#' @references Bates, S., Hastie, T. and Tibshirani, R. (2024). Cross-validation: what does it
+#'   estimate and how well does it do it? *Journal of the American Statistical Association*
+#'   **119**(546), 1434-1445. \doi{10.1080/01621459.2023.2197686}
+#'
+#' @return A one-row data frame: the mean per-variable difference; the centre of the interval and
+#'   its bounds, on Student's t across variables or on nested cross-validation as `interval`
+#'   names, which the row carries; the number of variables the difference favours; the paired
+#'   cells and variables it rests on; a Wilcoxon signed-rank p-value; and `p_method`, `"exact"` where the p-value is
 #'   read off the exact distribution and `"normal"` where it is the normal approximation with
 #'   continuity and tie corrections, which it is when the per-variable differences hold a zero or
 #'   a tie or number fifty or more.
@@ -46,7 +57,8 @@
 #' paired_contrast(lad, "week|elasticnet", "month|elasticnet")
 #'
 #' @export
-paired_contrast <- function(ladder, a, b) {
+paired_contrast <- function(ladder, a, b, interval = c("variables", "nested_cv")) {
+  interval <- .check_interval(interval[1L])
   ra <- .arm_rows(ladder, a)
   rb <- .arm_rows(ladder, b)
   key_a <- paste(ra$variable, ra$fold)
@@ -62,12 +74,24 @@ paired_contrast <- function(ladder, a, b) {
 
   n <- length(per_variable)
   d <- mean(per_variable)
+  centre <- d
   half <- .t_margin(stats::sd(per_variable) / sqrt(n), n)
+  lower <- d - half
+  upper <- d + half
+  if (interval == "nested_cv") {
+    scorer <- attr(ladder, "scorer") %||% .metrics_reg$get(attr(ladder, "metric"))
+    iv <- .ncv_read(.ncv_of(ladder), c(attr(ra, "label"), attr(rb, "label")),
+                    attr(ladder, "response") %||% "presence_absence", scorer)
+    centre <- iv$center
+    lower <- iv$lower
+    upper <- iv$upper
+  }
   test <- .signed_rank(per_variable)
-  data.frame(a = attr(ra, "label"), b = attr(rb, "label"), diff = d,
-             lower = d - half, upper = d + half,
+  data.frame(a = attr(ra, "label"), b = attr(rb, "label"), diff = d, center = centre,
+             lower = lower, upper = upper,
              n_variable = n, n_cell = length(shared), n_favour = sum(per_variable > 0),
-             p_value = test$p, p_method = test$method, stringsAsFactors = FALSE)
+             p_value = test$p, p_method = test$method, interval = interval,
+             stringsAsFactors = FALSE)
 }
 
 # The half-width of a 95 percent interval on a mean of `n` independent replicates with standard

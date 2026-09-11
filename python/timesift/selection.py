@@ -7,12 +7,15 @@ choose. This does the choosing inside the training data instead.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
-from .ladder import (Ladder, concat_ladders, grain_ladder, ladder_from_rows, learner_dict,
-                     mean_se, paired_contrast, per_variable, place, score_arm)
+from . import interval as ncv_module
+from ._stats import t_ppf
+from .interval import check_interval, interval_target
+from .ladder import (Ladder, aligned_predictions, concat_ladders, grain_ladder, ladder_from_rows,
+                     learner_dict, mean_se, paired_contrast, per_variable, place, score_arm)
 from .learners import fit_learner
 from .metrics import THRESHOLD_RULES, decision_threshold, tss
 from .registry import METRICS, RESPONSES, metrics
@@ -45,6 +48,9 @@ class Selection:
     threshold: str | None = None
     thresholds: list[dict] | None = None
     cut_scores: Ladder | None = None
+    interval: str = "variables"
+    nested_cv: list[dict] | None = None
+    final: dict | None = None
 
     def __repr__(self) -> str:  # pragma: no cover - display only
         picked: dict[str, int] = {}
@@ -57,12 +63,15 @@ class Selection:
         for row in self.estimate:
             mark = " <- selected on" if row["metric"] == self.metric else ""
             lines.append(f"  {row['metric']:<12} {row['score']:.4f} "
-                         f"(se {row['se']:.4f}, {row['n_variable']} variables){mark}")
+                         f"({row['lower']:.4f} to {row['upper']:.4f}, {row['interval']}){mark}")
+        for kind in dict.fromkeys(row["interval"] for row in self.estimate):
+            lines.append(f"  {kind}: {interval_target(kind)}")
         return "\n".join(lines)
 
 
 def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
-                 threshold: str | None = None, response: str = "presence_absence", metric=None,
+                 threshold: str | None = None, interval: str = "variables", repeats: int = 1,
+                 response: str = "presence_absence", metric=None,
                  compare: Ladder | None = None, control=None, seed: int = 1,
                  verbose: bool = True) -> Selection:
     """Choose the grain inside each outer fold's training units, then score the whole procedure.
@@ -99,11 +108,21 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
     training units and nothing else, freezes it, and reads the outer test fold's predictions at it
     with ``tss``. The estimate then carries a row ``tss_inner_cut``, ``thresholds`` the cut of
     every outer fold and variable, and ``cut_scores`` the per-cell rows.
+
+    The estimate carries the interval across the response variables, which is the spread between
+    the variables of this dataset rather than an interval for what the procedure would score on a
+    new sample. ``interval="nested_cv"`` adds one that is, by the nested cross-validation of Bates,
+    Hastie and Tibshirani (2024): each outer training set is cross-validated again over the
+    remaining folds of the same map, over ``repeats`` fold maps, which gives the mean squared error
+    of a cross-validation estimate; ``final`` then holds the procedure fitted on every unit, whose
+    risk the interval is for. One repetition costs one fit of the procedure per unordered pair of
+    outer folds.
     """
     if rule not in RULES:
         raise ValueError(f"rule must be one of {RULES}, got {rule!r}")
     if threshold is not None and threshold not in THRESHOLD_RULES:
         raise ValueError(f"threshold must be None or one of {THRESHOLD_RULES}, got {threshold!r}")
+    check_interval(interval)
     grains = timesift_set(x)
     units = grains.units
     spec = RESPONSES.get(response)
@@ -122,7 +141,7 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
     metric = metric or spec["metric"]
     score = METRICS.get(metric)
     split = _inner_splitter(inner, folds.group)
-    _check_compare(compare, metric)
+    _check_compare(compare, metric, interval)
     # The candidate set keeps the order its grains and its learners were declared in, so which
     # candidate an exact tie on the inner score falls to does not depend on how the names sort.
     learners = learner_dict(learners)
@@ -131,6 +150,8 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
         raise ValueError("selection needs at least two candidates; "
                          "got one grain and one learner")
     size = {c["grain"]: grains[c["grain"]].values.shape[1:] for c in candidates}
+    ctx = dict(grains=grains, y=y, learners=learners, candidates=candidates, size=size, rule=rule,
+               split=split, response=response, metric=metric, control=control, group=folds.group)
 
     levels = np.unique(f)
     p = np.full(y.values.shape, np.nan)
@@ -143,24 +164,9 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
         test = np.flatnonzero(f == k)
         y_train = y.take_units(train)
 
-        # The selector sees the outer training units and nothing else: the inner map is drawn on
-        # them, and the representation it searches over is cut to them before any fitting happens.
-        lad = grain_ladder(_subset(grains, train), y_train, learners,
-                            folds=split(y_train, seed + i, train), response=response,
-                            metric=metric, control=control, verbose=False)
-        grid = _join_candidates(candidates, lad.summary(), _inner_se(lad), int(k))
-        if not any(np.isfinite(g["score"]) for g in grid):
-            raise ValueError(f"no candidate scored inside the training data of fold {k}. Widen "
-                             "the inner folds or drop the variables that cannot be scored.")
-        best = _first_best(grid)
-        won = _choose_candidate(grid, size, rule)
-
-        fit = fit_learner(learners[won["learner"]], grains[won["grain"]].take_units(train),
-                          y_train, response=response, control=control,
-                          group=None if folds.group is None
-                          else tuple(folds.group[i] for i in train))
-        held = grains[won["grain"]].take_units(test)
-        place(p, y, held.units, fit.variables, fit.predict(held))
+        once = _select_once(ctx, train, test, seed + i, fold=int(k))
+        lad, grid, best, won = once["lad"], once["grid"], once["best"], once["won"]
+        p[test] = once["pred"]
 
         # The cut is learned on the selected candidate's inner out-of-fold predictions, which
         # cover the outer training units and nothing else.
@@ -183,6 +189,27 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
         metric=metric, scorer=score, response=response, fits={})
 
     estimate = _nested_estimate(y, p, f, levels, cells, response)
+    ncv = nested = final = None
+    if interval == "nested_cv":
+        # The procedure fitted once on every unit is the model the interval is for.
+        whole = _select_once(ctx, np.arange(len(units)), np.empty(0, dtype=int), seed)
+        final = dict(grain=whole["won"]["grain"], learner=whole["won"]["learner"],
+                     fit=whole["fit"], inner=whole["grid"])
+        maps = ncv_module.ncv_maps(y, f, folds.group, repeats, seed)
+        if verbose:
+            print(f"nested cross-validation: {len(maps)} repetition(s) of {len(levels)} "
+                  "outer folds")
+
+        def fit_predict(train, test, tag):
+            return _select_once(ctx, train, test,
+                                seed + 10007 * tag[0] + 101 * tag[1] + tag[2])["pred"]
+
+        ncv = ncv_module.record(y, maps,
+                                {SELECTED_ARM: ncv_module.keep_runs(
+                                    ncv_module.ncv_collect(fit_predict, y, maps, p))})
+        scores = replace(scores, ncv=ncv)
+        nested = _nested_cv_estimate(ncv, SELECTED_ARM, response)
+        estimate = estimate + [{k: row[k] for k in estimate[0]} for row in nested]
     thresholds = cut_scores = None
     if threshold is not None:
         thresholds = [dict(fold=k, variable=v, threshold=c, rule=threshold)
@@ -194,10 +221,40 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
         estimate.append(_estimate_row(INNER_CUT_METRIC, cut_scores))
 
     return Selection(selected=chosen, estimate=estimate,
-                     contrast=_selection_contrast(scores, compare),
+                     contrast=_selection_contrast(scores, compare, interval),
                      candidates=candidates, scores=scores, inner=inner_rows,
                      metric=metric, response=response, rule=rule, threshold=threshold,
-                     thresholds=thresholds, cut_scores=cut_scores)
+                     thresholds=thresholds, cut_scores=cut_scores, interval=interval,
+                     nested_cv=nested, final=final)
+
+
+def _select_once(ctx: dict, train, test, split_seed: int, fold: int | None = None) -> dict:
+    """One fit of the whole procedure: the inner search on the training units, the rule, the refit
+    of the chosen candidate on all of them, and its predictions for the test units. The outer folds
+    of ``select_grain`` and every fit of its nested cross-validation go through this."""
+    y_train = ctx["y"].take_units(train)
+    # The selector sees the training units and nothing else: the inner map is drawn on them, and
+    # the representation it searches over is cut to them before any fitting happens.
+    lad = grain_ladder(_subset(ctx["grains"], train), y_train, ctx["learners"],
+                       folds=ctx["split"](y_train, split_seed, train), response=ctx["response"],
+                       metric=ctx["metric"], control=ctx["control"], verbose=False)
+    grid = _join_candidates(ctx["candidates"], lad.summary(), _inner_se(lad),
+                            -1 if fold is None else fold)
+    if not any(np.isfinite(g["score"]) for g in grid):
+        where = "a fit of the nested cross-validation" if fold is None else f"fold {fold}"
+        raise ValueError(f"no candidate scored inside the training data of {where}. Widen the "
+                         "inner folds or drop the variables that cannot be scored.")
+    best = _first_best(grid)
+    won = _choose_candidate(grid, ctx["size"], ctx["rule"])
+    # The refit is the inner ladder's own fitting path, so the procedure's held-out predictions
+    # are the ones its chosen candidate would have made rather than a second fitting path's.
+    m = ctx["grains"][won["grain"]]
+    group = ctx["group"]
+    fit = fit_learner(ctx["learners"][won["learner"]], m.take_units(train), y_train,
+                      response=ctx["response"], control=ctx["control"],
+                      group=None if group is None else tuple(group[u] for u in train))
+    return dict(lad=lad, grid=grid, best=best, won=won, fit=fit,
+                pred=aligned_predictions(fit, m, ctx["y"], test))
 
 
 def _subset(grains: TimesiftSet, index) -> TimesiftSet:
@@ -299,13 +356,32 @@ def _nested_estimate(y, p, f, levels, cells, response) -> list[dict]:
 
 
 def _estimate_row(name: str, rows: Ladder) -> dict:
-    """One row of the estimate: the mean over variables of each variable's mean over its cells."""
+    """One row of the estimate: the mean over variables of each variable's mean over its cells,
+    and the interval across variables, on Student's t with one degree of freedom fewer than there
+    are variables."""
     by_variable = list(per_variable(rows).values())
     level, se = mean_se(by_variable)
-    return dict(metric=name, score=level, se=se, n_variable=len(by_variable))
+    n = len(by_variable)
+    half = t_ppf(0.975, n - 1) * se if n > 1 else float("nan")
+    return dict(metric=name, score=level, center=level, se=se, lower=level - half,
+                upper=level + half, n_variable=n, interval="variables")
 
 
-def _check_compare(compare, metric) -> None:
+def _nested_cv_estimate(ncv: dict, arm: str, response: str) -> list[dict]:
+    """The nested cross-validation rows of the estimate, one per registered metric, each read off
+    the same stored predictions, with the estimator's own quantities beside them."""
+    out = []
+    for name in metrics():
+        read = ncv_module.ncv_read(ncv, [arm], response, METRICS.get(name))
+        out.append(dict(metric=name, score=read["estimate"], center=read["center"],
+                        se=read["se"], lower=read["lower"], upper=read["upper"],
+                        n_variable=read["n_variable"], interval="nested_cv",
+                        **{k: read[k] for k in ("bias", "err_ncv", "mse_ncv", "se_naive",
+                                                "repeats", "folds")}))
+    return out
+
+
+def _check_compare(compare, metric, interval: str = "variables") -> None:
     if compare is None:
         return
     if not isinstance(compare, Ladder):
@@ -314,10 +390,16 @@ def _check_compare(compare, metric) -> None:
     if compare.metric != metric:
         raise ValueError(f"`compare` is scored by {compare.metric} and the selection by {metric}. "
                          "Score both by the same metric before contrasting them.")
+    if interval == "nested_cv" and compare.ncv is None:
+        raise ValueError("`compare` was fitted without nested cross-validation, so its contrast "
+                         "with the selection has none to read. Fit it with "
+                         'grain_ladder(interval="nested_cv") on the same folds, `repeats` and '
+                         "`seed`.")
 
 
-def _selection_contrast(scores: Ladder, compare: Ladder | None):
-    """One contrast row against each arm of ``compare``.
+def _selection_contrast(scores: Ladder, compare: Ladder | None, interval: str = "variables"):
+    """One contrast row against each arm of ``compare``, under the across-variable interval and,
+    where the selection was fitted with it, the nested cross-validation one too.
 
     The contrast is the ladder's, run on one table holding both arms, so the pairing rule and the
     interval come from ``paired_contrast`` rather than from a second copy of it here.
@@ -330,4 +412,5 @@ def _selection_contrast(scores: Ladder, compare: Ladder | None):
         arm = f"{w}|{ln}"
         if arm not in seen:
             seen.append(arm)
-    return [paired_contrast(both, SELECTED_ARM, arm) for arm in seen]
+    kinds = ["variables"] if interval == "variables" else ["variables", interval]
+    return [paired_contrast(both, SELECTED_ARM, arm, kind) for kind in kinds for arm in seen]

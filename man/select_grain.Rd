@@ -13,6 +13,8 @@ select_grain(
   inner = 5L,
   rule = c("argmax", "coarsest_adequate"),
   threshold = NULL,
+  interval = c("variables", "nested_cv"),
+  repeats = 1L,
   response = "presence_absence",
   metric = NULL,
   compare = NULL,
@@ -49,6 +51,13 @@ model complexity. See Choosing a candidate.}
 by: \code{"youden"}, the cut that maximises TSS, \code{"kappa"} or \code{"prevalence"}. See A cut learned
 inside the training data.}
 
+\item{interval}{Which interval to report beside the across-variable one, which is always
+reported: \code{"variables"} for that one alone, or \code{"nested_cv"} for an interval for the
+procedure's risk. See What the interval is for.}
+
+\item{repeats}{Repetitions of the nested cross-validation, each on its own fold map. The first
+is the map the estimate was computed on.}
+
 \item{response}{Name of the registered response head.}
 
 \item{metric}{Name of a registered metric the selection is made on, or \code{NULL} for the
@@ -80,6 +89,10 @@ was searched; and \code{scores}, the per-cell rows of the selected procedure und
 metric, in the layout \code{\link[=grain_ladder]{grain_ladder()}} returns. The held-out prediction of every unit is in
 the \code{predictions} attribute and the scorable-cell mask in \code{cells}. \code{inner} holds every
 candidate's inner score and standard error in every outer fold. With \code{threshold} set, the
+estimate carries the score, its interval and the interval's name in \code{interval}, one row per
+metric and interval. With \code{interval = "nested_cv"} it also carries \code{nested_cv}, the same rows
+with the estimator's own quantities beside them, and \code{final}, the procedure fitted on every
+unit, whose risk that interval is for. With \code{threshold} set, the
 estimate carries one further row, \code{tss_inner_cut}, the procedure's TSS at the learned cuts;
 \code{thresholds} holds the cut of every outer fold and variable; and \code{cut_scores} the per-cell
 rows it is averaged from, in the layout of \code{scores}. Both are \code{NULL} otherwise.
@@ -127,6 +140,36 @@ candidate was scored in fewer than two inner folds, is taken as zero, so the rul
 the candidates tied with the highest score.
 }
 
+\section{What the interval is for}{
+
+The across-variable interval, the one every level of the package reports, is the estimate plus
+or minus a Student's t quantile times the standard error across the response variables. Its
+spread is the spread of true skill between variables, and it cannot see the error every
+variable shares, since all of them are fitted and scored on the same units and the same folds.
+It is an interval over the variables of this dataset, and not an interval for what the
+procedure would score on a new sample.
+
+\code{interval = "nested_cv"} adds one that is, by the nested cross-validation of Bates, Hastie and
+Tibshirani (2024). Inside every repetition, each outer training set is cross-validated again
+over the remaining folds of the same map, which gives the mean squared error of a
+cross-validation estimate as the difference of two terms it can estimate: the squared gap
+between the inner estimate and the held-out fold's score, less the variance of that fold's
+score. The paper's error is a mean of per-unit losses; here a fold's score is the mean over the
+variables scorable in it, the inner estimate is averaged as the reported estimate is, and the
+variance of a fold's score is its delete-one jackknife variance over the units of the fold,
+which for a mean of per-unit losses is exactly the paper's \verb{var(e) / |I_k|}. The square root of
+the estimated mean squared error is held between the jackknife standard error of the estimate
+and the square root of the fold count times it, as the paper's section 4.3.2 has it, and the
+centre carries its bias correction, so the interval is for the risk of the procedure fitted on
+a sample of this size, which is the fit \code{final} holds.
+
+The cost is the selection's, multiplied: one repetition fits the procedure once for every
+unordered pair of outer folds, \code{v_outer * (v_outer - 1) / 2} fits, and every repetition after
+the first refits the outer folds as well. More repetitions steady the estimate of the mean
+squared error; the paper uses two hundred random splits, which is affordable where a fit is
+cheap and is not where a fit is a neural network.
+}
+
 \section{A cut learned inside the training data}{
 
 TSS read at the cut that maximises it on the scored units is biased upward, most where presences
@@ -158,6 +201,11 @@ sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), inner = 3,
 sel
 sel$estimate
 \dontshow{\}) # examplesIf}
+}
+\references{
+Bates, S., Hastie, T. and Tibshirani, R. (2024). Cross-validation: what does it
+estimate and how well does it do it? \emph{Journal of the American Statistical Association}
+\strong{119}(546), 1434-1445. \doi{10.1080/01621459.2023.2197686}
 }
 \seealso{
 \code{\link[=grain_ladder]{grain_ladder()}} for the grid this selects from, and \code{\link[=paired_contrast]{paired_contrast()}} for the

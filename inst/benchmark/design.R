@@ -28,6 +28,10 @@ BENCH <- list(
   step_hours   = 3,
   year_start   = "09-01",
   outer        = 5L,
+  # Repetitions of the nested cross-validation the interval for the procedure's risk is read off.
+  # One repetition refits the procedure once per unordered pair of outer folds, so this is what
+  # sets the run's cost beside the selection's own.
+  ncv_repeats  = 1L,
   metric       = "roc_auc",
   grains      = c("halfday", "day", "week", "month", "season", "year"),
   elasticnet_squares = TRUE,
@@ -119,6 +123,7 @@ bench_scale <- function(scale) {
   BENCH$deploy_chunk <<- 600L
   BENCH$outer <<- 3L
   BENCH$cnn_epochs <<- 4L
+  BENCH$ncv_repeats <<- 1L
   invisible("smoke")
 }
 
@@ -171,6 +176,7 @@ bench_stamp <- function(cell, replicate, candidates, pkg_dir, learner) {
     n_unit = cell$n_unit,
     inner = cell$inner,
     outer = BENCH$outer,
+    ncv_repeats = BENCH$ncv_repeats,
     replicate = replicate,
     design_seed = unname(BENCH$design_seed[cell$mechanism]),
     draw = replicate,
@@ -346,9 +352,21 @@ bench_proportion <- function(hit) {
   c(p = p, mc = 1.96 * sqrt(p * (1 - p) / length(hit)))
 }
 
+# Wilson's score interval for a coverage rate. The normal approximation is the one that says a
+# coverage of 1.000 is certain and a coverage near the nominal rate is further from it than it is;
+# this is the interval a miss is read against.
+bench_wilson <- function(hit, level = 0.95) {
+  n <- length(hit)
+  p <- mean(hit)
+  z <- stats::qnorm(1 - (1 - level) / 2)
+  centre <- (p + z^2 / (2 * n)) / (1 + z^2 / n)
+  half <- z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n)
+  c(p = p, lower = centre - half, upper = centre + half)
+}
+
 .bench_row <- function(stamp, arm, candidate, outer_fold, metric, quantity, value) {
   data.frame(stamp[c("scale", "cell_id", "block", "mechanism", "n_unit", "inner", "outer",
-                     "replicate",
+                     "ncv_repeats", "replicate",
                      "design_seed", "draw", "deploy_draw", "true_grain", "n_candidate",
                      "candidate_digest", "learner_digest", "pkg_version", "pkg_commit",
                      "pkg_dirty", "r_version", "platform", "device")],

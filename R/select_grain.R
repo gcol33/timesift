@@ -40,6 +40,38 @@
 #' candidate was scored in fewer than two inner folds, is taken as zero, so the rule falls back to
 #' the candidates tied with the highest score.
 #'
+#' @section What the interval is for:
+#' The across-variable interval, the one every level of the package reports, is the estimate plus
+#' or minus a Student's t quantile times the standard error across the response variables. Its
+#' spread is the spread of true skill between variables, and it cannot see the error every
+#' variable shares, since all of them are fitted and scored on the same units and the same folds.
+#' It is an interval over the variables of this dataset, and not an interval for what the
+#' procedure would score on a new sample.
+#'
+#' `interval = "nested_cv"` adds one that is, by the nested cross-validation of Bates, Hastie and
+#' Tibshirani (2024). Inside every repetition, each outer training set is cross-validated again
+#' over the remaining folds of the same map, which gives the mean squared error of a
+#' cross-validation estimate as the difference of two terms it can estimate: the squared gap
+#' between the inner estimate and the held-out fold's score, less the variance of that fold's
+#' score. The paper's error is a mean of per-unit losses; here a fold's score is the mean over the
+#' variables scorable in it, the inner estimate is averaged as the reported estimate is, and the
+#' variance of a fold's score is its delete-one jackknife variance over the units of the fold,
+#' which for a mean of per-unit losses is exactly the paper's `var(e) / |I_k|`. The square root of
+#' the estimated mean squared error is held between the jackknife standard error of the estimate
+#' and the square root of the fold count times it, as the paper's section 4.3.2 has it, and the
+#' centre carries its bias correction, so the interval is for the risk of the procedure fitted on
+#' a sample of this size, which is the fit `final` holds.
+#'
+#' The cost is the selection's, multiplied: one repetition fits the procedure once for every
+#' unordered pair of outer folds, `v_outer * (v_outer - 1) / 2` fits, and every repetition after
+#' the first refits the outer folds as well. More repetitions steady the estimate of the mean
+#' squared error; the paper uses two hundred random splits, which is affordable where a fit is
+#' cheap and is not where a fit is a neural network.
+#'
+#' @references Bates, S., Hastie, T. and Tibshirani, R. (2024). Cross-validation: what does it
+#'   estimate and how well does it do it? *Journal of the American Statistical Association*
+#'   **119**(546), 1434-1445. \doi{10.1080/01621459.2023.2197686}
+#'
 #' @section A cut learned inside the training data:
 #' TSS read at the cut that maximises it on the scored units is biased upward, most where presences
 #' are few ([tss_inflation()]). With `threshold` set, each outer fold learns one cut per variable
@@ -69,6 +101,11 @@
 #' @param threshold `NULL`, or the rule of [decision_threshold()] a presence-absence cut is learned
 #'   by: `"youden"`, the cut that maximises TSS, `"kappa"` or `"prevalence"`. See A cut learned
 #'   inside the training data.
+#' @param interval Which interval to report beside the across-variable one, which is always
+#'   reported: `"variables"` for that one alone, or `"nested_cv"` for an interval for the
+#'   procedure's risk. See What the interval is for.
+#' @param repeats Repetitions of the nested cross-validation, each on its own fold map. The first
+#'   is the map the estimate was computed on.
 #' @param response Name of the registered response head.
 #' @param metric Name of a registered metric the selection is made on, or `NULL` for the
 #'   response's own. The estimate is reported under every registered metric whichever this is.
@@ -90,6 +127,10 @@
 #'   metric, in the layout [grain_ladder()] returns. The held-out prediction of every unit is in
 #'   the `predictions` attribute and the scorable-cell mask in `cells`. `inner` holds every
 #'   candidate's inner score and standard error in every outer fold. With `threshold` set, the
+#'   estimate carries the score, its interval and the interval's name in `interval`, one row per
+#'   metric and interval. With `interval = "nested_cv"` it also carries `nested_cv`, the same rows
+#'   with the estimator's own quantities beside them, and `final`, the procedure fitted on every
+#'   unit, whose risk that interval is for. With `threshold` set, the
 #'   estimate carries one further row, `tss_inner_cut`, the procedure's TSS at the learned cuts;
 #'   `thresholds` holds the cut of every outer fold and variable; and `cut_scores` the per-cell
 #'   rows it is averaged from, in the layout of `scores`. Both are `NULL` otherwise.
@@ -117,9 +158,11 @@
 #' @export
 select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
                          rule = c("argmax", "coarsest_adequate"), threshold = NULL,
+                         interval = c("variables", "nested_cv"), repeats = 1L,
                          response = "presence_absence", metric = NULL, compare = NULL,
                          control = train_control(), seed = 1L, verbose = TRUE) {
   rule <- match.arg(rule)
+  interval <- .check_interval(interval[1L])
   if (!is.null(threshold)) {
     threshold <- match.arg(threshold, c("youden", "kappa", "prevalence"))
   }
@@ -144,13 +187,16 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
   learners <- .learner_list(learners)
   group <- .fold_group(folds, units)
   inner_split <- .inner_splitter(inner, group)
-  .check_compare(compare, metric)
+  .check_compare(compare, metric, interval)
   candidates <- expand.grid(grain = names(set), learner = names(learners),
                             KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
   if (nrow(candidates) < 2L) {
     stop("selection needs at least two candidates; got one grain and one learner.", call. = FALSE)
   }
   size <- .candidate_size(set, candidates)
+  ctx <- list(set = set, y = y, learners = learners, candidates = candidates, size = size,
+              rule = rule, inner_split = inner_split, response = response, metric = metric,
+              control = control, group = group)
 
   levels <- sort(unique(f))
   p <- matrix(NA_real_, nrow = length(units), ncol = ncol(y),
@@ -165,27 +211,12 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     train <- which(f != k)
     test <- which(f == k)
     y_train <- y[train, , drop = FALSE]
-
-    # The selector sees the outer training units and nothing else: the inner map is drawn on them,
-    # and the representation it searches over is cut to them before any fitting happens.
-    lad <- grain_ladder(.subset_set(set, train), y_train, learners,
-                         folds = inner_split(y_train, seed + i, train), response = response,
-                         metric = metric, control = control, verbose = FALSE)
-    grid <- .join_candidates(candidates, summary(lad), .inner_se(lad), k)
-    if (all(!is.finite(grid$score))) {
-      stop("no candidate scored inside the training data of fold ", k,
-           ". Widen the inner folds or drop the variables that cannot be scored.", call. = FALSE)
-    }
-    best <- .first_best(grid$score)
-    won <- .choose_candidate(grid, size, rule)
-
-    # The refit is the inner ladder's own fitting path, so the procedure's held-out predictions are
-    # the ones its chosen candidate would have made rather than a second fitting path's.
-    fit <- fit_learner(learners[[grid$learner[won]]],
-                       .subset_units(set[[grid$grain[won]]], train), y_train,
-                       response = response, control = control, group = group[train])
-    held_out <- stats::predict(fit, .subset_units(set[[grid$grain[won]]], test))
-    p[rownames(held_out), colnames(held_out)] <- held_out
+    once <- .select_once(ctx, train, test, seed + i, fold = k)
+    lad <- once$lad
+    grid <- once$grid
+    best <- once$best
+    won <- once$won
+    p[rownames(once$pred), colnames(once$pred)] <- once$pred
 
     # The cut is learned on the selected candidate's inner out-of-fold predictions, which cover
     # the outer training units and nothing else.
@@ -215,6 +246,25 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
                       metric = metric, scorer = score, response = response)
 
   estimate <- .nested_estimate(y, p, f, levels, cells)
+  ncv <- nested <- final <- NULL
+  if (interval == "nested_cv") {
+    # The procedure fitted once on every unit is the model the interval is for.
+    whole <- .select_once(ctx, seq_along(units), integer(), seed, fold = NA_integer_)
+    final <- list(grain = whole$grid$grain[whole$won], learner = whole$grid$learner[whole$won],
+                  fit = whole$fit, inner = whole$grid)
+    maps <- .ncv_maps(y, f, group, repeats, seed)
+    if (verbose) {
+      message("nested cross-validation: ", length(maps), " repetition(s) of ",
+              length(levels), " outer folds")
+    }
+    runs <- .ncv_collect(function(train, test, tag) {
+      .select_once(ctx, train, test, seed + 10007L * tag[1L] + 101L * tag[2L] + tag[3L])$pred
+    }, y, maps, p)
+    ncv <- .ncv_record(y, maps, stats::setNames(list(.ncv_keep(runs)), .selected_arm))
+    attr(scores, "ncv") <- ncv
+    nested <- .nested_cv_estimate(ncv, .selected_arm, response)
+    estimate <- rbind(estimate, nested[names(estimate)])
+  }
   thresholds <- cut_scores <- NULL
   if (!is.null(threshold)) {
     thresholds <- data.frame(fold = rep(levels, times = ncol(y)),
@@ -232,15 +282,18 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
   out <- list(
     selected = selected,
     estimate = estimate,
-    contrast = .selection_contrast(scores, compare),
+    contrast = .selection_contrast(scores, compare, interval),
     candidates = candidates,
     scores = scores,
     inner = do.call(rbind, inner_scores),
     thresholds = thresholds,
-    cut_scores = cut_scores
+    cut_scores = cut_scores,
+    nested_cv = nested,
+    final = final
   )
   structure(out, class = "timesift_selection", metric = metric, response = response,
-            rule = rule, threshold = threshold, folds = stats::setNames(f, units), cells = cells,
+            rule = rule, threshold = threshold, interval = interval,
+            folds = stats::setNames(f, units), cells = cells,
             predictions = stats::setNames(list(p), .selected_arm))
 }
 
@@ -254,8 +307,12 @@ print.timesift_selection <- function(x, ...) {
   cat("<timesift selection>", .plural(nrow(x$selected), "outer fold"), "over",
       .plural(nrow(x$candidates), "candidate"), "by", attr(x, "rule") %||% "argmax", "\n")
   est <- x$estimate[x$estimate$metric == attr(x, "metric"), , drop = FALSE]
-  cat(sprintf("%s: %.3f (se %.3f) for the procedure, selection included\n",
-              attr(x, "metric"), est$score, est$se))
+  cat(sprintf("%s: %.3f for the procedure, selection included\n", attr(x, "metric"),
+              est$score[1L]))
+  for (r in seq_len(nrow(est))) {
+    cat(sprintf("  95%% interval %.3f to %.3f (se %.3f), for %s\n", est$lower[r], est$upper[r],
+                est$se[r], .interval_target(est$interval[r])))
+  }
   cut <- x$estimate[x$estimate$metric == .inner_cut_metric, , drop = FALSE]
   if (nrow(cut)) {
     cat(sprintf("tss at the %s cut learned on the inner folds: %.3f (se %.3f)\n",
@@ -354,12 +411,31 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
   out
 }
 
-# One row of the estimate: the mean over variables of each variable's mean over its scored cells.
+# One row of the estimate: the mean over variables of each variable's mean over its scored cells,
+# and the interval across variables, on Student's t with one degree of freedom fewer than there
+# are variables.
 .estimate_row <- function(name, rows) {
   per_variable <- .cell_means(rows)
   ms <- .mean_se(per_variable$score)
-  data.frame(metric = name, score = ms[1L], se = ms[2L], n_variable = nrow(per_variable),
+  half <- .t_margin(ms[2L], nrow(per_variable))
+  data.frame(metric = name, score = ms[1L], center = ms[1L], se = ms[2L], lower = ms[1L] - half,
+             upper = ms[1L] + half, n_variable = nrow(per_variable), interval = "variables",
              stringsAsFactors = FALSE)
+}
+
+# The nested cross-validation rows of the estimate, one per registered metric, each read off the
+# same stored predictions. The diagnostics of the paper's estimator ride along for inspection.
+.nested_cv_estimate <- function(ncv, arm, response) {
+  out <- lapply(metrics(), function(nm) {
+    iv <- .ncv_read(ncv, arm, response, .metrics_reg$get(nm))
+    cbind(data.frame(metric = nm, score = iv$estimate, center = iv$center, se = iv$se,
+                     lower = iv$lower, upper = iv$upper, n_variable = iv$n_variable,
+                     interval = "nested_cv", stringsAsFactors = FALSE),
+          iv[c("bias", "err_ncv", "mse_ncv", "se_naive", "repeats", "folds")])
+  })
+  out <- do.call(rbind, out)
+  rownames(out) <- NULL
+  out
 }
 
 # The label the TSS read at a cut learned on the inner folds is reported under. It is not a
@@ -368,7 +444,7 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
 
 # The contrast is the ladder's, run on one table holding both arms, so the pairing rule and the
 # interval come from paired_contrast() rather than from a second copy of it here.
-.check_compare <- function(compare, metric) {
+.check_compare <- function(compare, metric, interval = "variables") {
   if (is.null(compare)) {
     return(invisible(TRUE))
   }
@@ -379,22 +455,62 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
     stop("`compare` is scored by ", attr(compare, "metric"), " and the selection by ", metric,
          ". Score both by the same metric before contrasting them.", call. = FALSE)
   }
+  if (identical(interval, "nested_cv") && is.null(.ncv_of(compare))) {
+    stop("`compare` was fitted without nested cross-validation, so its contrast with the ",
+         "selection has none to read. Fit it with grain_ladder(interval = \"nested_cv\") on the ",
+         "same folds, `repeats` and `seed`.", call. = FALSE)
+  }
   invisible(TRUE)
 }
 
-.selection_contrast <- function(scores, compare) {
+# The across-variable interval of every contrast, and beside it the nested cross-validation one
+# where the selection was fitted with it.
+.selection_contrast <- function(scores, compare, interval = "variables") {
   if (is.null(compare)) {
     return(NULL)
   }
   shared <- intersect(names(scores), names(compare))
   both <- rbind(scores[shared], compare[shared])
   both <- structure(both, class = c("timesift_ladder", "data.frame"),
-                    metric = attr(scores, "metric"))
+                    metric = attr(scores, "metric"), scorer = attr(scores, "scorer"),
+                    response = attr(scores, "response"),
+                    ncv = .ncv_join(.ncv_of(scores), .ncv_of(compare)))
   arms <- unique(paste(compare$grain, compare$learner, sep = "|"))
-  out <- lapply(arms, function(a) paired_contrast(both, .selected_arm, a))
+  kinds <- unique(c("variables", interval))
+  out <- lapply(kinds, function(kind) {
+    do.call(rbind, lapply(arms, function(a) paired_contrast(both, .selected_arm, a, kind)))
+  })
   out <- do.call(rbind, out)
   rownames(out) <- NULL
   out
+}
+
+# One fit of the whole procedure: the inner search on the training units, the rule, the refit of
+# the chosen candidate on all of them, and its predictions for the test units. The outer folds of
+# select_grain() and every fit of its nested cross-validation go through this.
+.select_once <- function(ctx, train, test, split_seed, fold = NA_integer_) {
+  y_train <- ctx$y[train, , drop = FALSE]
+  # The selector sees the training units and nothing else: the inner map is drawn on them, and the
+  # representation it searches over is cut to them before any fitting happens.
+  lad <- grain_ladder(.subset_set(ctx$set, train), y_train, ctx$learners,
+                      folds = ctx$inner_split(y_train, split_seed, train),
+                      response = ctx$response, metric = ctx$metric, control = ctx$control,
+                      verbose = FALSE)
+  grid <- .join_candidates(ctx$candidates, summary(lad), .inner_se(lad), fold)
+  if (all(!is.finite(grid$score))) {
+    stop("no candidate scored inside the training data of ",
+         if (is.na(fold)) "a fit of the nested cross-validation" else paste("fold", fold),
+         ". Widen the inner folds or drop the variables that cannot be scored.", call. = FALSE)
+  }
+  best <- .first_best(grid$score)
+  won <- .choose_candidate(grid, ctx$size, ctx$rule)
+  # The refit is the inner ladder's own fitting path, so the procedure's held-out predictions are
+  # the ones its chosen candidate would have made rather than a second fitting path's.
+  x_won <- ctx$set[[grid$grain[won]]]
+  fit <- fit_learner(ctx$learners[[grid$learner[won]]], .subset_units(x_won, train), y_train,
+                     response = ctx$response, control = ctx$control, group = ctx$group[train])
+  pred <- if (length(test)) stats::predict(fit, .subset_units(x_won, test)) else NULL
+  list(lad = lad, grid = grid, best = best, won = won, fit = fit, pred = pred)
 }
 
 # The candidate set keeps the order its grains and its learners were declared in, so which

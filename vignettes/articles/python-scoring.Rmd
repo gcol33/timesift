@@ -74,7 +74,7 @@ which is what keeps two arms comparable.
 ## `paired_contrast()`
 
 ```python
-paired_contrast(ladder: Ladder, a: str, b: str)
+paired_contrast(ladder: Ladder, a: str, b: str, interval: str = 'variables')
 ```
 
 The difference between two arms, taken inside each cell both scored.
@@ -91,6 +91,11 @@ chosen on the scores the contrast is then read off, and pairing does not cancel 
 variables, and `p_method` says whether the signed-rank p-value is `"exact"` or the
 `"normal"` approximation, which it is when the per-variable differences hold a zero or a tie
 or number fifty or more.
+
+`interval="nested_cv"` replaces that interval with one for the difference in the two arms'
+risk on a new sample, by the nested cross-validation of Bates, Hastie and Tibshirani (2024)
+read on the difference of the two arms' cell scores, which needs a ladder fitted with
+`grain_ladder(interval="nested_cv")`.
 
 ## `tss_inflation()`
 

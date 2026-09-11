@@ -6,7 +6,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from . import interval as ncv_module
 from ._stats import norm_ppf, t_ppf, wilcoxon_p
+from .interval import check_interval
 from .learners import fit_learner
 from .metrics import tss
 from .registry import RESPONSES, get_learner, resolve_metric
@@ -14,9 +16,9 @@ from .representation import timesift_set
 from .response import (Folds, Response, align_folds, as_response, fold_map,
                        scorable_cells)
 
-__all__ = ["Ladder", "concat_ladders", "grain_ladder", "implied_skill", "ladder_from_rows",
-           "learner_dict", "mean_se", "out_of_fold", "paired_contrast", "per_variable", "place",
-           "score_arm", "score_predictions",
+__all__ = ["Ladder", "aligned_predictions", "concat_ladders", "grain_ladder", "implied_skill",
+           "ladder_from_rows", "learner_dict", "mean_se", "out_of_fold", "paired_contrast",
+           "per_variable", "place", "score_arm", "score_predictions",
            "scored_cells", "table_columns", "tss_inflation", "variable_means"]
 
 
@@ -37,6 +39,7 @@ class Ladder:
     scorer: object
     response: str
     fits: dict
+    ncv: dict | None = None
 
     def arm(self, name: str):
         """A mask over the rows of one grain-and-learner arm, named ``grain|learner``."""
@@ -72,7 +75,8 @@ class Ladder:
 
 
 def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence", metric=None,
-                  control=None, keep_fits: bool = False, verbose: bool = True) -> Ladder:
+                  control=None, keep_fits: bool = False, interval: str = "variables",
+                  repeats: int = 1, seed: int = 1, verbose: bool = True) -> Ladder:
     """Cross-validate every learner at every grain, on one fold map and one mask of cells.
 
     Every arm sees identical splits and is restricted to identical cells, so the arms' means share
@@ -83,7 +87,13 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
 
     ``control`` is the ``train_control`` every neural learner of the ladder trains under; a learner
     carrying settings of its own overrides it on the ones it names.
+
+    ``interval="nested_cv"`` refits every arm inside every outer training set of every repetition,
+    which is what ``paired_contrast(interval="nested_cv")`` reads an interval for the difference in
+    risk off. Two tables whose contrast is to be read take the same ``folds``, ``repeats`` and
+    ``seed``.
     """
+    check_interval(interval)
     grains = timesift_set(x)
     units = grains.units
     spec = RESPONSES.get(response)
@@ -114,11 +124,49 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
                               ("fold", fold), ("score", value), ("scorable", ok)):
                 into.extend(scored[key])
 
+    # Nested cross-validation refits every arm inside every outer training set of every
+    # repetition, and keeps the predictions paired_contrast reads the interval off.
+    ncv = None
+    if interval == "nested_cv":
+        maps = ncv_module.ncv_maps(y, f, folds.group, repeats, seed)
+        kept = {}
+        for w, m in grains.items():
+            for name, ln in learners.items():
+                arm = f"{w}|{name}"
+                if verbose:
+                    print(f"nested cross-validation of {arm}: {len(maps)} repetition(s)")
+
+                def fit_predict(train, test, tag, m=m, ln=ln):
+                    fit = fit_learner(ln, m.take_units(train), y.take_units(train),
+                                      response=response, control=control,
+                                      group=_group_of(folds.group, train))
+                    return aligned_predictions(fit, m, y, test)
+
+                kept[arm] = ncv_module.keep_runs(
+                    ncv_module.ncv_collect(fit_predict, y, maps, predictions[arm]))
+        ncv = ncv_module.record(y, maps, kept)
+
     return ladder_from_rows(dict(grain=grain, learner=learner, variable=variable, fold=fold,
                                  score=value, scorable=ok),
                             predictions=predictions, cells=cells,
                             folds=Folds(fold=f, units=units), metric=metric_name, scorer=score,
-                            response=response, fits=fits)
+                            response=response, fits=fits, ncv=ncv)
+
+
+def aligned_predictions(fit, m, y: Response, rows) -> np.ndarray:
+    """One fit's predictions for the units given, in the response's own order of variables.
+
+    Keyed rather than positional, for the reason ``place`` is: a learner returning its responses in
+    another order would otherwise scramble which prediction belongs to which one.
+    """
+    out = np.full((len(rows), len(y.variables)), np.nan)
+    if not len(rows):
+        return out
+    raw = fit.predict(m.take_units(rows))
+    column = {v: j for j, v in enumerate(y.variables)}
+    for b, v in enumerate(fit.variables):
+        out[:, column[v]] = raw[:, b]
+    return out
 
 
 def out_of_fold(m, y: Response, f: np.ndarray, levels, learner, response: str, control=None,
@@ -231,13 +279,15 @@ def score_predictions(y, p, folds, cells=None, metric: str = "tss") -> dict:
 
 
 def ladder_from_rows(rows: dict, predictions: dict, cells, folds: Folds, metric: str,
-                     fits: dict, scorer=None, response: str = "presence_absence") -> Ladder:
+                     fits: dict, scorer=None, response: str = "presence_absence",
+                     ncv: dict | None = None) -> Ladder:
     scorer = resolve_metric(metric)[0] if scorer is None else scorer
     return Ladder(grain=np.asarray(rows["grain"]), learner=np.asarray(rows["learner"]),
                   variable=np.asarray(rows["variable"]), fold=np.asarray(rows["fold"]),
                   score=np.asarray(rows["score"], dtype=float),
                   scorable=np.asarray(rows["scorable"]), predictions=predictions, cells=cells,
-                  folds=folds, metric=metric, scorer=scorer, response=response, fits=fits)
+                  folds=folds, metric=metric, scorer=scorer, response=response, fits=fits,
+                  ncv=ncv)
 
 
 def concat_ladders(a: Ladder, b: Ladder) -> Ladder:
@@ -252,7 +302,8 @@ def concat_ladders(a: Ladder, b: Ladder) -> Ladder:
         score=np.concatenate([a.score, b.score]),
         scorable=np.concatenate([a.scorable, b.scorable]),
         predictions={**a.predictions, **b.predictions}, cells=a.cells, folds=a.folds,
-        metric=a.metric, scorer=a.scorer, response=a.response, fits={})
+        metric=a.metric, scorer=a.scorer, response=a.response, fits={},
+        ncv=ncv_module.join(a.ncv, b.ncv))
 
 
 def variable_means(group, variable, value) -> dict:
@@ -316,7 +367,7 @@ def mean_se(values) -> tuple[float, float]:
     return float(v.mean()), se
 
 
-def paired_contrast(ladder: Ladder, a: str, b: str) -> dict:
+def paired_contrast(ladder: Ladder, a: str, b: str, interval: str = "variables") -> dict:
     """The difference between two arms, taken inside each cell both scored.
 
     Two arms scored on the same held-out units do not necessarily have the same set of defined
@@ -331,7 +382,13 @@ def paired_contrast(ladder: Ladder, a: str, b: str) -> dict:
     variables, and ``p_method`` says whether the signed-rank p-value is ``"exact"`` or the
     ``"normal"`` approximation, which it is when the per-variable differences hold a zero or a tie
     or number fifty or more.
+
+    ``interval="nested_cv"`` replaces that interval with one for the difference in the two arms'
+    risk on a new sample, by the nested cross-validation of Bates, Hastie and Tibshirani (2024)
+    read on the difference of the two arms' cell scores, which needs a ladder fitted with
+    ``grain_ladder(interval="nested_cv")``.
     """
+    check_interval(interval)
     hit_a, hit_b = ladder.arm(a), ladder.arm(b)
     key = np.char.add(np.char.add(ladder.variable.astype(str), "|"), ladder.fold.astype(str))
     defined_a = hit_a & ~np.isnan(ladder.score)
@@ -349,10 +406,16 @@ def paired_contrast(ladder: Ladder, a: str, b: str) -> dict:
     n = len(by_variable)
     d, se = mean_se(by_variable)
     half = t_ppf(0.975, n - 1) * se if n > 1 else float("nan")
+    centre, lower, upper = d, d - half, d + half
+    if interval == "nested_cv":
+        read = ncv_module.ncv_read(ladder.ncv, [_label(ladder, a), _label(ladder, b)],
+                                   ladder.response, ladder.scorer)
+        centre, lower, upper = read["center"], read["lower"], read["upper"]
     p, method = _wilcoxon(by_variable)
-    return dict(a=_label(ladder, a), b=_label(ladder, b), diff=d, lower=d - half,
-                upper=d + half, n_variable=n, n_cell=len(shared),
-                n_favour=int((by_variable > 0).sum()), p_value=p, p_method=method)
+    return dict(a=_label(ladder, a), b=_label(ladder, b), diff=d, center=centre, lower=lower,
+                upper=upper, n_variable=n, n_cell=len(shared),
+                n_favour=int((by_variable > 0).sum()), p_value=p, p_method=method,
+                interval=interval)
 
 
 def tss_inflation(y: Response, folds, skill=(0.6, 0.7, 0.9), replicates: int = 200,

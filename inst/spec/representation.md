@@ -801,6 +801,18 @@ call site.
   selected candidate's inner out-of-fold predictions of the outer training units, and the test
   fold is read at it by `tss(threshold =)`, presence at `p >= threshold`; the estimate row is
   `tss_inner_cut`.
+- Every estimate and every contrast names the interval it carries. `"variables"` is the spread
+  across the response variables of the dataset, on Student's t with one degree of freedom fewer
+  than there are variables. `"nested_cv"` is the nested cross-validation interval of Bates, Hastie
+  and Tibshirani (2024): `select_grain()` and `grain_ladder()` take it as `interval` with
+  `repeats` fold maps, the first being the map already cross-validated on, and each repetition
+  fits the procedure or the arm once per unordered pair of outer folds; `paired_contrast()` reads
+  it on the difference of two arms of a ladder fitted with it. A fold's score is the mean over the
+  variables scorable in it, the inner estimate is averaged as the reported estimate is, the
+  variance of a fold's score is its delete-one jackknife variance over that fold's units, the root
+  mean squared error is rescaled by `(K - 1) / K` and held between the jackknife standard error of
+  the estimate and `sqrt(K)` times it, and the centre carries the paper's bias correction. Two
+  tables whose contrast is read must carry the same response, maps, `repeats` and `seed`.
 - `models` takes one learner, a set or list of them, or the name of a registered one, and
   `learners` on a ladder takes the same three forms.
 - Predicting rebuilds each member's representation for the new targets from the settings its own

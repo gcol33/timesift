@@ -20,6 +20,22 @@
   maximum over cuts as before. On a binormal design with a planted skill of 0.60 the learned cut
   reads it back within Monte Carlo error, where the maximum over cuts on the same cells does not.
   On both sides.
+* An interval for the procedure's risk, by the nested cross-validation of Bates, Hastie and
+  Tibshirani (2024). `select_grain(interval = "nested_cv")` cross-validates each outer training
+  set again over the remaining folds of the same map, over `repeats` maps, and reports the
+  estimate's mean squared error the way the paper's Algorithm 1 does, rescaled and bounded as its
+  section 4.3.2 states and centred on its bias correction; `final` is then the procedure fitted on
+  every unit, whose risk the interval is for. `grain_ladder(interval = "nested_cv")` does the same
+  for every arm, and `paired_contrast(interval = "nested_cv")` reads it on the difference between
+  two. The paper's error is a mean of per-unit losses, so a fold's score here is the mean over the
+  variables scorable in it and the variance of that score is its delete-one jackknife variance,
+  which for a mean of per-unit losses is exactly the paper's `var(e) / |I_k|`.
+* The estimate and the contrast now name what their interval is for. The across-variable interval
+  is still reported and now carries `interval = "variables"`, `lower` and `upper`: it is the spread
+  across the response variables of one dataset, all of them fitted and scored on the same units and
+  folds, and not an interval for a new sample. On a simulated design with a measured truth
+  (150 replicates, five outer folds, AUC) it covered 0.925 of the time with an error-SD to
+  standard-error ratio of 1.23, where the nested interval covered 0.955 at one repetition (#73).
 * `grain_matrix()` documents what a day is in a zone that keeps daylight saving time: a
   wall-clock day, 23 hours on the day the clock goes forward and 25 on the day it goes back, with
   the week and the month holding them an hour shorter or longer, and 24-hour days on a record kept

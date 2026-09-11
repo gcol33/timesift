@@ -53,7 +53,18 @@ per_cell <- lapply(split(rows, rows$cell_id), function(d) {
     bench_paired(d, c("nested", "reported_lower"), c("nested", "true"), `<=`),
     bench_paired(d, c("nested", "reported_upper"), c("nested", "true"), `>=`),
     `&`, paste(d$cell_id[1L], c("the lower interval", "the upper interval")))
-  cov <- bench_proportion(covered)
+  cov <- bench_wilson(covered)
+  # The nested cross-validation interval is for the risk of the procedure fitted on every unit, so
+  # it is read against that truth rather than against the mean over the outer training sets.
+  covered_ncv <- bench_align(
+    bench_paired(d, c("nested", "lower_ncv"), c("nested", "true_full"), `<=`),
+    bench_paired(d, c("nested", "upper_ncv"), c("nested", "true_full"), `>=`),
+    `&`, paste(d$cell_id[1L], c("the lower nested interval", "the upper nested interval")))
+  cov_ncv <- bench_wilson(covered_ncv)
+  # How wide the interval is against how wide it had to be: the spread of the error it has to
+  # cover, over the standard error it was built from. Above one is too narrow.
+  err_ncv <- bench_paired(d, c("nested", "center_ncv"), c("nested", "true_full"))
+  ratio <- function(err, se) stats::sd(err) / mean(se)
   nested_bias <- bench_paired(d, c("nested", "reported"), c("nested", "true"))
   single_bias <- bench_paired(d, c("single_loop", "reported"), c("single_loop", "true"))
   regret <- bench_paired(d, c("oracle", "true"), c("nested", "true"))
@@ -73,7 +84,14 @@ per_cell <- lapply(split(rows, rows$cell_id), function(d) {
     single_reported = mean(single_rep), single_bias = mean(single_bias),
     single_bias_mc = bench_margin(single_bias),
     optimism_gap = mean(optimism), optimism_gap_mc = bench_margin(optimism),
-    coverage = cov[["p"]], coverage_mc = cov[["mc"]],
+    coverage = cov[["p"]], coverage_lo = cov[["lower"]], coverage_hi = cov[["upper"]],
+    ratio = ratio(nested_bias, bench_by_replicate(d, "nested", "reported_se")),
+    true_full = mean(bench_by_replicate(d, "nested", "true_full")),
+    center_ncv = mean(bench_by_replicate(d, "nested", "center_ncv")),
+    coverage_ncv = cov_ncv[["p"]], coverage_ncv_lo = cov_ncv[["lower"]],
+    coverage_ncv_hi = cov_ncv[["upper"]],
+    ratio_ncv = ratio(err_ncv, bench_by_replicate(d, "nested", "se_ncv")),
+    bias_ncv = mean(err_ncv), bias_ncv_mc = bench_margin(err_ncv),
     regret = mean(regret), regret_mc = bench_margin(regret),
     secs = mean(tapply(bench_pick(d, "stage", "secs", NA)$value,
                        bench_pick(d, "stage", "secs", NA)$replicate, sum)),
@@ -94,6 +112,12 @@ cat("\n== per cell\n")
 print(per_cell[c("cell_id", "replicates", "true_grain", "select_exact", "select_adequate",
                  "nested_reported", "nested_true", "nested_bias", "single_reported",
                  "optimism_gap", "coverage", "regret", "secs")], digits = 3)
+
+cat("\n== what each interval covers, with its Wilson interval and the spread of the error it\n",
+    "   has to cover over the standard error it was built from\n", sep = "")
+print(per_cell[c("cell_id", "replicates", "coverage", "coverage_lo", "coverage_hi", "ratio",
+                 "coverage_ncv", "coverage_ncv_lo", "coverage_ncv_hi", "ratio_ncv", "true_full",
+                 "center_ncv", "bias_ncv", "bias_ncv_mc")], digits = 3)
 
 if (!is.na(opt$csv)) {
   utils::write.csv(per_cell, opt$csv, row.names = FALSE)

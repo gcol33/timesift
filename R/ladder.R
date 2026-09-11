@@ -23,6 +23,13 @@
 #'   names.
 #' @param keep_fits Keep every per-fold fitted model, which is what lets [occlusion()] read a
 #'   fitted model without refitting it.
+#' @param interval `"nested_cv"` refits every arm inside every outer training set, which is what
+#'   [paired_contrast()] reads an interval for the difference in risk off. `"variables"`, the
+#'   default, fits nothing further, and a contrast is then read across the response variables.
+#' @param repeats Repetitions of the nested cross-validation, each on its own fold map. The first
+#'   is the map the ladder was cross-validated on.
+#' @param seed Seed the repetitions' fold maps are drawn under. Two tables whose contrast is to be
+#'   read take the same `folds`, `repeats` and `seed`.
 #' @param verbose Report each arm and each fold as it runs.
 #' @param ... Ignored, so that `summary()` takes the arguments its generic declares.
 #'
@@ -48,7 +55,9 @@
 #' @export
 grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_absence",
                           metric = NULL, control = train_control(), keep_fits = FALSE,
+                          interval = c("variables", "nested_cv"), repeats = 1L, seed = 1L,
                           verbose = TRUE) {
+  interval <- .check_interval(interval[1L])
   set <- .as_set(x)
   units <- dimnames(set[[1L]])[[1L]]
   spec <- .responses_reg$get(response)
@@ -87,10 +96,34 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
   }
   out <- do.call(rbind, rows)
   rownames(out) <- NULL
+
+  # Nested cross-validation refits every arm inside every outer training set of every repetition,
+  # and keeps the predictions paired_contrast() reads the interval off.
+  ncv <- NULL
+  if (interval == "nested_cv") {
+    maps <- .ncv_maps(y, f, group, repeats, seed)
+    kept <- list()
+    for (w in names(set)) {
+      for (ln in names(learners)) {
+        arm <- paste(w, ln, sep = "|")
+        if (verbose) {
+          message("nested cross-validation of ", arm, ": ", length(maps), " repetition(s)")
+        }
+        runs <- .ncv_collect(function(train, test, tag) {
+          fit <- fit_learner(learners[[ln]], .subset_units(set[[w]], train),
+                             y[train, , drop = FALSE], response = response, control = control,
+                             group = group[train])
+          stats::predict(fit, .subset_units(set[[w]], test))
+        }, y, maps, preds[[arm]])
+        kept[[arm]] <- .ncv_keep(runs)
+      }
+    }
+    ncv <- .ncv_record(y, maps, kept)
+  }
   structure(out, class = c("timesift_ladder", "data.frame"),
             predictions = preds, cells = cells, folds = stats::setNames(f, units),
             fits = if (keep_fits) fits else NULL,
-            metric = metric$name, scorer = score, response = response)
+            metric = metric$name, scorer = score, response = response, ncv = ncv)
 }
 
 # One arm's cells, scored. The label is a representation, which a calendar grain is one kind of,

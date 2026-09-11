@@ -62,7 +62,8 @@ bench_replicate <- function(cell, replicate, candidates, learner, pkg_dir) {
   folds <- fold_map(sim$y, v = BENCH$outer, seed = replicate)
 
   sel <- tick("select", select_grain(set, sim$y, learner, folds = folds, inner = cell$inner,
-                                     metric = BENCH$metric, verbose = FALSE))
+                                     metric = BENCH$metric, interval = "nested_cv",
+                                     repeats = BENCH$ncv_repeats, verbose = FALSE))
   bench_assert_candidates(sel, stamp)
   lad <- tick("ladder", grain_ladder(set, sim$y, learner, folds = folds, metric = BENCH$metric,
                                       keep_fits = TRUE, verbose = FALSE))
@@ -92,22 +93,45 @@ bench_replicate <- function(cell, replicate, candidates, learner, pkg_dir) {
   picked <- sel$selected$grain[match(levels, sel$selected$fold)]
   true_fold <- deployed[cbind(seq_along(levels), match(picked, colnames(deployed)))]
 
+  # The procedure fitted on every unit, which the nested interval is an interval for, scored on the
+  # deployment sample the same way every other truth here is.
+  true_full <- tick("deploy_full", mean(.bench_deploy_score(sel$final$fit,
+                                                            dep$set[[sel$final$grain]], dep$y,
+                                                            BENCH$metric)))
+
   grid <- summary(lad)
   single <- grid$grain[which.max(grid$score)]
-  est <- sel$estimate
-  sel_est <- est[est$metric == BENCH$metric, ]
-  # The interval read off the estimate and its standard error across variables, on Student's t
-  # with one degree of freedom fewer than there are variables, as the package takes every interval
-  # across variables.
-  half <- stats::qt(0.975, sel_est$n_variable - 1) * sel_est$se
+  across <- sel$estimate[sel$estimate$interval == "variables", ]
+  nested <- sel$estimate[sel$estimate$interval == "nested_cv", ]
+  sel_est <- across[across$metric == BENCH$metric, ]
+  ncv_est <- nested[nested$metric == BENCH$metric, ]
+  ncv_all <- sel$nested_cv[sel$nested_cv$metric == BENCH$metric, ]
 
   rows <- list(
-    .bench_row(stamp, "nested", NA_character_, NA_integer_, est$metric, "reported", est$score),
-    .bench_row(stamp, "nested", NA_character_, NA_integer_, est$metric, "reported_se", est$se),
+    .bench_row(stamp, "nested", NA_character_, NA_integer_, across$metric, "reported",
+               across$score),
+    .bench_row(stamp, "nested", NA_character_, NA_integer_, across$metric, "reported_se",
+               across$se),
     .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "reported_lower",
-               sel_est$score - half),
+               sel_est$lower),
     .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "reported_upper",
-               sel_est$score + half),
+               sel_est$upper),
+    # The nested cross-validation interval, its centre and the quantities it is built from.
+    .bench_row(stamp, "nested", NA_character_, NA_integer_, nested$metric, "center_ncv",
+               nested$center),
+    .bench_row(stamp, "nested", NA_character_, NA_integer_, nested$metric, "se_ncv", nested$se),
+    .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "lower_ncv",
+               ncv_est$lower),
+    .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "upper_ncv",
+               ncv_est$upper),
+    .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "bias_ncv",
+               ncv_all$bias),
+    .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "mse_ncv",
+               ncv_all$mse_ncv),
+    .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "se_naive_ncv",
+               ncv_all$se_naive),
+    .bench_row(stamp, "nested", sel$final$grain, NA_integer_, BENCH$metric, "true_full",
+               true_full),
     .bench_row(stamp, "nested", NA_character_, NA_integer_, BENCH$metric, "true",
                mean(true_fold)),
     .bench_row(stamp, "nested", picked, levels, BENCH$metric, "true_fold", true_fold),
