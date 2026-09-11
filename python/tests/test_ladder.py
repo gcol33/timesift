@@ -6,7 +6,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from timesift._stats import norm_ppf, wilcoxon_p
+from timesift._stats import norm_ppf, t_ppf, wilcoxon_p
 from timesift.control import CONTROL_SETTINGS, as_control, train_control
 from timesift.ladder import (grain_ladder, paired_contrast, per_variable,
                              score_predictions, tss_inflation, variable_means)
@@ -144,9 +144,45 @@ def test_the_normal_quantile_and_the_signed_rank_p_value_are_the_ones_r_reports(
     # qnorm(0.975) and qnorm(0.005) to twelve places
     assert norm_ppf(0.975) == pytest.approx(1.959963984540, abs=1e-11)
     assert norm_ppf(0.005) == pytest.approx(-2.575829303549, abs=1e-11)
-    # wilcox.test(1:10)$p.value and wilcox.test(c(-3,-1,2,4,5,6))$p.value
-    assert wilcoxon_p(np.arange(1, 11)) == pytest.approx(0.001953125, abs=1e-12)
-    assert wilcoxon_p(np.array([-3.0, -1, 2, 4, 5, 6])) == pytest.approx(0.21875, abs=1e-12)
+    # qt(0.975, df) and qt(0.995, df), printed by R to seventeen significant digits
+    reference = {1: (12.706204736174694, 63.656741162871526), 2: (4.3026527297494619, 9.9248432009182892),
+                 5: (2.5705818356363137, 4.0321429835552287), 9: (2.2621571627982049, 3.2498355415921254),
+                 100: (1.9839715185235516, 2.6258905214380182), 1000: (1.9623390808264078, 2.5807546980659501)}
+    for df, (q975, q995) in reference.items():
+        assert t_ppf(0.975, df) == pytest.approx(q975, rel=1e-13)
+        assert t_ppf(0.995, df) == pytest.approx(q995, rel=1e-13)
+        assert t_ppf(0.025, df) == pytest.approx(-q975, rel=1e-13)
+    # wilcox.test(1:10)$p.value and wilcox.test(c(-3,-1,2,4,5,6))$p.value, both exact
+    assert wilcoxon_p(np.arange(1, 11)) == (pytest.approx(0.001953125, abs=1e-12), "exact")
+    assert wilcoxon_p(np.array([-3.0, -1, 2, 4, 5, 6])) == (pytest.approx(0.21875, abs=1e-12),
+                                                             "exact")
+    # A zero takes the normal approximation, as wilcox.test(c(0, 1, 2, 3, 4), exact = FALSE) does
+    assert wilcoxon_p(np.array([0.0, 1, 2, 3, 4])) == (pytest.approx(0.1003482464622909,
+                                                                      abs=1e-7), "normal")
+
+
+def test_the_contrast_interval_is_students_t_on_the_variables_and_the_p_value_names_its_method():
+    from timesift import Ladder
+
+    def ladder(a, b):
+        score = np.asarray(a + b, dtype=float)
+        return Ladder(grain=np.asarray(["week"] * 12), learner=np.asarray(["a"] * 6 + ["b"] * 6),
+                      variable=np.asarray(["v1", "v1", "v2", "v2", "v3", "v3"] * 2),
+                      fold=np.asarray([1, 2] * 6), score=score, scorable=np.ones(12, dtype=bool),
+                      predictions={}, cells=None, folds=None, metric="tss", scorer=None,
+                      response="presence_absence", fits={})
+
+    got = paired_contrast(ladder([0.5, 0.625, 0.75, 0.875, 0.5, 0.625],
+                                 [0.375, 0.5, 0.625, 0.625, 0.5, 0.5]), "week|a", "week|b")
+    per = np.asarray([0.125, 0.1875, 0.0625])
+    assert got["diff"] == pytest.approx(per.mean())
+    assert got["upper"] - got["diff"] == pytest.approx(t_ppf(0.975, 2) * per.std(ddof=1) / np.sqrt(3))
+    assert got["p_method"] == "exact"
+    # A zero and a tie among the per-variable differences: the normal approximation, on purpose.
+    tied = paired_contrast(ladder([0.75, 0.75, 0.875, 0.875, 0.5, 0.5],
+                                  [0.625, 0.625, 0.75, 0.75, 0.5, 0.5]), "week|a", "week|b")
+    assert tied["p_method"] == "normal"
+    assert tied["p_value"] == pytest.approx(0.34577858615116019, abs=1e-7)
 
 
 def test_a_level_is_the_mean_of_the_variable_means_wherever_it_is_read():

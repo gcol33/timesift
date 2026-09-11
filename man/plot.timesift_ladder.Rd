@@ -20,7 +20,8 @@ The summary table the plot is drawn from, invisibly.
 }
 \description{
 One line per learner across the grains, at the across-variable mean of the per-variable score,
-with an interval from its standard error across variables. An open circle marks each learner's
+with a 95 percent interval from its standard error across variables, on Student's t with one
+degree of freedom fewer than there are variables. An open circle marks each learner's
 best grain, which is where the curve says the record stops paying for being read more finely.
 }
 \examples{

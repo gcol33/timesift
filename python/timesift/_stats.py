@@ -1,14 +1,18 @@
-"""The two distributions the package reads, written out rather than imported.
+"""The distributions the package reads, written out rather than imported.
 
-Both fit in a page and both are needed in exactly one place each, so carrying a scientific
-computing stack for them would cost every install more than they are worth. The quantile function
-is Wichura's AS241, which is the algorithm R's ``qnorm`` uses, and the signed-rank test follows
-``wilcox.test`` in taking the exact distribution below fifty values with no tie and no zero and the
-normal approximation with continuity and tie corrections otherwise, so a p-value read here and a
-p-value read on the R side agree.
+Each fits in a page and each is needed in one place, so carrying a scientific computing stack for
+them would cost every install more than they are worth. The normal quantile is Wichura's AS241,
+which is the algorithm R's ``qnorm`` uses. Student's t quantile is solved on the closed-form
+distribution function a whole number of degrees of freedom has, to the precision R's ``qt``
+reports. The signed-rank test follows ``wilcox.test`` in taking the exact distribution below fifty
+values with no tie and no zero and the normal approximation with continuity and tie corrections
+otherwise, and returns which of the two it took, so a p-value read here and a p-value read on the R
+side agree and say the same thing about how they were read.
 """
 
 from __future__ import annotations
+
+import math
 
 import numpy as np
 
@@ -58,31 +62,81 @@ def _poly(coefs, r):
     return out
 
 
-def wilcoxon_p(values) -> float:
-    """Two-sided p-value of the signed-rank test on one sample against a centre of zero."""
-    x = np.asarray([v for v in np.asarray(values, dtype=float) if v != 0])
+def t_ppf(p: float, df: int) -> float:
+    """Student's t quantile on a whole number of degrees of freedom.
+
+    For a whole number of degrees of freedom the distribution function is a finite sum
+    (Abramowitz and Stegun 26.7.3 and 26.7.4), and the quantile is solved on it by Newton's
+    method from the normal quantile, which lies below it. The function is concave beyond zero, so
+    every step lands short of the root and the iteration climbs to it without overshooting.
+    """
+    if not 0 < p < 1:
+        raise ValueError(f"a probability must lie strictly between 0 and 1, got {p}")
+    if df < 1 or int(df) != df:
+        raise ValueError(f"the degrees of freedom are a whole number of at least one, got {df}")
+    df = int(df)
+    if p < 0.5:
+        return -t_ppf(1 - p, df)
+    if p == 0.5:
+        return 0.0
+    target = 2 * p - 1
+    log_scale = math.lgamma((df + 1) / 2) - math.lgamma(df / 2) - 0.5 * math.log(df * math.pi)
+    t = norm_ppf(p)
+    for _ in range(200):
+        density = math.exp(log_scale - (df + 1) / 2 * math.log1p(t * t / df))
+        step = (_t_central(t, df) - target) / (2 * density)
+        t -= step
+        if abs(step) <= 1e-15 * t:
+            break
+    return t
+
+
+def _t_central(t: float, df: int) -> float:
+    """P(|T| < t) for t >= 0, as the finite sum a whole number of degrees of freedom gives."""
+    theta = math.atan(t / math.sqrt(df))
+    c2 = math.cos(theta) ** 2
+    if df % 2:
+        if df == 1:
+            return 2 * theta / math.pi
+        term = total = math.cos(theta)
+        for k in range(1, (df - 1) // 2):
+            term *= c2 * (2 * k) / (2 * k + 1)
+            total += term
+        return 2 / math.pi * (theta + math.sin(theta) * total)
+    term = total = 1.0
+    for k in range(1, df // 2):
+        term *= c2 * (2 * k - 1) / (2 * k)
+        total += term
+    return math.sin(theta) * total
+
+
+def wilcoxon_p(values) -> tuple[float, str | None]:
+    """Two-sided p-value of the signed-rank test on one sample against a centre of zero, and the
+    method it was read by: ``"exact"`` or ``"normal"``."""
+    values = np.asarray(values, dtype=float)
+    x = values[values != 0]
     n = len(x)
     if n < 1:
-        return float("nan")
+        return float("nan"), None
     ranks = _average_ranks(np.abs(x))
     statistic = float(ranks[x > 0].sum())
     ties = len(np.unique(np.abs(x))) != n
 
-    if n < 50 and not ties:
+    if n < 50 and not ties and n == len(values):
         counts = _signed_rank_counts(n)
         total = 2.0 ** n
         below = counts[:int(statistic) + 1].sum() / total
         above = counts[int(statistic):].sum() / total
-        return float(min(1.0, 2 * min(below, above)))
+        return float(min(1.0, 2 * min(below, above))), "exact"
 
     expected = n * (n + 1) / 4
     _, tie_counts = np.unique(np.abs(x), return_counts=True)
     correction = (tie_counts ** 3 - tie_counts).sum() / 48
     sigma = np.sqrt(n * (n + 1) * (2 * n + 1) / 24 - correction)
     if sigma == 0:
-        return float("nan")
+        return float("nan"), None
     z = (statistic - expected - np.sign(statistic - expected) * 0.5) / sigma
-    return float(min(1.0, 2 * _norm_sf(abs(z))))
+    return float(min(1.0, 2 * _norm_sf(abs(z)))), "normal"
 
 
 def _average_ranks(values: np.ndarray) -> np.ndarray:

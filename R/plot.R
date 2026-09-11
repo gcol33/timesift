@@ -1,7 +1,8 @@
 #' Draw a ladder
 #'
 #' One line per learner across the grains, at the across-variable mean of the per-variable score,
-#' with an interval from its standard error across variables. An open circle marks each learner's
+#' with a 95 percent interval from its standard error across variables, on Student's t with one
+#' degree of freedom fewer than there are variables. An open circle marks each learner's
 #' best grain, which is where the curve says the record stops paying for being read more finely.
 #'
 #' @param x A [grain_ladder()] result.
@@ -33,6 +34,7 @@ plot.timesift_ladder <- function(x, col = NULL, interval = TRUE, ...) {
                        arms = unique(x$learner), levels = unique(x$grain))
   .draw_curves(stat, col = col, interval = interval, xlab = "grain",
                ylab = attr(x, "metric"), ...)
+  stat <- stat[c("arm", "level", "score", "se")]
   names(stat) <- c("learner", "grain", "score", "se")
   invisible(stat)
 }
@@ -62,6 +64,7 @@ plot.timesift <- function(x, col = NULL, interval = TRUE, ...) {
                        levels = unique(per_response$representation))
   .draw_curves(stat, col = col, interval = interval, xlab = "representation",
                ylab = x$metric, rule = .ensemble_level(x), ...)
+  stat <- stat[c("arm", "level", "score", "se")]
   names(stat) <- c("learner", "representation", "score", "se")
   invisible(stat)
 }
@@ -70,8 +73,12 @@ plot.timesift <- function(x, col = NULL, interval = TRUE, ...) {
 # from. One place, so a ladder and a run report the same quantity computed the same way.
 .curve_stats <- function(arm, level, score, arms, levels) {
   out <- lapply(arms, function(a) {
-    m <- vapply(levels, function(w) .mean_se(score[arm == a & level == w]), numeric(2L))
-    data.frame(arm = a, level = levels, score = m[1L, ], se = m[2L, ], stringsAsFactors = FALSE)
+    m <- vapply(levels, function(w) {
+      v <- score[arm == a & level == w]
+      c(.mean_se(v), sum(!is.na(v)))
+    }, numeric(3L))
+    data.frame(arm = a, level = levels, score = m[1L, ], se = m[2L, ],
+               half = .t_margin(m[2L, ], m[3L, ]), stringsAsFactors = FALSE)
   })
   out <- do.call(rbind, out)
   rownames(out) <- NULL
@@ -87,8 +94,8 @@ plot.timesift <- function(x, col = NULL, interval = TRUE, ...) {
   col <- rep_len(col, length(arms))
   ruled <- !is.null(rule) && length(rule) == 1L && is.finite(rule)
 
-  span <- if (interval && any(is.finite(stat$se))) {
-    range(c(stat$score - 1.96 * stat$se, stat$score + 1.96 * stat$se), na.rm = TRUE)
+  span <- if (interval && any(is.finite(stat$half))) {
+    range(c(stat$score - stat$half, stat$score + stat$half), na.rm = TRUE)
   } else {
     range(stat$score, na.rm = TRUE)
   }
@@ -106,10 +113,9 @@ plot.timesift <- function(x, col = NULL, interval = TRUE, ...) {
     s <- stat[stat$arm == arms[k], , drop = FALSE]
     s <- s[match(levels, s$level), , drop = FALSE]
     at <- seq_along(levels)
-    if (interval && any(is.finite(s$se) & s$se > 0)) {
-      ok <- is.finite(s$se) & s$se > 0
-      graphics::arrows(at[ok], (s$score - 1.96 * s$se)[ok], at[ok],
-                       (s$score + 1.96 * s$se)[ok],
+    if (interval && any(is.finite(s$half) & s$half > 0)) {
+      ok <- is.finite(s$half) & s$half > 0
+      graphics::arrows(at[ok], (s$score - s$half)[ok], at[ok], (s$score + s$half)[ok],
                        length = 0.03, angle = 90, code = 3L, col = col[k])
     }
     graphics::lines(at, s$score, col = col[k], lwd = 2)

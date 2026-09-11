@@ -6,7 +6,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from .ladder import _split_arm
+from .ladder import _best_arm, _split_arm
 from .registry import RESPONSES, resolve_metric
 from .representation import TimesiftMatrix
 from .response import Response, align_folds, as_response
@@ -45,7 +45,7 @@ def ladder_occlusion(ladder, x, y: Response, arm: str, over: str = "bin",
     """
     if not ladder.fits:
         raise ValueError("this ladder kept no fits; refit with grain_ladder(..., keep_fits=True)")
-    grain, learner = _split_arm(ladder, arm)
+    grain, learner = _split_arm(ladder, _best_arm(ladder, arm))
     if isinstance(x, TimesiftMatrix):
         m = x
     else:

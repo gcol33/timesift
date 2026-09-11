@@ -162,7 +162,8 @@ test_that("the paired contrast matches the value the fixtures pin", {
   got <- paired_contrast(ladder, "week|a", "week|b")
 
   for (i in seq_len(nrow(expected))) {
-    expect_identical(sprintf("%.12g", got[[expected$quantity[i]]]), expected$value[i],
+    v <- got[[expected$quantity[i]]]
+    expect_identical(if (is.character(v)) v else sprintf("%.12g", v), expected$value[i],
                      info = expected$quantity[i])
   }
   # A table where both arms scored every cell would pin the pairing at its easiest. The fixture

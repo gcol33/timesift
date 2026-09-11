@@ -240,8 +240,9 @@ def test_an_arm_is_found_whole_so_a_learner_named_with_the_separator_is_still_an
     grain = lad.summary()[0]["grain"]
     whole = paired_contrast(lad, f"{grain}|a|b", f"{grain}|linear")
     assert whole["a"] == f"{grain}|a|b"
-    assert paired_contrast(lad, "a|b", "linear")["a"].endswith("|a|b")
-    with pytest.raises(KeyError, match=r'no arm or learner called "week\|c"'):
+    with pytest.raises(KeyError, match="names a learner and no grain"):
+        paired_contrast(lad, "a|b", f"{grain}|linear")
+    with pytest.raises(KeyError, match=r'no arm called "week\|c"'):
         paired_contrast(lad, "week|c", "week|linear")
 
 

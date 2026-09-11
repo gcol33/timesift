@@ -76,7 +76,7 @@ occlusion.timesift_ladder <- function(x, data, y, arm, over = c("bin", "channel"
     stop("this ladder kept no fits. Refit with grain_ladder(..., keep_fits = TRUE).",
          call. = FALSE)
   }
-  rows <- .arm_rows(ladder, arm)
+  rows <- .arm_rows(ladder, .best_arm(ladder, arm))
   label <- attr(rows, "label")
   grain <- attr(rows, "grain")
   set <- .as_set(x)

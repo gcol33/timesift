@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ._stats import norm_ppf, wilcoxon_p
+from ._stats import norm_ppf, t_ppf, wilcoxon_p
 from .learners import fit_learner
 from .metrics import tss
 from .registry import RESPONSES, get_learner, resolve_metric
@@ -39,7 +39,7 @@ class Ladder:
     fits: dict
 
     def arm(self, name: str):
-        """A mask over the rows of one grain-and-learner arm, named `grain/learner`."""
+        """A mask over the rows of one grain-and-learner arm, named ``grain|learner``."""
         grain, learner = _split_arm(self, name)
         return (self.grain == grain) & (self.learner == learner)
 
@@ -316,6 +316,14 @@ def paired_contrast(ladder: Ladder, a: str, b: str) -> dict:
     cells, so a difference of two marginal means is not a difference between the arms. Pairing also
     cancels what a threshold-selected metric carries in its level, since both arms carry the same
     bias on the same cell.
+
+    Each arm is named whole, ``grain|learner``. A learner named alone would take its best grain,
+    chosen on the scores the contrast is then read off, and pairing does not cancel that choice;
+    ``select_grain`` chooses a grain on inner folds instead and contrasts the selection through
+    ``compare``. The interval is Student's t on one degree of freedom fewer than there are
+    variables, and ``p_method`` says whether the signed-rank p-value is ``"exact"`` or the
+    ``"normal"`` approximation, which it is when the per-variable differences hold a zero or a tie
+    or number fifty or more.
     """
     hit_a, hit_b = ladder.arm(a), ladder.arm(b)
     key = np.char.add(np.char.add(ladder.variable.astype(str), "|"), ladder.fold.astype(str))
@@ -333,9 +341,11 @@ def paired_contrast(ladder: Ladder, a: str, b: str) -> dict:
     by_variable = np.asarray([diff[variable == v].mean() for v in np.unique(variable)])
     n = len(by_variable)
     d, se = mean_se(by_variable)
-    return dict(a=_label(ladder, a), b=_label(ladder, b), diff=d, lower=d - 1.96 * se,
-                upper=d + 1.96 * se, n_variable=n, n_cell=len(shared),
-                n_favour=int((by_variable > 0).sum()), p_value=_wilcoxon(by_variable))
+    half = t_ppf(0.975, n - 1) * se if n > 1 else float("nan")
+    p, method = _wilcoxon(by_variable)
+    return dict(a=_label(ladder, a), b=_label(ladder, b), diff=d, lower=d - half,
+                upper=d + half, n_variable=n, n_cell=len(shared),
+                n_favour=int((by_variable > 0).sum()), p_value=p, p_method=method)
 
 
 def tss_inflation(y: Response, folds, skill=(0.6, 0.7, 0.9), replicates: int = 200,
@@ -412,14 +422,27 @@ def learner_dict(learners):
 def _split_arm(ladder: Ladder, name: str):
     """The grain and the learner an arm names, matched whole against the labels the ladder
     carries rather than split at a ``|``, so a grain or a learner whose own name holds one is
-    still found. A name that is no arm's label is a learner, read at its best grain."""
+    still found. A learner named alone is refused: its best grain would be chosen on the scores a
+    contrast is then read off."""
     for grain, learner in zip(ladder.grain, ladder.learner):
         if f"{grain}|{learner}" == name:
             return str(grain), str(learner)
+    whole = [f"{g}|{l}" for g, l in zip(ladder.grain, ladder.learner) if str(l) == name]
+    if whole:
+        raise KeyError(f'"{name}" names a learner and no grain. Its best grain would be chosen on '
+                       f'the scores the contrast is read off, so name the arm whole, as '
+                       f'"{whole[0]}", or let select_grain choose the grain on inner folds and '
+                       f'contrast the selection through its `compare`')
+    raise KeyError(f'no arm called "{name}" in this ladder')
+
+
+def _best_arm(ladder: Ladder, name: str) -> str:
+    """The arm a learner named alone is read at: its best grain on the ladder's own scores. That is
+    the natural arm for describing a fitted model, and never the arm a contrast is computed on."""
+    if any(f"{g}|{l}" == name for g, l in zip(ladder.grain, ladder.learner)):
+        return name
     rows = [r for r in ladder.summary() if r["learner"] == name and r["score"] == r["score"]]
-    if not rows:
-        raise KeyError(f'no arm or learner called "{name}" in this ladder')
-    return max(rows, key=lambda r: r["score"])["grain"], name
+    return f'{max(rows, key=lambda r: r["score"])["grain"]}|{name}' if rows else name
 
 
 def _label(ladder: Ladder, name: str) -> str:
@@ -435,7 +458,7 @@ def _ordered(values):
     return seen
 
 
-def _wilcoxon(values) -> float:
+def _wilcoxon(values) -> tuple[float, str | None]:
     if len(values) < 2 or not np.any(values != 0):
-        return float("nan")
+        return float("nan"), None
     return wilcoxon_p(values)

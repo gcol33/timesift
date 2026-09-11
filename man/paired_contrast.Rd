@@ -9,13 +9,16 @@ paired_contrast(ladder, a, b)
 \arguments{
 \item{ladder}{A \code{\link[=grain_ladder]{grain_ladder()}} result.}
 
-\item{a, b}{The two arms, each given as \code{"learner"} or \code{"grain|learner"}. Naming a learner alone
-takes its best grain.}
+\item{a, b}{The two arms, each named \code{"grain|learner"}.}
 }
 \value{
-A one-row data frame: the mean per-variable difference, a 95 percent interval from its
-standard error across variables, the number of variables the difference favours, the paired
-cells and variables it rests on, and a Wilcoxon signed-rank p-value.
+A one-row data frame: the mean per-variable difference; a 95 percent interval from its
+standard error across variables, on Student's t with one degree of freedom fewer than there
+are variables; the number of variables the difference favours; the paired cells and variables
+it rests on; a Wilcoxon signed-rank p-value; and \code{p_method}, \code{"exact"} where the p-value is
+read off the exact distribution and \code{"normal"} where it is the normal approximation with
+continuity and tie corrections, which it is when the per-variable differences hold a zero or
+a tie or number fifty or more.
 }
 \description{
 Two arms scored on the same held-out units do not necessarily have the same set of defined
@@ -29,6 +32,14 @@ Pairing also cancels what a threshold-selected metric carries in its level. TSS 
 threshold that maximises it is biased upward where presences are thin, both arms carry the same
 bias on the same cell, and it cancels in the difference. That is why the levels a ladder reports
 are upper bounds while the differences between arms are read at face value.
+
+An arm is named whole, by its grain and its learner. A learner named alone would have to take
+its best grain, and that grain is chosen on the held-out scores the contrast is then read off:
+the difference becomes one between two maxima, favouring whichever learner ran across more
+grains, and neither the interval nor the p-value accounts for the choice. It is the mechanism
+\code{\link[=tss_inflation]{tss_inflation()}} measures one level down, and here pairing does not cancel it.
+\code{\link[=select_grain]{select_grain()}} chooses a grain on inner folds instead, and its \code{compare} argument contrasts
+the selection with the arms of a ladder on matched cells.
 }
 \examples{
 \dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}

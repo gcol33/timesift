@@ -11,13 +11,24 @@
 #' bias on the same cell, and it cancels in the difference. That is why the levels a ladder reports
 #' are upper bounds while the differences between arms are read at face value.
 #'
-#' @param ladder A [grain_ladder()] result.
-#' @param a,b The two arms, each given as `"learner"` or `"grain|learner"`. Naming a learner alone
-#'   takes its best grain.
+#' An arm is named whole, by its grain and its learner. A learner named alone would have to take
+#' its best grain, and that grain is chosen on the held-out scores the contrast is then read off:
+#' the difference becomes one between two maxima, favouring whichever learner ran across more
+#' grains, and neither the interval nor the p-value accounts for the choice. It is the mechanism
+#' [tss_inflation()] measures one level down, and here pairing does not cancel it.
+#' [select_grain()] chooses a grain on inner folds instead, and its `compare` argument contrasts
+#' the selection with the arms of a ladder on matched cells.
 #'
-#' @return A one-row data frame: the mean per-variable difference, a 95 percent interval from its
-#'   standard error across variables, the number of variables the difference favours, the paired
-#'   cells and variables it rests on, and a Wilcoxon signed-rank p-value.
+#' @param ladder A [grain_ladder()] result.
+#' @param a,b The two arms, each named `"grain|learner"`.
+#'
+#' @return A one-row data frame: the mean per-variable difference; a 95 percent interval from its
+#'   standard error across variables, on Student's t with one degree of freedom fewer than there
+#'   are variables; the number of variables the difference favours; the paired cells and variables
+#'   it rests on; a Wilcoxon signed-rank p-value; and `p_method`, `"exact"` where the p-value is
+#'   read off the exact distribution and `"normal"` where it is the normal approximation with
+#'   continuity and tie corrections, which it is when the per-variable differences hold a zero or
+#'   a tie or number fifty or more.
 #'
 #' @examplesIf requireNamespace("glmnet", quietly = TRUE)
 #' set.seed(1)
@@ -51,16 +62,34 @@ paired_contrast <- function(ladder, a, b) {
 
   n <- length(per_variable)
   d <- mean(per_variable)
-  se <- stats::sd(per_variable) / sqrt(n)
-  p <- if (n > 1L && any(per_variable != 0)) {
-    suppressWarnings(stats::wilcox.test(per_variable)$p.value)
-  } else {
-    NA_real_
-  }
+  half <- .t_margin(stats::sd(per_variable) / sqrt(n), n)
+  test <- .signed_rank(per_variable)
   data.frame(a = attr(ra, "label"), b = attr(rb, "label"), diff = d,
-             lower = d - 1.96 * se, upper = d + 1.96 * se,
+             lower = d - half, upper = d + half,
              n_variable = n, n_cell = length(shared), n_favour = sum(per_variable > 0),
-             p_value = p, stringsAsFactors = FALSE)
+             p_value = test$p, p_method = test$method, stringsAsFactors = FALSE)
+}
+
+# The half-width of a 95 percent interval on a mean of `n` independent replicates with standard
+# error `se`, on Student's t with n - 1 degrees of freedom. The replicates are response variables,
+# and a design with a handful of them is where the normal quantile is too narrow.
+.t_margin <- function(se, n) {
+  ifelse(n > 1, stats::qt(0.975, pmax(n - 1, 1)) * se, NA_real_)
+}
+
+# Wilcoxon's signed-rank test of the per-variable differences against zero, and the method it is
+# read by. The exact distribution holds below fifty values with no zero and no tie among their
+# absolute values; otherwise the p-value is the normal approximation with continuity and tie
+# corrections. The choice is made here, so wilcox.test() is never left to fall back on its own.
+.signed_rank <- function(x) {
+  nonzero <- x[x != 0]
+  if (length(x) < 2L || !length(nonzero)) {
+    return(list(p = NA_real_, method = NA_character_))
+  }
+  exact <- length(nonzero) < 50L && length(nonzero) == length(x) &&
+    !anyDuplicated(abs(nonzero))
+  list(p = stats::wilcox.test(x, exact = exact, correct = TRUE)$p.value,
+       method = if (exact) "exact" else "normal")
 }
 
 .arm_rows <- function(ladder, arm) {
@@ -70,19 +99,32 @@ paired_contrast <- function(ladder, a, b) {
   # An arm is matched whole against the labels the ladder carries rather than split at a `|`, so
   # a grain or a learner whose own name holds one is still found.
   label <- paste(ladder$grain, ladder$learner, sep = "|")
-  if (arm %in% label) {
-    rows <- ladder[label == arm, , drop = FALSE]
-  } else {
-    s <- summary(ladder)
-    s <- s[s$learner == arm & !is.na(s$score), , drop = FALSE]
-    if (!nrow(s)) {
-      stop("no arm or learner called \"", arm, "\" in this ladder.", call. = FALSE)
+  if (!arm %in% label) {
+    if (arm %in% ladder$learner) {
+      stop("\"", arm, "\" names a learner and no grain. Its best grain would be chosen on the ",
+           "scores the contrast is read off, so name the arm whole, as \"",
+           label[match(arm, ladder$learner)], "\", or let select_grain() choose the grain on ",
+           "inner folds and contrast the selection through its `compare`.", call. = FALSE)
     }
-    grain <- s$grain[which.max(s$score)]
-    rows <- ladder[ladder$grain == grain & ladder$learner == arm, , drop = FALSE]
+    stop("no arm called \"", arm, "\" in this ladder.", call. = FALSE)
   }
-  structure(rows, label = paste(rows$grain[1L], rows$learner[1L], sep = "|"),
-            grain = rows$grain[1L], learner = rows$learner[1L])
+  rows <- ladder[label == arm, , drop = FALSE]
+  structure(rows, label = arm, grain = rows$grain[1L], learner = rows$learner[1L])
+}
+
+# The arm a learner named alone is read at: its best grain on the ladder's own scores. That is the
+# natural arm for describing a fitted model, and never the arm a contrast is computed on.
+.best_arm <- function(ladder, arm) {
+  label <- paste(ladder$grain, ladder$learner, sep = "|")
+  if (arm %in% label || !arm %in% ladder$learner) {
+    return(arm)
+  }
+  s <- summary(ladder)
+  s <- s[s$learner == arm & !is.na(s$score), , drop = FALSE]
+  if (!nrow(s)) {
+    return(arm)
+  }
+  paste(s$grain[which.max(s$score)], arm, sep = "|")
 }
 
 #' How much a self-selected threshold inflates the reported level

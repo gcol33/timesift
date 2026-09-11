@@ -604,12 +604,15 @@ as_ladder <- function(cells) {
   structure(rbind(arm("a", cells$a), arm("b", cells$b)),
             class = c("timesift_ladder", "data.frame"))
 }
-QUANTITIES <- c("diff", "lower", "upper", "n_variable", "n_cell", "n_favour", "p_value")
+QUANTITIES <- c("diff", "lower", "upper", "n_variable", "n_cell", "n_favour", "p_value",
+                "p_method")
 contrast <- paired_contrast(as_ladder(contrast_cells), "week|a", "week|b")
 write_fixture(
   data.frame(quantity = QUANTITIES,
-             value = vapply(QUANTITIES, function(nm) sprintf("%.12g", contrast[[nm]]),
-                            character(1L)),
+             value = vapply(QUANTITIES, function(nm) {
+               v <- contrast[[nm]]
+               if (is.character(v)) v else sprintf("%.12g", v)
+             }, character(1L)),
              stringsAsFactors = FALSE),
   "contrast.csv"
 )

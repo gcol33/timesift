@@ -171,7 +171,8 @@ def test_the_paired_contrast_matches_the_value_the_fixtures_pin():
     got = paired_contrast(ladder, "week|a", "week|b")
 
     for quantity, value in expected.items():
-        assert f"{float(got[quantity]):.12g}" == value, quantity
+        v = got[quantity]
+        assert (v if isinstance(v, str) else f"{float(v):.12g}") == value, quantity
     # A table where both arms scored every cell would pin the pairing at its easiest.
     assert got["n_cell"] < len(cells)
 

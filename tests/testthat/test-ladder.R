@@ -95,17 +95,46 @@ test_that("an arm is found whole, so a learner whose name holds the separator is
                        folds = f$folds, verbose = FALSE)
   p <- paired_contrast(lad, "week|a|b", "week|b")
   expect_equal(p$a, "week|a|b")
-  expect_equal(paired_contrast(lad, "a|b", "b")$a, attr(.arm_rows(lad, "a|b"), "label"))
-  expect_error(paired_contrast(lad, "week|c", "week|b"), 'no arm or learner called "week|c"')
+  expect_error(paired_contrast(lad, "week|c", "week|b"), 'no arm called "week|c"', fixed = TRUE)
 })
 
-test_that("naming a learner alone contrasts it at its own best grain", {
+test_that("a learner named alone is refused, since its grain would be chosen on the contrast", {
   f <- ladder_fixture()
   lad <- grain_ladder(f$x, f$y, list(a = constant_learner(), b = constant_learner(0.3)),
                        folds = f$folds, verbose = FALSE)
+  expect_error(paired_contrast(lad, "a", "week|b"), "names a learner and no grain")
+  expect_error(paired_contrast(lad, "week|a", "b"), "select_grain()", fixed = TRUE)
+  # Describing a fitted model is another matter: occlusion reads a learner at its best grain.
   s <- summary(lad)
-  best <- s$grain[s$learner == "a" & s$best]
-  expect_equal(paired_contrast(lad, "a", "b")$a, paste(best, "a", sep = "|"))
+  expect_equal(.best_arm(lad, "a"), paste(s$grain[s$learner == "a" & s$best], "a", sep = "|"))
+  expect_equal(.best_arm(lad, "week|a"), "week|a")
+})
+
+contrast_ladder <- function(a, b) {
+  arm <- function(name, score) {
+    data.frame(grain = "week", learner = name, variable = rep(c("v1", "v2", "v3"), each = 2L),
+               fold = rep(1:2, 3L), score = score, scorable = TRUE, stringsAsFactors = FALSE)
+  }
+  structure(rbind(arm("a", a), arm("b", b)), class = c("timesift_ladder", "data.frame"))
+}
+
+test_that("the interval is Student's t on the variables, and the p-value names its method", {
+  lad <- contrast_ladder(a = c(0.5, 0.625, 0.75, 0.875, 0.5, 0.625),
+                         b = c(0.375, 0.5, 0.625, 0.625, 0.5, 0.5))
+  p <- paired_contrast(lad, "week|a", "week|b")
+  per <- c(0.125, 0.1875, 0.0625)
+  expect_equal(p$diff, mean(per))
+  expect_equal(p$upper - p$diff, stats::qt(0.975, 2) * stats::sd(per) / sqrt(3))
+  expect_identical(p$p_method, "exact")
+  expect_equal(p$p_value, stats::wilcox.test(per, exact = TRUE)$p.value)
+
+  # One variable identical in both arms and two sharing a difference: a zero and a tie, where
+  # the exact distribution does not hold and the normal approximation is taken on purpose.
+  tied <- contrast_ladder(a = c(0.75, 0.75, 0.875, 0.875, 0.5, 0.5),
+                          b = c(0.625, 0.625, 0.75, 0.75, 0.5, 0.5))
+  q <- expect_silent(paired_contrast(tied, "week|a", "week|b"))
+  expect_identical(q$p_method, "normal")
+  expect_equal(q$p_value, stats::wilcox.test(c(0.125, 0.125, 0), exact = FALSE)$p.value)
 })
 
 test_that("two learners cannot be reported under one name", {
