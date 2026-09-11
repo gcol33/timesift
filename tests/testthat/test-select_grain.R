@@ -104,7 +104,7 @@ test_that("the plot draws the inner scores and returns them", {
   grDevices::dev.off()
   expect_true(file.exists(path))
   expect_equal(nrow(drawn), nrow(sel$candidates) * nrow(sel$selected))
-  expect_named(drawn, c("fold", "grain", "learner", "score", "n_variable"))
+  expect_named(drawn, c("fold", "grain", "learner", "score", "se", "n_variable"))
   unlink(path)
 })
 
@@ -291,6 +291,73 @@ test_that("a selection hands its control to the inner search and to the refit al
   # refit: nothing in that chain may reach a learner without the control the caller gave.
   expect_equal(length(seen$epochs), 2L * (3L * 2L + 1L))
   expect_true(all(seen$epochs == 7L))
+})
+
+test_that("the one-standard-error rule takes the coarsest candidate inside the band", {
+  grid <- data.frame(grain = c("day", "week", "month", "year"), learner = "l",
+                     score = c(0.70, 0.69, 0.66, 0.55), se = c(0.02, 0.03, 0.01, 0.01))
+  size <- data.frame(bins = c(365, 52, 12, 1), channels = 1)
+  expect_equal(.choose_candidate(grid, size, "argmax"), 1L)
+  # The band is the best candidate's own standard error: 0.70 - 0.02 admits the week and not the
+  # month, however small the month's own error is.
+  expect_equal(.choose_candidate(grid, size, "coarsest_adequate"), 2L)
+  grid$score[3L] <- 0.685
+  expect_equal(.choose_candidate(grid, size, "coarsest_adequate"), 3L)
+  # Between two candidates with the same bins, fewer channels is coarser.
+  size2 <- data.frame(bins = c(52, 52), channels = c(3, 1))
+  two <- data.frame(grain = c("week.mmm", "week.mean"), learner = "l", score = c(0.70, 0.695),
+                    se = c(0.01, 0.01))
+  expect_equal(.choose_candidate(two, size2, "coarsest_adequate"), 2L)
+  # A standard error that could not be computed leaves only the ties with the best.
+  grid$se[1L] <- NA_real_
+  expect_equal(.choose_candidate(grid, size, "coarsest_adequate"), 1L)
+})
+
+test_that("the coarsest adequate grain is the generating grain or coarser where the profile is flat", {
+  skip_if_not_installed("glmnet")
+  # The grain-invariant control of simulate_records(): the driver is the unit's constant offset,
+  # which every grain reports exactly, so no candidate is better than another inside the training
+  # data beyond noise. The mechanism is anchored on one season, which is the generating grain.
+  sim <- simulate_records(n = 240L, mechanism = "season", variables = 4L, prevalence = 0.3,
+                          auc = 0.85, step_hours = 6, anomaly_sd = 0.1, offset_effect = 1,
+                          seed = 11L)
+  expect_equal(sim$grain, "season")
+  x <- grain_matrix(sim$readings, unit, time, reading,
+                    grain = c("month", "season", "year"))
+  sel <- select_grain(x, sim$y, elasticnet(), folds = fold_map(sim$y, v = 4L, seed = 5L),
+                      inner = 4L, rule = "coarsest_adequate", seed = 2L, verbose = FALSE)
+  expect_equal(attr(sel, "rule"), "coarsest_adequate")
+  bins <- vapply(x, function(m) dim(m)[2L], numeric(1L))
+  expect_true(all(bins[sel$selected$grain] <= bins[["season"]]))
+  expect_true(all(sel$selected$inner_score >= sel$selected$inner_best - sel$selected$inner_se))
+  # The choice is the rule applied to the inner scores the object carries, fold by fold.
+  for (k in sel$selected$fold) {
+    g <- sel$inner[sel$inner$fold == k, , drop = FALSE]
+    best <- which.max(g$score)
+    ok <- g$grain[g$score >= g$score[best] - g$se[best]]
+    expect_equal(sel$selected$grain[sel$selected$fold == k], ok[which.min(bins[ok])])
+  }
+})
+
+test_that("where one candidate clearly separates, the coarsest adequate rule is the argmax", {
+  skip_if_not_installed("glmnet")
+  # The season mechanism on the anomaly alone: one season bin carries the driver, and the year bin,
+  # which averages four seasons over a unit offset the driver does not read, carries almost
+  # nothing. The year is the coarser candidate and the rule must not take it.
+  sim <- simulate_records(n = 240L, mechanism = "season", variables = 4L, prevalence = 0.3,
+                          auc = 0.85, step_hours = 6, seed = 13L)
+  x <- grain_matrix(sim$readings, unit, time, reading, grain = c("season", "year"))
+  folds <- fold_map(sim$y, v = 4L, seed = 5L)
+  coarse <- select_grain(x, sim$y, elasticnet(), folds = folds, inner = 4L,
+                         rule = "coarsest_adequate", seed = 2L, verbose = FALSE)
+  top <- select_grain(x, sim$y, elasticnet(), folds = folds, inner = 4L, seed = 2L,
+                      verbose = FALSE)
+  year <- coarse$inner[coarse$inner$grain == "year", ]
+  best <- coarse$selected$inner_best[match(year$fold, coarse$selected$fold)]
+  se <- coarse$selected$inner_se[match(year$fold, coarse$selected$fold)]
+  expect_true(all(year$score < best - se))
+  expect_equal(coarse$selected$grain, top$selected$grain)
+  expect_true(all(coarse$selected$grain == "season"))
 })
 
 test_that("the inner fold count is checked before it is coerced", {

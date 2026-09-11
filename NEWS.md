@@ -2,6 +2,16 @@
 
 ## New
 
+* `select_grain(rule = "coarsest_adequate")` takes, inside each outer fold, the coarsest
+  candidate whose inner score lies within one standard error of the highest, where `"argmax"`,
+  still the default, takes the highest. Coarser is fewer bins, then fewer channels. The standard
+  error is the spread over the inner folds of each fold's score, so the rule reads nothing the
+  selection did not already compute. Where the inner profile is flat it returns the least storage
+  the record can be kept at without a measured loss inside the training data; where one candidate
+  separates by more than a standard error the two rules agree. Every outer fold now reports the
+  highest inner score (`inner_best`) and its standard error (`inner_se`) beside the chosen one,
+  and `inner` carries each candidate's standard error. On both sides.
+
 * `coverage()` lays the binning out as a count of readings per `(unit, bin)`, over every bin the
   calendar tiles the record with. `grain_matrix()` refuses a record where a unit misses a bin
   rather than padding it, and this is the table that decision is made on: a logger that started

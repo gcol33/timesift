@@ -791,7 +791,12 @@ call site.
   learner defined outside any registry has no name to be rebuilt from and travels whole.
 - `select_grain()` searches the candidates in the order the grains and the learners were declared
   in, so which candidate an exact tie on the inner score falls to does not depend on how the names
-  sort.
+  sort. Its `rule` is `"argmax"` by default. `"coarsest_adequate"` takes, among the candidates
+  whose inner score is at least the highest minus that candidate's standard error (the standard
+  deviation over the inner folds of each fold's mean over its scored variables, over the square
+  root of the fold count), the one with the fewest bins, then the fewest channels, then the higher
+  score, then the one declared first; a standard error that cannot be computed is zero. Each
+  outer fold reports the chosen score, the highest score and that standard error.
 - `models` takes one learner, a set or list of them, or the name of a registered one, and
   `learners` on a ladder takes the same three forms.
 - Predicting rebuilds each member's representation for the new targets from the settings its own

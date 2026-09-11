@@ -22,6 +22,24 @@
 #' The cost is the ladder's, multiplied by the number of inner folds: `v_outer * (v_inner *
 #' candidates + 1)` fits. With a neural learner that is where an overnight run goes.
 #'
+#' @section Choosing a candidate:
+#' Inside each outer fold every candidate carries an inner score, the mean over variables of its
+#' per-variable mean over the inner folds, and a standard error, the standard deviation over the
+#' inner folds of the fold's own score (the mean over the variables scored in that fold) divided by
+#' the square root of the number of inner folds. `rule = "argmax"` takes the highest inner score,
+#' and on an exact tie the candidate declared first.
+#'
+#' `rule = "coarsest_adequate"` first finds that highest score and its standard error, calls every
+#' candidate scoring at least the highest minus one standard error adequate, and takes the coarsest
+#' adequate one. Coarseness is read off the representation as the package holds it: fewer bins is
+#' coarser, and between two candidates with the same number of bins, fewer channels is coarser.
+#' A tie on both goes to the higher inner score, then to the candidate declared first. Where one
+#' candidate scores more than a standard error above every other, the two rules agree; where the
+#' inner profile is flat, this one returns the least storage the record can be kept at without a
+#' measured loss inside the training data. A standard error that cannot be computed, because a
+#' candidate was scored in fewer than two inner folds, is taken as zero, so the rule falls back to
+#' the candidates tied with the highest score.
+#'
 #' @param x A [grain_matrix()] result, a [timesift_set()], or a named list of representations.
 #'   Its names are the grains being chosen between.
 #' @param y The response for the same units.
@@ -32,6 +50,11 @@
 #' @param inner Number of inner folds the selection is made on, or a function of the outer training
 #'   response returning a fold map for those units. A count deals the inner folds by the grouping
 #'   the outer fold map carries, so what [grouped_cv()] kept whole outside stays whole inside.
+#' @param rule How a candidate is chosen from its inner scores. `"argmax"` takes the highest.
+#'   `"coarsest_adequate"` takes the coarsest candidate whose inner score lies within one standard
+#'   error of the highest, the one-standard-error rule of Breiman, Friedman, Olshen and Stone
+#'   (1984) and of Hastie, Tibshirani and Friedman (2009, section 7.10) with coarseness in place of
+#'   model complexity. See Choosing a candidate.
 #' @param response Name of the registered response head.
 #' @param metric Name of a registered metric the selection is made on, or `NULL` for the
 #'   response's own. The estimate is reported under every registered metric whichever this is.
@@ -45,12 +68,14 @@
 #' @param verbose Report each outer fold and what it selected as it runs.
 #'
 #' @return A `timesift_selection`: a list carrying `selected`, one row per outer fold with the
-#'   candidate it chose and the inner score it chose on; `estimate`, the nested score under every
+#'   candidate it chose, the inner score it chose on, the highest inner score in that fold
+#'   (`inner_best`) and that score's standard error (`inner_se`); `estimate`, the nested score under every
 #'   registered metric with its standard error across variables; `contrast`, one
 #'   [paired_contrast()] row against each arm of `compare`, or `NULL`; `candidates`, the set that
 #'   was searched; and `scores`, the per-cell rows of the selected procedure under the selection
 #'   metric, in the layout [grain_ladder()] returns. The held-out prediction of every unit is in
-#'   the `predictions` attribute and the scorable-cell mask in `cells`.
+#'   the `predictions` attribute and the scorable-cell mask in `cells`. `inner` holds every
+#'   candidate's inner score and standard error in every outer fold.
 #'
 #' @seealso [grain_ladder()] for the grid this selects from, and [paired_contrast()] for the
 #'   comparison the `contrast` element holds.
@@ -74,8 +99,10 @@
 #'
 #' @export
 select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
+                         rule = c("argmax", "coarsest_adequate"),
                          response = "presence_absence", metric = NULL, compare = NULL,
                          control = train_control(), seed = 1L, verbose = TRUE) {
+  rule <- match.arg(rule)
   set <- .as_set(x)
   units <- dimnames(set[[1L]])[[1L]]
   spec <- .responses_reg$get(response)
@@ -103,6 +130,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
   if (nrow(candidates) < 2L) {
     stop("selection needs at least two candidates; got one grain and one learner.", call. = FALSE)
   }
+  size <- .candidate_size(set, candidates)
 
   levels <- sort(unique(f))
   p <- matrix(NA_real_, nrow = length(units), ncol = ncol(y),
@@ -121,12 +149,13 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     lad <- grain_ladder(.subset_set(set, train), y_train, learners,
                          folds = inner_split(y_train, seed + i, train), response = response,
                          metric = metric, control = control, verbose = FALSE)
-    grid <- .join_candidates(candidates, summary(lad), k)
+    grid <- .join_candidates(candidates, summary(lad), .inner_se(lad), k)
     if (all(!is.finite(grid$score))) {
       stop("no candidate scored inside the training data of fold ", k,
            ". Widen the inner folds or drop the variables that cannot be scored.", call. = FALSE)
     }
-    won <- which.max(ifelse(is.finite(grid$score), grid$score, -Inf))
+    best <- .first_best(grid$score)
+    won <- .choose_candidate(grid, size, rule)
 
     # The refit is the inner ladder's own fitting path, so the procedure's held-out predictions are
     # the ones its chosen candidate would have made rather than a second fitting path's.
@@ -137,9 +166,10 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     p[rownames(held_out), colnames(held_out)] <- held_out
 
     chosen[[i]] <- data.frame(fold = k, grain = grid$grain[won], learner = grid$learner[won],
-                              inner_score = grid$score[won], n_train = length(train),
+                              inner_score = grid$score[won], inner_best = grid$score[best],
+                              inner_se = grid$se[best], n_train = length(train),
                               n_test = length(test), stringsAsFactors = FALSE)
-    inner_scores[[i]] <- grid[c("fold", "grain", "learner", "score", "n_variable")]
+    inner_scores[[i]] <- grid[c("fold", "grain", "learner", "score", "se", "n_variable")]
     if (verbose) {
       message(sprintf("fold %s of %d selected %s|%s at %s %.3f", k, length(levels),
                       grid$grain[won], grid$learner[won], metric, grid$score[won]))
@@ -162,7 +192,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     inner = do.call(rbind, inner_scores)
   )
   structure(out, class = "timesift_selection", metric = metric, response = response,
-            folds = stats::setNames(f, units), cells = cells,
+            rule = rule, folds = stats::setNames(f, units), cells = cells,
             predictions = stats::setNames(list(p), .selected_arm))
 }
 
@@ -174,7 +204,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
 #' @export
 print.timesift_selection <- function(x, ...) {
   cat("<timesift selection>", .plural(nrow(x$selected), "outer fold"), "over",
-      .plural(nrow(x$candidates), "candidate"), "\n")
+      .plural(nrow(x$candidates), "candidate"), "by", attr(x, "rule") %||% "argmax", "\n")
   est <- x$estimate[x$estimate$metric == attr(x, "metric"), , drop = FALSE]
   cat(sprintf("%s: %.3f (se %.3f) for the procedure, selection included\n",
               attr(x, "metric"), est$score, est$se))
@@ -309,13 +339,57 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
 # The candidate set keeps the order its grains and its learners were declared in, so which
 # candidate an exact tie on the inner score falls to does not depend on the session's collation the
 # way a join on the names would.
-.join_candidates <- function(candidates, grid, fold) {
-  i <- match(paste(candidates$grain, candidates$learner, sep = "|"),
-             paste(grid$grain, grid$learner, sep = "|"))
+.join_candidates <- function(candidates, grid, se, fold) {
+  key <- paste(candidates$grain, candidates$learner, sep = "|")
+  i <- match(key, paste(grid$grain, grid$learner, sep = "|"))
   candidates$score <- grid$score[i]
+  candidates$se <- unname(se[key])
   candidates$n_variable <- grid$n_variable[i]
   candidates$fold <- fold
   candidates
+}
+
+# The standard error of each candidate's inner score: the spread over the inner folds of the fold's
+# own score, the mean over the variables scored in it, divided by the square root of their number.
+# Named by the candidate's "grain|learner" label.
+.inner_se <- function(lad) {
+  keep <- lad[!is.na(lad$score), , drop = FALSE]
+  if (!nrow(keep)) {
+    return(stats::setNames(numeric(), character()))
+  }
+  by_fold <- stats::aggregate(list(score = keep$score), keep[c("grain", "learner", "fold")], mean)
+  key <- paste(by_fold$grain, by_fold$learner, sep = "|")
+  vapply(split(by_fold$score, key), function(s) {
+    if (length(s) < 2L) NA_real_ else stats::sd(s) / sqrt(length(s))
+  }, numeric(1L))
+}
+
+# The highest inner score, and on an exact tie the candidate declared first.
+.first_best <- function(score) {
+  which.max(ifelse(is.finite(score), score, -Inf))
+}
+
+# How coarse each candidate is, read off the representation it reads: its number of bins and its
+# number of channels.
+.candidate_size <- function(set, candidates) {
+  d <- lapply(candidates$grain, function(g) dim(set[[g]]))
+  data.frame(bins = vapply(d, `[`, numeric(1L), 2L),
+             channels = vapply(d, `[`, numeric(1L), 3L))
+}
+
+# The rule a candidate is chosen by. Under "coarsest_adequate" every candidate within one standard
+# error of the highest score is adequate, and the coarsest of them wins: fewest bins, then fewest
+# channels, then the higher score, then the order of declaration.
+.choose_candidate <- function(grid, size, rule) {
+  best <- .first_best(grid$score)
+  if (identical(rule, "argmax")) {
+    return(best)
+  }
+  score <- ifelse(is.finite(grid$score), grid$score, -Inf)
+  se <- grid$se[best]
+  tolerance <- if (is.finite(se)) se else 0
+  adequate <- which(score >= score[best] - tolerance)
+  adequate[order(size$bins[adequate], size$channels[adequate], -score[adequate], adequate)][1L]
 }
 
 # The inner map is drawn on the outer training units alone, either by fold_map() at a given count,

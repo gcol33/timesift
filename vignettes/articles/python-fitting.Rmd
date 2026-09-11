@@ -338,6 +338,7 @@ select_grain(
     learners,
     folds=None,
     inner=5,
+    rule: str = 'argmax',
     response: str = 'presence_absence',
     metric=None,
     compare: Ladder | None = None,
@@ -364,6 +365,16 @@ candidates + 1)` fits.
 
 `control` is the `train_control` every neural learner trains under, in the inner search and
 in the refit alike; a learner carrying settings of its own overrides it on the ones it names.
+
+Inside each outer fold every candidate carries an inner score, the mean over variables of its
+per-variable mean over the inner folds, and a standard error, the standard deviation over the
+inner folds of the fold's own score divided by the square root of their number. `rule`
+chooses among them. `"argmax"` takes the highest score, and on an exact tie the candidate
+declared first. `"coarsest_adequate"` is the one-standard-error rule (Breiman, Friedman,
+Olshen and Stone 1984; Hastie, Tibshirani and Friedman 2009, section 7.10) with coarseness in
+place of complexity: every candidate scoring at least the highest minus its standard error is
+adequate, and the one with the fewest bins wins, then the fewest channels, then the higher
+score, then the one declared first. A standard error that cannot be computed is taken as zero.
 
 ## `Ladder`
 
@@ -452,7 +463,17 @@ Predictions for a representation, as a `[unit, variable]` matrix.
 ## `Selection`
 
 ```python
-Selection(selected, estimate, contrast, candidates, scores, inner, metric, response)
+Selection(
+    selected,
+    estimate,
+    contrast,
+    candidates,
+    scores,
+    inner,
+    metric,
+    response,
+    rule,
+)
 ```
 
 What a nested selection chose, what it scores, and what it was searched over.
@@ -467,3 +488,4 @@ Attributes:
 - `inner` - list[dict]
 - `metric` - str
 - `response` - str
+- `rule` - str

@@ -22,6 +22,7 @@ from .response import Folds, align_folds, as_response, fold_map
 # shape and every reader that splits on "|" keeps working.
 SELECTED = "selected"
 SELECTED_ARM = "selected|selected"
+RULES = ("argmax", "coarsest_adequate")
 
 
 @dataclass
@@ -36,6 +37,7 @@ class Selection:
     inner: list[dict]
     metric: str
     response: str
+    rule: str = "argmax"
 
     def __repr__(self) -> str:  # pragma: no cover - display only
         picked: dict[str, int] = {}
@@ -43,7 +45,7 @@ class Selection:
             arm = f"{row['grain']}|{row['learner']}"
             picked[arm] = picked.get(arm, 0) + 1
         lines = [f"<timesift selection> {len(self.candidates)} candidates over "
-                 f"{len(self.selected)} outer folds",
+                 f"{len(self.selected)} outer folds by {self.rule}",
                  "selected: " + ", ".join(f"{a} x{n}" for a, n in picked.items())]
         for row in self.estimate:
             mark = " <- selected on" if row["metric"] == self.metric else ""
@@ -52,9 +54,9 @@ class Selection:
         return "\n".join(lines)
 
 
-def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_absence",
-                 metric=None, compare: Ladder | None = None, control=None, seed: int = 1,
-                 verbose: bool = True) -> Selection:
+def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
+                 response: str = "presence_absence", metric=None, compare: Ladder | None = None,
+                 control=None, seed: int = 1, verbose: bool = True) -> Selection:
     """Choose the grain inside each outer fold's training units, then score the whole procedure.
 
     Within each outer fold the training units are split again, every candidate is fitted on part of
@@ -72,7 +74,19 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
 
     ``control`` is the ``train_control`` every neural learner trains under, in the inner search and
     in the refit alike; a learner carrying settings of its own overrides it on the ones it names.
+
+    Inside each outer fold every candidate carries an inner score, the mean over variables of its
+    per-variable mean over the inner folds, and a standard error, the standard deviation over the
+    inner folds of the fold's own score divided by the square root of their number. ``rule``
+    chooses among them. ``"argmax"`` takes the highest score, and on an exact tie the candidate
+    declared first. ``"coarsest_adequate"`` is the one-standard-error rule (Breiman, Friedman,
+    Olshen and Stone 1984; Hastie, Tibshirani and Friedman 2009, section 7.10) with coarseness in
+    place of complexity: every candidate scoring at least the highest minus its standard error is
+    adequate, and the one with the fewest bins wins, then the fewest channels, then the higher
+    score, then the one declared first. A standard error that cannot be computed is taken as zero.
     """
+    if rule not in RULES:
+        raise ValueError(f"rule must be one of {RULES}, got {rule!r}")
     grains = timesift_set(x)
     units = grains.units
     spec = RESPONSES.get(response)
@@ -99,6 +113,7 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
     if len(candidates) < 2:
         raise ValueError("selection needs at least two candidates; "
                          "got one grain and one learner")
+    size = {c["grain"]: grains[c["grain"]].values.shape[1:] for c in candidates}
 
     levels = np.unique(f)
     p = np.full(y.values.shape, np.nan)
@@ -115,11 +130,12 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
         lad = grain_ladder(_subset(grains, train), y_train, learners,
                             folds=split(y_train, seed + i, train), response=response,
                             metric=metric, control=control, verbose=False)
-        grid = _join_candidates(candidates, lad.summary(), int(k))
+        grid = _join_candidates(candidates, lad.summary(), _inner_se(lad), int(k))
         if not any(np.isfinite(g["score"]) for g in grid):
             raise ValueError(f"no candidate scored inside the training data of fold {k}. Widen "
                              "the inner folds or drop the variables that cannot be scored.")
-        won = _first_best(grid)
+        best = _first_best(grid)
+        won = _choose_candidate(grid, size, rule)
 
         fit = fit_learner(learners[won["learner"]], grains[won["grain"]].take_units(train),
                           y_train, response=response, control=control,
@@ -129,7 +145,8 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
         place(p, y, held.units, fit.variables, fit.predict(held))
 
         chosen.append(dict(fold=int(k), grain=won["grain"], learner=won["learner"],
-                           inner_score=won["score"], n_train=len(train), n_test=len(test)))
+                           inner_score=won["score"], inner_best=best["score"],
+                           inner_se=best["se"], n_train=len(train), n_test=len(test)))
         inner_rows.extend(grid)
         if verbose:
             print(f"fold {k} of {len(levels)} selected {won['grain']}|{won['learner']} "
@@ -144,15 +161,17 @@ def select_grain(x, y, learners, folds=None, inner=5, response: str = "presence_
                      estimate=_nested_estimate(y, p, f, levels, cells, response),
                      contrast=_selection_contrast(scores, compare),
                      candidates=candidates, scores=scores, inner=inner_rows,
-                     metric=metric, response=response)
+                     metric=metric, response=response, rule=rule)
 
 
 def _subset(grains: TimesiftSet, index) -> TimesiftSet:
     return timesift_set({w: m.take_units(index) for w, m in grains.items()})
 
 
-def _join_candidates(candidates: list[dict], summary: list[dict], fold: int) -> list[dict]:
-    """Every candidate's inner score, in the order the candidates were declared.
+def _join_candidates(candidates: list[dict], summary: list[dict], se: dict,
+                     fold: int) -> list[dict]:
+    """Every candidate's inner score and its standard error, in the order the candidates were
+    declared.
 
     A candidate nothing was scorable for carries no score rather than being dropped, so a fold
     where one grain could not be read is visible instead of quietly narrowing the search.
@@ -160,10 +179,28 @@ def _join_candidates(candidates: list[dict], summary: list[dict], fold: int) -> 
     found = {(r["grain"], r["learner"]): r for r in summary}
     out = []
     for candidate in candidates:
-        hit = found.get((candidate["grain"], candidate["learner"]))
+        key = (candidate["grain"], candidate["learner"])
+        hit = found.get(key)
         out.append(dict(fold=fold, grain=candidate["grain"], learner=candidate["learner"],
                         score=hit["score"] if hit else float("nan"),
+                        se=se.get(key, float("nan")),
                         n_variable=hit["n_variable"] if hit else 0))
+    return out
+
+
+def _inner_se(lad: Ladder) -> dict:
+    """The standard error of each candidate's inner score: the spread over the inner folds of the
+    fold's own score, the mean over the variables scored in it, divided by the square root of their
+    number. Keyed by ``(grain, learner)``."""
+    keep = ~np.isnan(lad.score)
+    acc: dict = {}
+    for w, ln, k, s in zip(lad.grain[keep], lad.learner[keep], lad.fold[keep], lad.score[keep]):
+        acc.setdefault((str(w), str(ln)), {}).setdefault(int(k), []).append(float(s))
+    out = {}
+    for key, per_fold in acc.items():
+        fold_scores = np.asarray([np.mean(v) for v in per_fold.values()])
+        out[key] = (float(fold_scores.std(ddof=1) / np.sqrt(len(fold_scores)))
+                    if len(fold_scores) > 1 else float("nan"))
     return out
 
 
@@ -175,6 +212,23 @@ def _first_best(grid: list[dict]) -> dict:
         if best is None or value > best_value:
             best, best_value = candidate, value
     return best
+
+
+def _choose_candidate(grid: list[dict], size: dict, rule: str) -> dict:
+    """The candidate a rule chooses. Under ``"coarsest_adequate"`` every candidate within one
+    standard error of the highest score is adequate, and the coarsest of them wins: fewest bins,
+    then fewest channels, then the higher score, then the order of declaration."""
+    best = _first_best(grid)
+    if rule == "argmax":
+        return best
+    tolerance = best["se"] if np.isfinite(best["se"]) else 0.0
+
+    def value(c):
+        return c["score"] if np.isfinite(c["score"]) else -np.inf
+
+    adequate = [(i, c) for i, c in enumerate(grid) if value(c) >= value(best) - tolerance]
+    return min(adequate, key=lambda ic: (size[ic[1]["grain"]][0], size[ic[1]["grain"]][1],
+                                         -value(ic[1]), ic[0]))[1]
 
 
 def _inner_splitter(inner, group=None):

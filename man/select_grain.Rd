@@ -11,6 +11,7 @@ select_grain(
   learners,
   folds = NULL,
   inner = 5L,
+  rule = c("argmax", "coarsest_adequate"),
   response = "presence_absence",
   metric = NULL,
   compare = NULL,
@@ -37,6 +38,12 @@ defaults of \code{\link[=fold_map]{fold_map()}} when not given.}
 response returning a fold map for those units. A count deals the inner folds by the grouping
 the outer fold map carries, so what \code{\link[=grouped_cv]{grouped_cv()}} kept whole outside stays whole inside.}
 
+\item{rule}{How a candidate is chosen from its inner scores. \code{"argmax"} takes the highest.
+\code{"coarsest_adequate"} takes the coarsest candidate whose inner score lies within one standard
+error of the highest, the one-standard-error rule of Breiman, Friedman, Olshen and Stone
+(1984) and of Hastie, Tibshirani and Friedman (2009, section 7.10) with coarseness in place of
+model complexity. See Choosing a candidate.}
+
 \item{response}{Name of the registered response head.}
 
 \item{metric}{Name of a registered metric the selection is made on, or \code{NULL} for the
@@ -60,12 +67,14 @@ so no two outer folds inherit the same inner partition.}
 }
 \value{
 A \code{timesift_selection}: a list carrying \code{selected}, one row per outer fold with the
-candidate it chose and the inner score it chose on; \code{estimate}, the nested score under every
+candidate it chose, the inner score it chose on, the highest inner score in that fold
+(\code{inner_best}) and that score's standard error (\code{inner_se}); \code{estimate}, the nested score under every
 registered metric with its standard error across variables; \code{contrast}, one
 \code{\link[=paired_contrast]{paired_contrast()}} row against each arm of \code{compare}, or \code{NULL}; \code{candidates}, the set that
 was searched; and \code{scores}, the per-cell rows of the selected procedure under the selection
 metric, in the layout \code{\link[=grain_ladder]{grain_ladder()}} returns. The held-out prediction of every unit is in
-the \code{predictions} attribute and the scorable-cell mask in \code{cells}.
+the \code{predictions} attribute and the scorable-cell mask in \code{cells}. \code{inner} holds every
+candidate's inner score and standard error in every outer fold.
 }
 \description{
 \code{\link[=grain_ladder]{grain_ladder()}} fits every candidate against one fold map and reports the grid, so reading the
@@ -90,6 +99,26 @@ one a mechanism acts at; it says that grain predicted best on the units the sele
 
 The cost is the ladder's, multiplied by the number of inner folds: \code{v_outer * (v_inner * candidates + 1)} fits. With a neural learner that is where an overnight run goes.
 }
+\section{Choosing a candidate}{
+
+Inside each outer fold every candidate carries an inner score, the mean over variables of its
+per-variable mean over the inner folds, and a standard error, the standard deviation over the
+inner folds of the fold's own score (the mean over the variables scored in that fold) divided by
+the square root of the number of inner folds. \code{rule = "argmax"} takes the highest inner score,
+and on an exact tie the candidate declared first.
+
+\code{rule = "coarsest_adequate"} first finds that highest score and its standard error, calls every
+candidate scoring at least the highest minus one standard error adequate, and takes the coarsest
+adequate one. Coarseness is read off the representation as the package holds it: fewer bins is
+coarser, and between two candidates with the same number of bins, fewer channels is coarser.
+A tie on both goes to the higher inner score, then to the candidate declared first. Where one
+candidate scores more than a standard error above every other, the two rules agree; where the
+inner profile is flat, this one returns the least storage the record can be kept at without a
+measured loss inside the training data. A standard error that cannot be computed, because a
+candidate was scored in fewer than two inner folds, is taken as zero, so the rule falls back to
+the candidates tied with the highest score.
+}
+
 \examples{
 \dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 set.seed(1)

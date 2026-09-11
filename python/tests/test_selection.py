@@ -10,7 +10,7 @@ from timesift import (Learner, Response, fold_map, metrics, paired_contrast, sel
 from timesift.control import train_control
 from timesift.ladder import per_variable
 from timesift.learners import _logistic
-from timesift.selection import SELECTED_ARM, _inner_splitter
+from timesift.selection import SELECTED_ARM, _choose_candidate, _inner_splitter
 
 
 def linear_learner(offset: float = 0.0, reduce: str = "mean") -> Learner:
@@ -251,6 +251,62 @@ def test_a_contrast_needs_both_arms_to_have_scored_a_shared_cell():
     lad = grain_ladder(x, y, linear_learner(), folds=folds, verbose=False)
     with pytest.raises(KeyError, match="no arm"):
         paired_contrast(lad, SELECTED_ARM, "week|linear")
+
+
+def test_the_one_standard_error_rule_takes_the_coarsest_candidate_inside_the_band():
+    grid = [dict(grain=g, learner="l", score=s, se=e) for g, s, e in
+            (("day", 0.70, 0.02), ("week", 0.69, 0.03), ("month", 0.66, 0.01),
+             ("year", 0.55, 0.01))]
+    size = {"day": (365, 1), "week": (52, 1), "month": (12, 1), "year": (1, 1)}
+    assert _choose_candidate(grid, size, "argmax")["grain"] == "day"
+    # The band is the best candidate's own standard error: 0.70 - 0.02 admits the week and not the
+    # month, however small the month's own error is.
+    assert _choose_candidate(grid, size, "coarsest_adequate")["grain"] == "week"
+    grid[2]["score"] = 0.685
+    assert _choose_candidate(grid, size, "coarsest_adequate")["grain"] == "month"
+    # Between two candidates with the same bins, fewer channels is coarser.
+    two = [dict(grain="week.mmm", learner="l", score=0.70, se=0.01),
+           dict(grain="week.mean", learner="l", score=0.695, se=0.01)]
+    assert _choose_candidate(two, {"week.mmm": (52, 3), "week.mean": (52, 1)},
+                             "coarsest_adequate")["grain"] == "week.mean"
+    # A standard error that could not be computed leaves only the ties with the best.
+    grid[0]["se"] = float("nan")
+    assert _choose_candidate(grid, size, "coarsest_adequate")["grain"] == "day"
+    with pytest.raises(ValueError, match="rule must be one of"):
+        x, y, folds = fixture()
+        select_grain(x, y, linear_learner(), folds=folds, inner=3, rule="widest", verbose=False)
+
+
+def test_where_every_grain_carries_the_signal_equally_the_coarsest_is_taken():
+    # The mean over bins is the same number at the day and the month grain, whose bins are whole
+    # days, so those two tie exactly and the rule takes the month where the argmax takes the day
+    # declared first. The week differs through its partial end bins.
+    x, y, folds = fixture()
+    coarse = select_grain(x, y, linear_learner(), folds=folds, inner=3,
+                          rule="coarsest_adequate", verbose=False)
+    top = select_grain(x, y, linear_learner(), folds=folds, inner=3, verbose=False)
+    assert coarse.rule == "coarsest_adequate"
+    bins = {w: x[w].values.shape[1] for w in x}
+    for c, t in zip(coarse.selected, top.selected):
+        rows = [r for r in coarse.inner if r["fold"] == c["fold"]]
+        band = [r["grain"] for r in rows if r["score"] >= c["inner_best"] - c["inner_se"]]
+        assert c["grain"] == min(band, key=lambda w: bins[w])
+        assert bins[c["grain"]] <= bins[t["grain"]]
+    assert any(c["grain"] == "month" and t["grain"] == "day"
+               for c, t in zip(coarse.selected, top.selected))
+
+
+def test_where_one_candidate_clearly_separates_the_coarsest_adequate_rule_is_the_argmax():
+    x, y, folds = planted_at_month()
+    learner = linear_learner(reduce="coldest")
+    coarse = select_grain(x, y, learner, folds=folds, inner=4, rule="coarsest_adequate",
+                          verbose=False)
+    top = select_grain(x, y, learner, folds=folds, inner=4, verbose=False)
+    for c, t in zip(coarse.selected, top.selected):
+        rows = [r for r in coarse.inner if r["fold"] == c["fold"]]
+        others = [r["score"] for r in rows if r["grain"] != t["grain"]]
+        if all(s < c["inner_best"] - c["inner_se"] for s in others):
+            assert c["grain"] == t["grain"]
 
 
 def test_a_selection_hands_its_control_to_the_inner_search_and_to_the_refit_alike():
