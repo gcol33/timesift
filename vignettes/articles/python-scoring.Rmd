@@ -9,10 +9,13 @@ The metrics, the paired contrast between two arms on matched cells, the inflatio
 ## `tss()`
 
 ```python
-tss(y, p)
+tss(y, p, threshold=None)
 ```
 
 Sensitivity plus specificity minus one, at the threshold that maximises it.
+
+Given a `threshold` learned elsewhere, the score is read at that cut instead, presence being
+predicted at `p >= threshold`.
 
 ## `roc_auc()`
 

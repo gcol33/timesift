@@ -12,6 +12,7 @@ select_grain(
   folds = NULL,
   inner = 5L,
   rule = c("argmax", "coarsest_adequate"),
+  threshold = NULL,
   response = "presence_absence",
   metric = NULL,
   compare = NULL,
@@ -44,6 +45,10 @@ error of the highest, the one-standard-error rule of Breiman, Friedman, Olshen a
 (1984) and of Hastie, Tibshirani and Friedman (2009, section 7.10) with coarseness in place of
 model complexity. See Choosing a candidate.}
 
+\item{threshold}{\code{NULL}, or the rule of \code{\link[=decision_threshold]{decision_threshold()}} a presence-absence cut is learned
+by: \code{"youden"}, the cut that maximises TSS, \code{"kappa"} or \code{"prevalence"}. See A cut learned
+inside the training data.}
+
 \item{response}{Name of the registered response head.}
 
 \item{metric}{Name of a registered metric the selection is made on, or \code{NULL} for the
@@ -74,7 +79,10 @@ registered metric with its standard error across variables; \code{contrast}, one
 was searched; and \code{scores}, the per-cell rows of the selected procedure under the selection
 metric, in the layout \code{\link[=grain_ladder]{grain_ladder()}} returns. The held-out prediction of every unit is in
 the \code{predictions} attribute and the scorable-cell mask in \code{cells}. \code{inner} holds every
-candidate's inner score and standard error in every outer fold.
+candidate's inner score and standard error in every outer fold. With \code{threshold} set, the
+estimate carries one further row, \code{tss_inner_cut}, the procedure's TSS at the learned cuts;
+\code{thresholds} holds the cut of every outer fold and variable; and \code{cut_scores} the per-cell
+rows it is averaged from, in the layout of \code{scores}. Both are \code{NULL} otherwise.
 }
 \description{
 \code{\link[=grain_ladder]{grain_ladder()}} fits every candidate against one fold map and reports the grid, so reading the
@@ -117,6 +125,19 @@ inner profile is flat, this one returns the least storage the record can be kept
 measured loss inside the training data. A standard error that cannot be computed, because a
 candidate was scored in fewer than two inner folds, is taken as zero, so the rule falls back to
 the candidates tied with the highest score.
+}
+
+\section{A cut learned inside the training data}{
+
+TSS read at the cut that maximises it on the scored units is biased upward, most where presences
+are few (\code{\link[=tss_inflation]{tss_inflation()}}). With \code{threshold} set, each outer fold learns one cut per variable
+on the inner out-of-fold predictions of the candidate it selected, which the inner search has
+already made for every outer training unit, by \code{\link[=decision_threshold]{decision_threshold()}} under the rule named. The
+cut is then frozen and the outer test fold's predictions are read at it by \code{\link[=tss]{tss()}}. No unit of
+an outer test fold enters the cut its own fold is read at. The inner out-of-fold predictions
+come from models fitted on part of the outer training set and the held-out predictions from
+the refit on all of it, so the cut is learned on predictions of the same candidate from slightly
+smaller training sets.
 }
 
 \examples{

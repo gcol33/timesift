@@ -163,11 +163,13 @@ def place(p: np.ndarray, y: Response, units, variables, predicted: np.ndarray) -
 
 
 def score_arm(grain, learner, y: Response, p: np.ndarray, f: np.ndarray, levels,
-              cells, score) -> dict:
+              cells, score, at: dict | None = None) -> dict:
     """One arm's cells: which of them a score is defined on, and the score of each.
 
     A ladder and a selection both read a level off this, so the two report the same quantity
-    computed the same way rather than each computing it.
+    computed the same way rather than each computing it. ``at``, where given, maps each
+    ``(fold, variable)`` to one cut, handed to the metric as its third argument: the cell is then
+    read at a cut learned elsewhere rather than one chosen on it.
     """
     rows = dict(grain=[], learner=[], variable=[], fold=[], score=[], scorable=[])
     unsettled = []
@@ -182,7 +184,12 @@ def score_arm(grain, learner, y: Response, p: np.ndarray, f: np.ndarray, levels,
             rows["variable"].append(v)
             rows["fold"].append(int(k))
             rows["scorable"].append(ok)
-            rows["score"].append(score(y.values[take, j], p[take, j]) if ok else np.nan)
+            if not ok:
+                rows["score"].append(np.nan)
+            elif at is None:
+                rows["score"].append(score(y.values[take, j], p[take, j]))
+            else:
+                rows["score"].append(score(y.values[take, j], p[take, j], at[(int(k), v)]))
     _check_finite(unsettled, grain, learner)
     return rows
 

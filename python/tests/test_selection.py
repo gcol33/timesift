@@ -5,8 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from timesift import (Learner, Response, fold_map, metrics, paired_contrast, select_grain,
-                       tss_inflation, grain_ladder, grain_matrix)
+from timesift import (Learner, Response, decision_threshold, feature_matrix, fold_map, metrics,
+                       paired_contrast, select_grain, tss, tss_inflation, grain_ladder,
+                       grain_matrix)
+from timesift._stats import norm_ppf
 from timesift.control import train_control
 from timesift.ladder import per_variable
 from timesift.learners import _logistic
@@ -307,6 +309,65 @@ def test_where_one_candidate_clearly_separates_the_coarsest_adequate_rule_is_the
         others = [r["score"] for r in rows if r["grain"] != t["grain"]]
         if all(s < c["inner_best"] - c["inner_se"] for s in others):
             assert c["grain"] == t["grain"]
+
+
+def test_tss_at_a_given_cut_is_sensitivity_plus_specificity_minus_one_there():
+    y = np.array([0, 0, 0, 1, 1, 1])
+    p = np.array([0.1, 0.4, 0.6, 0.3, 0.7, 0.9])
+    assert tss(y, p, threshold=0.5) == pytest.approx(2 / 3 - 1 / 3)
+    assert tss(y, p, threshold=0.95) == 0
+    assert np.isnan(tss(y, p, threshold=float("nan")))
+    assert np.isnan(tss(np.zeros(3), np.array([0.1, 0.2, 0.3]), threshold=0.15))
+    assert tss(y, p) >= tss(y, p, threshold=0.5)
+
+
+def binormal_cut_design(n=3000, v=4, skill=0.6, seed=21):
+    """Each variable's score is N(delta, 1) on a presence and N(0, 1) on an absence, so the
+    population skill at the best cut, delta / 2, is 2 Phi(delta / 2) - 1. A learner reading the
+    score and fitting nothing makes the inner out-of-fold predictions the score itself."""
+    rng = np.random.default_rng(seed)
+    delta = 2 * norm_ppf((skill + 1) / 2)
+    units = [f"u{i:04d}" for i in range(n)]
+    variables = [f"sp{j}" for j in range(v)]
+    y = rng.binomial(1, 0.3, (n, v)).astype(float)
+    score = y * delta + rng.normal(size=(n, v))
+    noisy = score + rng.normal(0, 2, (n, v))
+    reader = Learner(name="reader", fit=lambda x, y, **_: {},
+                     predict=lambda model, x: x.values[:, :, 0])
+    x = {"good": feature_matrix(score, units, variables, "good"),
+         "noisy": feature_matrix(noisy, units, variables, "noisy")}
+    return x, Response(y, tuple(units), tuple(variables)), score, reader, skill
+
+
+def test_a_cut_learned_on_the_inner_folds_reads_the_population_skill_a_maximised_cut_overstates():
+    x, y, score, reader, skill = binormal_cut_design()
+    folds = fold_map(y, v=5, seed=3)
+    sel = select_grain(x, y, reader, folds=folds, inner=5, threshold="youden", verbose=False)
+    assert {r["grain"] for r in sel.selected} == {"good"}
+    assert sel.threshold == "youden"
+    # Every cut is the Youden cut of the outer training units' own scores.
+    for row in sel.thresholds:
+        train = folds.fold != row["fold"]
+        j = y.variables.index(row["variable"])
+        assert row["threshold"] == decision_threshold(y.values[train, j], score[train, j],
+                                                      "youden")
+    cut = sel.cut_scores.score[~np.isnan(sel.cut_scores.score)]
+    top = sel.scores.score[~np.isnan(sel.scores.score)]
+    assert len(cut) == len(top)
+    assert np.all(top >= cut)
+    level = next(r for r in sel.estimate if r["metric"] == "tss_inner_cut")
+    assert abs(level["score"] - skill) < 3 * level["se"] + 0.01
+    assert next(r["score"] for r in sel.estimate if r["metric"] == "tss") > level["score"]
+
+
+def test_without_a_threshold_rule_no_cut_is_learned_and_another_name_is_refused():
+    x, y, _, reader, _ = binormal_cut_design(n=300, v=2)
+    folds = fold_map(y, v=3, seed=3)
+    sel = select_grain(x, y, reader, folds=folds, inner=3, verbose=False)
+    assert sel.thresholds is None and sel.cut_scores is None
+    assert "tss_inner_cut" not in {r["metric"] for r in sel.estimate}
+    with pytest.raises(ValueError, match="threshold must be None or one of"):
+        select_grain(x, y, reader, folds=folds, inner=3, threshold="median", verbose=False)
 
 
 def test_a_selection_hands_its_control_to_the_inner_search_and_to_the_refit_alike():

@@ -360,6 +360,77 @@ test_that("where one candidate clearly separates, the coarsest adequate rule is 
   expect_true(all(coarse$selected$grain == "season"))
 })
 
+test_that("tss at a given cut is sensitivity plus specificity minus one there", {
+  y <- c(0, 0, 0, 1, 1, 1)
+  p <- c(0.1, 0.4, 0.6, 0.3, 0.7, 0.9)
+  expect_equal(tss(y, p, threshold = 0.5), 2 / 3 - 1 / 3)
+  expect_equal(tss(y, p, threshold = 0.95), 0)
+  expect_true(is.na(tss(y, p, threshold = NA_real_)))
+  expect_true(is.na(tss(c(0, 0, 0), c(0.1, 0.2, 0.3), threshold = 0.15)))
+  expect_gte(tss(y, p), tss(y, p, threshold = 0.5))
+})
+
+# A binormal design with a known answer. Each variable's score is N(delta, 1) on a presence and
+# N(0, 1) on an absence, so the population skill at the best cut, delta / 2, is 2 * pnorm(delta / 2)
+# - 1. A learner that reads the score and fits nothing makes the inner out-of-fold predictions the
+# score itself, so the cut each outer fold learns is decision_threshold() on its training units.
+binormal_cut_design <- function(n = 3000L, v = 4L, skill = 0.6, seed = 21L) {
+  set.seed(seed)
+  delta <- 2 * stats::qnorm((skill + 1) / 2)
+  units <- sprintf("u%04d", seq_len(n))
+  y <- matrix(stats::rbinom(n * v, 1L, 0.3), nrow = n,
+              dimnames = list(units, sprintf("sp%d", seq_len(v))))
+  score <- y * delta + matrix(stats::rnorm(n * v), nrow = n, dimnames = dimnames(y))
+  noisy <- score + matrix(stats::rnorm(n * v, sd = 2), nrow = n, dimnames = dimnames(y))
+  reader <- learner("reader", fit = function(x, y, ...) list(),
+                    predict = function(model, x) matrix(x[, , 1], nrow = dim(x)[1L]))
+  list(y = y, score = score, skill = skill, learner = reader,
+       x = timesift_set(list(good = feature_matrix(score, "good"),
+                             noisy = feature_matrix(noisy, "noisy"))))
+}
+
+test_that("a cut learned on the inner folds reads the population skill a maximised cut overstates", {
+  d <- binormal_cut_design()
+  folds <- fold_map(d$y, v = 5L, seed = 3L)
+  sel <- select_grain(d$x, d$y, d$learner, folds = folds, inner = 5L, threshold = "youden",
+                      verbose = FALSE)
+  expect_true(all(sel$selected$grain == "good"))
+  expect_equal(attr(sel, "threshold"), "youden")
+
+  # Every cut is the Youden cut of the outer training units' own scores: the inner out-of-fold
+  # predictions of this learner are the score, and no unit of the outer test fold enters it.
+  f <- stats::setNames(as.integer(folds), names(folds))
+  for (r in seq_len(nrow(sel$thresholds))) {
+    k <- sel$thresholds$fold[r]
+    v <- sel$thresholds$variable[r]
+    train <- names(f)[f != k]
+    expect_equal(sel$thresholds$threshold[r],
+                 decision_threshold(d$y[train, v], d$score[train, v], "youden"))
+  }
+
+  # The held-out cells read at that cut average to the planted skill within Monte Carlo error,
+  # while the maximum over cuts on the same cells is never below it and averages above the truth.
+  cut <- sel$cut_scores[!is.na(sel$cut_scores$score), ]
+  max_tss <- sel$scores[!is.na(sel$scores$score), ]
+  expect_equal(nrow(cut), nrow(max_tss))
+  expect_true(all(max_tss$score >= cut$score))
+  level <- sel$estimate[sel$estimate$metric == "tss_inner_cut", ]
+  expect_lt(abs(level$score - d$skill), 3 * level$se + 0.01)
+  expect_gt(sel$estimate$score[sel$estimate$metric == "tss"], level$score)
+  expect_output(print(sel), "cut learned on the inner folds")
+})
+
+test_that("without a threshold rule no cut is learned and a rule of another name is refused", {
+  d <- binormal_cut_design(n = 300L, v = 2L)
+  folds <- fold_map(d$y, v = 3L, seed = 3L)
+  sel <- select_grain(d$x, d$y, d$learner, folds = folds, inner = 3L, verbose = FALSE)
+  expect_null(sel$thresholds)
+  expect_null(sel$cut_scores)
+  expect_false("tss_inner_cut" %in% sel$estimate$metric)
+  expect_error(select_grain(d$x, d$y, d$learner, folds = folds, inner = 3L, threshold = "median",
+                            verbose = FALSE), "should be one of")
+})
+
 test_that("the inner fold count is checked before it is coerced", {
   expect_error(.inner_splitter("five"), 'got "five"')
   expect_error(.inner_splitter(1L), "got 1")

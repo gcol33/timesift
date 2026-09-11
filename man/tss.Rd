@@ -4,12 +4,15 @@
 \alias{tss}
 \title{The true skill statistic}
 \usage{
-tss(y, p)
+tss(y, p, threshold = NULL)
 }
 \arguments{
 \item{y}{Observed presence-absence, \code{0}/\code{1} or logical.}
 
 \item{p}{Predicted scores for the same units, in the same order. Higher means presence.}
+
+\item{threshold}{\code{NULL} for the maximum over every cut, or one cut, presence being predicted at
+\code{p >= threshold}.}
 }
 \value{
 One number, or \code{NA} where the cell defines none.
@@ -27,11 +30,14 @@ presences or only absences has no skill to measure and returns \code{NA} rather 
 The threshold is chosen on the same units the score is then read on, which is how the metric is
 defined in the literature and how it is defined here, and it inflates the level where presences
 are thin. \code{\link[=tss_inflation]{tss_inflation()}} measures that inflation for a given design, and it cancels in the
-paired differences \code{\link[=paired_contrast]{paired_contrast()}} takes.
+paired differences \code{\link[=paired_contrast]{paired_contrast()}} takes. Given a \code{threshold} learned elsewhere, the score
+is read at that cut instead, which is what \code{\link[=select_grain]{select_grain()}} reports under \verb{threshold =} with a
+cut learned on the inner folds.
 }
 \examples{
 tss(c(0, 0, 1, 1), c(0.1, 0.2, 0.8, 0.9))
 tss(c(0, 0, 1, 1), c(0.9, 0.8, 0.2, 0.1))
 tss(c(0, 0, 0, 0), c(0.1, 0.2, 0.8, 0.9))
+tss(c(0, 0, 1, 1), c(0.1, 0.6, 0.8, 0.9), threshold = 0.5)
 
 }

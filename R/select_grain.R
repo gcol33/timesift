@@ -40,6 +40,17 @@
 #' candidate was scored in fewer than two inner folds, is taken as zero, so the rule falls back to
 #' the candidates tied with the highest score.
 #'
+#' @section A cut learned inside the training data:
+#' TSS read at the cut that maximises it on the scored units is biased upward, most where presences
+#' are few ([tss_inflation()]). With `threshold` set, each outer fold learns one cut per variable
+#' on the inner out-of-fold predictions of the candidate it selected, which the inner search has
+#' already made for every outer training unit, by [decision_threshold()] under the rule named. The
+#' cut is then frozen and the outer test fold's predictions are read at it by [tss()]. No unit of
+#' an outer test fold enters the cut its own fold is read at. The inner out-of-fold predictions
+#' come from models fitted on part of the outer training set and the held-out predictions from
+#' the refit on all of it, so the cut is learned on predictions of the same candidate from slightly
+#' smaller training sets.
+#'
 #' @param x A [grain_matrix()] result, a [timesift_set()], or a named list of representations.
 #'   Its names are the grains being chosen between.
 #' @param y The response for the same units.
@@ -55,6 +66,9 @@
 #'   error of the highest, the one-standard-error rule of Breiman, Friedman, Olshen and Stone
 #'   (1984) and of Hastie, Tibshirani and Friedman (2009, section 7.10) with coarseness in place of
 #'   model complexity. See Choosing a candidate.
+#' @param threshold `NULL`, or the rule of [decision_threshold()] a presence-absence cut is learned
+#'   by: `"youden"`, the cut that maximises TSS, `"kappa"` or `"prevalence"`. See A cut learned
+#'   inside the training data.
 #' @param response Name of the registered response head.
 #' @param metric Name of a registered metric the selection is made on, or `NULL` for the
 #'   response's own. The estimate is reported under every registered metric whichever this is.
@@ -75,7 +89,10 @@
 #'   was searched; and `scores`, the per-cell rows of the selected procedure under the selection
 #'   metric, in the layout [grain_ladder()] returns. The held-out prediction of every unit is in
 #'   the `predictions` attribute and the scorable-cell mask in `cells`. `inner` holds every
-#'   candidate's inner score and standard error in every outer fold.
+#'   candidate's inner score and standard error in every outer fold. With `threshold` set, the
+#'   estimate carries one further row, `tss_inner_cut`, the procedure's TSS at the learned cuts;
+#'   `thresholds` holds the cut of every outer fold and variable; and `cut_scores` the per-cell
+#'   rows it is averaged from, in the layout of `scores`. Both are `NULL` otherwise.
 #'
 #' @seealso [grain_ladder()] for the grid this selects from, and [paired_contrast()] for the
 #'   comparison the `contrast` element holds.
@@ -99,10 +116,13 @@
 #'
 #' @export
 select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
-                         rule = c("argmax", "coarsest_adequate"),
+                         rule = c("argmax", "coarsest_adequate"), threshold = NULL,
                          response = "presence_absence", metric = NULL, compare = NULL,
                          control = train_control(), seed = 1L, verbose = TRUE) {
   rule <- match.arg(rule)
+  if (!is.null(threshold)) {
+    threshold <- match.arg(threshold, c("youden", "kappa", "prevalence"))
+  }
   set <- .as_set(x)
   units <- dimnames(set[[1L]])[[1L]]
   spec <- .responses_reg$get(response)
@@ -137,6 +157,8 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
               dimnames = list(units, colnames(y)))
   chosen <- vector("list", length(levels))
   inner_scores <- vector("list", length(levels))
+  cuts <- matrix(NA_real_, nrow = length(levels), ncol = ncol(y),
+                 dimnames = list(as.character(levels), colnames(y)))
 
   for (i in seq_along(levels)) {
     k <- levels[i]
@@ -165,6 +187,15 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     held_out <- stats::predict(fit, .subset_units(set[[grid$grain[won]]], test))
     p[rownames(held_out), colnames(held_out)] <- held_out
 
+    # The cut is learned on the selected candidate's inner out-of-fold predictions, which cover
+    # the outer training units and nothing else.
+    if (!is.null(threshold)) {
+      oof <- attr(lad, "predictions")[[paste(grid$grain[won], grid$learner[won], sep = "|")]]
+      cuts[i, ] <- vapply(colnames(y), function(v) {
+        decision_threshold(y_train[, v], oof[rownames(y_train), v], threshold)
+      }, numeric(1L))
+    }
+
     chosen[[i]] <- data.frame(fold = k, grain = grid$grain[won], learner = grid$learner[won],
                               inner_score = grid$score[won], inner_best = grid$score[best],
                               inner_se = grid$se[best], n_train = length(train),
@@ -183,16 +214,33 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
                       cells = cells, folds = stats::setNames(f, units),
                       metric = metric, scorer = score, response = response)
 
+  estimate <- .nested_estimate(y, p, f, levels, cells)
+  thresholds <- cut_scores <- NULL
+  if (!is.null(threshold)) {
+    thresholds <- data.frame(fold = rep(levels, times = ncol(y)),
+                             variable = rep(colnames(y), each = length(levels)),
+                             threshold = as.vector(cuts), rule = threshold,
+                             stringsAsFactors = FALSE)
+    cut_scores <- .as_grain_rows(.score_arm(.selected_label, "selected", y, p, f, levels, cells,
+                                            tss, at = cuts))
+    cut_scores <- structure(cut_scores, class = c("timesift_ladder", "data.frame"),
+                            cells = cells, folds = stats::setNames(f, units),
+                            metric = .inner_cut_metric, response = response)
+    estimate <- rbind(estimate, .estimate_row(.inner_cut_metric, cut_scores))
+  }
+
   out <- list(
     selected = selected,
-    estimate = .nested_estimate(y, p, f, levels, cells),
+    estimate = estimate,
     contrast = .selection_contrast(scores, compare),
     candidates = candidates,
     scores = scores,
-    inner = do.call(rbind, inner_scores)
+    inner = do.call(rbind, inner_scores),
+    thresholds = thresholds,
+    cut_scores = cut_scores
   )
   structure(out, class = "timesift_selection", metric = metric, response = response,
-            rule = rule, folds = stats::setNames(f, units), cells = cells,
+            rule = rule, threshold = threshold, folds = stats::setNames(f, units), cells = cells,
             predictions = stats::setNames(list(p), .selected_arm))
 }
 
@@ -208,6 +256,11 @@ print.timesift_selection <- function(x, ...) {
   est <- x$estimate[x$estimate$metric == attr(x, "metric"), , drop = FALSE]
   cat(sprintf("%s: %.3f (se %.3f) for the procedure, selection included\n",
               attr(x, "metric"), est$score, est$se))
+  cut <- x$estimate[x$estimate$metric == .inner_cut_metric, , drop = FALSE]
+  if (nrow(cut)) {
+    cat(sprintf("tss at the %s cut learned on the inner folds: %.3f (se %.3f)\n",
+                attr(x, "threshold"), cut$score, cut$se))
+  }
   print(summary(x))
   invisible(x)
 }
@@ -293,17 +346,25 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
 # of them and the choice of selection metric does not decide what may be quoted.
 .nested_estimate <- function(y, p, f, levels, cells) {
   out <- lapply(metrics(), function(nm) {
-    rows <- .score_arm(.selected_label, "selected", y, p, f, levels, cells,
-                       .metrics_reg$get(nm))
-    per_variable <- .cell_means(rows)
-    ms <- .mean_se(per_variable$score)
-    data.frame(metric = nm, score = ms[1L], se = ms[2L], n_variable = nrow(per_variable),
-               stringsAsFactors = FALSE)
+    .estimate_row(nm, .score_arm(.selected_label, "selected", y, p, f, levels, cells,
+                                 .metrics_reg$get(nm)))
   })
   out <- do.call(rbind, out)
   rownames(out) <- NULL
   out
 }
+
+# One row of the estimate: the mean over variables of each variable's mean over its scored cells.
+.estimate_row <- function(name, rows) {
+  per_variable <- .cell_means(rows)
+  ms <- .mean_se(per_variable$score)
+  data.frame(metric = name, score = ms[1L], se = ms[2L], n_variable = nrow(per_variable),
+             stringsAsFactors = FALSE)
+}
+
+# The label the TSS read at a cut learned on the inner folds is reported under. It is not a
+# registered metric: a cut learned elsewhere is not a function of one cell's (y, p).
+.inner_cut_metric <- "tss_inner_cut"
 
 # The contrast is the ladder's, run on one table holding both arms, so the pairing rule and the
 # interval come from paired_contrast() rather than from a second copy of it here.

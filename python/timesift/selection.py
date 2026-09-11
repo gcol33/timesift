@@ -14,6 +14,7 @@ import numpy as np
 from .ladder import (Ladder, concat_ladders, grain_ladder, ladder_from_rows, learner_dict,
                      mean_se, paired_contrast, per_variable, place, score_arm)
 from .learners import fit_learner
+from .metrics import THRESHOLD_RULES, decision_threshold, tss
 from .registry import METRICS, RESPONSES, metrics
 from .representation import TimesiftSet, timesift_set
 from .response import Folds, align_folds, as_response, fold_map
@@ -23,6 +24,9 @@ from .response import Folds, align_folds, as_response, fold_map
 SELECTED = "selected"
 SELECTED_ARM = "selected|selected"
 RULES = ("argmax", "coarsest_adequate")
+# The label the TSS read at a cut learned on the inner folds is reported under. It is not a
+# registered metric: a cut learned elsewhere is not a function of one cell's (y, p).
+INNER_CUT_METRIC = "tss_inner_cut"
 
 
 @dataclass
@@ -38,6 +42,9 @@ class Selection:
     metric: str
     response: str
     rule: str = "argmax"
+    threshold: str | None = None
+    thresholds: list[dict] | None = None
+    cut_scores: Ladder | None = None
 
     def __repr__(self) -> str:  # pragma: no cover - display only
         picked: dict[str, int] = {}
@@ -55,8 +62,9 @@ class Selection:
 
 
 def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
-                 response: str = "presence_absence", metric=None, compare: Ladder | None = None,
-                 control=None, seed: int = 1, verbose: bool = True) -> Selection:
+                 threshold: str | None = None, response: str = "presence_absence", metric=None,
+                 compare: Ladder | None = None, control=None, seed: int = 1,
+                 verbose: bool = True) -> Selection:
     """Choose the grain inside each outer fold's training units, then score the whole procedure.
 
     Within each outer fold the training units are split again, every candidate is fitted on part of
@@ -84,9 +92,18 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
     place of complexity: every candidate scoring at least the highest minus its standard error is
     adequate, and the one with the fewest bins wins, then the fewest channels, then the higher
     score, then the one declared first. A standard error that cannot be computed is taken as zero.
+
+    ``threshold`` names a rule of ``decision_threshold`` (``"youden"``, the cut that maximises
+    TSS, ``"kappa"`` or ``"prevalence"``). With it set, each outer fold learns one cut per variable
+    on the inner out-of-fold predictions of the candidate it selected, which cover the outer
+    training units and nothing else, freezes it, and reads the outer test fold's predictions at it
+    with ``tss``. The estimate then carries a row ``tss_inner_cut``, ``thresholds`` the cut of
+    every outer fold and variable, and ``cut_scores`` the per-cell rows.
     """
     if rule not in RULES:
         raise ValueError(f"rule must be one of {RULES}, got {rule!r}")
+    if threshold is not None and threshold not in THRESHOLD_RULES:
+        raise ValueError(f"threshold must be None or one of {THRESHOLD_RULES}, got {threshold!r}")
     grains = timesift_set(x)
     units = grains.units
     spec = RESPONSES.get(response)
@@ -119,6 +136,7 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
     p = np.full(y.values.shape, np.nan)
     chosen: list[dict] = []
     inner_rows: list[dict] = []
+    cuts: dict = {}
 
     for i, k in enumerate(levels, start=1):
         train = np.flatnonzero(f != k)
@@ -144,6 +162,13 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
         held = grains[won["grain"]].take_units(test)
         place(p, y, held.units, fit.variables, fit.predict(held))
 
+        # The cut is learned on the selected candidate's inner out-of-fold predictions, which
+        # cover the outer training units and nothing else.
+        if threshold is not None:
+            oof = lad.predictions[f"{won['grain']}|{won['learner']}"]
+            for j, v in enumerate(y.variables):
+                cuts[(int(k), v)] = decision_threshold(y_train.values[:, j], oof[:, j], threshold)
+
         chosen.append(dict(fold=int(k), grain=won["grain"], learner=won["learner"],
                            inner_score=won["score"], inner_best=best["score"],
                            inner_se=best["se"], n_train=len(train), n_test=len(test)))
@@ -157,11 +182,22 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
         predictions={SELECTED_ARM: p}, cells=cells, folds=Folds(fold=f, units=units),
         metric=metric, scorer=score, response=response, fits={})
 
-    return Selection(selected=chosen,
-                     estimate=_nested_estimate(y, p, f, levels, cells, response),
+    estimate = _nested_estimate(y, p, f, levels, cells, response)
+    thresholds = cut_scores = None
+    if threshold is not None:
+        thresholds = [dict(fold=k, variable=v, threshold=c, rule=threshold)
+                      for (k, v), c in cuts.items()]
+        cut_scores = ladder_from_rows(
+            score_arm(SELECTED, SELECTED, y, p, f, levels, cells, tss, at=cuts),
+            predictions={}, cells=cells, folds=Folds(fold=f, units=units),
+            metric=INNER_CUT_METRIC, scorer=tss, response=response, fits={})
+        estimate.append(_estimate_row(INNER_CUT_METRIC, cut_scores))
+
+    return Selection(selected=chosen, estimate=estimate,
                      contrast=_selection_contrast(scores, compare),
                      candidates=candidates, scores=scores, inner=inner_rows,
-                     metric=metric, response=response, rule=rule)
+                     metric=metric, response=response, rule=rule, threshold=threshold,
+                     thresholds=thresholds, cut_scores=cut_scores)
 
 
 def _subset(grains: TimesiftSet, index) -> TimesiftSet:
@@ -258,10 +294,15 @@ def _nested_estimate(y, p, f, levels, cells, response) -> list[dict]:
             score_arm(SELECTED, SELECTED, y, p, f, levels, cells, METRICS.get(name)),
             predictions={}, cells=cells, folds=Folds(fold=f, units=y.units), metric=name,
             scorer=METRICS.get(name), response=response, fits={})
-        by_variable = list(per_variable(rows).values())
-        level, se = mean_se(by_variable)
-        out.append(dict(metric=name, score=level, se=se, n_variable=len(by_variable)))
+        out.append(_estimate_row(name, rows))
     return out
+
+
+def _estimate_row(name: str, rows: Ladder) -> dict:
+    """One row of the estimate: the mean over variables of each variable's mean over its cells."""
+    by_variable = list(per_variable(rows).values())
+    level, se = mean_se(by_variable)
+    return dict(metric=name, score=level, se=se, n_variable=len(by_variable))
 
 
 def _check_compare(compare, metric) -> None:

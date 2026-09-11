@@ -339,6 +339,7 @@ select_grain(
     folds=None,
     inner=5,
     rule: str = 'argmax',
+    threshold: str | None = None,
     response: str = 'presence_absence',
     metric=None,
     compare: Ladder | None = None,
@@ -375,6 +376,13 @@ Olshen and Stone 1984; Hastie, Tibshirani and Friedman 2009, section 7.10) with 
 place of complexity: every candidate scoring at least the highest minus its standard error is
 adequate, and the one with the fewest bins wins, then the fewest channels, then the higher
 score, then the one declared first. A standard error that cannot be computed is taken as zero.
+
+`threshold` names a rule of `decision_threshold` (`"youden"`, the cut that maximises
+TSS, `"kappa"` or `"prevalence"`). With it set, each outer fold learns one cut per variable
+on the inner out-of-fold predictions of the candidate it selected, which cover the outer
+training units and nothing else, freezes it, and reads the outer test fold's predictions at it
+with `tss`. The estimate then carries a row `tss_inner_cut`, `thresholds` the cut of
+every outer fold and variable, and `cut_scores` the per-cell rows.
 
 ## `Ladder`
 
@@ -473,6 +481,9 @@ Selection(
     metric,
     response,
     rule,
+    threshold,
+    thresholds,
+    cut_scores,
 )
 ```
 
@@ -489,3 +500,6 @@ Attributes:
 - `metric` - str
 - `response` - str
 - `rule` - str
+- `threshold` - str | None
+- `thresholds` - list[dict] | None
+- `cut_scores` - Ladder | None

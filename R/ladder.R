@@ -95,14 +95,16 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
 
 # One arm's cells, scored. The label is a representation, which a calendar grain is one kind of,
 # so the column is named for the general case and a grain ladder relabels it below.
-.score_arm <- function(representation, learner, y, p, f, levels, cells, score) {
+.score_arm <- function(representation, learner, y, p, f, levels, cells, score, at = NULL) {
   cbind(representation = representation, learner = learner,
         .score_cells(y, p, f, levels, cells, score,
-                     arm = paste(representation, learner, sep = "|")),
+                     arm = paste(representation, learner, sep = "|"), at = at),
         stringsAsFactors = FALSE)
 }
 
-.score_cells <- function(y, p, f, levels, cells, score, arm = NULL) {
+# `at`, where given, is a [fold, variable] matrix of one cut per cell, handed to the metric as its
+# third argument: the cell is then read at a cut learned elsewhere rather than one chosen on it.
+.score_cells <- function(y, p, f, levels, cells, score, arm = NULL, at = NULL) {
   grid <- expand.grid(variable = colnames(y), fold = levels,
                       KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
   key <- paste(grid$variable, grid$fold)
@@ -112,7 +114,12 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
   value <- rep(NA_real_, nrow(grid))
   for (i in which(ok)) {
     rows <- f == grid$fold[i]
-    value[i] <- score(y[rows, grid$variable[i]], p[rows, grid$variable[i]])
+    value[i] <- if (is.null(at)) {
+      score(y[rows, grid$variable[i]], p[rows, grid$variable[i]])
+    } else {
+      score(y[rows, grid$variable[i]], p[rows, grid$variable[i]],
+            at[as.character(grid$fold[i]), grid$variable[i]])
+    }
   }
   data.frame(variable = grid$variable, fold = grid$fold, score = value, scorable = ok,
              stringsAsFactors = FALSE)

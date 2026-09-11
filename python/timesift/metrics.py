@@ -40,8 +40,19 @@ def _sweep(y, p):
                 fp=np.cumsum(1 - ys)[keep].astype(float), n_pos=n_pos, n_neg=n_neg)
 
 
-def tss(y, p) -> float:
-    """Sensitivity plus specificity minus one, at the threshold that maximises it."""
+def tss(y, p, threshold=None) -> float:
+    """Sensitivity plus specificity minus one, at the threshold that maximises it.
+
+    Given a ``threshold`` learned elsewhere, the score is read at that cut instead, presence being
+    predicted at ``p >= threshold``.
+    """
+    if threshold is not None:
+        s = _sweep(y, p)
+        if s is None or not np.isfinite(threshold):
+            return float("nan")
+        y = _labels(y)
+        hit = np.asarray(p, dtype=np.float64) >= threshold
+        return float(hit[y == 1].mean() - hit[y == 0].mean())
     s = _sweep(y, p)
     if s is None:
         return float("nan")

@@ -11,6 +11,15 @@
   separates by more than a standard error the two rules agree. Every outer fold now reports the
   highest inner score (`inner_best`) and its standard error (`inner_se`) beside the chosen one,
   and `inner` carries each candidate's standard error. On both sides.
+* `select_grain(threshold = "youden")` learns a presence-absence cut inside the training data.
+  Each outer fold takes one cut per variable from the inner out-of-fold predictions of the
+  candidate it selected, which the inner search already made for every outer training unit and
+  for no other, by `decision_threshold()` under the rule named, and reads its test fold at that cut,
+  frozen. The estimate gains a row `tss_inner_cut`, and the selection carries `thresholds` and the
+  per-cell `cut_scores`. `tss()` takes the cut it is read at as `threshold`, left `NULL` for the
+  maximum over cuts as before. On a binormal design with a planted skill of 0.60 the learned cut
+  reads it back within Monte Carlo error, where the maximum over cuts on the same cells does not.
+  On both sides.
 
 * `coverage()` lays the binning out as a count of readings per `(unit, bin)`, over every bin the
   calendar tiles the record with. `grain_matrix()` refuses a record where a unit misses a bin

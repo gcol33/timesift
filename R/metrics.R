@@ -11,10 +11,14 @@
 #' The threshold is chosen on the same units the score is then read on, which is how the metric is
 #' defined in the literature and how it is defined here, and it inflates the level where presences
 #' are thin. [tss_inflation()] measures that inflation for a given design, and it cancels in the
-#' paired differences [paired_contrast()] takes.
+#' paired differences [paired_contrast()] takes. Given a `threshold` learned elsewhere, the score
+#' is read at that cut instead, which is what [select_grain()] reports under `threshold =` with a
+#' cut learned on the inner folds.
 #'
 #' @param y Observed presence-absence, `0`/`1` or logical.
 #' @param p Predicted scores for the same units, in the same order. Higher means presence.
+#' @param threshold `NULL` for the maximum over every cut, or one cut, presence being predicted at
+#'   `p >= threshold`.
 #'
 #' @return One number, or `NA` where the cell defines none.
 #'
@@ -22,9 +26,18 @@
 #' tss(c(0, 0, 1, 1), c(0.1, 0.2, 0.8, 0.9))
 #' tss(c(0, 0, 1, 1), c(0.9, 0.8, 0.2, 0.1))
 #' tss(c(0, 0, 0, 0), c(0.1, 0.2, 0.8, 0.9))
+#' tss(c(0, 0, 1, 1), c(0.1, 0.6, 0.8, 0.9), threshold = 0.5)
 #'
 #' @export
-tss <- function(y, p) {
+tss <- function(y, p, threshold = NULL) {
+  if (!is.null(threshold)) {
+    y <- .check_labels(y, p)
+    if (is.null(y) || length(threshold) != 1L || !is.finite(threshold)) {
+      return(NA_real_)
+    }
+    hit <- as.numeric(p) >= threshold
+    return(mean(hit[y == 1L]) - mean(hit[y == 0L]))
+  }
   s <- .sweep(y, p)
   if (is.null(s)) {
     return(NA_real_)

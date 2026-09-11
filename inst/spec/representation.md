@@ -796,7 +796,11 @@ call site.
   deviation over the inner folds of each fold's mean over its scored variables, over the square
   root of the fold count), the one with the fewest bins, then the fewest channels, then the higher
   score, then the one declared first; a standard error that cannot be computed is zero. Each
-  outer fold reports the chosen score, the highest score and that standard error.
+  outer fold reports the chosen score, the highest score and that standard error. With a
+  `threshold` rule, each outer fold learns one cut per variable by `decision_threshold()` on the
+  selected candidate's inner out-of-fold predictions of the outer training units, and the test
+  fold is read at it by `tss(threshold =)`, presence at `p >= threshold`; the estimate row is
+  `tss_inner_cut`.
 - `models` takes one learner, a set or list of them, or the name of a registered one, and
   `learners` on a ladder takes the same three forms.
 - Predicting rebuilds each member's representation for the new targets from the settings its own
