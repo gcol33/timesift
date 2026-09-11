@@ -45,6 +45,7 @@ Suggests:
     emmeans,
     knitr,
     rmarkdown,
+    spelling,
     withr
 VignetteBuilder: knitr
 Config/testthat/edition: 3

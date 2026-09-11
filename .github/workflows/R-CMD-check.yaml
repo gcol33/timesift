@@ -29,6 +29,9 @@ jobs:
       # The libtorch runtime is a download rather than a CRAN install, so it is fetched on one
       # platform and the encoder tests skip themselves on the others.
       TORCH_INSTALL: ${{ matrix.config.torch && '1' || '0' }}
+      # tests/spelling.R checks the prose against inst/WORDLIST and fails the check on a word it
+      # does not know, and it runs only where NOT_CRAN is set, which rcmdcheck does not do itself.
+      NOT_CRAN: true
 
     steps:
       - uses: actions/checkout@v4
