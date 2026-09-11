@@ -85,6 +85,29 @@ test_that("the penalised learner fits, predicts and refuses a different represen
   expect_error(stats::predict(fit, other), "different channels or bins")
 })
 
+test_that("the inner folds spread a rare outcome, and one too rare to choose a penalty on is named", {
+  skip_if_not_installed("glmnet")
+  # Five presences over five inner folds: a plain deal puts two in one fold about four draws in
+  # five, the stratified one puts one in each.
+  yj <- c(rep(1, 5L), rep(0, 45L))
+  inner <- .inner_folds(yj, 5L, 11L)
+  expect_equal(as.integer(tapply(yj, inner, sum)), rep(1L, 5L))
+  expect_true(.inner_fittable(yj, inner))
+  expect_false(.inner_fittable(c(1, 1, rep(0, 48L)), .inner_folds(c(1, 1, rep(0, 48L)), 5L, 11L)))
+
+  sim <- sim_series(n_unit = 50L, days = 40L, seed = 35L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
+  units <- dimnames(x)[[1L]]
+  y <- cbind(common = rep(c(1, 0), 25L), rare = c(1, 1, rep(0, 48L)))
+  rownames(y) <- units
+  # The common response carries no signal, and glmnet may warn that the far end of its path did
+  # not converge. What is asserted is that the rare response no longer stops the fit.
+  fit <- suppressWarnings(fit_learner(elasticnet(), x, y))
+  expect_identical(fit$model$unfitted, "rare")
+  p <- stats::predict(fit, x)
+  expect_equal(unname(p[, "rare"]), rep(2 / 50, 50L))
+})
+
 test_that("forward selection stops at its budget and is non-monotone in a predictor", {
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 33L)
   y <- sim_response(sim, n_var = 1L, seed = 34L)

@@ -156,6 +156,25 @@ def test_the_penalised_fit_uses_the_mixing_it_was_given_and_a_standardised_desig
 
 
 @needs_sklearn
+def test_the_inner_folds_spread_a_rare_outcome_and_one_too_rare_to_choose_a_penalty_on_is_named():
+    from timesift.learners import _inner_fittable, _inner_folds
+    # Five presences over five inner folds: a plain deal puts two in one fold about four draws in
+    # five, the stratified one puts one in each.
+    yj = np.r_[np.ones(5), np.zeros(45)]
+    cv = _inner_folds(yj, 5, 11)
+    assert sorted(int(yj[test].sum()) for _, test in cv) == [1] * 5
+    assert _inner_fittable(yj, cv)
+    two = np.r_[np.ones(2), np.zeros(48)]
+    assert not _inner_fittable(two, _inner_folds(two, 5, 11))
+
+    x, _ = planted(n_unit=50, days=28, seed=43)
+    y = Response(np.column_stack([np.tile([1.0, 0.0], 25), two]), x.units, ("common", "rare"))
+    fit = fit_learner(elasticnet(), x, y)
+    assert fit.model["unfitted"] == ["rare"]
+    assert np.allclose(fit.predict(x)[:, 1], 2 / 50)
+
+
+@needs_sklearn
 def test_a_setting_given_at_fit_time_overrides_the_one_the_learner_carries():
     x, y = planted(n_unit=24, days=28)
     overridden = fit_learner(elasticnet(), x, y, squares=False)

@@ -465,10 +465,24 @@ print.timesift_models <- function(x, ...) {
   families[[head$loss]]
 }
 
-# Inner folds for a fit that chooses a setting by cross-validation inside itself: a plain deal
-# under the fit's own seed, over the groups where the outer map carries a grouping.
-.inner_folds <- function(y, v, seed, group = NULL) {
-  as.integer(fold_map(y, v = v, seed = seed, strata = 1L, group = group))
+# Inner folds for a fit that chooses a setting by cross-validation inside itself, dealt for one
+# response under the fit's own seed, over the groups where the outer map carries a grouping. The
+# deal is stratified on the response, so a rare outcome is spread over the inner folds as evenly as
+# its count allows rather than wherever a plain deal drops it.
+.inner_folds <- function(yj, v, seed, group = NULL) {
+  key <- .group_key(group, length(yj))
+  .check_fold_count(v, key, grouped = !is.null(group))
+  .seeded_deal(.response_strata(as.numeric(tapply(yj, key, mean))), v, seed)[key]
+}
+
+# Whether every inner training set of a presence-absence response holds at least two of each
+# outcome, the fewest a logistic path is fitted to. A response short of that has too few of one
+# outcome to choose a penalty on.
+.inner_fittable <- function(yj, inner) {
+  all(vapply(unique(inner), function(k) {
+    train <- yj[inner != k]
+    sum(train == 1) >= 2L && sum(train == 0) >= 2L
+  }, logical(1L)))
 }
 
 # The family the forward search fits under. The binomial one is the quasi-binomial: the

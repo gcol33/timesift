@@ -46,42 +46,15 @@ fold_map <- function(y, v = 10L, seed = 1L, strata = 5L, by = NULL, group = NULL
   }
   # A row on its own is a group of one, so grouping is the general case and there is one dealing
   # path rather than one per setting. A group's stratifying value is the mean of its rows'.
-  if (!is.null(group) && length(group) != n) {
-    stop("`group` must have one value per unit, got ", length(group), " for ", n, ".",
-         call. = FALSE)
-  }
-  key <- if (is.null(group)) seq_len(n) else match(as.character(group),
-                                                   unique(as.character(group)))
-  n_group <- max(key)
-  if (v < 2L || v > n_group) {
-    stop("`v` must be between 2 and the ", n_group, if (is.null(group)) " units" else " groups",
-         ", got ", v, ".", call. = FALSE)
-  }
+  key <- .group_key(group, n)
+  .check_fold_count(v, key, grouped = !is.null(group))
   group_value <- as.numeric(tapply(value, key, mean))
-  stratum <- if (strata <= 1L) rep(1L, n_group) else .quantile_strata(group_value, strata)
-
-  old <- .seed_state()
-  on.exit(.restore_seed(old), add = TRUE)
-  set.seed(seed)
-
-  # The fold labels are permuted once, and the deal runs on from one stratum into the next: a
-  # counter restarted in every stratum hands the first labels one unit more than the last in
-  # every stratum, and a stratum smaller than `v` never reaches the last labels at all.
-  labels <- sample.int(v)
-  dealt <- integer(n_group)
-  dealt_so_far <- 0L
-  for (s in sort(unique(stratum))) {
-    idx <- which(stratum == s)
-    # Permute by position, never by value: sample() on a length-one vector samples 1:x instead of
-    # returning x, so a stratum holding a single group would scatter one fold over every position
-    # below that group's index and leave the map degenerate with nothing raised.
-    dealt[idx[sample.int(length(idx))]] <- labels[(dealt_so_far + seq_along(idx) - 1L) %% v + 1L]
-    dealt_so_far <- dealt_so_far + length(idx)
-  }
+  stratum <- if (strata <= 1L) rep(1L, max(key)) else .quantile_strata(group_value, strata)
   # The grouping travels with the map, so every split drawn inside a fold, the encoders'
   # validation set and the penalised fit's inner folds, keeps whole what the outer folds kept
   # whole.
-  structure(stats::setNames(dealt[key], rownames(y)), v = as.integer(v), seed = seed,
+  structure(stats::setNames(.seeded_deal(stratum, v, seed)[key], rownames(y)), v = as.integer(v),
+            seed = seed,
             strata = as.integer(strata), grouped = !is.null(group),
             group = if (is.null(group)) NULL else as.character(group),
             class = "timesift_folds")
@@ -219,6 +192,59 @@ print.timesift_folds <- function(x, ...) {
 
 # Equal-count strata, with a value that fills more than one stratum's worth of the sample folded
 # into a single stratum rather than split across boundaries it cannot be told apart on.
+# Which group each row belongs to, numbered in order of first appearance; every row its own group
+# where there is no grouping.
+.group_key <- function(group, n) {
+  if (is.null(group)) {
+    return(seq_len(n))
+  }
+  if (length(group) != n) {
+    stop("`group` must have one value per unit, got ", length(group), " for ", n, ".",
+         call. = FALSE)
+  }
+  match(as.character(group), unique(as.character(group)))
+}
+
+.check_fold_count <- function(v, key, grouped) {
+  n_group <- max(key)
+  if (v < 2L || v > n_group) {
+    stop("`v` must be between 2 and the ", n_group, if (grouped) " groups" else " units",
+         ", got ", v, ".", call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+# The deal every fold map is made by, one label per stratified item under a fixed seed. The fold
+# labels are permuted once, and the deal runs on from one stratum into the next: a counter
+# restarted in every stratum hands the first labels one unit more than the last in every stratum,
+# and a stratum smaller than `v` never reaches the last labels at all.
+.seeded_deal <- function(stratum, v, seed) {
+  old <- .seed_state()
+  on.exit(.restore_seed(old), add = TRUE)
+  set.seed(seed)
+  labels <- sample.int(v)
+  dealt <- integer(length(stratum))
+  dealt_so_far <- 0L
+  for (s in sort(unique(stratum))) {
+    idx <- which(stratum == s)
+    # Permute by position, never by value: sample() on a length-one vector samples 1:x instead of
+    # returning x, so a stratum holding a single group would scatter one fold over every position
+    # below that group's index and leave the map degenerate with nothing raised.
+    dealt[idx[sample.int(length(idx))]] <- labels[(dealt_so_far + seq_along(idx) - 1L) %% v + 1L]
+    dealt_so_far <- dealt_so_far + length(idx)
+  }
+  dealt
+}
+
+# Strata for a deal on one response: each distinct value its own stratum where there are no more
+# than five, which is every presence-absence response and the group means of one, and quintiles
+# otherwise. Quantile cuts cannot separate the two values of a presence-absence response and would
+# leave it one stratum.
+.response_strata <- function(value) {
+  levels <- sort(unique(value))
+  if (length(levels) <= 5L) match(value, levels) else .quantile_strata(value, 5L)
+}
+
 .quantile_strata <- function(value, k) {
   breaks <- unique(stats::quantile(value, probs = seq(0, 1, length.out = k + 1L), type = 7))
   if (length(breaks) < 3L) {

@@ -375,7 +375,7 @@ def test_a_fold_map_carries_its_grouping_and_the_inner_folds_a_fit_draws_keep_it
     assert fold_map(y, v=4).group is None
     # Read back in another row order, the grouping follows the units.
     assert f.align(tuple(reversed(y.units))).group == tuple(reversed(group))
-    for train, test in _inner_folds(values, 3, 5, group):
+    for train, test in _inner_folds(values[:, 0], 3, 5, group):
         assert not ({group[i] for i in train} & {group[i] for i in test})
     split = _inner_splitter(3, group)
     train = np.arange(18)

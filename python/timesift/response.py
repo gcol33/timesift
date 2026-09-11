@@ -187,26 +187,59 @@ def fold_map(y: Response, v: int = 10, seed: int = 1, strata: int = 5, by=None,
     if len(value) != n:
         raise ValueError(f"`by` must have one value per unit, got {len(value)} for {n}")
     if group is None:
-        return Folds(fold=_deal(value, v, seed, strata, "units"), units=y.units)
-    key = np.asarray([str(g) for g in group])
-    if len(key) != n:
-        raise ValueError(f"`group` must have one value per unit, got {len(key)} for {n}")
-    names, index = np.unique(key, return_inverse=True)
-    per_group = np.asarray([value[index == k].mean() for k in range(len(names))])
+        return Folds(fold=_deal(_strata_of(value, strata), v, seed, "units"), units=y.units)
+    key, index = _group_index(group, n)
     # The grouping travels with the map, so every split drawn inside a fold, the encoders'
     # validation set and the penalised fit's inner folds, keeps whole what the outer folds kept
     # whole.
-    return Folds(fold=_deal(per_group, v, seed, strata, "groups")[index], units=y.units,
-                 grouped=True, group=tuple(key.tolist()))
+    return Folds(fold=_deal(_strata_of(_group_means(value, index), strata), v, seed,
+                            "groups")[index],
+                 units=y.units, grouped=True, group=tuple(key.tolist()))
 
 
-def _deal(value: np.ndarray, v: int, seed: int, strata: int, what: str) -> np.ndarray:
+def _deal_response(yj: np.ndarray, v: int, seed: int, group=None) -> np.ndarray:
+    """The deal for one response: over the groups where there is a grouping, and stratified on
+    the response, so a rare outcome is spread over the folds as evenly as its count allows."""
+    yj = np.asarray(yj, dtype=np.float64)
+    if group is None:
+        return _deal(_response_strata(yj), v, seed, "units")
+    _, index = _group_index(group, len(yj))
+    return _deal(_response_strata(_group_means(yj, index)), v, seed, "groups")[index]
+
+
+def _group_index(group, n: int):
+    key = np.asarray([str(g) for g in group])
+    if len(key) != n:
+        raise ValueError(f"`group` must have one value per unit, got {len(key)} for {n}")
+    _, index = np.unique(key, return_inverse=True)
+    return key, index
+
+
+def _group_means(value: np.ndarray, index: np.ndarray) -> np.ndarray:
+    return np.asarray([value[index == k].mean() for k in range(index.max() + 1)])
+
+
+def _strata_of(value: np.ndarray, strata: int) -> np.ndarray:
+    return np.ones(len(value), dtype=int) if strata <= 1 else _quantile_strata(value, strata)
+
+
+def _response_strata(value: np.ndarray) -> np.ndarray:
+    """Each distinct value its own stratum where there are no more than five, which is every
+    presence-absence response and the group means of one, and quintiles otherwise. Quantile cuts
+    cannot separate the two values of a presence-absence response and would leave it one
+    stratum."""
+    levels = np.unique(value)
+    if len(levels) <= 5:
+        return np.searchsorted(levels, value) + 1
+    return _quantile_strata(value, 5)
+
+
+def _deal(stratum: np.ndarray, v: int, seed: int, what: str) -> np.ndarray:
     """Shuffle inside each stratum and deal the folds round-robin, so every fold carries the same
     mix of the stratifying value."""
-    n = len(value)
+    n = len(stratum)
     if not 2 <= v <= n:
         raise ValueError(f"`v` must be between 2 and the {n} {what}, got {v}")
-    stratum = np.ones(n, dtype=int) if strata <= 1 else _quantile_strata(value, strata)
 
     # The fold labels are permuted once, and the deal runs on from one stratum into the next: a
     # counter restarted in every stratum hands the first labels one unit more than the last in

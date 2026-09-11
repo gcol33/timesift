@@ -44,6 +44,12 @@ squared-error loss a linear one, so the learner is the same under a presence-abs
 under a continuous one. So are the case weights: the head's \code{weights}, \code{\link[=positive_weights]{positive_weights()}}
 for presence-absence, are what every learner that ships fits under.
 
+The inner folds are dealt for each response and stratified on it, so a rare outcome is spread
+over them as evenly as its count allows. A presence-absence response whose inner training sets
+cannot each hold two of each outcome, the fewest a logistic path is fitted to, has too few of
+one outcome to choose a penalty on. It is predicted its share among the fitting units, as a
+response holding one outcome is, and the fit names every such response in \code{unfitted}.
+
 This is the aggregate-feature side of the comparison the package was built for, and it is the
 fair opponent for a network: a per-fold discrete selector pays selection variance a network
 never pays, so beating that one is not a matched result.

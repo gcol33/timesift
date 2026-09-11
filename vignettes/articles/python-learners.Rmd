@@ -26,6 +26,12 @@ not penalised for the scale it was recorded on. The penalty itself is the one th
 cross-validation refits at; where R takes a named point of the path through `s`,
 scikit-learn keeps only that one, so there is nothing to name here.
 
+The inner folds are dealt for each response and stratified on it, so a rare outcome is spread
+over them as evenly as its count allows. A presence-absence response whose inner training
+sets cannot each hold two of each outcome, the fewest a logistic path is fitted to, has too few
+of one outcome to choose a penalty on. It is predicted its share among the fitting units, as a
+response holding one outcome is, and the fit names every such response in `unfitted`.
+
 ## `stepwise()`
 
 ```python

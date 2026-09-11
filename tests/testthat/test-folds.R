@@ -234,7 +234,7 @@ test_that("a fold map carries its grouping, and the inner folds a fit draws keep
   # Read back in another row order, the grouping follows the units.
   shuffled <- rev(rownames(y))
   expect_equal(unname(.fold_group(f, shuffled)), rev(group))
-  inner <- .inner_folds(y, 3L, 5L, group)
+  inner <- .inner_folds(y[, 1L], 3L, 5L, group)
   expect_true(all(tapply(inner, group, function(v) length(unique(v))) == 1L))
   expect_setequal(unique(inner), 1:3)
   # The selection's inner splitter deals the outer training units by the same grouping.
