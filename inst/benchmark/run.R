@@ -6,6 +6,7 @@
 #
 # Usage:
 #   Rscript inst/benchmark/run.R --cell=elasticnet-event-n300 --reps=1:200 --out=<dir> [--force]
+#   Rscript inst/benchmark/run.R --cell=elasticnet-none-n300 --ncv_repeats=10 --out=<other dir>
 #   Rscript inst/benchmark/run.R --scale=smoke --list
 
 suppressWarnings(suppressMessages({
@@ -17,8 +18,10 @@ here <- if (length(here)) dirname(normalizePath(sub("^--file=", "", here[1L]))) 
 source(file.path(here, "design.R"))
 
 opt <- bench_args(list(cell = NA_character_, reps = NA_character_, out = NA_character_,
-                       force = FALSE, list = FALSE, pkg = NA_character_, scale = "full"))
+                       force = FALSE, list = FALSE, pkg = NA_character_, scale = "full",
+                       ncv_repeats = NA_character_))
 bench_scale(opt$scale)
+bench_ncv_repeats(opt$ncv_repeats)
 pkg_dir <- if (is.na(opt$pkg)) dirname(dirname(here)) else opt$pkg
 
 cells <- bench_cells()

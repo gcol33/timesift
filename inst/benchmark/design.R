@@ -127,6 +127,21 @@ bench_scale <- function(scale) {
   invisible("smoke")
 }
 
+# The number of nested cross-validation repetitions, when a run asks for other than the default
+# above. Every row carries it in its stamp, and summarise.R will not pool rows that differ in it, so
+# a run at another count goes to its own results directory.
+bench_ncv_repeats <- function(repeats) {
+  if (is.na(repeats)) {
+    return(invisible(BENCH$ncv_repeats))
+  }
+  r <- suppressWarnings(as.numeric(repeats))
+  if (length(r) != 1L || is.na(r) || r < 1 || r != round(r)) {
+    stop("--ncv_repeats must be a positive whole number, got \"", repeats, "\".", call. = FALSE)
+  }
+  BENCH$ncv_repeats <<- as.integer(r)
+  invisible(BENCH$ncv_repeats)
+}
+
 bench_learner <- function(block) {
   switch(bench_block(block),
          elasticnet = timesift::elasticnet(squares = BENCH$elasticnet_squares,

@@ -20,12 +20,14 @@ if (!length(files)) {
 }
 rows <- do.call(rbind, lapply(files, utils::read.csv, stringsAsFactors = FALSE))
 
-# A cell that mixed two candidate sets, two package builds or two scales is not one cell, and the
-# rows cannot be pooled. Say so rather than averaging over it.
-mixed <- unique(rows[c("cell_id", "scale", "candidate_digest", "learner_digest", "pkg_commit")])
+# A cell that mixed two candidate sets, two package builds, two scales or two counts of nested
+# cross-validation repetitions is not one cell, and the rows cannot be pooled. Say so rather than
+# averaging over it.
+mixed <- unique(rows[c("cell_id", "scale", "candidate_digest", "learner_digest", "pkg_commit",
+                       "ncv_repeats")])
 clash <- names(which(table(mixed$cell_id) > 1L))
 if (length(clash)) {
-  stop("these cells hold rows from more than one design or build: ",
+  stop("these cells hold rows from more than one design, build or repetition count: ",
        paste(clash, collapse = ", "), ". Rerun them under one.", call. = FALSE)
 }
 
@@ -73,7 +75,8 @@ per_cell <- lapply(split(rows, rows$cell_id), function(d) {
 
   data.frame(
     cell_id = d$cell_id[1L], scale = d$scale[1L], block = d$block[1L],
-    mechanism = d$mechanism[1L], n_unit = d$n_unit[1L], replicates = length(reps),
+    mechanism = d$mechanism[1L], n_unit = d$n_unit[1L], ncv_repeats = d$ncv_repeats[1L],
+    replicates = length(reps),
     true_grain = true_grain,
     select_exact = mean(by_rep["exact", ]), select_exact_mc = bench_margin(by_rep["exact", ]),
     select_grain = mean(by_rep["grain", ]), select_grain_mc = bench_margin(by_rep["grain", ]),
@@ -115,7 +118,8 @@ print(per_cell[c("cell_id", "replicates", "true_grain", "select_exact", "select_
 
 cat("\n== what each interval covers, with its Wilson interval and the spread of the error it\n",
     "   has to cover over the standard error it was built from\n", sep = "")
-print(per_cell[c("cell_id", "replicates", "coverage", "coverage_lo", "coverage_hi", "ratio",
+print(per_cell[c("cell_id", "ncv_repeats", "replicates", "coverage", "coverage_lo", "coverage_hi",
+                 "ratio",
                  "coverage_ncv", "coverage_ncv_lo", "coverage_ncv_hi", "ratio_ncv", "true_full",
                  "center_ncv", "bias_ncv", "bias_ncv_mc")], digits = 3)
 
