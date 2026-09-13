@@ -60,7 +60,8 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 # run that wrote it is the run being replayed, so its identity, not this session's, is what the
 # replayed rows are keyed by.
 .b4_stamp <- function(d) {
-  keep <- c("scale", "cell_id", "block", "mechanism", "n_unit", "inner", "outer", "replicate",
+  keep <- c("scale", "cell_id", "block", "mechanism", "n_unit", "inner", "outer", "ncv_repeats",
+            "replicate",
             "design_seed", "draw", "deploy_draw", "true_grain", "n_candidate", "candidate_digest",
             "learner_digest", "pkg_version", "pkg_commit", "pkg_dirty", "r_version", "platform",
             "device")
