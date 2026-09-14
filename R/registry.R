@@ -98,8 +98,11 @@ metrics <- function() .metrics_reg$names()
 #'   learner that ships reads `loss` and `activation` from here: the encoders train under the loss
 #'   and predict through the activation, and the learners fitting one model per response take the
 #'   family the loss names, logistic or Gaussian. The combiner minimises the same loss. An
-#'   optional `weights(y)` returns a `[unit, variable]` matrix of case weights every learner fits
-#'   under; the shipped head's is [positive_weights()], and a head without one fits unweighted.
+#'   optional `weights(y, fitting)` returns a `[unit, variable]` matrix of case weights every
+#'   learner fits under, with `fitting` a logical vector marking the rows the model is fitted on:
+#'   whatever the head reads off the response, it reads off those rows, and it weights every row,
+#'   so an encoder's inner validation loss is weighted as its fit is. The shipped head's is
+#'   [positive_weights()], and a head without one fits unweighted.
 #' @param overwrite Replace an existing registration.
 #'
 #' @return The registered specification, invisibly.

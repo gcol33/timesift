@@ -2,6 +2,15 @@
 
 ## Changed
 
+* The encoders read the inner validation loss that early stopping watches under the head's case
+  weights, as they read the fitting loss, so the epoch kept is the one the fit's own objective
+  prefers. The weights are still read off the fitting units alone: a response head's `weights`
+  now takes `(y, fitting)`, with `fitting` marking the rows the model is fitted on, and
+  `positive_weights()` gains the same argument. Read unweighted, the validation loss of a
+  presence-absence fit is dominated by the absences of the rare responses the fit was told to
+  weigh up and stops at an earlier epoch: on the Schrankogel weekly three-channel arm the change
+  is worth about 0.003 AUC, which is the gap to the analysis pipeline's encoder (#75). On both
+  sides.
 * `timesift()` now estimates the procedure it runs. Inside each outer fold of `resampling` the
   training targets are split again into `inner` folds (5 by default), every candidate is
   cross-validated there, `rule` chooses one on its inner score and the stack's weights are fitted

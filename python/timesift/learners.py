@@ -21,6 +21,7 @@ import numpy as np
 from .control import CONTROL_SETTINGS, as_control, check_settings
 from .registry import get_learner
 from .representation import TimesiftMatrix
+from .response import fitting_rows
 
 __all__ = ["Fit", "Learner", "READS", "MULTI", "cnn", "elasticnet", "fit_learner", "flatten",
            "mlp", "rescnn", "forest", "stepwise"]
@@ -154,16 +155,18 @@ def _declared(fit, **given) -> dict:
     return {name: value for name, value in given.items() if name in parameters}
 
 
-def _head_weights(head, y: np.ndarray) -> np.ndarray:
+def _head_weights(head, y: np.ndarray, fitting=None) -> np.ndarray:
     """The case weights a fit is made under, one per cell of the response it is handed: the head's
     where it carries ``weights``, and one everywhere where it does not. Every learner that ships
-    reads them here, so what a rare response weighs is decided once, by the head."""
+    reads them here, so what a rare response weighs is decided once, by the head. ``fitting``
+    marks the rows the model is fitted on, for a learner that holds some back: the head reads
+    what it reads off those rows and weights every row."""
     if head.get("weights") is None:
         return np.ones(y.shape, dtype=np.float64)
-    w = np.asarray(head["weights"](y), dtype=np.float64)
+    w = np.asarray(head["weights"](y, fitting_rows(fitting, y.shape[0])), dtype=np.float64)
     if w.shape != y.shape or not np.isfinite(w).all() or (w < 0).any():
-        raise ValueError("a response head's `weights(y)` returns a numeric array of the "
-                         "response's shape, with no missing or negative entry.")
+        raise ValueError("a response head's `weights(y, fitting)` returns a numeric array of "
+                         "the response's shape, with no missing or negative entry.")
     return w
 
 
@@ -399,10 +402,11 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head, group=
 
     xt = torch.tensor(m, dtype=torch.float32, device=device)
     yt = torch.tensor(y, dtype=torch.float32, device=device)
-    # The weights are the head's, read off the fitting units alone: the validation units are held
-    # out of the count a rare response's weight is made from, as they are held out of the fit.
-    weights = np.ones_like(y, dtype=np.float64)
-    weights[fit_idx] = _head_weights(head, y[fit_idx])
+    # The weights are the head's, read off the fitting units alone and applied to every unit: the
+    # validation units are held out of the count a rare response's weight is made from, as they
+    # are held out of the fit, and the loss the early stopping reads on them is weighted as the
+    # loss the fit minimises, so the epoch it keeps is the one the fit's own objective prefers.
+    weights = _head_weights(head, y, fitting=np.isin(np.arange(n), fit_idx))
     wt = torch.tensor(weights, dtype=torch.float32, device=device)
     loss_fn = make_loss(torch)
 

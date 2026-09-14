@@ -298,26 +298,47 @@ def scorable_cells(y: Response, folds) -> Cells:
                            (p_test >= 1) & (a_test >= 1))[order])
 
 
-def positive_weights(y, cap: float = 50.0) -> np.ndarray:
+def positive_weights(y, cap: float = 50.0, fitting=None) -> np.ndarray:
     """Case weights that balance a rare response.
 
     The weight every learner that ships fits a presence-absence response under: each presence of
-    a response weighs the ratio of absences to presences among the units handed in, capped, and
+    a response weighs the ratio of absences to presences among the fitting units, capped, and
     each absence weighs one. A response with a presence in one target of a hundred is otherwise
     fitted away by any learner that minimises a mean loss.
 
+    The ratio is read off the units the model is fitted on and the weight applies to every unit
+    handed in. An encoder holds part of its units back as an inner validation set and reads the
+    loss it stops on under the same weights, so the loss that stops the fit is the loss the fit
+    minimises; a unit held back that way is not in the count the ratio is made from. ``fitting``
+    is a boolean vector over the rows of ``y``, True for the units the model is fitted on, or
+    None for all of them.
+
     The weights are the response head's: the shipped presence-absence head carries this function
-    as its ``weights``, and a head registered with ``weights=lambda y: positive_weights(y, cap=20)``
-    weights every learner by that cap instead. A head without ``weights`` is fitted unweighted.
-    Returns a ``[unit, variable]`` array of case weights, one per cell of ``y``.
+    as its ``weights``, and a head registered with ``weights=lambda y, fitting:
+    positive_weights(y, cap=20, fitting=fitting)`` weights every learner by that cap instead. A
+    head without ``weights`` is fitted unweighted. Returns a ``[unit, variable]`` array of case
+    weights, one per cell of ``y``.
     """
     if cap < 1:
         raise ValueError(f"`cap` must be at least 1, got {cap}")
     values = np.asarray(y.values if isinstance(y, Response) else y, dtype=np.float64)
-    pos = (values == 1).sum(axis=0)
-    neg = (values == 0).sum(axis=0)
+    counted = values[fitting_rows(fitting, values.shape[0])]
+    pos = (counted == 1).sum(axis=0)
+    neg = (counted == 0).sum(axis=0)
     w = np.where(pos > 0, np.clip(neg / np.maximum(pos, 1), 1, cap), 1.0)
     return np.where(values == 1, w[None, :], 1.0)
+
+
+def fitting_rows(fitting, n: int) -> np.ndarray:
+    """The rows a head reads its counts off: every row where ``fitting`` is None, else the rows
+    it marks."""
+    if fitting is None:
+        return np.ones(n, dtype=bool)
+    mask = np.asarray(fitting)
+    if mask.dtype != bool or mask.shape != (n,):
+        raise ValueError("`fitting` is a boolean vector with one entry per row of the response, "
+                         f"got shape {mask.shape} of {mask.dtype}")
+    return mask
 
 
 PRESENCE_ABSENCE = dict(
@@ -325,7 +346,7 @@ PRESENCE_ABSENCE = dict(
     activation="sigmoid",
     loss="binary_cross_entropy",
     metric="roc_auc",
-    weights=positive_weights,
+    weights=lambda y, fitting: positive_weights(y, fitting=fitting),
     cells=lambda y, folds: scorable_cells(y, folds),
 )
 

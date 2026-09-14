@@ -446,18 +446,31 @@ def test_the_head_owns_what_a_rare_response_weighs(temporary_response):
     assert positive_weights(y, cap=3)[0, 0] == 3
     with pytest.raises(ValueError, match="at least 1"):
         positive_weights(y, cap=0.5)
+    # The ratio is read off the fitting rows alone and the weight applies to every row: with the
+    # first four rows fitting, the first response has three absences to one presence and the
+    # second two to two, and the presences held back weigh the same as the ones fitted on.
+    fitting = np.array([True, True, True, True, False, False])
+    y_held = np.array([[1, 1], [0, 1], [0, 0], [0, 0], [1, 0], [0, 1]], dtype=float)
+    w_held = positive_weights(y_held, fitting=fitting)
+    assert w_held[:, 0].tolist() == [3, 1, 1, 1, 3, 1]
+    assert w_held[:, 1].tolist() == [1, 1, 1, 1, 1, 1]
+    with pytest.raises(ValueError, match="one entry per row"):
+        positive_weights(y_held, fitting=np.array([True, False]))
     # The shipped head carries it, a head without `weights` fits unweighted, and a cap of one's
     # own is a registration.
     from timesift.registry import RESPONSES
     assert np.array_equal(_head_weights(RESPONSES.get("presence_absence"), y), w)
+    assert np.array_equal(_head_weights(RESPONSES.get("presence_absence"), y_held, fitting),
+                          w_held)
     plain = {**RESPONSES.get("presence_absence")}
     plain.pop("weights")
     assert np.array_equal(_head_weights(plain, y), np.ones_like(y))
-    capped = temporary_response("capped_test", {**RESPONSES.get("presence_absence"),
-                                                "weights": lambda y: positive_weights(y, cap=2)})
+    capped = temporary_response("capped_test", {
+        **RESPONSES.get("presence_absence"),
+        "weights": lambda y, fitting: positive_weights(y, cap=2, fitting=fitting)})
     assert _head_weights(RESPONSES.get("capped_test"), y)[0, 0] == 2
     with pytest.raises(ValueError, match="response's shape"):
-        _head_weights({"weights": lambda y: np.ones(3)}, y)
+        _head_weights({"weights": lambda y, fitting: np.ones(3)}, y)
 
 
 @needs_sklearn

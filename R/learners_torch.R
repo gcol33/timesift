@@ -167,10 +167,11 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
   xt <- torch$torch_tensor(m, dtype = torch$torch_float())$to(device = device)
   yt <- torch$torch_tensor(y, dtype = torch$torch_float())$to(device = device)
-  # The weights are the head's, read off the fitting units alone: the validation units are held
-  # out of the count a rare response's weight is made from, as they are held out of the fit.
-  weights <- matrix(1, nrow(y), ncol(y))
-  weights[fit_idx, ] <- .head_weights(head, y[fit_idx, , drop = FALSE])
+  # The weights are the head's, read off the fitting units alone and applied to every unit: the
+  # validation units are held out of the count a rare response's weight is made from, as they are
+  # held out of the fit, and the loss the early stopping reads on them is weighted as the loss the
+  # fit minimises, so the epoch it keeps is the one the fit's own objective prefers.
+  weights <- .head_weights(head, y, fitting = seq_len(n) %in% fit_idx)
   wt <- torch$torch_tensor(weights, dtype = torch$torch_float())$to(device = device)
   loss_fn <- objective$loss
 

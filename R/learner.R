@@ -439,15 +439,17 @@ print.timesift_models <- function(x, ...) {
 
 # The case weights a fit is made under, one per cell of the response it is handed: the head's
 # where it carries a `weights`, and one everywhere where it does not. Every learner that ships
-# reads them here, so what a rare response weighs is decided once, by the head.
-.head_weights <- function(head, y) {
+# reads them here, so what a rare response weighs is decided once, by the head. `fitting` marks
+# the rows the model is fitted on, for a learner that holds some back: the head reads what it
+# reads off those rows and weights every row.
+.head_weights <- function(head, y, fitting = NULL) {
   if (is.null(head$weights)) {
     return(matrix(1, nrow(y), ncol(y), dimnames = dimnames(y)))
   }
-  w <- head$weights(y)
+  w <- head$weights(y, .fitting_rows(fitting, nrow(y)))
   if (!is.numeric(w) || !identical(dim(w), dim(y)) || anyNA(w) || any(w < 0)) {
-    stop("a response head's `weights(y)` returns a numeric matrix of the response's shape, with ",
-         "no missing or negative entry.", call. = FALSE)
+    stop("a response head's `weights(y, fitting)` returns a numeric matrix of the response's ",
+         "shape, with no missing or negative entry.", call. = FALSE)
   }
   w
 }

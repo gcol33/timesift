@@ -19,8 +19,11 @@ default metric name; and \code{cells(y, folds)}, returning the mask of scorable 
 learner that ships reads \code{loss} and \code{activation} from here: the encoders train under the loss
 and predict through the activation, and the learners fitting one model per response take the
 family the loss names, logistic or Gaussian. The combiner minimises the same loss. An
-optional \code{weights(y)} returns a \verb{[unit, variable]} matrix of case weights every learner fits
-under; the shipped head's is \code{\link[=positive_weights]{positive_weights()}}, and a head without one fits unweighted.}
+optional \code{weights(y, fitting)} returns a \verb{[unit, variable]} matrix of case weights every
+learner fits under, with \code{fitting} a logical vector marking the rows the model is fitted on:
+whatever the head reads off the response, it reads off those rows, and it weights every row,
+so an encoder's inner validation loss is weighted as its fit is. The shipped head's is
+\code{\link[=positive_weights]{positive_weights()}}, and a head without one fits unweighted.}
 
 \item{overwrite}{Replace an existing registration.}
 }

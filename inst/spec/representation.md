@@ -763,13 +763,16 @@ call site.
   elementwise weight on the loss, the penalised fit and the forward search as case weights, and
   the forest as the probability a unit is drawn into a tree's bootstrap, which is what ranger's
   case weights are and what the Python side's forest does with its own draw, because
-  scikit-learn's forest grows the same pure-leaved tree under any sample weight. The shipped
-  presence-absence head weights each presence by the ratio of absences to presences among the
-  fitting units, capped at 50, and each absence by one; a head without a weights function fits
-  unweighted. On both sides.
+  scikit-learn's forest grows the same pure-leaved tree under any sample weight. The weights
+  function takes the response and a mask of the rows the model is fitted on, reads whatever it
+  reads off those rows alone, and weights every row. The shipped presence-absence head weights
+  each presence by the ratio of absences to presences among the fitting units, capped at 50, and
+  each absence by one; a head without a weights function fits unweighted. On both sides.
 - The encoders standardise every channel by its own centre and sample standard deviation over
   every unit and bin of the fitting units; the inner validation set is one unit from each of as
-  many equal-count strata of the response total as it holds; the fitting units are cut into as
+  many equal-count strata of the response total as it holds, and the loss read on it, which the
+  early stopping watches, is weighted by the head as the fitting loss is, with the fitting units
+  alone in the count the weights are made from; the fitting units are cut into as
   few batches of at most `batch_size` rows as they divide into, of as equal a length as they can
   be; the snapshot early stopping restores, and the running average `swa` keeps, are copies of
   the weights and never the storage the optimiser updates.

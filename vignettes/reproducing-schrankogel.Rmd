@@ -175,8 +175,9 @@ through two hidden layers of 512 and 256 units.
 How all three are trained is `train_control()`. Its defaults are AdamW at a learning rate of 1e-3
 with weight decay 1e-4, cosine annealing over 60 epochs, early stopping after ten epochs without an
 improvement on an inner validation split of 15 percent of the fitting plots, and a per-species
-positive-class weight capped at 50. The encoders of the study read batches of 32 plots, which the
-grid asks for; the default is 64.
+positive-class weight capped at 50, under which the validation loss is read as the fitting loss
+is. The encoders of the study read batches of 32 plots, which the grid asks for; the default is
+64.
 
 The eleven members of the paper's ensemble are the same architectures at three widths, three kernel
 widths and three seeds, trained with weight averaging over the tail of the epoch budget:

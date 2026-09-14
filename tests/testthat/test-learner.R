@@ -447,15 +447,26 @@ test_that("the head owns what a rare response weighs", {
   expect_equal(unname(w[, "b"]), c(2, 2, 1, 1, 1, 1))
   expect_equal(unname(positive_weights(y, cap = 3)[1, "a"]), 3)
   expect_error(positive_weights(y, cap = 0.5), "at least 1")
+  # The ratio is read off the fitting rows alone and the weight applies to every row: with the
+  # first four rows fitting, the first response has three absences to one presence and the second
+  # two to two, and the presences held back weigh the same as the ones fitted on.
+  fitting <- c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE)
+  y_held <- cbind(a = c(1, 0, 0, 0, 1, 0), b = c(1, 1, 0, 0, 0, 1))
+  w_held <- positive_weights(y_held, fitting = fitting)
+  expect_equal(unname(w_held[, "a"]), c(3, 1, 1, 1, 3, 1))
+  expect_equal(unname(w_held[, "b"]), c(1, 1, 1, 1, 1, 1))
+  expect_error(positive_weights(y_held, fitting = c(TRUE, FALSE)), "one entry per row")
   head <- .responses_reg$get("presence_absence")
   expect_equal(.head_weights(head, y), w)
+  expect_equal(.head_weights(head, y_held, fitting = fitting), w_held)
   # A head without `weights` fits unweighted, and a cap of one's own is a registration.
   plain <- head[setdiff(names(head), "weights")]
   expect_equal(unname(.head_weights(plain, y)), matrix(1, 6L, 2L))
   local_response("capped_test", utils::modifyList(
-    head, list(weights = function(y) positive_weights(y, cap = 2))))
+    head, list(weights = function(y, fitting) positive_weights(y, cap = 2, fitting = fitting))))
   expect_equal(unname(.head_weights(.responses_reg$get("capped_test"), y)[1, "a"]), 2)
-  expect_error(.head_weights(list(weights = function(y) rep(1, 3)), y), "response's shape")
+  expect_error(.head_weights(list(weights = function(y, fitting) rep(1, 3)), y),
+               "response's shape")
 })
 
 test_that("every shipped learner fits a rare response under the head's weight", {
