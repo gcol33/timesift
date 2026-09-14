@@ -121,6 +121,7 @@ reference:
   contents:
   - tss
   - roc_auc
+  - average_precision
   - kappa_score
   - score_predictions
   - paired_contrast

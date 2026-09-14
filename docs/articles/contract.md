@@ -777,13 +777,14 @@ three back and assert the bytes, which is what makes the file format a
 contract rather than a convention.
 
 `metric_cases.csv` and `metrics.csv` hold ten `(y, p)` cases and the
-value of every threshold metric on each: `tss`, `roc_auc`, `kappa` under
-both rules, and `decision_threshold` under all three. The cases are
-where the tie rule is the whole answer – every prediction tied, ties
-within a class, ties across the classes, one presence, one absence, all
-presences, all absences, a perfect separation and a reversed one. A
-metric a case defines no value on is written `NA` rather than left out,
-so a suite that quietly skipped it fails rather than passes.
+value of every threshold metric on each: `tss`, `roc_auc`,
+`average_precision`, `kappa` under both rules, and `decision_threshold`
+under all three. The cases are where the tie rule is the whole answer –
+every prediction tied, ties within a class, ties across the classes, one
+presence, one absence, all presences, all absences, a perfect separation
+and a reversed one. A metric a case defines no value on is written `NA`
+rather than left out, so a suite that quietly skipped it fails rather
+than passes.
 
 `contrast_cells.csv` and `contrast.csv` hold a fixed table of per-cell
 scores for two arms, with cells one arm scored and the other did not,
@@ -829,7 +830,7 @@ the difference is recorded here rather than found at a call site.
 
 | concept | the name, on both sides |
 |----|----|
-| the whole run | [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md), from a table of targets and a table of series to a scored comparison |
+| the whole run | [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md), from a table of targets and a table of series to a scored comparison and a nested estimate of choosing among it |
 | what a representation is | [`native()`](https://gillescolling.com/timesift/reference/native.md), [`grain()`](https://gillescolling.com/timesift/reference/native.md), [`multigrain()`](https://gillescolling.com/timesift/reference/native.md), [`lookback()`](https://gillescolling.com/timesift/reference/native.md), and the sets [`grains()`](https://gillescolling.com/timesift/reference/grains.md) and [`lookbacks()`](https://gillescolling.com/timesift/reference/grains.md) |
 | coercing to a set of representations | [`as_sift()`](https://gillescolling.com/timesift/reference/grains.md), from a representation, a list of them or a vector of grain names |
 | the calendar-binned array | [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md) |
@@ -849,7 +850,7 @@ the difference is recorded here rather than found at a call site.
 | fitting across a set of grains | [`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md), and [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md) for the nested selection |
 | the combiner | [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md), [`ensemble_fit()`](https://gillescolling.com/timesift/reference/ensemble_fit.md), [`ensemble_combine()`](https://gillescolling.com/timesift/reference/ensemble_combine.md) and [`ensemble_weights()`](https://gillescolling.com/timesift/reference/ensemble_weights.md) |
 | scoring held-out predictions | [`score_predictions()`](https://gillescolling.com/timesift/reference/score_predictions.md), on the cells the mask allows |
-| the metrics | [`tss()`](https://gillescolling.com/timesift/reference/tss.md), [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md) and [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md), with [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md) and [`model_agreement()`](https://gillescolling.com/timesift/reference/kappa_score.md) beside them |
+| the metrics | [`tss()`](https://gillescolling.com/timesift/reference/tss.md), [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md), [`average_precision()`](https://gillescolling.com/timesift/reference/average_precision.md) and [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md), with [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md) and [`model_agreement()`](https://gillescolling.com/timesift/reference/kappa_score.md) beside them |
 | two arms on matched cells | [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md) |
 | the inflation of a self-selected threshold | [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md), and [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.md) for the level it implies |
 | a set of representations | [`timesift_set()`](https://gillescolling.com/timesift/reference/timesift_set.md), which reads as a mapping of grain name to representation |
@@ -912,10 +913,11 @@ the difference is recorded here rather than found at a call site.
   a setting the learner does not have is refused rather than ignored.
 - The response head and the metric are registry entries. `metric` takes
   a registered name or a function of `(y, p)`, and left unset it is the
-  one the response head carries. Both travel with the fit: the function
-  is what scores, and the name is what the report prints. A function has
-  no name to print and reads as `<function>` on both sides rather than
-  as whatever each language calls an anonymous one.
+  one the response head carries, which for the shipped presence-absence
+  head is `roc_auc`. Both travel with the fit: the function is what
+  scores, and the name is what the report prints. A function has no name
+  to print and reads as `<function>` on both sides rather than as
+  whatever each language calls an anonymous one.
   [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
   is the one door that takes a name only, because it reports the
   estimate under every registered metric and the one it selects on has
@@ -1002,7 +1004,8 @@ the difference is recorded here rather than found at a call site.
   [`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md)
   take it as `interval` with `repeats` fold maps, the first being the
   map already cross-validated on, and each repetition fits the procedure
-  or the arm once per unordered pair of outer folds;
+  or the arm once per unordered pair and once per unordered triple of
+  outer folds, which needs at least four;
   [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md)
   reads it on the difference of two arms of a ladder fitted with it. A
   fold’s score is the mean over the variables scorable in it, the inner
@@ -1011,8 +1014,20 @@ the difference is recorded here rather than found at a call site.
   units, the root mean squared error is rescaled by `(K - 1) / K` and
   held between the jackknife standard error of the estimate and
   `sqrt(K)` times it, and the centre carries the paper’s bias
-  correction. Two tables whose contrast is read must carry the same
-  response, maps, `repeats` and `seed`.
+  correction, equation (15) at `K` folds. The mean squared error the
+  width is read off is that of the bias-corrected estimate: inside every
+  outer training set the same nested cross-validation runs once more,
+  from the triple fits, at `K - 1` folds, and term (a) is the squared
+  gap between the bias-corrected estimate that training set reports and
+  the held-out fold’s score, and its root is held between the corrected
+  centre’s own jackknife standard error, every prediction held fixed,
+  and `sqrt(K)` times it; the paper’s width, read off the plain inner
+  estimate and held by the plain estimate’s jackknife standard error, is
+  reported beside it as `se_bates`. A fit of the nested cross-validation
+  draws its seed as `seed + 10007 r + 101 a + b + 3001 c` from its tag
+  `(r, a, b, c)`, the repetition and the folds it leaves out, zero where
+  it leaves out fewer than three. Two tables whose contrast is read must
+  carry the same response, maps, `repeats` and `seed`.
 - `models` takes one learner, a set or list of them, or the name of a
   registered one, and `learners` on a ladder takes the same three forms.
 - Predicting rebuilds each member’s representation for the new targets
@@ -1028,6 +1043,26 @@ the difference is recorded here rather than found at a call site.
   candidate emits an out-of-fold prediction for every scorable cell over
   the same folds. The combiner is handed those predictions, the
   response, the mask and the fold map, and never a model.
+- [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+  evaluates the procedure nested. Within each outer fold it draws an
+  inner map of `inner` folds on the training targets, as
+  [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+  draws one, cross-validates every candidate on it, chooses one by
+  `rule` on the inner scores, and fits the stack’s weights on the inner
+  out-of-fold predictions over the inner mask; every candidate is then
+  refitted on the outer training targets and predicts the test fold,
+  which gives each candidate’s outer out-of-fold prediction, the
+  selected candidate’s and the stack’s under that fold’s weights. The
+  estimate is both of those held-out predictions scored under every
+  registered metric, and the run’s own where it is a function, with the
+  interval across variables; one outer fold’s choice, weights and
+  held-out predictions do not move when that fold’s responses change.
+  `inner` left unset is 5, and `inner = NULL` / `inner=None` runs no
+  search and makes no estimate. With one candidate there is no search
+  and the candidate is its own choice. `choice` is the rule applied to
+  the outer scores, with the outer folds as its split, and the stack a
+  prediction goes through is fitted on the outer out-of-fold
+  predictions, so neither is the one the estimate was read under.
 - The combiner minimises the loss of the head the run was fitted under.
   [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md)
   left without a `response` takes the run’s, and one naming a different
@@ -1042,7 +1077,7 @@ the difference is recorded here rather than found at a call site.
 | a learner of your own | [`learner()`](https://gillescolling.com/timesift/reference/learner.md), a constructor taking the fit and the predict | `Learner`, the dataclass, built directly with the same fields |
 | a learner’s own training settings | a `control` field holding a partly specified [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md) | its `params`, beside the architecture |
 | the occlusion profile | [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md), an S3 generic with methods on a run and on a ladder | [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md), one function taking either |
-| the report on a run | [`summary()`](https://rdrr.io/r/base/summary.html), a method on the base generic, printing the candidates and the ensemble | [`summary()`](https://rdrr.io/r/base/summary.html), one function returning the text, with `candidate_table()` and `ensemble_row()` for the two tables it prints |
+| the report on a run | [`summary()`](https://rdrr.io/r/base/summary.html), a method on the base generic, printing the candidates and the procedure | [`summary()`](https://rdrr.io/r/base/summary.html), one function returning the text, with `candidate_table()` and `procedure_table()` for the two tables it prints |
 | predicting new targets | [`predict()`](https://rdrr.io/r/stats/predict.html), a method on the base generic | `.predict()`, a method on the fit |
 | a set of learners, or of representations | [`c()`](https://rdrr.io/r/base/c.html), an S3 method on each spec class | a `list`, and `+` between two of them |
 

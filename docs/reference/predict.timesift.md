@@ -31,7 +31,9 @@ predict(object, targets, series = NULL, candidate = "ensemble", ...)
 
 - candidate:
 
-  `"ensemble"`, or the name of one candidate.
+  `"ensemble"`, the stack refitted on every target; `"selected"`, the
+  candidate the rule chose on every target (`object$choice`); or the
+  name of one candidate.
 
 - ...:
 

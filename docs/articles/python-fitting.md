@@ -20,22 +20,45 @@ timesift(
     sift=None,
     ensemble=True,
     resampling=None,
+    inner=5,
+    rule: str = 'argmax',
     response: str = 'presence_absence',
     metric=None,
     control=None,
     keep_fits: bool = False,
+    seed: int = 1,
     verbose: bool = True,
 )
 ```
 
-Fit every learner across every representation, on one fold map, and
-combine them.
+Compare every learner across every representation, and estimate choosing
+among them.
 
 `targets` is one row per thing to predict and `series` is the long,
 time-stamped record belonging to it; both are mappings of column name to
 array, which a data frame satisfies. `y`, `x` and `static` are
 selections over their own table: a name, a list of names, a glob such as
 `"sp_*"`, or a function of a name.
+
+Within each outer fold of `resampling` the training targets are split
+again into `inner` folds. Every candidate is cross-validated on that
+inner split, `rule` picks one on its inner score (`"argmax"` or
+`"coarsest_adequate"`, as in `select_grain`), and the stack’s weights
+are fitted on the inner out-of-fold predictions. Every candidate is then
+refitted on the whole outer training set and predicts the outer test
+fold, and the selected candidate’s prediction and the prediction
+combined under that fold’s weights are kept. Nothing the outer test fold
+holds enters the choice or the weights it is scored under, so `estimate`
+is of the procedure, selection and stacking included. Its interval is
+across the response variables of this dataset, all fitted and scored on
+the same targets and folds, and not one for a new sample.
+
+The same refits give every candidate an out-of-fold prediction on the
+outer folds, which `scores` holds: the comparison, whose highest level
+was picked out on the folds it is scored on. `inner=None` runs no inner
+search and makes no estimate. `choice`, `models` and `stack` are the
+procedure applied to every target, for prediction: the rule read on the
+outer scores and weights fitted on the outer out-of-fold predictions.
 
 Columns of `targets` that are neither the response nor the identifier
 nor the anchor are ignored unless `static` names them: a predictor is
@@ -62,6 +85,12 @@ Timesift(
     spec,
     fits,
     control,
+    estimate,
+    selected,
+    inner,
+    fold_weights,
+    predictions,
+    choice,
 )
 ```
 
@@ -92,6 +121,12 @@ Attributes:
 - `spec` - TimesiftSpec
 - `fits` - dict
 - `control` - object
+- `estimate` - list \| None
+- `selected` - list \| None
+- `inner` - list \| None
+- `fold_weights` - list \| None
+- `predictions` - dict \| None
+- `choice` - str \| None
 
 ### `representation_of()`
 
@@ -112,7 +147,9 @@ stored settings.
 
 Every candidate is refitted on all the targets at the end of a fit, so
 what predicts here is one model per candidate rather than a fold’s worth
-of them.
+of them. `"ensemble"` combines them under the weights fitted on every
+target, `"selected"` predicts with the candidate the rule chose on every
+target (`choice`), and any other value names one candidate.
 
 ## `TimesiftSpec`
 
@@ -187,8 +224,8 @@ frame.
 summary(fit)
 ```
 
-The fit as text: one row per candidate, the ensemble under them, and the
-weights.
+The fit as text: the candidates on the outer folds, the procedure, and
+the weights.
 
 ## `candidate_table()`
 
@@ -202,14 +239,15 @@ how it covered them.
 A candidate whose learner and representation could not be paired carries
 no level, and is listed under the ones that do.
 
-## `ensemble_row()`
+## `procedure_table()`
 
 ``` python
-ensemble_row(fit)
+procedure_table(fit)
 ```
 
-The ensemble’s level, read on the same cells and by the same metric as
-its members.
+The selected candidate’s and the stack’s held-out level under the run’s
+own metric, with the standard error across responses: one row each, or
+none where the run made no estimate.
 
 ## `ensemble()`
 
@@ -247,6 +285,13 @@ Fit the combiner on the out-of-fold predictions and nothing else.
 `oof` is one `[target, response]` matrix per candidate, in the
 response’s own row order. Only the cells the mask admits are read, so
 every candidate is weighted on the same cells its score was read on.
+
+The weights are fitted to the response on those predictions, so the
+combination scored against the same response is scored on the data its
+weights were fitted to, and that score is optimistic. `timesift`
+evaluates the stack the other way: each outer fold’s weights are fitted
+on inner out-of-fold predictions of its training targets and applied to
+the outer test fold.
 
 ## `ensemble_combine()`
 
@@ -428,13 +473,22 @@ and `cut_scores` the per-cell rows.
 The estimate carries the interval across the response variables, which
 is the spread between the variables of this dataset rather than an
 interval for what the procedure would score on a new sample.
-`interval="nested_cv"` adds one that is, by the nested cross-validation
-of Bates, Hastie and Tibshirani (2024): each outer training set is
-cross-validated again over the remaining folds of the same map, over
-`repeats` fold maps, which gives the mean squared error of a
-cross-validation estimate; `final` then holds the procedure fitted on
-every unit, whose risk the interval is for. One repetition costs one fit
-of the procedure per unordered pair of outer folds.
+`interval="nested_cv"` adds one that is meant to be, by the nested
+cross-validation of Bates, Hastie and Tibshirani (2024): each outer
+training set is cross-validated again over the remaining folds of the
+same map, over `repeats` fold maps, which gives the mean squared error
+of a cross-validation estimate, and the centre carries the paper’s bias
+correction, so `final` holds the procedure fitted on every unit, whose
+risk the interval is for. The width departs from the paper in one
+respect: the paper’s is the mean squared error of the plain estimate and
+takes the correction as a shift with no spread, and in the package’s
+benchmark that spread exceeded the estimate’s where the sample was small
+or the signal absent; the width here is the same identity applied to the
+corrected estimator, from a cross-validation one level further down,
+held above the corrected centre’s own naive standard error, and the
+paper’s is kept beside it as `se_bates`. One repetition costs one fit of
+the procedure per unordered pair and per unordered triple of outer
+folds.
 
 ## `Ladder`
 

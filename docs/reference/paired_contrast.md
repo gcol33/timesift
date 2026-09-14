@@ -51,12 +51,17 @@ or a tie or number fifty or more.
 
 ## Details
 
-Pairing also cancels what a threshold-selected metric carries in its
-level. TSS read at the threshold that maximises it is biased upward
-where presences are thin, both arms carry the same bias on the same
-cell, and it cancels in the difference. That is why the levels a ladder
-reports are upper bounds while the differences between arms are read at
-face value.
+Pairing removes the variation between variables and the part of a
+threshold-selected metric's bias that the design sets, but not the part
+that belongs to each arm. TSS read at the threshold that maximises it is
+biased upward where presences are thin, and how far depends on how an
+arm's predictions are distributed as well as on how many presences the
+cell holds, so two arms of equal skill on the same cell can carry
+different biases. A difference in TSS can therefore favour one arm with
+no difference in skill behind it. A threshold-free metric such as
+[`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md)
+has no cut to choose, and a TSS contrast is best read beside the same
+contrast under it.
 
 An arm is named whole, by its grain and its learner. A learner named
 alone would have to take its best grain, and that grain is chosen on the

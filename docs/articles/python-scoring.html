@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -135,10 +135,23 @@ at that cut instead, presence being predicted at
 take the average rank.</p>
 </div>
 <div class="section level2">
+<h2 id="average_precision">
+<code>average_precision()</code><a class="anchor" aria-label="anchor" href="#average_precision"></a>
+</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>average_precision(y, p)</span></code></pre></div>
+<p>The area under the precision-recall curve, as the step sum over the
+distinct predictions.</p>
+<p>At each distinct prediction, the precision of calling every unit at
+or above it a presence, weighted by the share of presences that cut
+adds. Units sharing a prediction enter together. Its floor is the
+prevalence rather than one half, which makes it the reading of how well
+presences are ranked above absences where presences are rare.</p>
+</div>
+<div class="section level2">
 <h2 id="kappa_score">
 <code>kappa_score()</code><a class="anchor" aria-label="anchor" href="#kappa_score"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>kappa_score(y, p, rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>kappa_score(y, p, rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>)</span></code></pre></div>
 <p>Cohen’s kappa of a model’s decisions against the observed
 response.</p>
 </div>
@@ -146,7 +159,7 @@ response.</p>
 <h2 id="cohen_kappa">
 <code>cohen_kappa()</code><a class="anchor" aria-label="anchor" href="#cohen_kappa"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>cohen_kappa(a, b)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>cohen_kappa(a, b)</span></code></pre></div>
 <p>Chance-corrected agreement of two labellings of the same units, in
 either order.</p>
 </div>
@@ -154,7 +167,7 @@ either order.</p>
 <h2 id="decision_threshold">
 <code>decision_threshold()</code><a class="anchor" aria-label="anchor" href="#decision_threshold"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>decision_threshold(y, p, rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>decision_threshold(y, p, rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>)</span></code></pre></div>
 <p>The probability cut a rule selects. Presence is predicted at
 <code>p &gt;= threshold</code>.</p>
 </div>
@@ -162,7 +175,7 @@ either order.</p>
 <h2 id="model_agreement">
 <code>model_agreement()</code><a class="anchor" aria-label="anchor" href="#model_agreement"></a>
 </h2>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>model_agreement(y, p_a, p_b, rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>model_agreement(y, p_a, p_b, rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>)</span></code></pre></div>
 <p>Agreement between two models’ decisions, with how often each is right
 where they differ.</p>
 </div>
@@ -170,7 +183,7 @@ where they differ.</p>
 <h2 id="score_predictions">
 <code>score_predictions()</code><a class="anchor" aria-label="anchor" href="#score_predictions"></a>
 </h2>
-<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>score_predictions(y, p, folds, cells<span class="op">=</span><span class="va">None</span>, metric: <span class="bu">str</span> <span class="op">=</span> <span class="st">'tss'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>score_predictions(y, p, folds, cells<span class="op">=</span><span class="va">None</span>, metric: <span class="bu">str</span> <span class="op">=</span> <span class="st">'roc_auc'</span>)</span></code></pre></div>
 <p>Score held-out predictions on the cells the mask allows.</p>
 <p>The scoring every arm of a ladder and every candidate of a run goes
 through, reachable on its own for a prediction matrix that came from
@@ -183,17 +196,22 @@ alone, never from a model, which is what keeps two arms comparable.</p>
 <h2 id="paired_contrast">
 <code>paired_contrast()</code><a class="anchor" aria-label="anchor" href="#paired_contrast"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>paired_contrast(ladder: Ladder, a: <span class="bu">str</span>, b: <span class="bu">str</span>, interval: <span class="bu">str</span> <span class="op">=</span> <span class="st">'variables'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>paired_contrast(ladder: Ladder, a: <span class="bu">str</span>, b: <span class="bu">str</span>, interval: <span class="bu">str</span> <span class="op">=</span> <span class="st">'variables'</span>)</span></code></pre></div>
 <p>The difference between two arms, taken inside each cell both
 scored.</p>
 <p>Two arms scored on the same held-out units do not necessarily have
 the same set of defined cells, so a difference of two marginal means is
-not a difference between the arms. Pairing also cancels what a
-threshold-selected metric carries in its level, since both arms carry
-the same bias on the same cell.</p>
+not a difference between the arms. Pairing removes the variation between
+variables and the part of a threshold-selected metric’s bias that the
+design sets, but not the part that belongs to each arm: how far TSS read
+at its best cut is inflated depends on how an arm’s predictions are
+distributed as well as on the presence counts, so two arms of equal
+skill on the same cell can carry different biases. A TSS contrast is
+best read beside the same contrast under <code>roc_auc</code>, which has
+no cut to choose.</p>
 <p>Each arm is named whole, <code>grain|learner</code>. A learner named
 alone would take its best grain, chosen on the scores the contrast is
-then read off, and pairing does not cancel that choice;
+then read off, and pairing does not remove that choice;
 <code>select_grain</code> chooses a grain on inner folds instead and
 contrasts the selection through <code>compare</code>. The interval is
 Student’s t on one degree of freedom fewer than there are variables, and
@@ -211,45 +229,49 @@ with <code>grain_ladder(interval="nested_cv")</code>.</p>
 <h2 id="tss_inflation">
 <code>tss_inflation()</code><a class="anchor" aria-label="anchor" href="#tss_inflation"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>tss_inflation(</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>    y: Response,</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>    folds,</span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>    skill<span class="op">=</span>(<span class="fl">0.6</span>, <span class="fl">0.7</span>, <span class="fl">0.9</span>),</span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>    replicates: <span class="bu">int</span> <span class="op">=</span> <span class="dv">200</span>,</span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>tss_inflation(</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>    y: Response,</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>    folds,</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    skill<span class="op">=</span>(<span class="fl">0.6</span>, <span class="fl">0.7</span>, <span class="fl">0.9</span>),</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    replicates: <span class="bu">int</span> <span class="op">=</span> <span class="dv">200</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>)</span></code></pre></div>
 <p>How much a threshold chosen on the scored units inflates the level it
 reports.</p>
 <p>Predictions are simulated under a normal model whose population skill
 is exactly the value planted, at the cell sizes and presence counts of
 this design, and read back the way a ladder reports a level. The gap is
-the inflation. It cancels in a paired difference and does not cancel in
-a level, so a level is an upper bound on the skill a population has.</p>
+the inflation. It is an expectation: a level is optimistic on average,
+not a bound every reading sits above. The model planted is one
+distribution of predictions, and another at the same skill inflates by a
+different amount, which is also why a paired difference is not free of
+it.</p>
 </div>
 <div class="section level2">
 <h2 id="implied_skill">
 <code>implied_skill()</code><a class="anchor" aria-label="anchor" href="#implied_skill"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>implied_skill(</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>    y: Response,</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>    folds,</span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    observed,</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    grid<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>    replicates: <span class="bu">int</span> <span class="op">=</span> <span class="dv">200</span>,</span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>implied_skill(</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>    y: Response,</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    folds,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>    observed,</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    grid<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    replicates: <span class="bu">int</span> <span class="op">=</span> <span class="dv">200</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>)</span></code></pre></div>
 <p>What population skill a level actually read is consistent with.</p>
 <p><code>tss_inflation</code> maps a population skill to the level a
-design reports for it; this inverts that map. It is the only honest way
-to read a level as a statement about a population rather than about a
-scoring rule, and it says nothing about a difference between two arms,
-where the inflation cancels and the reported number stands as it is.</p>
+design reports for it; this inverts that map, under the distribution of
+predictions <code>tss_inflation</code> plants; a model whose predictions
+are distributed otherwise is inflated by a different amount. It does not
+correct a difference between two arms, whose inflations need not be
+equal.</p>
 </div>
 <div class="section level2">
 <h2 id="occlusion">
 <code>occlusion()</code><a class="anchor" aria-label="anchor" href="#occlusion"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>occlusion(x, <span class="op">*</span>args, <span class="op">**</span>kwargs)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>occlusion(x, <span class="op">*</span>args, <span class="op">**</span>kwargs)</span></code></pre></div>
 <p>What one candidate’s score loses when a bin, or a channel, is
 withheld from it.</p>
 <p>Takes a <code>timesift.fit.timesift</code> run or a

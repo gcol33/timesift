@@ -52,10 +52,13 @@ response and fold map supplied, and the level is read back exactly as
 reports it. The gap between what comes back and the truth planted is the
 inflation.
 
-It cancels in the paired differences
+The inflation is an expectation. A level read on one design is
+optimistic on average, not a bound every reading sits above: a single
+level can fall below the population skill. The model planted here is one
+distribution of predictions, and another at the same skill inflates by a
+different amount, which is also why a paired difference
 [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md)
-takes, since both arms carry it on the same cell. It does not cancel in
-a level, so a level is an upper bound on the skill a population has.
+takes is not free of it.
 
 ## Examples
 

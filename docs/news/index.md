@@ -1,5 +1,108 @@
 # Changelog
 
+## timesift 0.2.0
+
+### Changed
+
+- [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+  now estimates the procedure it runs. Inside each outer fold of
+  `resampling` the training targets are split again into `inner` folds
+  (5 by default), every candidate is cross-validated there, `rule`
+  chooses one on its inner score and the stack’s weights are fitted on
+  the inner out-of-fold predictions; the choice and the weights then
+  predict the outer test fold once. `estimate` holds the held-out score
+  of the selected candidate and of the stack under every registered
+  metric, `selected` and `inner` the choice in every outer fold,
+  `fold_weights` the weights, and `predictions` both held-out prediction
+  matrices. The candidates’ scores on the outer folds are unchanged and
+  are reported apart from the estimate, because the best of them was
+  picked out on the folds it is scored on. `inner = NULL` compares the
+  candidates without an estimate.
+  [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+  and
+  [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+  share one inner search and one refit, so on the same candidates, fold
+  map, inner count and seed the selected arm is
+  [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)’s
+  selection. On both sides.
+- The ensemble row of the report is the stack’s held-out score under
+  per-fold weights. Before, the weights were fitted on the outer
+  out-of-fold predictions and the combination was then scored against
+  the responses they had been fitted to.
+  [`summary()`](https://rdrr.io/r/base/summary.html) prints the
+  candidates and the procedure as two tables; the Python side’s
+  `ensemble_row()` is replaced by `procedure_table()`.
+- `predict(candidate = "selected")` predicts with `choice`, the
+  candidate the rule takes on every target.
+- The presence-absence head is scored by `roc_auc` unless a metric is
+  named, and
+  [`score_predictions()`](https://gillescolling.com/timesift/reference/score_predictions.md)
+  defaults to it too. TSS read at its best cut is inflated by an amount
+  that depends on how a model’s predictions are distributed, so it stays
+  beside AUC rather than ahead of it. On both sides.
+
+### New
+
+- [`average_precision()`](https://gillescolling.com/timesift/reference/average_precision.md),
+  registered as a metric and pinned in the metric fixtures. On both
+  sides.
+- The reproduction driver compares the demonstration species by species
+  ([\#74](https://github.com/gcol33/timesift/issues/74)).
+  `inst/reproduce/reference.csv` carries, per species, the analysis
+  pipeline’s five-inner-fold selection and its weekly series elastic net
+  under AUC and TSS, and the spread of a single fitted encoder at that
+  species over the pipeline’s eleven runs of the fixed weekly arm;
+  `reference_runs.csv` carries those runs’ levels. Every tolerance is
+  derived from those two files rather than written into the script: a
+  level or a margin of the encoder is two fitted runs against each
+  other, so its tolerance is three times sqrt(2) times the spread of the
+  level, and a species is held to the same rule at its own spread, with
+  the check being how many of the 101 sit inside. Run on the deposit
+  with the study’s fold map and inner partition on a graphics processor
+  (`dev_notes/repro-lisc/` holds the run’s files): the series elastic
+  net reproduces to +0.001 TSS and +0.0002 AUC with every species
+  inside; the selection lands on a weekly candidate in nine of the ten
+  outer folds and on a monthly one in the tenth; the procedure’s level
+  is 0.0065 AUC and 0.0086 TSS below the pipeline’s, inside the
+  tolerances of 0.0087 and 0.0145, with 100 and 99 of 101 species inside
+  their own bands; and its margin over the series elastic net is +0.002
+  AUC against the pipeline’s +0.009, inside the tolerance but, unlike
+  the pipeline’s, not separated from zero across species.
+
+### Documentation
+
+- The pairing and inflation text no longer says a paired TSS difference
+  cancels the inflation of a self-selected threshold, or that a level is
+  an upper bound: the inflation is an expectation, and two arms of equal
+  skill can carry different amounts of it.
+- The width of `interval = "nested_cv"` is the mean squared error of the
+  bias-corrected estimate it is centred on, from a nested
+  cross-validation one level further down
+  ([\#73](https://github.com/gcol33/timesift/issues/73)). The paper’s
+  width is the mean squared error of the plain cross-validation estimate
+  and adds its bias correction to the centre as a shift with no spread
+  of its own; in the package’s benchmark that correction moved from
+  sample to sample by more than the estimate it corrects where the
+  sample was small or the signal absent, and the paper’s interval
+  covered a nominal 95% at 0.86 to 0.93 on the two penalised cells rerun
+  at ten repetitions (300 units, no signal and the weekly lag; 174 and
+  183 replicates) and at 0.84 to 0.96 across the twelve cells at one
+  repetition. Inside every outer training set the same nested
+  cross-validation now runs once more, over the unordered triples of
+  outer folds, which gives the bias-corrected estimate that training set
+  alone would report, and the squared gap between that and the held-out
+  fold’s score is what the width is read off; its root is held between
+  the corrected centre’s own jackknife standard error and sqrt(K) times
+  it, where the paper holds the plain estimate’s root between the plain
+  estimate’s. On the package’s cheap recovery design (150 units, five
+  outer folds, one repetition, 200 replicates) the interval covers a
+  nominal 95% at 0.96 with a signal and 0.94 without, against 0.955 and
+  0.895 for the paper’s width around the same centre. The paper’s width
+  is kept beside it as `se_bates` in `nested_cv`, and the benchmark
+  writes both intervals and reports both coverages. Nested
+  cross-validation needs four outer folds now rather than three. On both
+  sides.
+
 ## timesift 0.1.1
 
 ### New

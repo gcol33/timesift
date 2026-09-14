@@ -31,7 +31,7 @@ point where making the record finer stops paying."><style>
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -155,8 +155,9 @@ fitted model without refitting it.</p></dd>
 
 <dt id="arg-interval">interval<a class="anchor" aria-label="anchor" href="#arg-interval"></a></dt>
 <dd><p><code>"nested_cv"</code> refits every arm inside every outer training set, which is what
-<code><a href="paired_contrast.html">paired_contrast()</a></code> reads an interval for the difference in risk off. <code>"variables"</code>, the
-default, fits nothing further, and a contrast is then read across the response variables.</p></dd>
+<code><a href="paired_contrast.html">paired_contrast()</a></code> reads an interval for the difference in risk off; see <code><a href="select_grain.html">select_grain()</a></code>
+for what it estimates and what it costs. <code>"variables"</code>, the default, fits nothing further,
+and a contrast is then read across the response variables.</p></dd>
 
 
 <dt id="arg-repeats">repeats<a class="anchor" aria-label="anchor" href="#arg-repeats"></a></dt>

@@ -93,6 +93,8 @@ Weights fitted on the out-of-fold predictions alone.
   true skill statistic
 - [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md)
   : The area under the ROC curve
+- [`average_precision()`](https://gillescolling.com/timesift/reference/average_precision.md)
+  : Average precision
 - [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md)
   [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
   [`model_agreement()`](https://gillescolling.com/timesift/reference/kappa_score.md)

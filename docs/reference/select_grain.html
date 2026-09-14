@@ -37,7 +37,7 @@ is what an ecologist applying it to a new site would run."><style>
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -275,24 +275,41 @@ spread is the spread of true skill between variables, and it cannot see the erro
 variable shares, since all of them are fitted and scored on the same units and the same folds.
 It is an interval over the variables of this dataset, and not an interval for what the
 procedure would score on a new sample.</p>
-<p><code>interval = "nested_cv"</code> adds one that is, by the nested cross-validation of Bates, Hastie and
-Tibshirani (2024). Inside every repetition, each outer training set is cross-validated again
-over the remaining folds of the same map, which gives the mean squared error of a
-cross-validation estimate as the difference of two terms it can estimate: the squared gap
-between the inner estimate and the held-out fold's score, less the variance of that fold's
-score. The paper's error is a mean of per-unit losses; here a fold's score is the mean over the
-variables scorable in it, the inner estimate is averaged as the reported estimate is, and the
-variance of a fold's score is its delete-one jackknife variance over the units of the fold,
-which for a mean of per-unit losses is exactly the paper's <code>var(e) / |I_k|</code>. The square root of
-the estimated mean squared error is held between the jackknife standard error of the estimate
-and the square root of the fold count times it, as the paper's section 4.3.2 has it, and the
-centre carries its bias correction, so the interval is for the risk of the procedure fitted on
-a sample of this size, which is the fit <code>final</code> holds.</p>
+<p><code>interval = "nested_cv"</code> adds one that is meant to be, by the nested cross-validation of Bates,
+Hastie and Tibshirani (2024). Inside every repetition, each outer training set is
+cross-validated again over the remaining folds of the same map, which gives the mean squared
+error of a cross-validation estimate as the difference of two terms it can estimate: the
+squared gap between the inner estimate and the held-out fold's score, less the variance of that
+fold's score. The paper's error is a mean of per-unit losses; here a fold's score is the mean
+over the variables scorable in it, the inner estimate is averaged as the reported estimate is,
+and the variance of a fold's score is its delete-one jackknife variance over the units of the
+fold, which for a mean of per-unit losses is exactly the paper's <code>var(e) / |I_k|</code>. The centre
+is the nested estimate less the paper's bias correction, its Appendix C, so the interval is
+for the risk of the procedure fitted on a sample of this size, which is the fit <code>final</code> holds.
+The square root of the estimated mean squared error is held between the jackknife standard
+error of the estimate and the square root of the fold count times it, as the paper's section
+4.3.2 has it.</p>
+<p>The width departs from the paper in one respect. The paper's width is the mean squared error
+of the plain cross-validation estimate, and its bias correction is added to the centre as a
+shift with no spread of its own. The correction is <code>1 + (K - 2) / K</code> times the gap between two
+cross-validation estimates on the same units, and in the package's benchmark
+(<code>inst/benchmark/</code>) that gap moved from sample to sample by more than the estimate it corrects
+where the sample was small or the signal absent, so the paper's interval covered a nominal 95%
+at 0.86 to 0.93 there at ten repetitions. The width here is therefore the same identity
+applied to the corrected estimator: inside every outer training set the nested cross-validation
+is run once more, over the unordered triples of folds, which gives the bias-corrected estimate
+that training set alone would report, and the squared gap between that and the held-out fold's
+score replaces the plain estimate's; the bounds are the corrected centre's own jackknife
+standard error, with every prediction held fixed, and the square root of the fold count times
+it. The paper's width is reported beside it as <code>se_bates</code> in <code>nested_cv</code>. On the package's
+cheap recovery design (<code>tests/testthat/test-interval.R</code>: 150 units, five outer folds, one
+repetition, 200 replicates) the interval covers a nominal 95% at 0.96 with a signal and 0.94
+without, where the paper's covers 0.955 and 0.895.</p>
 <p>The cost is the selection's, multiplied: one repetition fits the procedure once for every
-unordered pair of outer folds, <code>v_outer * (v_outer - 1) / 2</code> fits, and every repetition after
-the first refits the outer folds as well. More repetitions steady the estimate of the mean
-squared error; the paper uses two hundred random splits, which is affordable where a fit is
-cheap and is not where a fit is a neural network.</p>
+unordered pair and every unordered triple of outer folds, <code>choose(v_outer, 2) + choose(v_outer, 3)</code> fits, and every repetition after the first refits the outer folds as well.
+More repetitions steady the estimate of the mean squared error; the paper uses two hundred
+random splits, which is affordable where a fit is cheap and is not where a fit is a neural
+network.</p>
     </div>
     <div class="section level2">
     <h2 id="a-cut-learned-inside-the-training-data">A cut learned inside the training data<a class="anchor" aria-label="anchor" href="#a-cut-learned-inside-the-training-data"></a></h2>

@@ -167,7 +167,7 @@ baseline <- grain_ladder(
   features, y,
   list(elastic_net = elasticnet(alpha = 0.5, n_inner = 5, squares = TRUE),
        stepwise = stepwise(max_terms = 3, degree = 2)),
-  folds = folds)
+  folds = folds, metric = "tss")
 ```
 
 Both redo their predictor selection inside every fold, on the training
@@ -229,7 +229,7 @@ ladder_input <- timesift_set(lapply(binning, function(w) {
   bind_channels(x, calendar_channels(x))
 }))
 
-grid <- grain_ladder(ladder_input, y, encoders, folds = folds)
+grid <- grain_ladder(ladder_input, y, encoders, folds = folds, metric = "tss")
 summary(grid)
 ```
 
@@ -242,7 +242,7 @@ decisions.
 
 ``` r
 
-lad <- grain_ladder(ladder_input, y, members, folds = folds)
+lad <- grain_ladder(ladder_input, y, members, folds = folds, metric = "tss")
 oof <- attr(lad, "predictions")
 arms <- paste("week", names(members), sep = "|")
 
@@ -332,7 +332,7 @@ weekly <- grain_matrix(readings, logger_ID, date, temp, grain = "week",
                         stats = c("cold_day", "mean", "warm_day"))
 series <- grain_ladder(timesift_set(list(series = weekly)), y,
                        list(elastic_net = elasticnet(alpha = 0.5, n_inner = 5, squares = TRUE)),
-                       folds = folds)
+                       folds = folds, metric = "tss")
 ```
 
 157 weeks by three channels is 471 numbers per plot, and with their
@@ -410,12 +410,24 @@ script produces them:
 | numbers per plot, weekly three-channel | 471 | 471 |
 | inflation of a level whose truth is 0.60 | +0.110 | +0.110 |
 | elastic net on the 188 aggregates | 0.687 | 0.686 |
+| the weekly series elastic net, TSS and AUC | 0.696, 0.868 | 0.697, 0.868 |
+| the selected procedure, AUC and TSS | 0.877, 0.710 | 0.870, 0.701 |
+| outer folds selecting a weekly candidate | 10 of 10 | 9 of 10 |
+| the procedure over the series elastic net, AUC | +0.009 | +0.002 |
 | stepwise AIC on the 188 aggregates | 0.662 | not rerun |
-| convolutional network, weekly, coldest and warmest day | 0.712 | not rerun |
 | the same network on the full hourly record | 0.658 | not rerun |
 
-A model fitted twice on different hardware does not give the same
-weights, so the network cells are reproduced to the seed noise the paper
-measures, a standard deviation of 0.0017 across seeds at the median
-cell. The representation, the fold map, the mask and the
-aggregated-feature arms carry no such noise and reproduce exactly.
+The selection stage ran once, on one NVIDIA L40S under torch 0.17.0 and
+libtorch 2.8.0, with the study’s fold map and inner partition. A model
+fitted twice does not give the same weights, so an encoder’s level is
+compared at three times sqrt(2) times the spread of that level over the
+pipeline’s eleven runs of its fixed weekly encoder, 0.0087 AUC and
+0.0145 TSS, and each of the 101 species at its own spread; the
+procedure’s level sits 0.0065 AUC below the pipeline’s single run,
+inside that tolerance, with 100 species inside their bands. Its margin
+over the series elastic net is inside the tolerance and does not
+separate from zero across species, where the pipeline’s did. The
+representation, the fold map, the mask and the elastic-net arms carry no
+such spread and reproduce to the third decimal. The run’s environment is
+in its `run.meta`, and the comparison, its tolerances and their
+derivation are in `inst/reproduce/README.md`.

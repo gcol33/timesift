@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -165,27 +165,67 @@ hour-to-hour noise an order of magnitude larger.</p>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">fit</span></span>
-<span><span class="co">#&gt; timesift  60 targets, 6 responses, 5-fold random CV, tss</span></span>
+<span><span class="co">#&gt; timesift  60 targets, 6 responses, 5-fold random CV, roc_auc</span></span>
 <span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; candidates, scored on the outer folds</span></span>
 <span><span class="co">#&gt; candidate                    mean    won  responses</span></span>
-<span><span class="co">#&gt; elasticnet / day            0.749      2  separate</span></span>
-<span><span class="co">#&gt; elasticnet / week           0.750      2  separate</span></span>
-<span><span class="co">#&gt; elasticnet / month          0.759      2  separate</span></span>
-<span><span class="co">#&gt; ensemble                    0.756      -</span></span>
+<span><span class="co">#&gt; elasticnet / day            0.870      0  separate</span></span>
+<span><span class="co">#&gt; elasticnet / week           0.891      2  separate</span></span>
+<span><span class="co">#&gt; elasticnet / month          0.903      4  separate</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; weights  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.01</span></span></code></pre></div>
+<span><span class="co">#&gt; procedure, chosen and weighted inside each outer training fold</span></span>
+<span><span class="co">#&gt; selected                    0.903  se 0.018</span></span>
+<span><span class="co">#&gt; ensemble                    0.906  se 0.016</span></span>
+<span><span class="co">#&gt; selected elasticnet / month in 5 of 5 folds</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; choice on every target  elasticnet / month</span></span>
+<span><span class="co">#&gt; weights on every target  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.01</span></span></code></pre></div>
 <p>Every representation named in <code>sift</code> was built, and
 <code>models</code> defaulting to <code>list(elasticnet())</code>, a
 penalised logistic regression was fitted on each of them over the same
-five folds and the out-of-fold predictions were stacked.
-<code>won</code> is how many responses a candidate scored highest on,
-and <code>responses</code> says whether one fitted model covered them
-all or one was fitted per response.</p>
+five folds. The report has two parts.</p>
+<p>The candidates are the comparison. Each is scored on the five outer
+folds, on the same cells, so their means can be read against each other
+across grains. <code>won</code> is how many responses a candidate scored
+highest on, and <code>responses</code> says whether one fitted model
+covered them all or one was fitted per response. The highest of those
+means was picked out on the folds it is scored on, so it is not the
+number to report.</p>
+<p>The procedure rows are. Inside each outer training fold the
+candidates were cross-validated again on five inner folds, one was
+chosen on its inner score and the stack’s weights were fitted on the
+inner out-of-fold predictions; the choice and the weights then predicted
+the outer test fold once. <code>selected</code> and
+<code>ensemble</code> are those held-out scores, choosing and weighting
+included.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit</span><span class="op">$</span><span class="va">estimate</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"arm"</span>, <span class="st">"metric"</span>, <span class="st">"score"</span>, <span class="st">"se"</span>, <span class="st">"lower"</span>, <span class="st">"upper"</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="co">#&gt;         arm            metric     score         se     lower     upper</span></span>
+<span><span class="co">#&gt; 1  selected average_precision 0.9107680 0.01278260 0.8779093 0.9436267</span></span>
+<span><span class="co">#&gt; 2  selected             kappa 0.6142196 0.02796198 0.5423410 0.6860981</span></span>
+<span><span class="co">#&gt; 3  selected      kappa_youden 0.7439128 0.02191276 0.6875842 0.8002413</span></span>
+<span><span class="co">#&gt; 4  selected           roc_auc 0.9028340 0.01819271 0.8560682 0.9495998</span></span>
+<span><span class="co">#&gt; 5  selected               tss 0.7594841 0.02865539 0.6858231 0.8331452</span></span>
+<span><span class="co">#&gt; 6  ensemble average_precision 0.9130114 0.01288686 0.8798847 0.9461381</span></span>
+<span><span class="co">#&gt; 7  ensemble             kappa 0.6027910 0.03350542 0.5166626 0.6889194</span></span>
+<span><span class="co">#&gt; 8  ensemble      kappa_youden 0.7421500 0.02013450 0.6903926 0.7939073</span></span>
+<span><span class="co">#&gt; 9  ensemble           roc_auc 0.9057540 0.01649183 0.8633604 0.9481476</span></span>
+<span><span class="co">#&gt; 10 ensemble               tss 0.7604365 0.02483927 0.6965851 0.8242879</span></span>
+<span><span class="va">fit</span><span class="op">$</span><span class="va">selected</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"fold"</span>, <span class="st">"candidate"</span>, <span class="st">"inner_score"</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="co">#&gt;   fold          candidate inner_score</span></span>
+<span><span class="co">#&gt; 1    1 elasticnet / month   0.8968360</span></span>
+<span><span class="co">#&gt; 2    2 elasticnet / month   0.8962751</span></span>
+<span><span class="co">#&gt; 3    3 elasticnet / month   0.9056376</span></span>
+<span><span class="co">#&gt; 4    4 elasticnet / month   0.8959669</span></span>
+<span><span class="co">#&gt; 5    5 elasticnet / month   0.9099788</span></span></code></pre></div>
+<p>The interval is across the six responses of this dataset, all fitted
+and scored on the same plots and folds, so it does not carry the error
+those share.</p>
 <p>A column of <code>targets</code> reaches the model only where
 <code>static</code> names it: <code>elevation</code> is a predictor here
 because it was asked for, and a column of notes sitting beside it would
 not be.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span><span class="op">$</span><span class="va">candidates</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"candidate"</span>, <span class="st">"representation"</span>, <span class="st">"bins"</span>, <span class="st">"channels"</span>, <span class="st">"status"</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt;            candidate representation bins channels status</span></span>
 <span><span class="co">#&gt; 1   elasticnet / day            day  120        2 fitted</span></span>
@@ -193,7 +233,7 @@ not be.</p>
 <span><span class="co">#&gt; 3 elasticnet / month          month    4        2 fitted</span></span></code></pre></div>
 <p>Two channels at every grain: the binned temperature, and elevation
 held constant across the bins.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></code></pre></div>
 <p><div class="svg-container"><button type="button" class="btn btn-primary btn-copy-svg" title="Copy SVG to clipboard" aria-label="Copy SVG to clipboard" data-bs-toggle="tooltip" data-bs-placement="left"><i class="fa fa-copy"></i></button>
 <svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='468.00pt' height='324.00pt' viewBox='0 0 468.00 324.00' class="r-plt inline-svg" style="width:100%;height:auto;">
@@ -232,16 +272,21 @@ held constant across the bins.</p>
   </clipPath>
 </defs>
 <g clip-path='url(#cpMC4wMHw0NjguMDB8MC4wMHwzMjQuMDA=)'>
-<line x1='68.88' y1='200.07' x2='68.88' y2='107.62' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='200.07' x2='60.48' y2='200.07' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='153.84' x2='60.48' y2='153.84' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='107.62' x2='60.48' y2='107.62' style='stroke-width: 0.75;' />
-<text transform='translate(48.72,200.07) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.70</text>
-<text transform='translate(48.72,153.84) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.75</text>
-<text transform='translate(48.72,107.62) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.80</text>
+<line x1='68.88' y1='238.15' x2='68.88' y2='87.47' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='238.15' x2='60.48' y2='238.15' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='213.04' x2='60.48' y2='213.04' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='187.93' x2='60.48' y2='187.93' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='162.81' x2='60.48' y2='162.81' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='137.70' x2='60.48' y2='137.70' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='112.59' x2='60.48' y2='112.59' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='87.47' x2='60.48' y2='87.47' style='stroke-width: 0.75;' />
+<text transform='translate(48.72,238.15) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.82</text>
+<text transform='translate(48.72,187.93) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.86</text>
+<text transform='translate(48.72,137.70) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.90</text>
+<text transform='translate(48.72,87.47) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.94</text>
 <polygon points='68.88,238.32 432.72,238.32 432.72,68.88 68.88,68.88 ' style='stroke-width: 0.75;' />
 <text x='250.80' y='302.16' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>representation</text>
-<text transform='translate(15.12,153.60) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>tss</text>
+<text transform='translate(15.12,153.60) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>roc_auc</text>
 <line x1='82.36' y1='238.32' x2='419.24' y2='238.32' style='stroke-width: 0.75;' />
 <line x1='82.36' y1='238.32' x2='82.36' y2='246.72' style='stroke-width: 0.75;' />
 <line x1='250.80' y1='238.32' x2='250.80' y2='246.72' style='stroke-width: 0.75;' />
@@ -256,24 +301,28 @@ held constant across the bins.</p>
   </clipPath>
 </defs>
 <g clip-path='url(#cpNjguODh8NDMyLjcyfDY4Ljg4fDIzOC4zMg==)'>
-<line x1='68.88' y1='200.07' x2='432.72' y2='200.07' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='153.84' x2='432.72' y2='153.84' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='107.62' x2='432.72' y2='107.62' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='148.57' x2='432.72' y2='148.57' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
-<line x1='82.36' y1='209.69' x2='82.36' y2='99.42' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='80.20,209.69 82.36,209.69 84.52,209.69 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='84.52,99.42 82.36,99.42 80.20,99.42 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<line x1='250.80' y1='232.04' x2='250.80' y2='75.16' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='248.64,232.04 250.80,232.04 252.96,232.04 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<line x1='68.88' y1='238.15' x2='432.72' y2='238.15' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='213.04' x2='432.72' y2='213.04' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='187.93' x2='432.72' y2='187.93' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='162.81' x2='432.72' y2='162.81' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='137.70' x2='432.72' y2='137.70' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='112.59' x2='432.72' y2='112.59' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='87.47' x2='432.72' y2='87.47' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='130.48' x2='432.72' y2='130.48' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
+<line x1='82.36' y1='232.04' x2='82.36' y2='117.63' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='80.20,232.04 82.36,232.04 84.52,232.04 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='84.52,117.63 82.36,117.63 80.20,117.63 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<line x1='250.80' y1='222.31' x2='250.80' y2='75.16' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='248.64,222.31 250.80,222.31 252.96,222.31 ' style='stroke-width: 0.75; stroke: #E16A86;' />
 <polyline points='252.96,75.16 250.80,75.16 248.64,75.16 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<line x1='419.24' y1='213.18' x2='419.24' y2='76.98' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='417.08,213.18 419.24,213.18 421.40,213.18 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='421.40,76.98 419.24,76.98 417.08,76.98 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='82.36,154.55 250.80,153.60 419.24,145.08 ' style='stroke-width: 1.50; stroke: #E16A86;' />
-<circle cx='82.36' cy='154.55' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
-<circle cx='250.80' cy='153.60' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
-<circle cx='419.24' cy='145.08' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
-<circle cx='419.24' cy='145.08' r='6.93' style='stroke-width: 1.50; stroke: #E16A86;' />
+<line x1='419.24' y1='192.86' x2='419.24' y2='75.42' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='417.08,192.86 419.24,192.86 421.40,192.86 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='421.40,75.42 419.24,75.42 417.08,75.42 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='82.36,174.84 250.80,148.73 419.24,134.14 ' style='stroke-width: 1.50; stroke: #E16A86;' />
+<circle cx='82.36' cy='174.84' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
+<circle cx='250.80' cy='148.73' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
+<circle cx='419.24' cy='134.14' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
+<circle cx='419.24' cy='134.14' r='6.93' style='stroke-width: 1.50; stroke: #E16A86;' />
 <line x1='81.48' y1='204.72' x2='106.68' y2='204.72' style='stroke-width: 1.50; stroke: #E16A86;' />
 <line x1='81.48' y1='221.52' x2='106.68' y2='221.52' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
 <text x='119.28' y='209.73' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>elasticnet</text>
@@ -283,8 +332,10 @@ held constant across the bins.</p>
 </svg></div></p>
 <p><code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> rebuilds each member’s representation for new
 rows from the settings its own arm was built with, and combines them
-through the ensemble.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+through the ensemble refitted on every target;
+<code>candidate = "selected"</code> predicts with the candidate the rule
+chose on every target instead.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">p</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">targets</span>, <span class="va">series</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">p</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        sp1   sp2   sp3   sp4</span></span>
@@ -298,7 +349,7 @@ through the ensemble.</p>
 <p>A representation carries the settings and nothing else, so the same
 object describes an arm before any record has been read and rebuilds
 itself for new targets afterwards.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/native.html">native</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;timesift representation&gt; native </span></span>
 <span><span class="co">#&gt; kind    : grain (a sequence) </span></span>
@@ -328,7 +379,7 @@ plot carrying several targets through time needs, given as
 <code>target_time</code>.</p>
 <p>A learner runs across the whole set, or at one representation it is
 pinned to:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/elasticnet.html">elasticnet</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="../reference/native.html">grain</a></span><span class="op">(</span><span class="st">"month"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;timesift learner&gt; elasticnet </span></span>
 <span><span class="co">#&gt; reads   : tabular ; one model per response: yes, separate </span></span>
@@ -345,7 +396,7 @@ given <code><a href="../reference/native.html">native()</a></code> is refused be
 since building the array it would have been handed is the expensive half
 of the call; a sequence learner is refused a representation that turns
 out to hold one bin, once the array says how many it has.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>         models <span class="op">=</span> <span class="fu"><a href="../reference/elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, sift <span class="op">=</span> <span class="fu"><a href="../reference/native.html">native</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
@@ -365,7 +416,7 @@ into folds balanced on a stratifying value and <code><a href="../reference/cv.ht
 keeps every target sharing a group value on one side of each split;
 <code>resampling</code> also takes a fold vector or a
 <code><a href="../reference/fold_map.html">fold_map()</a></code> result directly.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span><span class="op">$</span><span class="va">folds</span></span>
 <span><span class="co">#&gt; &lt;timesift folds&gt; 60 units in 5 folds </span></span>
 <span><span class="co">#&gt; fold</span></span>
@@ -375,7 +426,7 @@ keeps every target sharing a group value on one side of each split;
 a per-response model needs both classes among the units it was fitted
 on. The mask says which cells those are, from the response and the fold
 map alone.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span><span class="op">$</span><span class="va">cells</span></span>
 <span><span class="co">#&gt; &lt;timesift cells&gt; 30 cells over 6 variables </span></span>
 <span><span class="co">#&gt; scorable: 30 (100.0%); variables with at least one scorable fold: 6 of 6</span></span></code></pre></div>
@@ -397,7 +448,7 @@ these sample sizes.</p>
 <code><a href="../reference/train_control.html">train_control()</a></code>, which every neural learner of a run reads.
 A learner given a control of its own overrides the run’s on the settings
 it names and takes the rest from it.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/train_control.html">train_control</a></span><span class="op">(</span>epochs <span class="op">=</span> <span class="fl">200L</span>, device <span class="op">=</span> <span class="st">"cpu"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;timesift control&gt;</span></span>
 <span><span class="co">#&gt;   epochs          200</span></span>
@@ -420,7 +471,7 @@ it names and takes the rest from it.</p>
 <p>A learner of your own is a fit and a predict pair, and it goes
 through the same folds, the same cells and the same scoring as the ones
 that ship.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">flat</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, nrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">nearest_neighbour</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/learner.html">learner</a></span><span class="op">(</span></span>
@@ -436,27 +487,37 @@ that ship.</p>
 <span>                 models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, <span class="va">nearest_neighbour</span><span class="op">)</span>,</span>
 <span>                 sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"week"</span>, <span class="st">"month"</span><span class="op">)</span>, resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">both</span><span class="op">)</span></span>
-<span><span class="co">#&gt; timesift  60 targets, 6 responses, 5-fold random CV, tss</span></span>
+<span><span class="co">#&gt; timesift  60 targets, 6 responses, 5-fold random CV, roc_auc</span></span>
 <span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; candidates, scored on the outer folds</span></span>
 <span><span class="co">#&gt; candidate                    mean    won  responses</span></span>
-<span><span class="co">#&gt; 1nn / week                  0.446      0  separate</span></span>
-<span><span class="co">#&gt; 1nn / month                 0.546      0  separate</span></span>
-<span><span class="co">#&gt; elasticnet / week           0.752      3  separate</span></span>
-<span><span class="co">#&gt; elasticnet / month          0.777      3  separate</span></span>
-<span><span class="co">#&gt; ensemble                    0.760      -</span></span>
+<span><span class="co">#&gt; 1nn / week                  0.720      0  separate</span></span>
+<span><span class="co">#&gt; 1nn / month                 0.772      0  separate</span></span>
+<span><span class="co">#&gt; elasticnet / week           0.895      3  separate</span></span>
+<span><span class="co">#&gt; elasticnet / month          0.907      3  separate</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; weights  elasticnet / month 0.63   elasticnet / week 0.32   1nn / month 0.05</span></span></code></pre></div>
+<span><span class="co">#&gt; procedure, chosen and weighted inside each outer training fold</span></span>
+<span><span class="co">#&gt; selected                    0.907  se 0.019</span></span>
+<span><span class="co">#&gt; ensemble                    0.910  se 0.016</span></span>
+<span><span class="co">#&gt; selected elasticnet / month in 5 of 5 folds</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; choice on every target  elasticnet / month</span></span>
+<span><span class="co">#&gt; weights on every target  elasticnet / month 0.63   elasticnet / week 0.32   1nn / month 0.05</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="the-combination">The combination<a class="anchor" aria-label="anchor" href="#the-combination"></a>
 </h2>
-<p>The combiner is handed the out-of-fold predictions, the response, the
+<p>The combiner is handed out-of-fold predictions, the response, the
 mask and the fold map, and never a model. <code>"stack"</code> fits
 non-negative weights summing to one by minimising the response head’s
 own loss over the scorable cells; <code>"mean"</code>,
 <code>"median"</code> and <code>"weighted"</code> combine without
-fitting anything.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+fitting anything. The weights below are fitted on the outer out-of-fold
+predictions of every target and are what <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> uses.
+The ensemble’s score is not read with them, because they were fitted to
+the responses it would be scored against; each outer fold’s weights are
+in <code>fit$fold_weights</code>.</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/ensemble_weights.html">ensemble_weights</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   elasticnet / day  elasticnet / week elasticnet / month </span></span>
 <span><span class="co">#&gt;         0.01476295         0.30154490         0.68369215</span></span></code></pre></div>
@@ -474,16 +535,19 @@ chosen on the same units the score is then read on. That inflates the
 level, and by more the fewer presences a cell holds.
 <code><a href="../reference/tss_inflation.html">tss_inflation()</a></code> measures the inflation for the presence
 counts of the design in hand.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tss_inflation.html">tss_inflation</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">y</span>, <span class="va">fit</span><span class="op">$</span><span class="va">folds</span>, skill <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.6</span>, <span class="fl">0.9</span><span class="op">)</span>, replicates <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   skill  reported  inflation     lower     upper replicates</span></span>
 <span><span class="co">#&gt; 1   0.6 0.7581421 0.15814206 0.6931759 0.8198188        100</span></span>
 <span><span class="co">#&gt; 2   0.9 0.9664636 0.06646362 0.9361726 0.9855159        100</span></span></code></pre></div>
-<p>The inflation is common to every candidate scored the same way, so it
-cancels in a paired difference. It does not cancel in a level, so a
-level is an upper bound on the skill a population has, and
-<code><a href="../reference/implied_skill.html">implied_skill()</a></code> inverts the map to say which population
-skills a level read is consistent with.</p>
+<p>The inflation is an average over the planted model’s predictions: a
+level is optimistic in expectation, and <code><a href="../reference/implied_skill.html">implied_skill()</a></code>
+inverts the map to say which population skills a level read is
+consistent with. Its size depends on how a model’s predictions are
+distributed as well as on the presence counts, so two candidates of
+equal skill scored on the same cells can be inflated by different
+amounts, and a paired difference in TSS is not free of it. That is why a
+run is scored by AUC unless told otherwise.</p>
 </div>
 <div class="section level2">
 <h2 id="the-arrays-on-their-own">The arrays on their own<a class="anchor" aria-label="anchor" href="#the-arrays-on-their-own"></a>
@@ -491,7 +555,7 @@ skills a level read is consistent with.</p>
 <p><code><a href="../reference/grain_matrix.html">grain_matrix()</a></code> is the representation without the fitting
 layer around it. It bins the readings by the calendar and summarises
 every bin.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span>,</span>
 <span>                  stats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cold_day"</span>, <span class="st">"mean"</span>, <span class="st">"warm_day"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">x</span></span>
@@ -501,7 +565,7 @@ every bin.</p>
 <p>Bins follow the calendar. A month is 28, 30 or 31 days, and a week
 starts on a Monday, so a bin is a real month or a real week and not a
 drifting block of 730 or 168 hours.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span>, <span class="st">"bin_n"</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span>, <span class="op">]</span></span>
 <span><span class="co">#&gt; 2021-09-01T00:00:00Z 2021-10-01T00:00:00Z 2021-11-01T00:00:00Z </span></span>
 <span><span class="co">#&gt;                  720                  744                  720 </span></span>
@@ -518,7 +582,7 @@ the mean of the daily extremes, which is the exposure a typical day of
 the bin brought. One hour at -50 sets <code>min</code> to -50 outright;
 it reaches the day-level statistics only through its twenty-fourth of
 that day’s mean.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">week</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span>,</span>
 <span>                     stats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"min"</span>, <span class="st">"mean_daily_min"</span>, <span class="st">"cold_day"</span>, <span class="st">"mean"</span>,</span>
 <span>                               <span class="st">"warm_day"</span>, <span class="st">"mean_daily_max"</span>, <span class="st">"max"</span><span class="op">)</span><span class="op">)</span></span>
@@ -530,7 +594,7 @@ that day’s mean.</p>
 <p>An encoder that ends in global pooling discards when a thermal event
 happened, so the position of a bin in the year is given to it as
 input.</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">week_mean</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dimnames.html" class="external-link">dimnames</a></span><span class="op">(</span><span class="fu"><a href="../reference/bind_channels.html">bind_channels</a></span><span class="op">(</span><span class="va">week_mean</span>, <span class="fu"><a href="../reference/calendar_channels.html">calendar_channels</a></span><span class="op">(</span><span class="va">week_mean</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span></span>
 <span><span class="co">#&gt; [1] "mean"     "year_sin" "year_cos"</span></span></code></pre></div>
@@ -542,35 +606,35 @@ input.</p>
 <p>Where the arrays are already built, <code><a href="../reference/grain_ladder.html">grain_ladder()</a></code> fits
 every learner at every grain of a set on one split and one mask. It is
 the ladder a run reports as a curve, reachable on its own.</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">set</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">lad</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_ladder.html">grain_ladder</a></span><span class="op">(</span><span class="va">set</span>, <span class="va">fit</span><span class="op">$</span><span class="va">y</span>, <span class="fu"><a href="../reference/elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, folds <span class="op">=</span> <span class="va">fit</span><span class="op">$</span><span class="va">folds</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">lad</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      learner grain     score n_variable  best</span></span>
-<span><span class="co">#&gt; 1 elasticnet   day 0.7492328          6 FALSE</span></span>
-<span><span class="co">#&gt; 2 elasticnet  week 0.7520106          6 FALSE</span></span>
-<span><span class="co">#&gt; 3 elasticnet month 0.7766667          6  TRUE</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 elasticnet   day 0.8713503          6 FALSE</span></span>
+<span><span class="co">#&gt; 2 elasticnet  week 0.8950320          6 FALSE</span></span>
+<span><span class="co">#&gt; 3 elasticnet month 0.9074901          6  TRUE</span></span></code></pre></div>
 <p>A claim about one step of that curve rests on the paired contrast.
 The difference is taken inside each cell both arms scored, averaged
 within a response, and summarised across the responses, which are the
 independent replicates. Six responses is few, so the interval is wide
 and the rank test behind <code>p_value</code> has few values to work
 with.</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/paired_contrast.html">paired_contrast</a></span><span class="op">(</span><span class="va">lad</span>, <span class="st">"month|elasticnet"</span>, <span class="st">"day|elasticnet"</span><span class="op">)</span></span>
-<span><span class="co">#&gt;                  a              b       diff     center       lower     upper</span></span>
-<span><span class="co">#&gt; 1 month|elasticnet day|elasticnet 0.02743386 0.02743386 -0.03813488 0.0930026</span></span>
+<span><span class="co">#&gt;                  a              b       diff     center       lower      upper</span></span>
+<span><span class="co">#&gt; 1 month|elasticnet day|elasticnet 0.03613977 0.03613977 0.006698533 0.06558101</span></span>
 <span><span class="co">#&gt;   n_variable n_cell n_favour p_value p_method  interval</span></span>
-<span><span class="co">#&gt; 1          6     30        5  0.3125    exact variables</span></span></code></pre></div>
+<span><span class="co">#&gt; 1          6     30        6 0.03125    exact variables</span></span></code></pre></div>
 <p>Where the whole curve is the question rather than one step of it,
 <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code> fits a mixed model on the per-cell scores
 and compares every grain against the best one, correcting for the
 comparisons made and no others.</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/grain_contrasts.html">grain_contrasts</a></span><span class="op">(</span><span class="va">lad</span><span class="op">)</span></span>
-<span><span class="co">#&gt;      learner grain reference        diff      lower      upper   p_value</span></span>
-<span><span class="co">#&gt; 1 elasticnet   day     month -0.02743386 -0.1117228 0.05685503 0.6848011</span></span>
-<span><span class="co">#&gt; 2 elasticnet  week     month -0.02465608 -0.1089450 0.05963281 0.7347945</span></span></code></pre></div>
+<span><span class="co">#&gt;      learner grain reference        diff       lower       upper   p_value</span></span>
+<span><span class="co">#&gt; 1 elasticnet   day     month -0.03613977 -0.08170934 0.009429801 0.1380470</span></span>
+<span><span class="co">#&gt; 2 elasticnet  week     month -0.01245811 -0.05802768 0.033111459 0.7631558</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="what-was-read">What was read<a class="anchor" aria-label="anchor" href="#what-was-read"></a>
@@ -578,17 +642,17 @@ comparisons made and no others.</p>
 <p>With the per-fold fits kept, <code><a href="../reference/occlusion.html">occlusion()</a></code> holds each bin
 of the record back in turn, rescores the held-out units, and records the
 fall in score as that bin’s weight. Nothing is refitted.</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">kept</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>                 sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"month"</span><span class="op">)</span>, resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, ensemble <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>                 keep_fits <span class="op">=</span> <span class="cn">TRUE</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="va">weight</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/occlusion.html">occlusion</a></span><span class="op">(</span><span class="va">kept</span>, <span class="st">"elasticnet / month"</span>, permutations <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span><span class="va">weight</span> <span class="op">~</span> <span class="va">part</span>, <span class="va">weight</span>, <span class="va">mean</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                   part     weight</span></span>
-<span><span class="co">#&gt; 1 2021-09-01T00:00:00Z 0.10539947</span></span>
-<span><span class="co">#&gt; 2 2021-10-01T00:00:00Z 0.12886508</span></span>
-<span><span class="co">#&gt; 3 2021-11-01T00:00:00Z 0.08716138</span></span>
-<span><span class="co">#&gt; 4 2021-12-01T00:00:00Z 0.07247354</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 2021-09-01T00:00:00Z 0.09523258</span></span>
+<span><span class="co">#&gt; 2 2021-10-01T00:00:00Z 0.11486486</span></span>
+<span><span class="co">#&gt; 3 2021-11-01T00:00:00Z 0.07108554</span></span>
+<span><span class="co">#&gt; 4 2021-12-01T00:00:00Z 0.05093959</span></span></code></pre></div>
 <p>Holding a channel back instead asks what each statistic of a grain
 carries, which is the question behind keeping a bin’s extremes at
 all.</p>

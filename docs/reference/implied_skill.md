@@ -57,11 +57,12 @@ map was measured on.
 
 ## Details
 
-It answers the question a level raises once the inflation is known, and
-it is the only honest way to read a level as a statement about a
-population rather than about a scoring rule. It says nothing about a
-difference between two arms, where the inflation cancels and the
-reported number stands as it is.
+It answers the question a level raises once the inflation is known,
+under the distribution of predictions
+[`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
+plants; a model whose predictions are distributed otherwise is inflated
+by a different amount. It does not correct a difference between two
+arms, whose inflations need not be equal.
 
 ## Examples
 

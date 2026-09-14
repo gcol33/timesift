@@ -8,7 +8,7 @@ package, predictions read back from a file.
 ## Usage
 
 ``` r
-score_predictions(y, p, folds, cells = NULL, metric = "tss")
+score_predictions(y, p, folds, cells = NULL, metric = "roc_auc")
 ```
 
 ## Arguments

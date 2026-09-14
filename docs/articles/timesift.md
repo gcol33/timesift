@@ -58,23 +58,67 @@ fit <- timesift(
   verbose = FALSE
 )
 fit
-#> timesift  60 targets, 6 responses, 5-fold random CV, tss
+#> timesift  60 targets, 6 responses, 5-fold random CV, roc_auc
 #> 
+#> candidates, scored on the outer folds
 #> candidate                    mean    won  responses
-#> elasticnet / day            0.749      2  separate
-#> elasticnet / week           0.750      2  separate
-#> elasticnet / month          0.759      2  separate
-#> ensemble                    0.756      -
+#> elasticnet / day            0.870      0  separate
+#> elasticnet / week           0.891      2  separate
+#> elasticnet / month          0.903      4  separate
 #> 
-#> weights  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.01
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                    0.903  se 0.018
+#> ensemble                    0.906  se 0.016
+#> selected elasticnet / month in 5 of 5 folds
+#> 
+#> choice on every target  elasticnet / month
+#> weights on every target  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.01
 ```
 
 Every representation named in `sift` was built, and `models` defaulting
 to `list(elasticnet())`, a penalised logistic regression was fitted on
-each of them over the same five folds and the out-of-fold predictions
-were stacked. `won` is how many responses a candidate scored highest on,
-and `responses` says whether one fitted model covered them all or one
-was fitted per response.
+each of them over the same five folds. The report has two parts.
+
+The candidates are the comparison. Each is scored on the five outer
+folds, on the same cells, so their means can be read against each other
+across grains. `won` is how many responses a candidate scored highest
+on, and `responses` says whether one fitted model covered them all or
+one was fitted per response. The highest of those means was picked out
+on the folds it is scored on, so it is not the number to report.
+
+The procedure rows are. Inside each outer training fold the candidates
+were cross-validated again on five inner folds, one was chosen on its
+inner score and the stack’s weights were fitted on the inner out-of-fold
+predictions; the choice and the weights then predicted the outer test
+fold once. `selected` and `ensemble` are those held-out scores, choosing
+and weighting included.
+
+``` r
+
+fit$estimate[c("arm", "metric", "score", "se", "lower", "upper")]
+#>         arm            metric     score         se     lower     upper
+#> 1  selected average_precision 0.9107680 0.01278260 0.8779093 0.9436267
+#> 2  selected             kappa 0.6142196 0.02796198 0.5423410 0.6860981
+#> 3  selected      kappa_youden 0.7439128 0.02191276 0.6875842 0.8002413
+#> 4  selected           roc_auc 0.9028340 0.01819271 0.8560682 0.9495998
+#> 5  selected               tss 0.7594841 0.02865539 0.6858231 0.8331452
+#> 6  ensemble average_precision 0.9130114 0.01288686 0.8798847 0.9461381
+#> 7  ensemble             kappa 0.6027910 0.03350542 0.5166626 0.6889194
+#> 8  ensemble      kappa_youden 0.7421500 0.02013450 0.6903926 0.7939073
+#> 9  ensemble           roc_auc 0.9057540 0.01649183 0.8633604 0.9481476
+#> 10 ensemble               tss 0.7604365 0.02483927 0.6965851 0.8242879
+fit$selected[c("fold", "candidate", "inner_score")]
+#>   fold          candidate inner_score
+#> 1    1 elasticnet / month   0.8968360
+#> 2    2 elasticnet / month   0.8962751
+#> 3    3 elasticnet / month   0.9056376
+#> 4    4 elasticnet / month   0.8959669
+#> 5    5 elasticnet / month   0.9099788
+```
+
+The interval is across the six responses of this dataset, all fitted and
+scored on the same plots and folds, so it does not carry the error those
+share.
 
 A column of `targets` reaches the model only where `static` names it:
 `elevation` is a predictor here because it was asked for, and a column
@@ -97,13 +141,14 @@ constant across the bins.
 plot(fit)
 ```
 
-![Mean true skill statistic against representation, with the level the
-combination reached drawn across
-it.](timesift_files/figure-html/plot-run-1.svg)
+![Mean AUC against representation, with the level the combination
+reached drawn across it.](timesift_files/figure-html/plot-run-1.svg)
 
 [`predict()`](https://rdrr.io/r/stats/predict.html) rebuilds each
 member’s representation for new rows from the settings its own arm was
-built with, and combines them through the ensemble.
+built with, and combines them through the ensemble refitted on every
+target; `candidate = "selected"` predicts with the candidate the rule
+chose on every target instead.
 
 ``` r
 
@@ -297,25 +342,36 @@ both <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
                  models = c(elasticnet(), nearest_neighbour),
                  sift = grains("week", "month"), resampling = cv(v = 5), verbose = FALSE)
 summary(both)
-#> timesift  60 targets, 6 responses, 5-fold random CV, tss
+#> timesift  60 targets, 6 responses, 5-fold random CV, roc_auc
 #> 
+#> candidates, scored on the outer folds
 #> candidate                    mean    won  responses
-#> 1nn / week                  0.446      0  separate
-#> 1nn / month                 0.546      0  separate
-#> elasticnet / week           0.752      3  separate
-#> elasticnet / month          0.777      3  separate
-#> ensemble                    0.760      -
+#> 1nn / week                  0.720      0  separate
+#> 1nn / month                 0.772      0  separate
+#> elasticnet / week           0.895      3  separate
+#> elasticnet / month          0.907      3  separate
 #> 
-#> weights  elasticnet / month 0.63   elasticnet / week 0.32   1nn / month 0.05
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                    0.907  se 0.019
+#> ensemble                    0.910  se 0.016
+#> selected elasticnet / month in 5 of 5 folds
+#> 
+#> choice on every target  elasticnet / month
+#> weights on every target  elasticnet / month 0.63   elasticnet / week 0.32   1nn / month 0.05
 ```
 
 ## The combination
 
-The combiner is handed the out-of-fold predictions, the response, the
-mask and the fold map, and never a model. `"stack"` fits non-negative
-weights summing to one by minimising the response head’s own loss over
-the scorable cells; `"mean"`, `"median"` and `"weighted"` combine
-without fitting anything.
+The combiner is handed out-of-fold predictions, the response, the mask
+and the fold map, and never a model. `"stack"` fits non-negative weights
+summing to one by minimising the response head’s own loss over the
+scorable cells; `"mean"`, `"median"` and `"weighted"` combine without
+fitting anything. The weights below are fitted on the outer out-of-fold
+predictions of every target and are what
+[`predict()`](https://rdrr.io/r/stats/predict.html) uses. The ensemble’s
+score is not read with them, because they were fitted to the responses
+it would be scored against; each outer fold’s weights are in
+`fit$fold_weights`.
 
 ``` r
 
@@ -346,12 +402,15 @@ tss_inflation(fit$y, fit$folds, skill = c(0.6, 0.9), replicates = 100)
 #> 2   0.9 0.9664636 0.06646362 0.9361726 0.9855159        100
 ```
 
-The inflation is common to every candidate scored the same way, so it
-cancels in a paired difference. It does not cancel in a level, so a
-level is an upper bound on the skill a population has, and
+The inflation is an average over the planted model’s predictions: a
+level is optimistic in expectation, and
 [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.md)
 inverts the map to say which population skills a level read is
-consistent with.
+consistent with. Its size depends on how a model’s predictions are
+distributed as well as on the presence counts, so two candidates of
+equal skill scored on the same cells can be inflated by different
+amounts, and a paired difference in TSS is not free of it. That is why a
+run is scored by AUC unless told otherwise.
 
 ## The arrays on their own
 
@@ -427,9 +486,9 @@ set <- grain_matrix(series, plot, t, temp, grain = c("day", "week", "month"))
 lad <- grain_ladder(set, fit$y, elasticnet(), folds = fit$folds, verbose = FALSE)
 summary(lad)
 #>      learner grain     score n_variable  best
-#> 1 elasticnet   day 0.7492328          6 FALSE
-#> 2 elasticnet  week 0.7520106          6 FALSE
-#> 3 elasticnet month 0.7766667          6  TRUE
+#> 1 elasticnet   day 0.8713503          6 FALSE
+#> 2 elasticnet  week 0.8950320          6 FALSE
+#> 3 elasticnet month 0.9074901          6  TRUE
 ```
 
 A claim about one step of that curve rests on the paired contrast. The
@@ -441,10 +500,10 @@ test behind `p_value` has few values to work with.
 ``` r
 
 paired_contrast(lad, "month|elasticnet", "day|elasticnet")
-#>                  a              b       diff     center       lower     upper
-#> 1 month|elasticnet day|elasticnet 0.02743386 0.02743386 -0.03813488 0.0930026
+#>                  a              b       diff     center       lower      upper
+#> 1 month|elasticnet day|elasticnet 0.03613977 0.03613977 0.006698533 0.06558101
 #>   n_variable n_cell n_favour p_value p_method  interval
-#> 1          6     30        5  0.3125    exact variables
+#> 1          6     30        6 0.03125    exact variables
 ```
 
 Where the whole curve is the question rather than one step of it,
@@ -455,9 +514,9 @@ against the best one, correcting for the comparisons made and no others.
 ``` r
 
 grain_contrasts(lad)
-#>      learner grain reference        diff      lower      upper   p_value
-#> 1 elasticnet   day     month -0.02743386 -0.1117228 0.05685503 0.6848011
-#> 2 elasticnet  week     month -0.02465608 -0.1089450 0.05963281 0.7347945
+#>      learner grain reference        diff       lower       upper   p_value
+#> 1 elasticnet   day     month -0.03613977 -0.08170934 0.009429801 0.1380470
+#> 2 elasticnet  week     month -0.01245811 -0.05802768 0.033111459 0.7631558
 ```
 
 ## What was read
@@ -475,10 +534,10 @@ kept <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
 weight <- occlusion(kept, "elasticnet / month", permutations = 5)
 head(aggregate(weight ~ part, weight, mean), 4)
 #>                   part     weight
-#> 1 2021-09-01T00:00:00Z 0.10539947
-#> 2 2021-10-01T00:00:00Z 0.12886508
-#> 3 2021-11-01T00:00:00Z 0.08716138
-#> 4 2021-12-01T00:00:00Z 0.07247354
+#> 1 2021-09-01T00:00:00Z 0.09523258
+#> 2 2021-10-01T00:00:00Z 0.11486486
+#> 3 2021-11-01T00:00:00Z 0.07108554
+#> 4 2021-12-01T00:00:00Z 0.05093959
 ```
 
 Holding a channel back instead asks what each statistic of a grain

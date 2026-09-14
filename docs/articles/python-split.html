@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -368,7 +368,7 @@ counts that decided it.</p>
 <h2 id="presence_absence">
 <code>PRESENCE_ABSENCE</code><a class="anchor" aria-label="anchor" href="#presence_absence"></a>
 </h2>
-<div class="sourceCode" id="cb22"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>PRESENCE_ABSENCE <span class="op">=</span> <span class="bu">dict</span>(prepare<span class="op">=</span><span class="kw">lambda</span> y: as_response(y).check_presence_absence(), activation<span class="op">=</span><span class="st">'sigmoid'</span>, loss<span class="op">=</span><span class="st">'binary_cross_entropy'</span>, metric<span class="op">=</span><span class="st">'tss'</span>, weights<span class="op">=</span>positive_weights, cells<span class="op">=</span><span class="kw">lambda</span> y, folds: scorable_cells(y, folds))</span></code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>PRESENCE_ABSENCE <span class="op">=</span> <span class="bu">dict</span>(prepare<span class="op">=</span><span class="kw">lambda</span> y: as_response(y).check_presence_absence(), activation<span class="op">=</span><span class="st">'sigmoid'</span>, loss<span class="op">=</span><span class="st">'binary_cross_entropy'</span>, metric<span class="op">=</span><span class="st">'roc_auc'</span>, weights<span class="op">=</span>positive_weights, cells<span class="op">=</span><span class="kw">lambda</span> y, folds: scorable_cells(y, folds))</span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="positive_weights">

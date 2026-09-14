@@ -74,7 +74,12 @@ its tolerance is a finding rather than a crash.
 The selected window is compared exactly: the study's five-inner-fold selection chose a weekly
 candidate in all ten outer folds. Which weekly summary won is reported and not compared: in five of
 the ten folds the best and second-best inner scores differ by less than 0.0013, and in one by
-0.00001, which is inside the seed noise of a single encoder fit.
+0.00001, which is inside the spread of a single encoder fit.
+
+The levels, the margin and every species are compared at tolerances derived from `reference.csv`
+and `reference_runs.csv` beside the script, which carry the pipeline's numbers per species and the
+spread of its fixed weekly encoder over eleven runs; the derivation is in the script, above the
+reference, and its result for the one run made so far is in the section below.
 
 ## The environment on the output
 
@@ -159,3 +164,44 @@ counts and the representation carry no such randomness and reproduce exactly.
 The stepwise arm and the network grid have not been rerun here. Forward selection over 188 columns
 is many hours single-threaded, and the encoders want the graphics processor they had in the
 study.
+
+## The selection stage against the analysis pipeline
+
+The selection stage was run on 2026-09-12 on one NVIDIA L40S (R 4.5.2, torch 0.17.0 with
+libtorch 2.8.0 and CUDA 12.8, package commit `5f0a5a6`), with the study's fold map and inner
+partition, all 33 candidates at 60 epochs, in 19.7 hours; the series arm ran beside it. The
+files of that run are under `dev_notes/repro-lisc/selection33/` in the repository. The
+pipeline's side is `review/round2/nested_inner5.py` of the paper's repository, which ranks the
+same 33 candidates on the same inner partition and reads the winner's stored held-out
+predictions, and its weekly series elastic net from `baseline/08_regularized_glm.R` at a mixing
+parameter of 0.5.
+
+The tolerances come from `reference.csv` and `reference_runs.csv`, not from the script: the
+pipeline ran its fixed weekly coldest-day, mean, warmest-day encoder eleven times, on the study
+map and on ten repeated partitions, and the spread of the level over those runs is 0.0021 AUC and
+0.0034 TSS. A level of the encoder here is one fitted run against another, each under its own
+seed, so the two differ by sqrt(2) times that spread, and the tolerance is three of those: 0.0087
+AUC and 0.0145 TSS. Each species is held to the same rule at its own spread, and the check is
+how many of the 101 sit inside their band, with five allowed outside.
+
+| quantity | pipeline | this run | tolerance | inside |
+|---|---|---|---|---|
+| outer folds selecting a weekly candidate | 10 of 10 | 9 of 10, fold 6 monthly | exact | no |
+| the selected procedure, AUC | 0.8770 | 0.8704 | 0.0087 | yes |
+| the selected procedure, TSS | 0.7098 | 0.7012 | 0.0145 | yes |
+| species inside their own band, AUC | 101 | 100 | 96 | yes |
+| species inside their own band, TSS | 101 | 99 | 96 | yes |
+| the weekly series elastic net, TSS | 0.6962 | 0.6973 | 0.002 | yes |
+| the weekly series elastic net, AUC | 0.8680 | 0.8682 | 0.002 | yes |
+| its species inside their own band, TSS | 101 | 101 | 96 | yes |
+| the procedure over the series elastic net, AUC | +0.0090 (0.0055 to 0.0124) | +0.0022 (-0.0018 to 0.0062) | 0.0087 | yes |
+
+Which weekly summary won differs between the two in most folds, as the script expects: the top
+inner scores sit within a thousandth of each other. The package's inner scores are level with the
+pipeline's, fold for fold, to within 0.006; its held-out level sits 0.0065 AUC below the
+pipeline's single run, inside the spread of a fitted encoder, and in the same direction in 83 of
+the 101 species. The margin over the series elastic net is inside the tolerance and, unlike the
+pipeline's, does not separate from zero across species. What this measures is the two
+implementations of one procedure on one dataset; it does not measure agreement between a fitted
+R network and a fitted Python network, which the seed spread above says is not a thing to
+measure.

@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -1180,14 +1180,15 @@ assert the bytes, which is what makes the file format a contract rather
 than a convention.</p>
 <p><code>metric_cases.csv</code> and <code>metrics.csv</code> hold ten
 <code>(y, p)</code> cases and the value of every threshold metric on
-each: <code>tss</code>, <code>roc_auc</code>, <code>kappa</code> under
-both rules, and <code>decision_threshold</code> under all three. The
-cases are where the tie rule is the whole answer – every prediction
-tied, ties within a class, ties across the classes, one presence, one
-absence, all presences, all absences, a perfect separation and a
-reversed one. A metric a case defines no value on is written
-<code>NA</code> rather than left out, so a suite that quietly skipped it
-fails rather than passes.</p>
+each: <code>tss</code>, <code>roc_auc</code>,
+<code>average_precision</code>, <code>kappa</code> under both rules, and
+<code>decision_threshold</code> under all three. The cases are where the
+tie rule is the whole answer – every prediction tied, ties within a
+class, ties across the classes, one presence, one absence, all
+presences, all absences, a perfect separation and a reversed one. A
+metric a case defines no value on is written <code>NA</code> rather than
+left out, so a suite that quietly skipped it fails rather than
+passes.</p>
 <p><code>contrast_cells.csv</code> and <code>contrast.csv</code> hold a
 fixed table of per-cell scores for two arms, with cells one arm scored
 and the other did not, and the paired contrast read off it. No model is
@@ -1247,7 +1248,8 @@ site.</p>
 <td>the whole run</td>
 <td>
 <code><a href="../reference/timesift.html">timesift()</a></code>, from a table of targets and a table of
-series to a scored comparison</td>
+series to a scored comparison and a nested estimate of choosing among
+it</td>
 </tr>
 <tr class="even">
 <td>what a representation is</td>
@@ -1354,9 +1356,10 @@ nested selection</td>
 <tr class="odd">
 <td>the metrics</td>
 <td>
-<code><a href="../reference/tss.html">tss()</a></code>, <code><a href="../reference/roc_auc.html">roc_auc()</a></code> and
-<code><a href="../reference/kappa_score.html">kappa_score()</a></code>, with <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> and
-<code><a href="../reference/kappa_score.html">model_agreement()</a></code> beside them</td>
+<code><a href="../reference/tss.html">tss()</a></code>, <code><a href="../reference/roc_auc.html">roc_auc()</a></code>,
+<code><a href="../reference/average_precision.html">average_precision()</a></code> and <code><a href="../reference/kappa_score.html">kappa_score()</a></code>, with
+<code><a href="../reference/kappa_score.html">decision_threshold()</a></code> and <code><a href="../reference/kappa_score.html">model_agreement()</a></code>
+beside them</td>
 </tr>
 <tr class="even">
 <td>two arms on matched cells</td>
@@ -1465,10 +1468,11 @@ ignored.</li>
 <li>The response head and the metric are registry entries.
 <code>metric</code> takes a registered name or a function of
 <code>(y, p)</code>, and left unset it is the one the response head
-carries. Both travel with the fit: the function is what scores, and the
-name is what the report prints. A function has no name to print and
-reads as <code>&lt;function&gt;</code> on both sides rather than as
-whatever each language calls an anonymous one.
+carries, which for the shipped presence-absence head is
+<code>roc_auc</code>. Both travel with the fit: the function is what
+scores, and the name is what the report prints. A function has no name
+to print and reads as <code>&lt;function&gt;</code> on both sides rather
+than as whatever each language calls an anonymous one.
 <code><a href="../reference/select_grain.html">select_grain()</a></code> is the one door that takes a name only,
 because it reports the estimate under every registered metric and the
 one it selects on has to be a row of that table.</li>
@@ -1555,7 +1559,8 @@ interval of Bates, Hastie and Tibshirani (2024):
 <code><a href="../reference/select_grain.html">select_grain()</a></code> and <code><a href="../reference/grain_ladder.html">grain_ladder()</a></code> take it as
 <code>interval</code> with <code>repeats</code> fold maps, the first
 being the map already cross-validated on, and each repetition fits the
-procedure or the arm once per unordered pair of outer folds;
+procedure or the arm once per unordered pair and once per unordered
+triple of outer folds, which needs at least four;
 <code><a href="../reference/paired_contrast.html">paired_contrast()</a></code> reads it on the difference of two arms of
 a ladder fitted with it. A fold’s score is the mean over the variables
 scorable in it, the inner estimate is averaged as the reported estimate
@@ -1563,8 +1568,22 @@ is, the variance of a fold’s score is its delete-one jackknife variance
 over that fold’s units, the root mean squared error is rescaled by
 <code>(K - 1) / K</code> and held between the jackknife standard error
 of the estimate and <code>sqrt(K)</code> times it, and the centre
-carries the paper’s bias correction. Two tables whose contrast is read
-must carry the same response, maps, <code>repeats</code> and
+carries the paper’s bias correction, equation (15) at <code>K</code>
+folds. The mean squared error the width is read off is that of the
+bias-corrected estimate: inside every outer training set the same nested
+cross-validation runs once more, from the triple fits, at
+<code>K - 1</code> folds, and term (a) is the squared gap between the
+bias-corrected estimate that training set reports and the held-out
+fold’s score, and its root is held between the corrected centre’s own
+jackknife standard error, every prediction held fixed, and
+<code>sqrt(K)</code> times it; the paper’s width, read off the plain
+inner estimate and held by the plain estimate’s jackknife standard
+error, is reported beside it as <code>se_bates</code>. A fit of the
+nested cross-validation draws its seed as
+<code>seed + 10007 r + 101 a + b + 3001 c</code> from its tag
+<code>(r, a, b, c)</code>, the repetition and the folds it leaves out,
+zero where it leaves out fewer than three. Two tables whose contrast is
+read must carry the same response, maps, <code>repeats</code> and
 <code>seed</code>.</li>
 <li>
 <code>models</code> takes one learner, a set or list of them, or the
@@ -1584,6 +1603,26 @@ it.</li>
 and every candidate emits an out-of-fold prediction for every scorable
 cell over the same folds. The combiner is handed those predictions, the
 response, the mask and the fold map, and never a model.</li>
+<li>
+<code><a href="../reference/timesift.html">timesift()</a></code> evaluates the procedure nested. Within each
+outer fold it draws an inner map of <code>inner</code> folds on the
+training targets, as <code><a href="../reference/select_grain.html">select_grain()</a></code> draws one,
+cross-validates every candidate on it, chooses one by <code>rule</code>
+on the inner scores, and fits the stack’s weights on the inner
+out-of-fold predictions over the inner mask; every candidate is then
+refitted on the outer training targets and predicts the test fold, which
+gives each candidate’s outer out-of-fold prediction, the selected
+candidate’s and the stack’s under that fold’s weights. The estimate is
+both of those held-out predictions scored under every registered metric,
+and the run’s own where it is a function, with the interval across
+variables; one outer fold’s choice, weights and held-out predictions do
+not move when that fold’s responses change. <code>inner</code> left
+unset is 5, and <code>inner = NULL</code> / <code>inner=None</code> runs
+no search and makes no estimate. With one candidate there is no search
+and the candidate is its own choice. <code>choice</code> is the rule
+applied to the outer scores, with the outer folds as its split, and the
+stack a prediction goes through is fitted on the outer out-of-fold
+predictions, so neither is the one the estimate was read under.</li>
 <li>The combiner minimises the loss of the head the run was fitted
 under. <code><a href="../reference/ensemble.html">ensemble()</a></code> left without a <code>response</code>
 takes the run’s, and one naming a different head is refused before
@@ -1634,11 +1673,11 @@ a ladder</td>
 <td>the report on a run</td>
 <td>
 <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, a method on the base generic, printing the
-candidates and the ensemble</td>
+candidates and the procedure</td>
 <td>
 <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, one function returning the text, with
-<code>candidate_table()</code> and <code>ensemble_row()</code> for the
-two tables it prints</td>
+<code>candidate_table()</code> and <code>procedure_table()</code> for
+the two tables it prints</td>
 </tr>
 <tr class="odd">
 <td>predicting new targets</td>

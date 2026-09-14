@@ -241,28 +241,75 @@ CANDIDATE_SUMMARIES <- list(
                       grains = c("week", "month", "season", "year")))
 EXPECTED_CANDIDATES <- 33L
 
-# What the study reported, and the tolerance each comparison is made at. Stated here, before
-# anything is fitted, so a number that lands outside is a finding rather than a tolerance chosen
-# after the fact.
+# What the study's analysis pipeline reported, and the tolerance each comparison is made at.
+# Stated here, before anything is fitted, so a number that lands outside is a finding rather than
+# a tolerance chosen after the fact.
 #
-# `select_window` is exact: the study's five-inner-fold selection chose a weekly candidate in every
-# one of the ten outer folds, and a run landing on another window is a different procedure rather
-# than a different draw. `select_summary` is not asserted: in five of those folds the best and the
-# second-best inner score differ by less than 0.0013 and in one by 0.00001, which is inside the
-# seed noise of a single encoder fit (a standard deviation of 0.0017 at the median cell), so which
-# summary wins there is not reproducible and the script only reports it.
+# reference.csv beside this script carries, per species, the pipeline's five-inner-fold selection
+# (review/round2/nested_inner5.py of the paper's repository, the encoder's stored held-out
+# predictions assembled fold by fold) and its weekly series elastic net, under AUC and TSS, and
+# the spread of a single fitted encoder at that species: the standard deviation of the fixed
+# weekly coldest-day, mean, warmest-day encoder's per-species score over the pipeline's eleven
+# runs of it, the study map and ten repeated cross-validations on partitions of their own.
+# reference_runs.csv carries those eleven runs' levels over the 101 species. Both are written by
+# dev_notes/repro-lisc/make_reference.R from the pipeline's prediction stores.
 #
-# The level and the margin tolerances are three times that seed noise, taken over 101 species; the
-# elastic-net tolerance is the 0.001 the aggregated-feature arm already reproduces to, doubled,
-# since its inner cross-validation draws its own folds.
+# `select_window` is exact: the pipeline's selection chose a weekly candidate in every one of the
+# ten outer folds, and a run landing on another window is a different procedure rather than a
+# different draw. Which weekly summary wins is not asserted: in five of those folds the best and
+# the second-best inner score differ by less than 0.0013 and in one by 0.00001, inside the spread
+# of a single encoder fit, so the script only reports it.
+#
+# A level or a margin of the encoder is one fitted run against another, each with its own seed,
+# so the two differ by sqrt(2) times the spread of one; the tolerance is three of those, from the
+# spread of the level over the eleven runs. A species is held to the same rule at its own spread,
+# and the check on the species is how many of the 101 sit inside it. The elastic net's inner
+# cross-validation draws its own folds, and its tolerance is the 0.001 the aggregated-feature arm
+# already reproduces to, doubled.
+REFERENCE_SPECIES <- utils::read.csv(file.path(here, "reference.csv"), check.names = FALSE)
+REFERENCE_RUNS <- utils::read.csv(file.path(here, "reference_runs.csv"))
+assert_equal("reference species", nrow(REFERENCE_SPECIES), 101L)
+run_sd <- function(column) stats::sd(REFERENCE_RUNS[[column]])
 REFERENCE <- list(
   select_window = "week",
-  selection_auc = 0.87697, selection_tss = 0.70982,
-  series_tss = 0.69621, series_auc = 0.86801,
-  margin_auc = 0.00896, margin_auc_lo = 0.00550, margin_auc_hi = 0.01241,
-  margin_tss = 0.01361,
+  selection_auc = mean(REFERENCE_SPECIES$selection_auc),
+  selection_tss = mean(REFERENCE_SPECIES$selection_tss),
+  series_auc = mean(REFERENCE_SPECIES$series_auc),
+  series_tss = mean(REFERENCE_SPECIES$series_tss),
+  margin_auc = mean(REFERENCE_SPECIES$selection_auc - REFERENCE_SPECIES$series_auc),
+  margin_tss = mean(REFERENCE_SPECIES$selection_tss - REFERENCE_SPECIES$series_tss),
   aggregates_tss = 0.687)
-TOLERANCE <- list(level = 0.005, margin = 0.005, elastic_net = 0.002)
+TOLERANCE <- list(level_auc = 3 * sqrt(2) * run_sd("level_auc"),
+                  level_tss = 3 * sqrt(2) * run_sd("level_tss"),
+                  elastic_net = 0.002,
+                  # The share of species a run may leave outside their own three-spread band.
+                  species_outside = 0.05)
+
+# One arm's per-species means, from its per-cell rows, against the reference column named, each
+# species at its own tolerance: three times sqrt(2) times its spread over the pipeline's runs.
+compare_species <- function(what, rows, column, spread) {
+  rows <- rows[!is.na(rows$score), , drop = FALSE]
+  got <- tapply(rows$score, rows$variable, mean)
+  ref <- stats::setNames(REFERENCE_SPECIES[[column]], REFERENCE_SPECIES$species)
+  band <- stats::setNames(3 * sqrt(2) * REFERENCE_SPECIES[[spread]], REFERENCE_SPECIES$species)
+  shared <- intersect(names(got), names(ref))
+  inside <- abs(got[shared] - ref[shared]) <= band[shared]
+  if (!is.null(smoke)) {
+    say(sprintf("%-38s %d of %d species inside, smoke run, not compared", paste0(what, ":"),
+                sum(inside), length(inside)))
+    return(invisible(NA))
+  }
+  allowed <- length(inside) - floor(TOLERANCE$species_outside * length(inside))
+  ok <- sum(inside) >= allowed
+  say(sprintf("%-38s %d of %d species inside their own band (at least %d needed): %s",
+              paste0(what, ":"), sum(inside), length(inside), allowed,
+              if (ok) "inside" else "OUTSIDE"))
+  checks[[length(checks) + 1L]] <<- data.frame(
+    quantity = what, reproduced = sum(inside), reported = length(inside),
+    difference = sum(inside) - length(inside), tolerance = length(inside) - allowed,
+    inside = ok, stringsAsFactors = FALSE)
+  invisible(ok)
+}
 
 # ---- the response, the folds and the cells ----------------------------------------------------
 
@@ -464,10 +511,16 @@ if ("baseline" %in% stages) {
     write_out(series_ladder, "baseline_series.csv")
     print(summary(series_ladder))
     compare_with("the weekly series elastic net, TSS", summary(series_ladder)$score,
-                 REFERENCE$series_tss, TOLERANCE$level)
+                 REFERENCE$series_tss, TOLERANCE$elastic_net)
     compare_with("the weekly series elastic net, AUC",
                  rescore(series_ladder, "series|elastic_net", SELECTION_METRIC),
-                 REFERENCE$series_auc, TOLERANCE$level)
+                 REFERENCE$series_auc, TOLERANCE$elastic_net)
+    compare_species("the weekly series elastic net, species, TSS", as.data.frame(series_ladder),
+                    "series_tss", "run_sd_tss")
+    compare_species("the weekly series elastic net, species, AUC",
+                    score_predictions(y, attr(series_ladder, "predictions")[["series|elastic_net"]],
+                                      folds, cells, SELECTION_METRIC),
+                    "series_auc", "run_sd_auc")
   }
 }
 
@@ -522,16 +575,22 @@ if ("selection" %in% stages) {
   est <- selection$estimate
   compare_with("the selected procedure, AUC",
                est$score[est$metric == SELECTION_METRIC & est$interval == "variables"],
-               REFERENCE$selection_auc, TOLERANCE$level)
+               REFERENCE$selection_auc, TOLERANCE$level_auc)
   compare_with("the selected procedure, TSS",
                est$score[est$metric == METRIC_NAME & est$interval == "variables"],
-               REFERENCE$selection_tss, TOLERANCE$level)
+               REFERENCE$selection_tss, TOLERANCE$level_tss)
+  compare_species("the selected procedure, species, AUC", as.data.frame(selection$scores),
+                  "selection_auc", "run_sd_auc")
+  compare_species("the selected procedure, species, TSS",
+                  score_predictions(y, attr(selection, "predictions")[["selected|selected"]],
+                                    folds, cells, METRIC_NAME),
+                  "selection_tss", "run_sd_tss")
 
   if (!is.null(selection$contrast)) {
     write_out(selection$contrast, "selection_contrast.csv")
     print(selection$contrast)
     compare_with("the procedure over the weekly series elastic net, AUC",
-                 selection$contrast$diff[1L], REFERENCE$margin_auc, TOLERANCE$margin)
+                 selection$contrast$diff[1L], REFERENCE$margin_auc, TOLERANCE$level_auc)
   } else {
     say("no contrast: the weekly series arm is not in this run. Add --baseline=series.")
   }

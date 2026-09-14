@@ -85,9 +85,11 @@ summary(object, ...)
   `"nested_cv"` refits every arm inside every outer training set, which
   is what
   [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md)
-  reads an interval for the difference in risk off. `"variables"`, the
-  default, fits nothing further, and a contrast is then read across the
-  response variables.
+  reads an interval for the difference in risk off; see
+  [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+  for what it estimates and what it costs. `"variables"`, the default,
+  fits nothing further, and a contrast is then read across the response
+  variables.
 
 - repeats:
 

@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,29 @@
       <small>Source: <a href="https://github.com/gcol33/timesift/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.0" id="timesift-020">timesift 0.2.0<a class="anchor" aria-label="anchor" href="#timesift-020"></a></h2>
+<div class="section level3">
+<h3 id="changed-0-2-0">Changed<a class="anchor" aria-label="anchor" href="#changed-0-2-0"></a></h3>
+<ul><li>
+<code><a href="../reference/timesift.html">timesift()</a></code> now estimates the procedure it runs. Inside each outer fold of <code>resampling</code> the training targets are split again into <code>inner</code> folds (5 by default), every candidate is cross-validated there, <code>rule</code> chooses one on its inner score and the stack’s weights are fitted on the inner out-of-fold predictions; the choice and the weights then predict the outer test fold once. <code>estimate</code> holds the held-out score of the selected candidate and of the stack under every registered metric, <code>selected</code> and <code>inner</code> the choice in every outer fold, <code>fold_weights</code> the weights, and <code>predictions</code> both held-out prediction matrices. The candidates’ scores on the outer folds are unchanged and are reported apart from the estimate, because the best of them was picked out on the folds it is scored on. <code>inner = NULL</code> compares the candidates without an estimate. <code><a href="../reference/timesift.html">timesift()</a></code> and <code><a href="../reference/select_grain.html">select_grain()</a></code> share one inner search and one refit, so on the same candidates, fold map, inner count and seed the selected arm is <code><a href="../reference/select_grain.html">select_grain()</a></code>’s selection. On both sides.</li>
+<li>The ensemble row of the report is the stack’s held-out score under per-fold weights. Before, the weights were fitted on the outer out-of-fold predictions and the combination was then scored against the responses they had been fitted to. <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> prints the candidates and the procedure as two tables; the Python side’s <code>ensemble_row()</code> is replaced by <code>procedure_table()</code>.</li>
+<li>
+<code>predict(candidate = "selected")</code> predicts with <code>choice</code>, the candidate the rule takes on every target.</li>
+<li>The presence-absence head is scored by <code>roc_auc</code> unless a metric is named, and <code><a href="../reference/score_predictions.html">score_predictions()</a></code> defaults to it too. TSS read at its best cut is inflated by an amount that depends on how a model’s predictions are distributed, so it stays beside AUC rather than ahead of it. On both sides.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="new-0-2-0">New<a class="anchor" aria-label="anchor" href="#new-0-2-0"></a></h3>
+<ul><li>
+<code><a href="../reference/average_precision.html">average_precision()</a></code>, registered as a metric and pinned in the metric fixtures. On both sides.</li>
+<li>The reproduction driver compares the demonstration species by species (<a href="https://github.com/gcol33/timesift/issues/74" class="external-link">#74</a>). <code>inst/reproduce/reference.csv</code> carries, per species, the analysis pipeline’s five-inner-fold selection and its weekly series elastic net under AUC and TSS, and the spread of a single fitted encoder at that species over the pipeline’s eleven runs of the fixed weekly arm; <code>reference_runs.csv</code> carries those runs’ levels. Every tolerance is derived from those two files rather than written into the script: a level or a margin of the encoder is two fitted runs against each other, so its tolerance is three times sqrt(2) times the spread of the level, and a species is held to the same rule at its own spread, with the check being how many of the 101 sit inside. Run on the deposit with the study’s fold map and inner partition on a graphics processor (<code>dev_notes/repro-lisc/</code> holds the run’s files): the series elastic net reproduces to +0.001 TSS and +0.0002 AUC with every species inside; the selection lands on a weekly candidate in nine of the ten outer folds and on a monthly one in the tenth; the procedure’s level is 0.0065 AUC and 0.0086 TSS below the pipeline’s, inside the tolerances of 0.0087 and 0.0145, with 100 and 99 of 101 species inside their own bands; and its margin over the series elastic net is +0.002 AUC against the pipeline’s +0.009, inside the tolerance but, unlike the pipeline’s, not separated from zero across species.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="documentation-0-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-2-0"></a></h3>
+<ul><li>The pairing and inflation text no longer says a paired TSS difference cancels the inflation of a self-selected threshold, or that a level is an upper bound: the inflation is an expectation, and two arms of equal skill can carry different amounts of it.</li>
+<li>The width of <code>interval = "nested_cv"</code> is the mean squared error of the bias-corrected estimate it is centred on, from a nested cross-validation one level further down (<a href="https://github.com/gcol33/timesift/issues/73" class="external-link">#73</a>). The paper’s width is the mean squared error of the plain cross-validation estimate and adds its bias correction to the centre as a shift with no spread of its own; in the package’s benchmark that correction moved from sample to sample by more than the estimate it corrects where the sample was small or the signal absent, and the paper’s interval covered a nominal 95% at 0.86 to 0.93 on the two penalised cells rerun at ten repetitions (300 units, no signal and the weekly lag; 174 and 183 replicates) and at 0.84 to 0.96 across the twelve cells at one repetition. Inside every outer training set the same nested cross-validation now runs once more, over the unordered triples of outer folds, which gives the bias-corrected estimate that training set alone would report, and the squared gap between that and the held-out fold’s score is what the width is read off; its root is held between the corrected centre’s own jackknife standard error and sqrt(K) times it, where the paper holds the plain estimate’s root between the plain estimate’s. On the package’s cheap recovery design (150 units, five outer folds, one repetition, 200 replicates) the interval covers a nominal 95% at 0.96 with a signal and 0.94 without, against 0.955 and 0.895 for the paper’s width around the same centre. The paper’s width is kept beside it as <code>se_bates</code> in <code>nested_cv</code>, and the benchmark writes both intervals and reports both coverages. Nested cross-validation needs four outer folds now rather than three. On both sides.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.1" id="timesift-011">timesift 0.1.1<a class="anchor" aria-label="anchor" href="#timesift-011"></a></h2>
 <div class="section level3">
