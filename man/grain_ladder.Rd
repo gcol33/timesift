@@ -47,9 +47,9 @@ names.}
 fitted model without refitting it.}
 
 \item{interval}{\code{"nested_cv"} refits every arm inside every outer training set, which is what
-\code{\link[=paired_contrast]{paired_contrast()}} reads an interval for the difference in risk off. That interval is
-experimental; see \code{\link[=select_grain]{select_grain()}} for its measured coverage. \code{"variables"}, the
-default, fits nothing further, and a contrast is then read across the response variables.}
+\code{\link[=paired_contrast]{paired_contrast()}} reads an interval for the difference in risk off; see \code{\link[=select_grain]{select_grain()}}
+for what it estimates and what it costs. \code{"variables"}, the default, fits nothing further,
+and a contrast is then read across the response variables.}
 
 \item{repeats}{Repetitions of the nested cross-validation, each on its own fold map. The first
 is the map the ladder was cross-validated on.}

@@ -807,12 +807,22 @@ call site.
   than there are variables. `"nested_cv"` is the nested cross-validation interval of Bates, Hastie
   and Tibshirani (2024): `select_grain()` and `grain_ladder()` take it as `interval` with
   `repeats` fold maps, the first being the map already cross-validated on, and each repetition
-  fits the procedure or the arm once per unordered pair of outer folds; `paired_contrast()` reads
-  it on the difference of two arms of a ladder fitted with it. A fold's score is the mean over the
-  variables scorable in it, the inner estimate is averaged as the reported estimate is, the
-  variance of a fold's score is its delete-one jackknife variance over that fold's units, the root
-  mean squared error is rescaled by `(K - 1) / K` and held between the jackknife standard error of
-  the estimate and `sqrt(K)` times it, and the centre carries the paper's bias correction. Two
+  fits the procedure or the arm once per unordered pair and once per unordered triple of outer
+  folds, which needs at least four; `paired_contrast()` reads it on the difference of two arms of
+  a ladder fitted with it. A fold's score is the mean over the variables scorable in it, the inner
+  estimate is averaged as the reported estimate is, the variance of a fold's score is its
+  delete-one jackknife variance over that fold's units, the root mean squared error is rescaled by
+  `(K - 1) / K` and held between the jackknife standard error of the estimate and `sqrt(K)` times
+  it, and the centre carries the paper's bias correction, equation (15) at `K` folds. The mean
+  squared error the width is read off is that of the bias-corrected estimate: inside every outer
+  training set the same nested cross-validation runs once more, from the triple fits, at `K - 1`
+  folds, and term (a) is the squared gap between the bias-corrected estimate that training set
+  reports and the held-out fold's score, and its root is held between the corrected centre's own
+  jackknife standard error, every prediction held fixed, and `sqrt(K)` times it; the paper's
+  width, read off the plain inner estimate and held by the plain estimate's jackknife standard
+  error, is reported beside it as `se_bates`. A fit of the nested cross-validation draws its seed as
+  `seed + 10007 r + 101 a + b + 3001 c` from its tag `(r, a, b, c)`, the repetition and the folds
+  it leaves out, zero where it leaves out fewer than three. Two
   tables whose contrast is read must carry the same response, maps, `repeats` and `seed`.
 - `models` takes one learner, a set or list of them, or the name of a registered one, and
   `learners` on a ladder takes the same three forms.

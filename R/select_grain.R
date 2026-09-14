@@ -49,27 +49,43 @@
 #' procedure would score on a new sample.
 #'
 #' `interval = "nested_cv"` adds one that is meant to be, by the nested cross-validation of Bates,
-#' Hastie and Tibshirani (2024). It is experimental. In the selection benchmark under
-#' `inst/benchmark/`, at one repetition, its coverage of a nominal 95% ran from 84% to 96% across
-#' twelve designs and fell detectably below nominal in nine of them, so it is not yet an interval to
-#' report. Inside every repetition, each outer training set is cross-validated again
-#' over the remaining folds of the same map, which gives the mean squared error of a
-#' cross-validation estimate as the difference of two terms it can estimate: the squared gap
-#' between the inner estimate and the held-out fold's score, less the variance of that fold's
-#' score. The paper's error is a mean of per-unit losses; here a fold's score is the mean over the
-#' variables scorable in it, the inner estimate is averaged as the reported estimate is, and the
-#' variance of a fold's score is its delete-one jackknife variance over the units of the fold,
-#' which for a mean of per-unit losses is exactly the paper's `var(e) / |I_k|`. The square root of
-#' the estimated mean squared error is held between the jackknife standard error of the estimate
-#' and the square root of the fold count times it, as the paper's section 4.3.2 has it, and the
-#' centre carries its bias correction, so the interval is for the risk of the procedure fitted on
-#' a sample of this size, which is the fit `final` holds.
+#' Hastie and Tibshirani (2024). Inside every repetition, each outer training set is
+#' cross-validated again over the remaining folds of the same map, which gives the mean squared
+#' error of a cross-validation estimate as the difference of two terms it can estimate: the
+#' squared gap between the inner estimate and the held-out fold's score, less the variance of that
+#' fold's score. The paper's error is a mean of per-unit losses; here a fold's score is the mean
+#' over the variables scorable in it, the inner estimate is averaged as the reported estimate is,
+#' and the variance of a fold's score is its delete-one jackknife variance over the units of the
+#' fold, which for a mean of per-unit losses is exactly the paper's `var(e) / |I_k|`. The centre
+#' is the nested estimate less the paper's bias correction, its Appendix C, so the interval is
+#' for the risk of the procedure fitted on a sample of this size, which is the fit `final` holds.
+#' The square root of the estimated mean squared error is held between the jackknife standard
+#' error of the estimate and the square root of the fold count times it, as the paper's section
+#' 4.3.2 has it.
+#'
+#' The width departs from the paper in one respect. The paper's width is the mean squared error
+#' of the plain cross-validation estimate, and its bias correction is added to the centre as a
+#' shift with no spread of its own. The correction is `1 + (K - 2) / K` times the gap between two
+#' cross-validation estimates on the same units, and in the package's benchmark
+#' (`inst/benchmark/`) that gap moved from sample to sample by more than the estimate it corrects
+#' where the sample was small or the signal absent, so the paper's interval covered a nominal 95%
+#' at 0.86 to 0.93 there at ten repetitions. The width here is therefore the same identity
+#' applied to the corrected estimator: inside every outer training set the nested cross-validation
+#' is run once more, over the unordered triples of folds, which gives the bias-corrected estimate
+#' that training set alone would report, and the squared gap between that and the held-out fold's
+#' score replaces the plain estimate's; the bounds are the corrected centre's own jackknife
+#' standard error, with every prediction held fixed, and the square root of the fold count times
+#' it. The paper's width is reported beside it as `se_bates` in `nested_cv`. On the package's
+#' cheap recovery design (`tests/testthat/test-interval.R`: 150 units, five outer folds, one
+#' repetition, 200 replicates) the interval covers a nominal 95% at 0.96 with a signal and 0.94
+#' without, where the paper's covers 0.955 and 0.895.
 #'
 #' The cost is the selection's, multiplied: one repetition fits the procedure once for every
-#' unordered pair of outer folds, `v_outer * (v_outer - 1) / 2` fits, and every repetition after
-#' the first refits the outer folds as well. More repetitions steady the estimate of the mean
-#' squared error; the paper uses two hundred random splits, which is affordable where a fit is
-#' cheap and is not where a fit is a neural network.
+#' unordered pair and every unordered triple of outer folds, `choose(v_outer, 2) +
+#' choose(v_outer, 3)` fits, and every repetition after the first refits the outer folds as well.
+#' More repetitions steady the estimate of the mean squared error; the paper uses two hundred
+#' random splits, which is affordable where a fit is cheap and is not where a fit is a neural
+#' network.
 #'
 #' @references Bates, S., Hastie, T. and Tibshirani, R. (2024). Cross-validation: what does it
 #'   estimate and how well does it do it? *Journal of the American Statistical Association*
@@ -106,7 +122,7 @@
 #'   inside the training data.
 #' @param interval Which interval to report beside the across-variable one, which is always
 #'   reported: `"variables"` for that one alone, or `"nested_cv"` for an interval for the
-#'   procedure's risk, which is experimental. See What the interval is for.
+#'   procedure's risk. See What the interval is for.
 #' @param repeats Repetitions of the nested cross-validation, each on its own fold map. The first
 #'   is the map the estimate was computed on.
 #' @param response Name of the registered response head.
@@ -259,7 +275,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
               length(levels), " outer folds")
     }
     runs <- .ncv_collect(function(train, test, tag) {
-      .select_once(ctx, train, test, seed + 10007L * tag[1L] + 101L * tag[2L] + tag[3L])$pred
+      .select_once(ctx, train, test, .ncv_seed(seed, tag))$pred
     }, y, maps, p)
     ncv <- .ncv_record(y, maps, stats::setNames(list(.ncv_keep(runs)), .selected_arm))
     attr(scores, "ncv") <- ncv
@@ -432,7 +448,8 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
     cbind(data.frame(metric = nm, score = iv$estimate, center = iv$center, se = iv$se,
                      lower = iv$lower, upper = iv$upper, n_variable = iv$n_variable,
                      interval = "nested_cv", stringsAsFactors = FALSE),
-          iv[c("bias", "err_ncv", "mse_ncv", "se_naive", "repeats", "folds")])
+          iv[c("bias", "err_ncv", "mse_ncv", "mse_center", "se_bates", "se_naive",
+               "se_naive_center", "repeats", "folds")])
   })
   out <- do.call(rbind, out)
   rownames(out) <- NULL

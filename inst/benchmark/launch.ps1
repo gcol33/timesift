@@ -21,6 +21,7 @@ param(
   [int]    $Workers = 14,
   [string] $Out = '',
   [string] $Device = '',
+  [int]    $NcvRepeats = 0,
   [string] $Rscript = ''
 )
 
@@ -86,6 +87,7 @@ for ($i = 0; $i -lt $stripes; $i++) {
   "scale        $Scale"
   "block        $Block"
   "device       $(if ($Device) { $Device } else { 'design.R default' })"
+  "ncv_repeats  $(if ($NcvRepeats -gt 0) { $NcvRepeats } else { 'design.R default' })"
   "out          $Out"
   "cells        $($ids -join ', ')"
   "workers      $stripes"
@@ -101,6 +103,7 @@ for ($i = 0; $i -lt $stripes; $i++) {
   $steps = $mine | ForEach-Object {
     $a = @("`"$($bench)\run.R`"", "--scale=$Scale", "--cell=$_", "--out=`"$Out`"")
     if ($Reps) { $a += "--reps=$Reps" }
+    if ($NcvRepeats -gt 0) { $a += "--ncv_repeats=$NcvRepeats" }
     '& "' + $Rscript + '" ' + ($a -join ' ') + '; if ($LASTEXITCODE -ne 0) { $fail = 1 }'
   }
   # A process started with redirected streams reports no ExitCode back to its parent, so the worker

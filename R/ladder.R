@@ -24,9 +24,9 @@
 #' @param keep_fits Keep every per-fold fitted model, which is what lets [occlusion()] read a
 #'   fitted model without refitting it.
 #' @param interval `"nested_cv"` refits every arm inside every outer training set, which is what
-#'   [paired_contrast()] reads an interval for the difference in risk off. That interval is
-#'   experimental; see [select_grain()] for its measured coverage. `"variables"`, the
-#'   default, fits nothing further, and a contrast is then read across the response variables.
+#'   [paired_contrast()] reads an interval for the difference in risk off; see [select_grain()]
+#'   for what it estimates and what it costs. `"variables"`, the default, fits nothing further,
+#'   and a contrast is then read across the response variables.
 #' @param repeats Repetitions of the nested cross-validation, each on its own fold map. The first
 #'   is the map the ladder was cross-validated on.
 #' @param seed Seed the repetitions' fold maps are drawn under. Two tables whose contrast is to be

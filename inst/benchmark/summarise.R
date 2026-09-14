@@ -63,6 +63,12 @@ per_cell <- lapply(split(rows, rows$cell_id), function(d) {
     bench_paired(d, c("nested", "upper_ncv"), c("nested", "true_full"), `>=`),
     `&`, paste(d$cell_id[1L], c("the lower nested interval", "the upper nested interval")))
   cov_ncv <- bench_wilson(covered_ncv)
+  # The paper's width around the same centre, read against the same truth.
+  covered_bates <- bench_align(
+    bench_paired(d, c("nested", "lower_bates"), c("nested", "true_full"), `<=`),
+    bench_paired(d, c("nested", "upper_bates"), c("nested", "true_full"), `>=`),
+    `&`, paste(d$cell_id[1L], c("the lower Bates interval", "the upper Bates interval")))
+  cov_bates <- bench_wilson(covered_bates)
   # How wide the interval is against how wide it had to be: the spread of the error it has to
   # cover, over the standard error it was built from. Above one is too narrow.
   err_ncv <- bench_paired(d, c("nested", "center_ncv"), c("nested", "true_full"))
@@ -94,6 +100,9 @@ per_cell <- lapply(split(rows, rows$cell_id), function(d) {
     coverage_ncv = cov_ncv[["p"]], coverage_ncv_lo = cov_ncv[["lower"]],
     coverage_ncv_hi = cov_ncv[["upper"]],
     ratio_ncv = ratio(err_ncv, bench_by_replicate(d, "nested", "se_ncv")),
+    coverage_bates = cov_bates[["p"]], coverage_bates_lo = cov_bates[["lower"]],
+    coverage_bates_hi = cov_bates[["upper"]],
+    ratio_bates = ratio(err_ncv, bench_by_replicate(d, "nested", "se_bates_ncv")),
     bias_ncv = mean(err_ncv), bias_ncv_mc = bench_margin(err_ncv),
     regret = mean(regret), regret_mc = bench_margin(regret),
     secs = mean(tapply(bench_pick(d, "stage", "secs", NA)$value,
@@ -120,8 +129,9 @@ cat("\n== what each interval covers, with its Wilson interval and the spread of 
     "   has to cover over the standard error it was built from\n", sep = "")
 print(per_cell[c("cell_id", "ncv_repeats", "replicates", "coverage", "coverage_lo", "coverage_hi",
                  "ratio",
-                 "coverage_ncv", "coverage_ncv_lo", "coverage_ncv_hi", "ratio_ncv", "true_full",
-                 "center_ncv", "bias_ncv", "bias_ncv_mc")], digits = 3)
+                 "coverage_ncv", "coverage_ncv_lo", "coverage_ncv_hi", "ratio_ncv",
+                 "coverage_bates", "coverage_bates_lo", "coverage_bates_hi", "ratio_bates",
+                 "true_full", "center_ncv", "bias_ncv", "bias_ncv_mc")], digits = 3)
 
 if (!is.na(opt$csv)) {
   utils::write.csv(per_cell, opt$csv, row.names = FALSE)

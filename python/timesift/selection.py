@@ -112,14 +112,17 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
     The estimate carries the interval across the response variables, which is the spread between
     the variables of this dataset rather than an interval for what the procedure would score on a
     new sample. ``interval="nested_cv"`` adds one that is meant to be, by the nested
-    cross-validation of Bates, Hastie and Tibshirani (2024), and is experimental: in the selection
-    benchmark under ``inst/benchmark/``, at one repetition, its coverage of a nominal 95% ran from
-    84% to 96% across twelve designs and fell detectably below nominal in nine of them. It works
-    so: each outer training set is cross-validated again over the
-    remaining folds of the same map, over ``repeats`` fold maps, which gives the mean squared error
-    of a cross-validation estimate; ``final`` then holds the procedure fitted on every unit, whose
-    risk the interval is for. One repetition costs one fit of the procedure per unordered pair of
-    outer folds.
+    cross-validation of Bates, Hastie and Tibshirani (2024): each outer training set is
+    cross-validated again over the remaining folds of the same map, over ``repeats`` fold maps,
+    which gives the mean squared error of a cross-validation estimate, and the centre carries the
+    paper's bias correction, so ``final`` holds the procedure fitted on every unit, whose risk the
+    interval is for. The width departs from the paper in one respect: the paper's is the mean
+    squared error of the plain estimate and takes the correction as a shift with no spread, and
+    in the package's benchmark that spread exceeded the estimate's where the sample was small or
+    the signal absent; the width here is the same identity applied to the corrected estimator,
+    from a cross-validation one level further down, held above the corrected centre's own naive
+    standard error, and the paper's is kept beside it as ``se_bates``. One repetition costs one
+    fit of the procedure per unordered pair and per unordered triple of outer folds.
     """
     if rule not in RULES:
         raise ValueError(f"rule must be one of {RULES}, got {rule!r}")
@@ -203,8 +206,7 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
                   "outer folds")
 
         def fit_predict(train, test, tag):
-            return _select_once(ctx, train, test,
-                                seed + 10007 * tag[0] + 101 * tag[1] + tag[2])["pred"]
+            return _select_once(ctx, train, test, ncv_module.ncv_seed(seed, tag))["pred"]
 
         ncv = ncv_module.record(y, maps,
                                 {SELECTED_ARM: ncv_module.keep_runs(
@@ -405,7 +407,8 @@ def _nested_cv_estimate(ncv: dict, arm: str, response: str) -> list[dict]:
         out.append(dict(metric=name, score=read["estimate"], center=read["center"],
                         se=read["se"], lower=read["lower"], upper=read["upper"],
                         n_variable=read["n_variable"], interval="nested_cv",
-                        **{k: read[k] for k in ("bias", "err_ncv", "mse_ncv", "se_naive",
+                        **{k: read[k] for k in ("bias", "err_ncv", "mse_ncv", "mse_center",
+                                                "se_bates", "se_naive", "se_naive_center",
                                                 "repeats", "folds")}))
     return out
 
