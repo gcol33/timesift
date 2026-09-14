@@ -205,3 +205,42 @@ pipeline's, does not separate from zero across species. What this measures is th
 implementations of one procedure on one dataset; it does not measure agreement between a fitted
 R network and a fitted Python network, which the seed spread above says is not a thing to
 measure.
+
+### Where the package's encoder sat below the pipeline's, and why
+
+The direction was consistent enough to chase. The package's `cnn()` on the fixed weekly
+coldest-day, mean, warmest-day arm, on the study's fold map, 60 epochs, batches of 32, on an RTX
+5080 (`dev_notes/repro-lisc/weekly_seeds.R`), reads 0.8684, 0.8708, 0.8695, 0.8673 and 0.8674
+AUC under seeds 1 to 5, a mean of 0.8687 with a standard deviation of 0.0015, against the
+pipeline's 0.8777 on the study map and 0.8735 over its eleven runs. The inner scores agree fold
+for fold, so the difference was in the refit on the outer training set, and the two training
+recipes differed in four places: the pipeline standardises the three thermal channels by one
+scalar and leaves the calendar channels alone, draws the early-stopping validation plots by a
+plain permutation rather than by strata of the response total, reads the validation loss that
+early stopping watches under the same positive-class weights as the fitting loss, and cuts
+batches with a remainder.
+
+Rather than a seed experiment per variant, each fold was trained once for the whole budget and
+the validation loss read both ways after every epoch beside the held-out level of that epoch
+(`dev_notes/repro-lisc/stop_rule_diag.R`), so the two stopping rules are compared on one
+trajectory. Twelve trajectories, three seeds under each of the package recipe, the shared
+standardisation, the random split and the two together, give at the species level:
+
+| rule | mean AUC | range |
+|---|---|---|
+| the package's, validation loss unweighted | 0.8715 | 0.8678 to 0.8755 |
+| the pipeline's, validation loss weighted | 0.8729 | 0.8699 to 0.8753 |
+| the last epoch of the schedule | 0.8803 | 0.8787 to 0.8820 |
+| the best epoch, read on the test fold | 0.8813 | 0.8798 to 0.8829 |
+
+The weighted rule keeps an epoch 0.0014 AUC better on average (paired standard deviation
+0.0021, nine of twelve trajectories in that direction), and the package reads the validation
+loss that way from version 0.2.0: a response head's `weights` takes the rows the model is fitted
+on, reads its counts off those alone and weights every row. The standardisation and the split
+move the unweighted level by less than the seed spread (0.8696 to 0.8755 under the package's
+own recipe, 0.8678 to 0.8725 under the others), so they stay as they are. The last row is the
+larger finding: on this data the cosine schedule's final epoch beats either stopping rule by
+0.007 to 0.009 AUC and sits within 0.001 of the best epoch, so early stopping on 121 validation
+plots costs more than any recipe difference. Neither implementation trains that way;
+`train_control(early_stopping = Inf)` does. The selection stage has not yet been rerun under
+the weighted rule.
