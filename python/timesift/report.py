@@ -1,48 +1,70 @@
 """What a fitted ``timesift`` says about itself.
 
-The candidates, what each of them was best at, the ensemble that combines them and the weights it
-gave, read off the scores the fit already holds rather than recomputed from the models.
+Two tables. The candidates, what each of them was best at and how it covered the responses, read
+off the scores on the outer folds: the comparison. The procedure, the selected candidate and the
+stack, read off the held-out predictions whose choice and weights were made inside each outer
+training fold: the level to report. And the weights fitted on every target, for prediction.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from .ladder import Ladder, score_arm, scored_cells, table_columns, variable_means
+from .ladder import Ladder, scored_cells, table_columns, variable_means
 from .occlusion import ladder_occlusion, occlusion_profile
 from .response import align_folds, as_response
-from .stack import ensemble_combine
 
-__all__ = ["candidate_table", "ensemble_row", "ensemble_weights", "occlusion", "summary"]
+__all__ = ["candidate_table", "ensemble_weights", "occlusion", "procedure_table", "summary"]
 
 _MISSING = object()
 
 
 def summary(fit) -> str:
-    """The fit as text: one row per candidate, the ensemble under them, and the weights."""
+    """The fit as text: the candidates on the outer folds, the procedure, and the weights."""
     rows = list(candidate_table(fit))
-    combined = ensemble_row(fit)
-    if combined is not None:
-        rows.append(dict(combined, won=None, responses=""))
-    width = max([len("candidate")] + [len(r["candidate"]) for r in rows])
+    procedure = procedure_table(fit)
+    width = max([len("candidate")] + [len(r["candidate"]) for r in rows + procedure])
 
     def line(candidate, mean, won, responses):
         return f"{candidate:<{width}} {mean:>14} {won:>6}  {responses}".rstrip()
 
-    lines = [_header(fit), "", line("candidate", "mean", "won", "responses")]
+    lines = [_header(fit), "", "candidates, scored on the outer folds",
+             line("candidate", "mean", "won", "responses")]
     for r in rows:
         lines.append(line(r["candidate"],
                           "not applicable" if r["mean"] is None else f"{r['mean']:.3f}",
                           "-" if r["won"] is None else str(r["won"]), r["responses"]))
+    if procedure:
+        lines += ["", "procedure, chosen and weighted inside each outer training fold"]
+        for r in procedure:
+            lines.append(f"{r['candidate']:<{width}} {r['mean']:>14.3f}  se {r['se']:.3f}")
+        counts = _selection_counts(_field(fit, "selected", None))
+        if counts:
+            lines.append("selected " + ", ".join(f"{n} in {c}" for n, c in counts)
+                         + f" of {sum(c for _, c in counts)} folds")
 
+    choice = _field(fit, "choice", None)
+    if choice is not None:
+        lines += ["", f"choice on every target  {choice}"]
     weights = ensemble_weights(fit)
     if weights:
         # A member whose weight rounds to nothing is not a member of the combination in any way a
         # reader can act on; ensemble_weights() still carries every one of them.
         shown = sorted(((n, w) for n, w in weights.items() if w >= 0.005),
                        key=lambda kv: (-kv[1], kv[0]))
-        lines += ["", "weights  " + "   ".join(f"{n} {w:.2f}" for n, w in shown)]
+        lines.append("weights on every target  "
+                     + "   ".join(f"{n} {w:.2f}" for n, w in shown))
     return "\n".join(lines)
+
+
+def _selection_counts(selected) -> list[tuple[str, int]]:
+    """How often each candidate was chosen across the outer folds, most often first."""
+    if not selected:
+        return []
+    counts: dict = {}
+    for row in selected:
+        counts[row["candidate"]] = counts.get(row["candidate"], 0) + 1
+    return sorted(counts.items(), key=lambda kv: -kv[1])
 
 
 def _header(fit) -> str:
@@ -77,21 +99,15 @@ def candidate_table(fit) -> list[dict]:
     return scored + [r for r in rows if r["mean"] is None]
 
 
-def ensemble_row(fit) -> dict | None:
-    """The ensemble's level, read on the same cells and by the same metric as its members."""
-    stack = _field(fit, "stack", None)
-    if stack is None:
-        return None
-    y = as_response(_field(fit, "y"))
-    f = align_folds(_field(fit, "folds"), y.units)
-    score = _field(fit, "scorer")
-    rows = score_arm("ensemble", "ensemble", y, ensemble_combine(stack, _field(fit, "oof")), f,
-                     np.unique(f), _field(fit, "cells"), score)
-    per = variable_means(*scored_cells(dict(candidate=rows["learner"], variable=rows["variable"],
-                                            score=rows["score"], scorable=rows["scorable"])))
-    if "ensemble" not in per:
-        raise ValueError("the ensemble has no scorable cell to be levelled on")
-    return dict(candidate="ensemble", mean=float(np.mean(list(per["ensemble"].values()))))
+def procedure_table(fit) -> list[dict]:
+    """The selected candidate's and the stack's held-out level under the run's own metric, with
+    the standard error across responses: one row each, or none where the run made no estimate."""
+    estimate = _field(fit, "estimate", None)
+    if not estimate:
+        return []
+    metric = _field(fit, "metric")
+    return [dict(candidate=row["arm"], mean=row["score"], se=row["se"])
+            for row in estimate if row["metric"] == metric]
 
 
 def ensemble_weights(fit) -> dict | None:

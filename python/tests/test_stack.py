@@ -16,7 +16,7 @@ from timesift.ladder import grain_ladder, score_arm
 from timesift.learners import Learner
 from timesift.metrics import roc_auc, tss
 from timesift.occlusion import ladder_occlusion
-from timesift.report import (candidate_table, ensemble_row, ensemble_weights, occlusion,
+from timesift.report import (candidate_table, ensemble_weights, occlusion, procedure_table,
                              summary)
 from timesift.representation import grain_matrix
 from timesift.response import Response, align_folds, fold_map, scorable_cells
@@ -343,25 +343,43 @@ def test_a_candidate_that_could_not_be_paired_is_listed_under_the_ones_that_were
     assert "cnn / multigrain  not applicable" in summary(fit)
 
 
-def test_the_summary_is_the_candidates_the_ensemble_and_the_weights():
+def test_the_summary_is_the_candidates_and_the_weights():
     oof, y, cells, folds = board()
     fit = fitted_object(oof, y, cells, folds)
-    text = summary(fit)
-    lines = text.splitlines()
+    lines = summary(fit).splitlines()
     assert lines[0] == "timesift  80 targets, 4 responses, 4-fold random CV, tss"
-    assert lines[2].split() == ["candidate", "mean", "won", "responses"]
-    assert [line.split()[0] for line in lines[3:7]] == ["forest", "elasticnet", "cnn", "ensemble"]
-    assert lines[6].endswith("-")
-    assert lines[-1].startswith("weights  ")
-    # The ensemble is levelled by the fit's own metric, on the fit's own cells.
-    combined = ensemble_combine(fit.stack, oof)
-    f = align_folds(folds, y.units)
-    got = score_arm("", "ensemble", y, combined, f, np.unique(f), cells, tss)
-    by_hand = float(np.mean([np.mean([s for s, v, ok in zip(got["score"], got["variable"],
-                                                            got["scorable"])
-                                      if ok and v == name])
-                             for name in y.variables]))
-    assert float(lines[6].split()[1]) == pytest.approx(round(by_hand, 3), abs=5e-4)
+    assert lines[2] == "candidates, scored on the outer folds"
+    assert lines[3].split() == ["candidate", "mean", "won", "responses"]
+    assert [line.split()[0] for line in lines[4:7]] == ["forest", "elasticnet", "cnn"]
+    assert "procedure" not in summary(fit)
+    assert lines[-1].startswith("weights on every target  ")
+
+
+def estimated(fit):
+    """A fit carrying the estimate and the per-fold choice the nested evaluation writes."""
+    fit.estimate = [dict(arm=arm, metric=metric, score=score, se=0.01)
+                    for arm, base in (("selected", 0.61), ("ensemble", 0.63))
+                    for metric, score in (("tss", base), ("roc_auc", base + 0.2))]
+    fit.selected = [dict(fold=k, candidate="cnn / week" if k < 4 else "forest / month")
+                    for k in range(1, 5)]
+    fit.choice = "cnn / week"
+    return fit
+
+
+def test_the_procedure_rows_are_the_estimate_under_the_runs_own_metric():
+    oof, y, cells, folds = board()
+    fit = estimated(fitted_object(oof, y, cells, folds))
+    rows = procedure_table(fit)
+    assert [r["candidate"] for r in rows] == ["selected", "ensemble"]
+    assert [r["mean"] for r in rows] == [0.61, 0.63]
+    text = summary(fit)
+    assert "procedure, chosen and weighted inside each outer training fold" in text
+    assert "selected cnn / week in 3, forest / month in 1 of 4 folds" in text
+    assert "choice on every target  cnn / week" in text
+
+
+def test_a_fit_that_made_no_estimate_has_no_procedure_rows():
+    assert procedure_table(SimpleNamespace(estimate=None, metric="tss")) == []
 
 
 def test_the_weights_a_fit_reports_are_the_ones_its_combiner_holds():
@@ -487,34 +505,3 @@ def test_the_combiner_refuses_to_drop_a_scorable_cell_rather_than_fitting_on_few
     spoiled["forest / month"][a, b] = np.nan
     with pytest.raises(ValueError, match="did not settle"):
         ensemble_fit(spoiled, y, cells, folds, ensemble(), score_table(oof, y, folds, cells))
-
-
-def test_the_ensemble_row_is_the_combination_levelled_on_the_fits_own_cells():
-    oof, y, cells, folds = board()
-    fit = fitted_object(oof, y, cells, folds)
-    row = ensemble_row(fit)
-    assert row["candidate"] == "ensemble"
-
-    # Read by hand off the same combination, the same mask and the same metric the fit carries:
-    # the ensemble row is comparable with the candidate rows above it because nothing else went
-    # into it.
-    f = align_folds(folds, y.units)
-    got = score_arm("", "ensemble", y, ensemble_combine(fit.stack, oof), f, np.unique(f), cells,
-                    tss)
-    by_hand = float(np.mean([np.mean([s for s, v, ok in zip(got["score"], got["variable"],
-                                                            got["scorable"])
-                                      if ok and v == name])
-                             for name in y.variables]))
-    assert row["mean"] == pytest.approx(by_hand)
-
-
-def test_a_fit_that_combined_nothing_has_no_ensemble_row():
-    assert ensemble_row(SimpleNamespace(stack=None)) is None
-
-
-def test_an_ensemble_with_no_scorable_cell_to_be_levelled_on_says_so():
-    oof, y, cells, folds = board()
-    fit = fitted_object(oof, y, cells, folds)
-    fit.cells = replace(cells, scorable=np.zeros_like(cells.scorable))
-    with pytest.raises(ValueError, match="no scorable cell"):
-        ensemble_row(fit)

@@ -45,7 +45,7 @@ def readings(n_unit=12, days=40, seed=5):
 
 def test_what_ships_is_registered_and_reachable_by_name():
     assert learners() == ["cnn", "elasticnet", "forest", "mlp", "rescnn", "stepwise"]
-    assert metrics() == ["kappa", "kappa_youden", "roc_auc", "tss"]
+    assert metrics() == ["average_precision", "kappa", "kappa_youden", "roc_auc", "tss"]
     assert responses() == ["presence_absence"]
     assert get_learner("stepwise").name == "stepwise"
 

@@ -14,7 +14,8 @@ columns the fit was given.}
 
 \item{series}{The long table of readings for those targets, or \code{NULL} for a targets-only fit.}
 
-\item{candidate}{\code{"ensemble"}, or the name of one candidate.}
+\item{candidate}{\code{"ensemble"}, the stack refitted on every target; \code{"selected"}, the candidate
+the rule chose on every target (\code{object$choice}); or the name of one candidate.}
 
 \item{...}{Ignored.}
 }

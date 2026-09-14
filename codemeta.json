@@ -8,7 +8,7 @@
   "codeRepository": "https://github.com/gcol33/timesift",
   "issueTracker": "https://github.com/gcol33/timesift/issues",
   "license": "https://spdx.org/licenses/MIT",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "programmingLanguage": {
     "@type": "ComputerLanguage",
     "name": "R",
@@ -239,7 +239,7 @@
       ],
       "name": "timesift: Learn Predictive Representations of Time-Varying Data",
       "url": "https://gillescolling.com/timesift/",
-      "description": "R package version 0.1.1"
+      "description": "R package version 0.2.0"
     }
   ],
   "releaseNotes": "https://github.com/gcol33/timesift/blob/main/NEWS.md",

@@ -60,17 +60,18 @@ test_that("a run given c() and a run given list() agree", {
 test_that("a fit carries every element the layers above it read", {
   fit <- run_toy(toy_case())
   expect_s3_class(fit, "timesift")
-  expect_named(fit, c("candidates", "scores", "oof", "representations", "stack", "weights",
-                      "models", "fits", "folds", "cells", "y", "metric", "scorer", "response",
-                      "spec", "call"))
+  expect_named(fit, c("estimate", "selected", "inner", "fold_weights", "predictions",
+                      "candidates", "scores", "oof", "choice", "models", "stack", "weights",
+                      "representations", "fits", "folds", "cells", "y", "metric", "scorer",
+                      "response", "spec", "call"))
   expect_equal(sort(names(fit$oof)), c("toy / month", "toy / week"))
   expect_equal(names(fit$representations), c("week", "month"))
   expect_s3_class(fit$representations, "timesift_set")
   expect_equal(names(fit$models), names(fit$oof))
   expect_s3_class(fit$folds, "timesift_folds")
   expect_s3_class(fit$cells, "timesift_cells")
-  expect_equal(fit$metric, "tss")
-  expect_identical(fit$scorer, tss)
+  expect_equal(fit$metric, "roc_auc")
+  expect_identical(fit$scorer, roc_auc)
   expect_null(fit$stack)
 })
 
@@ -270,7 +271,7 @@ test_that("an anchored fit runs across lookback spans", {
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
                   target_time = when, models = list(toy()),
                   sift = lookbacks("30 days", "60 days"), ensemble = FALSE,
-                  resampling = cv(v = 3L), control = NULL, verbose = FALSE)
+                  resampling = cv(v = 3L), inner = NULL, control = NULL, verbose = FALSE)
   expect_equal(sort(names(fit$oof)), c("toy / 30 days", "toy / 60 days"))
   expect_equal(rownames(fit$y), rownames(case$targets))
 })
@@ -530,4 +531,82 @@ test_that("a grouped run hands every fit the grouping of the units it is fitted 
            resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   expect_length(seen, 4L)
   expect_true(all(vapply(seen, function(s) is.null(s$group), logical(1L))))
+})
+
+# ---- the nested evaluation ----------------------------------------------------------------------
+
+test_that("the selected arm is the selection select_grain() makes on the same split", {
+  case <- toy_case(n_unit = 48L, days = 90L, n_var = 3L)
+  folds <- stats::setNames(rep(1:3, length.out = 48L), sort(case$units))
+  fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+                  models = list(toy = toy()), sift = grains("week", "month"), ensemble = FALSE,
+                  resampling = folds, inner = 3L, seed = 5L, control = NULL, verbose = FALSE)
+  x <- grain_matrix(case$series, plot, t, temp, grain = c("week", "month"))
+  sel <- select_grain(x, fit$y, list(toy = toy()), folds = fit$folds, inner = 3L, seed = 5L,
+                      metric = "roc_auc", verbose = FALSE)
+  expect_equal(fit$selected$representation, sel$selected$grain)
+  expect_equal(fit$selected$inner_score, sel$selected$inner_score)
+  expect_equal(fit$predictions$selected, attr(sel, "predictions")[["selected|selected"]])
+  est <- fit$estimate[fit$estimate$arm == "selected", ]
+  expect_equal(est$score, sel$estimate$score[match(est$metric, sel$estimate$metric)])
+})
+
+test_that("an outer test fold's responses reach neither its choice nor its weights", {
+  case <- toy_case(n_unit = 48L, days = 90L, n_var = 3L)
+  folds <- stats::setNames(rep(1:3, length.out = 48L), sort(case$units))
+  run <- function(targets) {
+    timesift(targets, case$series, y = starts_with("sp"), id = plot, time = t,
+             models = list(a = toy(), b = toy("b", multi = "separate")),
+             sift = grains("week", "month"), resampling = folds, inner = 3L, control = NULL,
+             verbose = FALSE)
+  }
+  base <- run(case$targets)
+  flipped <- case$targets
+  held <- flipped$plot %in% names(folds)[folds == 1L]
+  for (v in c("sp1", "sp2", "sp3")) flipped[[v]][held] <- 1 - flipped[[v]][held]
+  moved <- run(flipped)
+  expect_equal(moved$selected[moved$selected$fold == 1L, ],
+               base$selected[base$selected$fold == 1L, ])
+  expect_equal(moved$fold_weights[moved$fold_weights$fold == 1L, ],
+               base$fold_weights[base$fold_weights$fold == 1L, ])
+  rows <- names(folds)[folds == 1L]
+  expect_equal(moved$predictions$ensemble[rows, ], base$predictions$ensemble[rows, ])
+  expect_equal(moved$predictions$selected[rows, ], base$predictions$selected[rows, ])
+})
+
+test_that("choosing among candidates that carry no signal is not reported as skill", {
+  # Eight candidates predicting noise: the best of them on the outer folds is selected on the
+  # folds it is scored on and sits above one half, while the procedure that chooses inside the
+  # training folds is scored on folds its choice never saw and centres on one half.
+  noise <- function(name, offset) {
+    learner(name, reads = "tabular", multi = "joint",
+            fit = function(x, y, ...) list(n = ncol(y)),
+            predict = function(model, x) {
+              code <- lapply(dimnames(x)[[1L]], utf8ToInt)
+              key <- vapply(code, function(u) sum(u * seq_along(u)), numeric(1L))
+              (sin(outer(key, seq_len(model$n)) * (offset + 1.7)) + 1) / 2
+            })
+  }
+  skip_on_cran()
+  models <- stats::setNames(lapply(1:8, function(i) noise(paste0("n", i), i)), paste0("n", 1:8))
+  best <- nested <- numeric()
+  for (r in 1:20) {
+    sim <- sim_series(n_unit = 90L, days = 30L, seed = 300L + r)
+    set.seed(400L + r)
+    y <- matrix(stats::rbinom(90L * 6L, 1L, 0.4), nrow = 90L,
+                dimnames = list(sim$units, paste0("sp", 1:6)))
+    targets <- cbind(data.frame(plot = sim$units, stringsAsFactors = FALSE), as.data.frame(y))
+    fit <- timesift(targets, sim$readings, y = starts_with("sp"), id = plot, time = t,
+                    models = models, sift = grains("week"), ensemble = FALSE,
+                    resampling = fold_map(y, v = 5L, seed = r), inner = 4L, control = NULL,
+                    verbose = FALSE)
+    s <- summary(fit)
+    best <- c(best, max(s$mean[s$scored == "outer folds"]))
+    nested <- c(nested, s$mean[s$candidate == "selected"])
+  }
+  # Twenty replicates put the standard error of the nested mean near 0.009 and the selection gain
+  # of the best candidate near 0.04.
+  se <- stats::sd(nested) / sqrt(length(nested))
+  expect_lt(abs(mean(nested) - 0.5), 2.5 * se)
+  expect_gt(mean(best - nested), 0.02)
 })

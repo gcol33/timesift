@@ -42,9 +42,11 @@ plot.timesift_ladder <- function(x, col = NULL, interval = TRUE, ...) {
 #' Draw a run
 #'
 #' One line per learner across the representations it ran on, read the way a ladder is read, and
-#' the level the combined prediction reaches drawn across them. Where the ensemble line sits above
-#' every curve the candidates are carrying different parts of the signal, and where it sits on the
-#' best curve they are not.
+#' the stack's held-out score drawn across them, its weights fitted inside each outer training
+#' fold. The curves are scored on the folds a choice among them would be judged on, so the best of
+#' them sits a little high; the ensemble line does not. Where the ensemble line sits above every
+#' curve the candidates are carrying different parts of the signal, and where it sits on or below
+#' the best curve they are not.
 #'
 #' @param x A `timesift` result.
 #' @param col One colour per learner, recycled.
@@ -63,7 +65,7 @@ plot.timesift <- function(x, col = NULL, interval = TRUE, ...) {
                        arms = unique(per_response$learner),
                        levels = unique(per_response$representation))
   .draw_curves(stat, col = col, interval = interval, xlab = "representation",
-               ylab = x$metric, rule = .ensemble_level(x), ...)
+               ylab = x$metric, rule = .ensemble_estimate(x), ...)
   stat <- stat[c("arm", "level", "score", "se")]
   names(stat) <- c("learner", "representation", "score", "se")
   invisible(stat)

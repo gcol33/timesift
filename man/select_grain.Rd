@@ -53,7 +53,7 @@ inside the training data.}
 
 \item{interval}{Which interval to report beside the across-variable one, which is always
 reported: \code{"variables"} for that one alone, or \code{"nested_cv"} for an interval for the
-procedure's risk. See What the interval is for.}
+procedure's risk, which is experimental. See What the interval is for.}
 
 \item{repeats}{Repetitions of the nested cross-validation, each on its own fold map. The first
 is the map the estimate was computed on.}
@@ -149,8 +149,11 @@ variable shares, since all of them are fitted and scored on the same units and t
 It is an interval over the variables of this dataset, and not an interval for what the
 procedure would score on a new sample.
 
-\code{interval = "nested_cv"} adds one that is, by the nested cross-validation of Bates, Hastie and
-Tibshirani (2024). Inside every repetition, each outer training set is cross-validated again
+\code{interval = "nested_cv"} adds one that is meant to be, by the nested cross-validation of Bates,
+Hastie and Tibshirani (2024). It is experimental. In the selection benchmark under
+\verb{inst/benchmark/}, at one repetition, its coverage of a nominal 95\% ran from 84\% to 96\% across
+twelve designs and fell detectably below nominal in nine of them, so it is not yet an interval to
+report. Inside every repetition, each outer training set is cross-validated again
 over the remaining folds of the same map, which gives the mean squared error of a
 cross-validation estimate as the difference of two terms it can estimate: the squared gap
 between the inner estimate and the held-out fold's score, less the variance of that fold's

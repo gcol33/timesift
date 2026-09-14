@@ -160,8 +160,8 @@ def test_the_contrast_against_a_ladder_runs_through_paired_contrast_on_matched_c
 
 def test_a_comparator_scored_by_another_metric_is_refused():
     x, y, folds = fixture()
-    lad = grain_ladder(x, y, linear_learner(), folds=folds, metric="roc_auc", verbose=False)
-    with pytest.raises(ValueError, match="scored by roc_auc and the selection by tss"):
+    lad = grain_ladder(x, y, linear_learner(), folds=folds, metric="tss", verbose=False)
+    with pytest.raises(ValueError, match="scored by tss and the selection by roc_auc"):
         select_grain(x, y, linear_learner(), folds=folds, inner=3, compare=lad, verbose=False)
     with pytest.raises(ValueError, match="grain_ladder"):
         select_grain(x, y, linear_learner(), folds=folds, inner=3, compare="week|linear",

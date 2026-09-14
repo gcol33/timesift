@@ -162,7 +162,7 @@ test_that("it takes a mask and a metric of its own", {
   expect_true(all(!blocked$scorable))
   expect_true(all(is.na(blocked$score)))
   by_auc <- score_predictions(y, p, folds, metric = "roc_auc")
-  by_tss <- score_predictions(y, p, folds)
+  by_tss <- score_predictions(y, p, folds, metric = "tss")
   expect_false(isTRUE(all.equal(by_auc$score, by_tss$score)))
   expect_error(score_predictions(y, p, folds, metric = "nope"), "unknown metric")
 })

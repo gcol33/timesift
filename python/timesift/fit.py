@@ -1,4 +1,4 @@
-"""One call: build the representations, fit every candidate over one fold map, combine them.
+"""One call: build the representations, compare every candidate, and estimate choosing among them.
 
 A candidate is one (representation, learner) pair, named for the two, and the contract every
 candidate obeys is that it emits an out-of-fold prediction for every scorable cell over the same
@@ -7,7 +7,10 @@ predictions, so a candidate whose learner fits one model covering every response
 learner fits a model per response are the same thing by the time they are compared.
 
 The fold map and the mask of scorable cells are drawn once, before anything is fitted, so every
-candidate is scored on identical cells and any two of them can be contrasted cell by cell.
+candidate is scored on identical cells and any two of them can be contrasted cell by cell. Inside
+each outer training fold the candidates are searched again on an inner split, one is chosen and
+the stack's weights are fitted there, so the estimate of the selected candidate and of the stack
+is read on folds neither the choice nor the weights saw.
 """
 
 from __future__ import annotations
@@ -16,10 +19,13 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .ladder import out_of_fold, score_arm
+from .ladder import ladder_from_rows, score_arm
 from .learners import fit_learner
+from .selection import (RULES, _choose_candidate, _estimate_row, _inner_se, _inner_splitter,
+                        _join_candidates, _nested_estimate, inner_search, refit_candidates,
+                        selection_context)
 from .registry import RESPONSES, get_learner, resolve_metric
-from .representation import TimesiftMatrix
+from .representation import TimesiftMatrix, timesift_set
 from .response import Folds, Response
 from .select import column_names, select_columns
 # A candidate is named for the learner and the representation it pairs, and the ensemble reads the
@@ -63,6 +69,12 @@ class Timesift:
     spec: TimesiftSpec
     fits: dict = field(default_factory=dict)
     control: object = None
+    estimate: list | None = None
+    selected: list | None = None
+    inner: list | None = None
+    fold_weights: list | None = None
+    predictions: dict | None = None
+    choice: str | None = None
 
     def representation_of(self, candidate: str) -> str:
         """Which representation a candidate reads."""
@@ -76,8 +88,12 @@ class Timesift:
         """Predict new targets, rebuilding each member's representation from the stored settings.
 
         Every candidate is refitted on all the targets at the end of a fit, so what predicts here
-        is one model per candidate rather than a fold's worth of them.
+        is one model per candidate rather than a fold's worth of them. ``"ensemble"`` combines them
+        under the weights fitted on every target, ``"selected"`` predicts with the candidate the
+        rule chose on every target (``choice``), and any other value names one candidate.
         """
+        if candidate == "selected":
+            candidate = self.choice
         if candidate == "ensemble":
             if self.stack is None:
                 raise ValueError("this fit has no ensemble. Name a candidate: "
@@ -105,20 +121,40 @@ class Timesift:
 
 
 def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time=None,
-             static=None, models=None, sift=None, ensemble=True, resampling=None,
-             response: str = "presence_absence", metric=None, control=None,
-             keep_fits: bool = False, verbose: bool = True) -> Timesift:
-    """Fit every learner across every representation, on one fold map, and combine them.
+             static=None, models=None, sift=None, ensemble=True, resampling=None, inner=5,
+             rule: str = "argmax", response: str = "presence_absence", metric=None,
+             control=None, keep_fits: bool = False, seed: int = 1,
+             verbose: bool = True) -> Timesift:
+    """Compare every learner across every representation, and estimate choosing among them.
 
     ``targets`` is one row per thing to predict and ``series`` is the long, time-stamped record
     belonging to it; both are mappings of column name to array, which a data frame satisfies.
     ``y``, ``x`` and ``static`` are selections over their own table: a name, a list of names, a
     glob such as ``"sp_*"``, or a function of a name.
 
+    Within each outer fold of ``resampling`` the training targets are split again into ``inner``
+    folds. Every candidate is cross-validated on that inner split, ``rule`` picks one on its inner
+    score (``"argmax"`` or ``"coarsest_adequate"``, as in ``select_grain``), and the stack's
+    weights are fitted on the inner out-of-fold predictions. Every candidate is then refitted on
+    the whole outer training set and predicts the outer test fold, and the selected candidate's
+    prediction and the prediction combined under that fold's weights are kept. Nothing the outer
+    test fold holds enters the choice or the weights it is scored under, so ``estimate`` is of the
+    procedure, selection and stacking included. Its interval is across the response variables of
+    this dataset, all fitted and scored on the same targets and folds, and not one for a new
+    sample.
+
+    The same refits give every candidate an out-of-fold prediction on the outer folds, which
+    ``scores`` holds: the comparison, whose highest level was picked out on the folds it is scored
+    on. ``inner=None`` runs no inner search and makes no estimate. ``choice``, ``models`` and
+    ``stack`` are the procedure applied to every target, for prediction: the rule read on the
+    outer scores and weights fitted on the outer out-of-fold predictions.
+
     Columns of ``targets`` that are neither the response nor the identifier nor the anchor are
     ignored unless ``static`` names them: a predictor is never picked up because it happened to be
     in the table.
     """
+    if rule not in RULES:
+        raise ValueError(f"rule must be one of {RULES}, got {rule!r}")
     spec = _resolve_spec(targets, series, y, x, id, time, target_time, static, response, metric)
     labels = target_labels(targets, spec)
     _check_rows(labels, spec)
@@ -165,41 +201,159 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
             if pair["reason"]:
                 print(f"not applicable: {pair['reason']}")
 
-    levels = np.unique(folds.fold)
-    table = {k: [] for k in SCORE_COLUMNS}
-    oof, fitted, fits = {}, {}, {}
-    for pair in pairs:
-        if pair["reason"]:
-            continue
-        name, label = pair["candidate"], pair["representation"]
-        learner, m = pair["learner"], representations[label]
+    fitted_pairs = [pair for pair in pairs if not pair["reason"]]
+    names = [pair["candidate"] for pair in fitted_pairs]
+    n_cand = len(fitted_pairs)
+    nested = inner is not None
+    stacking = ensemble is not None and n_cand >= 2
+    # The candidate set as the selection engine reads it: `grain` names the array and `learner`
+    # the candidate, and the order the candidates were declared in is both the fitting order and
+    # the order a tie falls in.
+    candidates = [dict(grain=pair["representation"], learner=pair["candidate"])
+                  for pair in fitted_pairs]
+    ctx = selection_context(timesift_set(dict(representations)), y_mat,
+                            {pair["candidate"]: pair["learner"] for pair in fitted_pairs},
+                            candidates, rule,
+                            _inner_splitter(inner, folds.group) if nested else None, response,
+                            metric if metric is not None else head["metric"], control,
+                            folds.group)
+
+    f = folds.fold
+    levels = np.unique(f)
+    shape = y_mat.values.shape
+    oof = {name: np.full(shape, np.nan) for name in names}
+    p_selected, p_ensemble = np.full(shape, np.nan), np.full(shape, np.nan)
+    fits: dict = {}
+    chosen, inner_rows, fold_weights = [], [], []
+    for i, k in enumerate(levels, start=1):
+        train, test = np.flatnonzero(f != k), np.flatnonzero(f == k)
+        search = None
+        if nested and n_cand >= 2:
+            search = inner_search(ctx, train, seed + i, fold=int(k))
+        refit = refit_candidates(ctx, candidates, train, test)
+        for name, one in zip(names, refit):
+            oof[name][test] = one["pred"]
+            if keep_fits:
+                fits[f"{name}|{int(k)}"] = one["fit"]
+        won = 0 if search is None else names.index(search["won"]["learner"])
+        if nested:
+            p_selected[test] = refit[won]["pred"]
+            chosen.append(_fold_choice(int(k), fitted_pairs[won], search, len(train), len(test)))
+            if search is not None:
+                inner_rows.extend(dict(g, candidate=g["learner"], representation=g["grain"])
+                                  for g in search["grid"])
+            if stacking:
+                weights, combined = _fold_stack(search["lad"], candidates,
+                                                y_mat.take_units(train), ensemble, refit)
+                p_ensemble[test] = combined
+                fold_weights.append(dict(fold=int(k), **weights))
         if verbose:
-            print(f"fitting {name}")
-        p, per_fold = out_of_fold(m, y_mat, folds.fold, levels, learner, response, control,
-                                  keep_fits, group=folds.group)
-        for k, fold_fit in per_fold.items():
-            fits[f"{name}|{k}"] = fold_fit
-        oof[name] = p
-        rows = score_arm(label, name, y_mat, p, folds.fold, levels, cells, score)
+            picked = f" selected {names[won]}" if nested else ""
+            print(f"fold {int(k)} of {len(levels)}{picked}")
+
+    table = {key: [] for key in SCORE_COLUMNS}
+    grain_of = []
+    for pair in fitted_pairs:
+        name, label = pair["candidate"], pair["representation"]
+        rows = score_arm(label, name, y_mat, oof[name], f, levels, cells, score)
         table["candidate"].extend(rows["learner"])
+        grain_of.extend(rows["grain"])
         for column in ("variable", "fold", "score", "scorable"):
             table[column].extend(rows[column])
-        fitted[name] = fit_learner(learner, m, y_mat, response=response,
-                                   control=control, group=folds.group)
-
     scores = {"candidate": np.asarray(table["candidate"]),
               "variable": np.asarray(table["variable"]),
               "fold": np.asarray(table["fold"], dtype=np.int64),
               "score": np.asarray(table["score"], dtype=float),
               "scorable": np.asarray(table["scorable"], dtype=bool)}
+
+    if verbose:
+        print(f"refitting every candidate on all {shape[0]} targets")
+    fitted = {pair["candidate"]: fit_learner(pair["learner"],
+                                             representations[pair["representation"]], y_mat,
+                                             response=response, control=control,
+                                             group=folds.group)
+              for pair in fitted_pairs}
     stack, weights = _combine(ensemble, oof, y_mat, cells, folds, scores, verbose)
+
+    estimate = predictions = None
+    if nested:
+        predictions = {"selected": p_selected}
+        estimate = _run_estimate("selected", y_mat, p_selected, f, levels, cells, response,
+                                 score, metric_name)
+        if stacking:
+            predictions["ensemble"] = p_ensemble
+            estimate += _run_estimate("ensemble", y_mat, p_ensemble, f, levels, cells, response,
+                                      score, metric_name)
 
     return Timesift(candidates=_candidate_table(pairs, representations), scores=scores, oof=oof,
                     representations=representations,
                     sift=Sift({k: v["spec"] for k, v in used.items()}), stack=stack,
                     weights=weights,
                     models=fitted, folds=folds, cells=cells, y=y_mat, metric=metric_name,
-                    scorer=score, response=response, spec=spec, fits=fits, control=control)
+                    scorer=score, response=response, spec=spec, fits=fits, control=control,
+                    estimate=estimate, selected=chosen if nested else None,
+                    inner=inner_rows if nested and n_cand >= 2 else None,
+                    fold_weights=fold_weights if nested and stacking else None,
+                    predictions=predictions, choice=_run_choice(scores, grain_of, ctx))
+
+
+# ---- the nested evaluation -----------------------------------------------------------------------
+
+def _fold_choice(k: int, pair: dict, search, n_train: int, n_test: int) -> dict:
+    won = None if search is None else search["won"]
+    return dict(fold=k, candidate=pair["candidate"], representation=pair["representation"],
+                learner=pair["learner"].name,
+                inner_score=float("nan") if won is None else won["score"],
+                inner_best=float("nan") if won is None else search["best"]["score"],
+                inner_se=float("nan") if won is None else search["best"]["se"],
+                n_train=n_train, n_test=n_test)
+
+
+def _fold_stack(lad, candidates, y_train, spec, refit):
+    """The weights one outer fold is combined under, fitted on the inner out-of-fold predictions of
+    its own training targets over the inner split's scorable cells, and the outer test fold's
+    predictions combined under them. The combiner never sees a prediction for a target of the
+    outer test fold, nor that target's response."""
+    from .stack import ensemble_combine, ensemble_fit
+    inner_oof = {c["learner"]: lad.predictions[f"{c['grain']}|{c['learner']}"]
+                 for c in candidates}
+    inner_scores = dict(candidate=lad.learner, variable=lad.variable, fold=lad.fold,
+                        score=lad.score, scorable=lad.scorable)
+    stack = ensemble_fit(inner_oof, y_train, lad.cells, lad.folds, spec, inner_scores)
+    combined = ensemble_combine(stack, {c["learner"]: one["pred"]
+                                        for c, one in zip(candidates, refit)})
+    return stack.weights, combined
+
+
+def _run_estimate(arm, y, p, f, levels, cells, response, score, metric_name) -> list[dict]:
+    """One arm of the estimate under every registered metric, and under the run's own where that
+    is a function no registry holds, so the number the choice was made on is always a row."""
+    rows = _nested_estimate(y, p, f, levels, cells, response)
+    if metric_name not in {r["metric"] for r in rows}:
+        scored = ladder_from_rows(score_arm(arm, arm, y, p, f, levels, cells, score),
+                                  predictions={}, cells=cells, folds=Folds(fold=f, units=y.units),
+                                  metric=metric_name, scorer=score, response=response, fits={})
+        rows.append(_estimate_row(metric_name, scored))
+    return [dict(row, arm=arm) for row in rows]
+
+
+def _run_choice(scores: dict, grain_of: list, ctx: dict) -> str:
+    """The procedure applied to every target: the rule, read on the outer scores with the outer
+    folds as the split it chooses on. One candidate is its own choice."""
+    candidates = ctx["candidates"]
+    if len(candidates) < 2:
+        return candidates[0]["learner"]
+    lad = ladder_from_rows(dict(grain=grain_of, learner=scores["candidate"],
+                                variable=scores["variable"], fold=scores["fold"],
+                                score=scores["score"], scorable=scores["scorable"]),
+                           predictions={}, cells=None, folds=None, metric="", fits={},
+                           scorer=_unused_scorer)
+    grid = _join_candidates(candidates, lad.summary(), _inner_se(lad), -1)
+    return _choose_candidate(grid, ctx["size"], ctx["rule"])["learner"]
+
+
+def _unused_scorer(y, p):
+    raise RuntimeError("a table rebuilt from stored scores is read, never rescored")
 
 
 def _combine(spec, oof, y, cells, folds, scores, verbose):

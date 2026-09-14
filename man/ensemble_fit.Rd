@@ -25,8 +25,13 @@ A \code{timesift_stack}: \code{method}, the named \code{weights}, and what they 
 }
 \description{
 The combiner sees the out-of-fold predictions, the response, the mask of scorable cells and the
-fold map, and never a model. That is what keeps it honest: there is no way for it to read
-anything a candidate fitted in-sample, because it is not handed one.
+fold map, and never a model, so it cannot read anything a candidate fitted in-sample.
+}
+\details{
+The weights are fitted to the response on those predictions, so the combined prediction scored
+against the same response is scored on the data its weights were fitted to, and that score is
+optimistic. \code{\link[=timesift]{timesift()}} evaluates the stack the other way: each outer fold's weights are fitted
+on inner out-of-fold predictions of its training targets and applied to the outer test fold.
 }
 \examples{
 set.seed(1)

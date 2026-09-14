@@ -550,7 +550,7 @@ write_fixture(
 )
 
 METRIC_FNS <- list(
-  tss = tss, roc_auc = roc_auc,
+  tss = tss, roc_auc = roc_auc, average_precision = average_precision,
   kappa = function(y, p) kappa_score(y, p, "prevalence"),
   kappa_youden = function(y, p) kappa_score(y, p, "youden"),
   threshold_youden = function(y, p) decision_threshold(y, p, "youden"),

@@ -59,6 +59,22 @@ def tss(y, p, threshold=None) -> float:
     return float(np.max(s["tp"] / s["n_pos"] - s["fp"] / s["n_neg"]))
 
 
+def average_precision(y, p) -> float:
+    """The area under the precision-recall curve, as the step sum over the distinct predictions.
+
+    At each distinct prediction, the precision of calling every unit at or above it a presence,
+    weighted by the share of presences that cut adds. Units sharing a prediction enter together.
+    Its floor is the prevalence rather than one half, which makes it the reading of how well
+    presences are ranked above absences where presences are rare.
+    """
+    s = _sweep(y, p)
+    if s is None:
+        return float("nan")
+    precision = s["tp"] / (s["tp"] + s["fp"])
+    gained = np.diff(np.concatenate(([0.0], s["tp"]))) / s["n_pos"]
+    return float(np.sum(gained * precision))
+
+
 def roc_auc(y, p) -> float:
     """The area under the ROC curve, as the rank sum of the presences. Ties take the average rank."""
     y = _labels(y)

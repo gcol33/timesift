@@ -14,8 +14,8 @@ import numpy as np
 from . import interval as ncv_module
 from ._stats import t_ppf
 from .interval import check_interval, interval_target
-from .ladder import (Ladder, aligned_predictions, concat_ladders, grain_ladder, ladder_from_rows,
-                     learner_dict, mean_se, paired_contrast, per_variable, place, score_arm)
+from .ladder import (Ladder, aligned_predictions, concat_ladders, ladder_from_rows, ladder_over,
+                     learner_dict, mean_se, paired_contrast, per_variable, score_arm)
 from .learners import fit_learner
 from .metrics import THRESHOLD_RULES, decision_threshold, tss
 from .registry import METRICS, RESPONSES, metrics
@@ -111,8 +111,11 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
 
     The estimate carries the interval across the response variables, which is the spread between
     the variables of this dataset rather than an interval for what the procedure would score on a
-    new sample. ``interval="nested_cv"`` adds one that is, by the nested cross-validation of Bates,
-    Hastie and Tibshirani (2024): each outer training set is cross-validated again over the
+    new sample. ``interval="nested_cv"`` adds one that is meant to be, by the nested
+    cross-validation of Bates, Hastie and Tibshirani (2024), and is experimental: in the selection
+    benchmark under ``inst/benchmark/``, at one repetition, its coverage of a nominal 95% ran from
+    84% to 96% across twelve designs and fell detectably below nominal in nine of them. It works
+    so: each outer training set is cross-validated again over the
     remaining folds of the same map, over ``repeats`` fold maps, which gives the mean squared error
     of a cross-validation estimate; ``final`` then holds the procedure fitted on every unit, whose
     risk the interval is for. One repetition costs one fit of the procedure per unordered pair of
@@ -149,9 +152,8 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
     if len(candidates) < 2:
         raise ValueError("selection needs at least two candidates; "
                          "got one grain and one learner")
-    size = {c["grain"]: grains[c["grain"]].values.shape[1:] for c in candidates}
-    ctx = dict(grains=grains, y=y, learners=learners, candidates=candidates, size=size, rule=rule,
-               split=split, response=response, metric=metric, control=control, group=folds.group)
+    ctx = selection_context(grains, y, learners, candidates, rule, split, response, metric,
+                            control, folds.group)
 
     levels = np.unique(f)
     p = np.full(y.values.shape, np.nan)
@@ -228,33 +230,60 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
                      nested_cv=nested, final=final)
 
 
+def selection_context(grains, y, learners: dict, candidates: list[dict], rule: str, split,
+                      response: str, metric, control, group) -> dict:
+    """What one fit of a selection procedure reads. ``candidates`` is the set in the order a tie is
+    broken in and the order it is fitted in, each naming the array under ``grain`` and the learner
+    under ``learner``."""
+    return dict(grains=grains, y=y, learners=learners, candidates=candidates,
+                pairs=[(c["grain"], c["learner"]) for c in candidates],
+                size={c["grain"]: grains[c["grain"]].values.shape[1:] for c in candidates},
+                rule=rule, split=split, response=response, metric=metric, control=control,
+                group=group)
+
+
 def _select_once(ctx: dict, train, test, split_seed: int, fold: int | None = None) -> dict:
     """One fit of the whole procedure: the inner search on the training units, the rule, the refit
     of the chosen candidate on all of them, and its predictions for the test units. The outer folds
     of ``select_grain`` and every fit of its nested cross-validation go through this."""
+    search = inner_search(ctx, train, split_seed, fold)
+    refit = refit_candidates(ctx, [search["won"]], train, test)
+    return dict(search, fit=refit[0]["fit"], pred=refit[0]["pred"])
+
+
+def inner_search(ctx: dict, train, split_seed: int, fold: int | None = None) -> dict:
+    """The search half of a selection: every candidate cross-validated on an inner map drawn on the
+    training units, and the rule applied to those inner scores. The selector sees the training
+    units and nothing else: the inner map is drawn on them, and the representation it searches over
+    is cut to them before any fitting happens."""
     y_train = ctx["y"].take_units(train)
-    # The selector sees the training units and nothing else: the inner map is drawn on them, and
-    # the representation it searches over is cut to them before any fitting happens.
-    lad = grain_ladder(_subset(ctx["grains"], train), y_train, ctx["learners"],
-                       folds=ctx["split"](y_train, split_seed, train), response=ctx["response"],
-                       metric=ctx["metric"], control=ctx["control"], verbose=False)
+    lad = ladder_over(_subset(ctx["grains"], train), y_train, ctx["learners"], ctx["pairs"],
+                      folds=ctx["split"](y_train, split_seed, train), response=ctx["response"],
+                      metric=ctx["metric"], control=ctx["control"], verbose=False)
     grid = _join_candidates(ctx["candidates"], lad.summary(), _inner_se(lad),
                             -1 if fold is None else fold)
     if not any(np.isfinite(g["score"]) for g in grid):
         where = "a fit of the nested cross-validation" if fold is None else f"fold {fold}"
         raise ValueError(f"no candidate scored inside the training data of {where}. Widen the "
                          "inner folds or drop the variables that cannot be scored.")
-    best = _first_best(grid)
-    won = _choose_candidate(grid, ctx["size"], ctx["rule"])
-    # The refit is the inner ladder's own fitting path, so the procedure's held-out predictions
-    # are the ones its chosen candidate would have made rather than a second fitting path's.
-    m = ctx["grains"][won["grain"]]
+    return dict(lad=lad, grid=grid, best=_first_best(grid),
+                won=_choose_candidate(grid, ctx["size"], ctx["rule"]))
+
+
+def refit_candidates(ctx: dict, chosen: list[dict], train, test) -> list[dict]:
+    """The refit half: each named candidate fitted on every training unit and asked for the test
+    units. This is the fitting path of the inner ladder itself, so a selected candidate's held-out
+    prediction is the one it would have made there."""
+    y_train = ctx["y"].take_units(train)
     group = ctx["group"]
-    fit = fit_learner(ctx["learners"][won["learner"]], m.take_units(train), y_train,
-                      response=ctx["response"], control=ctx["control"],
-                      group=None if group is None else tuple(group[u] for u in train))
-    return dict(lad=lad, grid=grid, best=best, won=won, fit=fit,
-                pred=aligned_predictions(fit, m, ctx["y"], test))
+    out = []
+    for c in chosen:
+        m = ctx["grains"][c["grain"]]
+        fit = fit_learner(ctx["learners"][c["learner"]], m.take_units(train), y_train,
+                          response=ctx["response"], control=ctx["control"],
+                          group=None if group is None else tuple(group[u] for u in train))
+        out.append(dict(fit=fit, pred=aligned_predictions(fit, m, ctx["y"], test)))
+    return out
 
 
 def _subset(grains: TimesiftSet, index) -> TimesiftSet:

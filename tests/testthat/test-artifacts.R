@@ -118,7 +118,7 @@ test_that("every threshold metric matches the value the fixtures pin", {
 
   cases <- read_fixture(dir, "metric_cases.csv")
   expected <- read_fixture(dir, "metrics.csv")
-  fns <- list(tss = tss, roc_auc = roc_auc,
+  fns <- list(tss = tss, roc_auc = roc_auc, average_precision = average_precision,
               kappa = function(y, p) kappa_score(y, p, "prevalence"),
               kappa_youden = function(y, p) kappa_score(y, p, "youden"),
               threshold_youden = function(y, p) decision_threshold(y, p, "youden"),

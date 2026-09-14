@@ -4,7 +4,7 @@
 \alias{score_predictions}
 \title{Score held-out predictions on the cells the mask allows}
 \usage{
-score_predictions(y, p, folds, cells = NULL, metric = "tss")
+score_predictions(y, p, folds, cells = NULL, metric = "roc_auc")
 }
 \arguments{
 \item{y}{The response, as a matrix of units by variables.}

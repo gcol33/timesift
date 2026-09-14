@@ -1,13 +1,16 @@
 #' What a run found
 #'
-#' The mean score of every candidate, how many responses each of them scored highest on, whether
-#' one fitted model covered those responses or one was fitted per response, and the level the
-#' combined prediction reached with the weights it reached it under.
+#' Two kinds of row. A candidate row is the candidate's mean score on the outer folds, how many
+#' responses it scored highest on, and whether one fitted model covered those responses or one was
+#' fitted per response. These rows are the comparison: they share folds and cells, so their shape
+#' is read across grains and learners, but the highest of them was picked out on the folds it is
+#' scored on. The `selected` and `ensemble` rows are the procedure's held-out score, the choice and
+#' the weights made inside every outer training fold, and they are the level to quote.
 #'
-#' Both columns beside the mean are worth reading. A candidate can carry the ensemble without
-#' winning a single response, which is what `won` shows and a mean alone hides; and a joint model
-#' and a per-response one reach the same `[target, response]` matrix by different routes, which is
-#' what `responses` records.
+#' Both columns beside a candidate's mean are worth reading. A candidate can carry the ensemble
+#' without winning a single response, which is what `won` shows and a mean alone hides; and a joint
+#' model and a per-response one reach the same `[target, response]` matrix by different routes,
+#' which is what `responses` records.
 #'
 #' A candidate the run built no representation for, because its learner cannot read the
 #' representation it was paired with, is listed with no mean rather than dropped, so the report says
@@ -17,9 +20,12 @@
 #' @param x A `timesift` result, or the table this returns.
 #' @param ... Ignored, so that the methods take the arguments their generics declare.
 #'
-#' @return A data frame of one row per candidate and one for the ensemble, of class
-#'   `timesift_summary`, carrying the mean score, the responses won and how the responses were
-#'   covered. The weights are in the `weights` attribute.
+#' @return A data frame of class `timesift_summary`, one row per candidate and, where the run made
+#'   an estimate, one for the selected candidate and one for the stack. It carries the mean score,
+#'   its standard error across responses for the two procedure rows, the responses won, how the
+#'   responses were covered, and `scored`: `"outer folds"` for a candidate, `"nested"` for the
+#'   procedure. The weights fitted on every target are in the `weights` attribute and the candidate
+#'   chosen on every target in `choice`.
 #'
 #' @name timesift_report
 NULL
@@ -33,19 +39,41 @@ summary.timesift <- function(object, ...) {
     v <- per_response$score[per_response$candidate == cd]
     if (!length(v)) NA_real_ else mean(v)
   }, numeric(1L))
-  out <- data.frame(candidate = candidates, mean = as.numeric(mean_score),
+  out <- data.frame(candidate = candidates, mean = as.numeric(mean_score), se = NA_real_,
                     won = .responses_won(per_response, candidates),
-                    responses = .candidate_multi(object, candidates),
+                    responses = .candidate_multi(object, candidates), scored = "outer folds",
                     stringsAsFactors = FALSE)
   out <- out[order(out$mean, na.last = FALSE, decreasing = FALSE), , drop = FALSE]
-  level <- .ensemble_level(object)
-  if (is.finite(level)) {
-    out <- rbind(out, data.frame(candidate = "ensemble", mean = level, won = NA_integer_,
-                                 responses = "", stringsAsFactors = FALSE))
+  est <- object$estimate
+  if (!is.null(est)) {
+    est <- est[est$metric == object$metric, , drop = FALSE]
+    out <- rbind(out, data.frame(candidate = est$arm, mean = est$score, se = est$se,
+                                 won = NA_integer_, responses = "", scored = "nested",
+                                 stringsAsFactors = FALSE))
   }
   rownames(out) <- NULL
   structure(out, class = c("timesift_summary", "data.frame"),
-            header = .run_header(object), weights = ensemble_weights(object))
+            header = .run_header(object), weights = ensemble_weights(object),
+            choice = object$choice, selected = .selection_counts(object$selected))
+}
+
+# The stack's held-out score under the run's own metric, or NA where the run made no estimate of it.
+.ensemble_estimate <- function(fit) {
+  est <- fit$estimate
+  if (is.null(est)) {
+    return(NA_real_)
+  }
+  hit <- est$score[est$arm == "ensemble" & est$metric == fit$metric]
+  if (length(hit)) hit[1L] else NA_real_
+}
+
+# How often each candidate was chosen across the outer folds, most often first.
+.selection_counts <- function(selected) {
+  if (is.null(selected)) {
+    return(NULL)
+  }
+  counts <- table(factor(selected$candidate, levels = unique(selected$candidate)))
+  sort(counts, decreasing = TRUE)
 }
 
 #' @rdname timesift_report
@@ -65,19 +93,38 @@ print.timesift_summary <- function(x, ...) {
   }
   width <- max(nchar(c(x$candidate, "candidate")))
   row <- function(...) cat(trimws(sprintf(...), which = "right"), "\n", sep = "")
+  cand <- x[x$scored == "outer folds", , drop = FALSE]
+  cat("candidates, scored on the outer folds\n")
   row("%-*s %14s %6s  %s", width, "candidate", "mean", "won", "responses")
-  for (i in seq_len(nrow(x))) {
-    row("%-*s %14s %6s  %s", width, x$candidate[i],
-        if (is.na(x$mean[i])) "not applicable" else sprintf("%.3f", x$mean[i]),
-        if (is.na(x$won[i])) "-" else format(x$won[i]),
-        x$responses[i])
+  for (i in seq_len(nrow(cand))) {
+    row("%-*s %14s %6s  %s", width, cand$candidate[i],
+        if (is.na(cand$mean[i])) "not applicable" else sprintf("%.3f", cand$mean[i]),
+        if (is.na(cand$won[i])) "-" else format(cand$won[i]),
+        cand$responses[i])
+  }
+  proc <- x[x$scored == "nested", , drop = FALSE]
+  if (nrow(proc)) {
+    cat("\nprocedure, chosen and weighted inside each outer training fold\n")
+    for (i in seq_len(nrow(proc))) {
+      row("%-*s %14s  se %.3f", width, proc$candidate[i], sprintf("%.3f", proc$mean[i]),
+          proc$se[i])
+    }
+    counts <- attr(x, "selected")
+    if (!is.null(counts)) {
+      cat("selected ", paste(sprintf("%s in %d", names(counts), as.integer(counts)),
+                             collapse = ", "),
+          " of ", sum(counts), " folds\n", sep = "")
+    }
+  }
+  if (!is.null(attr(x, "choice"))) {
+    cat("\nchoice on every target  ", attr(x, "choice"), "\n", sep = "")
   }
   weights <- attr(x, "weights")
   if (!is.null(weights)) {
     # A member whose weight rounds to nothing is not a member of the combination in any way a
     # reader can act on; ensemble_weights() still carries every one of them.
     weights <- sort(weights[weights >= 0.005], decreasing = TRUE)
-    cat("\nweights  ",
+    cat("weights on every target  ",
         paste(sprintf("%s %.2f", names(weights), weights), collapse = "   "), "\n", sep = "")
   }
   invisible(x)
@@ -164,20 +211,6 @@ occlusion.timesift <- function(x, candidate, over = c("bin", "channel"), ...) {
     model <- fit$models[[cd]]
     if (is.null(model) || is.null(model$learner)) NA_character_ else model$learner$multi
   }, character(1L), USE.NAMES = FALSE)
-}
-
-# The level the combined out-of-fold prediction reaches, scored on the same cells and by the same
-# metric as every candidate, so the ensemble row of the report is comparable with the rows above it.
-.ensemble_level <- function(fit) {
-  if (is.null(fit$stack)) {
-    return(NA_real_)
-  }
-  combined <- ensemble_combine(fit$stack, fit$oof)
-  f <- .as_folds(fit$folds, rownames(fit$y))
-  rows <- .score_arm("ensemble", "ensemble", fit$y, combined, f, sort(unique(f)), fit$cells,
-                     fit$scorer)
-  per <- .cell_means(rows)
-  if (!nrow(per)) NA_real_ else mean(per$score)
 }
 
 .run_header <- function(fit) {

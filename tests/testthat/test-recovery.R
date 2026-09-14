@@ -44,7 +44,8 @@ test_that("a response with no cause in the record scores at chance", {
               dimnames = list(sim$units, paste0("sp", 1:3)))
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("week", "month"))
   lad <- suppressWarnings(grain_ladder(x, y, elasticnet(),
-                                        folds = fold_map(y, v = 5L, seed = 7L), verbose = FALSE))
+                                        folds = fold_map(y, v = 5L, seed = 7L), metric = "tss",
+                                        verbose = FALSE))
   # TSS read at the cut that maximises it is biased upward on cells this small, so chance is not
   # zero here; the measured inflation is what "chance" means on this design.
   floor <- tss_inflation(y, fold_map(y, v = 5L, seed = 7L), skill = 0,

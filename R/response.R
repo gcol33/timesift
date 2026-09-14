@@ -157,7 +157,7 @@ positive_weights <- function(y, cap = 50) {
   },
   activation = "sigmoid",
   loss = "binary_cross_entropy",
-  metric = "tss",
+  metric = "roc_auc",
   weights = function(y) positive_weights(y),
   cells = function(y, folds) scorable_cells(y, folds)
 )

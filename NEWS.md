@@ -1,3 +1,43 @@
+# timesift 0.2.0
+
+## Changed
+
+* `timesift()` now estimates the procedure it runs. Inside each outer fold of `resampling` the
+  training targets are split again into `inner` folds (5 by default), every candidate is
+  cross-validated there, `rule` chooses one on its inner score and the stack's weights are fitted
+  on the inner out-of-fold predictions; the choice and the weights then predict the outer test fold
+  once. `estimate` holds the held-out score of the selected candidate and of the stack under every
+  registered metric, `selected` and `inner` the choice in every outer fold, `fold_weights` the
+  weights, and `predictions` both held-out prediction matrices. The candidates' scores on the
+  outer folds are unchanged and are reported apart from the estimate, because the best of them was
+  picked out on the folds it is scored on. `inner = NULL` compares the candidates without an
+  estimate. `timesift()` and `select_grain()` share one inner search and one refit, so on the same
+  candidates, fold map, inner count and seed the selected arm is `select_grain()`'s selection.
+  On both sides.
+* The ensemble row of the report is the stack's held-out score under per-fold weights. Before,
+  the weights were fitted on the outer out-of-fold predictions and the combination was then scored
+  against the responses they had been fitted to. `summary()` prints the candidates and the
+  procedure as two tables; the Python side's `ensemble_row()` is replaced by `procedure_table()`.
+* `predict(candidate = "selected")` predicts with `choice`, the candidate the rule takes on every
+  target.
+* The presence-absence head is scored by `roc_auc` unless a metric is named, and
+  `score_predictions()` defaults to it too. TSS read at its best cut is inflated by an amount that
+  depends on how a model's predictions are distributed, so it stays beside AUC rather than ahead of
+  it. On both sides.
+
+## New
+
+* `average_precision()`, registered as a metric and pinned in the metric fixtures. On both sides.
+
+## Documentation
+
+* The pairing and inflation text no longer says a paired TSS difference cancels the inflation of a
+  self-selected threshold, or that a level is an upper bound: the inflation is an expectation, and
+  two arms of equal skill can carry different amounts of it.
+* `interval = "nested_cv"` is documented, and printed, as experimental: at one repetition in the
+  package's benchmark its coverage of a nominal 95% ran from 84% to 96% and fell detectably below
+  nominal in nine of twelve designs.
+
 # timesift 0.1.1
 
 ## New

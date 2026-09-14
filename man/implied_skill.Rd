@@ -37,10 +37,10 @@ that map: given a level actually read off a ladder, it solves for the population
 expected reported level equals it.
 }
 \details{
-It answers the question a level raises once the inflation is known, and it is the only honest
-way to read a level as a statement about a population rather than about a scoring rule. It says
-nothing about a difference between two arms, where the inflation cancels and the reported number
-stands as it is.
+It answers the question a level raises once the inflation is known, under the distribution of
+predictions \code{\link[=tss_inflation]{tss_inflation()}} plants; a model whose predictions are distributed otherwise is
+inflated by a different amount. It does not correct a difference between two arms, whose
+inflations need not be equal.
 }
 \examples{
 set.seed(1)

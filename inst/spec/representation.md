@@ -637,8 +637,8 @@ fold map, recompute the mask, and assert it cell by cell. Both also write all th
 assert the bytes, which is what makes the file format a contract rather than a convention.
 
 `metric_cases.csv` and `metrics.csv` hold ten `(y, p)` cases and the value of every threshold
-metric on each: `tss`, `roc_auc`, `kappa` under both rules, and `decision_threshold` under all
-three. The cases are where the tie rule is the whole answer -- every prediction tied, ties within
+metric on each: `tss`, `roc_auc`, `average_precision`, `kappa` under both rules, and
+`decision_threshold` under all three. The cases are where the tie rule is the whole answer -- every prediction tied, ties within
 a class, ties across the classes, one presence, one absence, all presences, all absences, a
 perfect separation and a reversed one. A metric a case defines no value on is written `NA` rather
 than left out, so a suite that quietly skipped it fails rather than passes.
@@ -679,7 +679,7 @@ call site.
 
 | concept | the name, on both sides |
 |---|---|
-| the whole run | `timesift()`, from a table of targets and a table of series to a scored comparison |
+| the whole run | `timesift()`, from a table of targets and a table of series to a scored comparison and a nested estimate of choosing among it |
 | what a representation is | `native()`, `grain()`, `multigrain()`, `lookback()`, and the sets `grains()` and `lookbacks()` |
 | coercing to a set of representations | `as_sift()`, from a representation, a list of them or a vector of grain names |
 | the calendar-binned array | `grain_matrix()` |
@@ -699,7 +699,7 @@ call site.
 | fitting across a set of grains | `grain_ladder()`, and `select_grain()` for the nested selection |
 | the combiner | `ensemble()`, `ensemble_fit()`, `ensemble_combine()` and `ensemble_weights()` |
 | scoring held-out predictions | `score_predictions()`, on the cells the mask allows |
-| the metrics | `tss()`, `roc_auc()` and `kappa_score()`, with `decision_threshold()` and `model_agreement()` beside them |
+| the metrics | `tss()`, `roc_auc()`, `average_precision()` and `kappa_score()`, with `decision_threshold()` and `model_agreement()` beside them |
 | two arms on matched cells | `paired_contrast()` |
 | the inflation of a self-selected threshold | `tss_inflation()`, and `implied_skill()` for the level it implies |
 | a set of representations | `timesift_set()`, which reads as a mapping of grain name to representation |
@@ -742,7 +742,8 @@ call site.
 - A setting given at fit time overrides the one the learner carries, and a setting the learner does
   not have is refused rather than ignored.
 - The response head and the metric are registry entries. `metric` takes a registered name or a
-  function of `(y, p)`, and left unset it is the one the response head carries. Both travel with
+  function of `(y, p)`, and left unset it is the one the response head carries, which for the
+  shipped presence-absence head is `roc_auc`. Both travel with
   the fit: the function is what scores, and the name is what the report prints. A function has no
   name to print and reads as `<function>` on both sides rather than as whatever each language
   calls an anonymous one. `select_grain()` is the one door that takes a name only, because it
@@ -825,6 +826,19 @@ call site.
 - A candidate is reported as `learner / representation`, and every candidate emits an out-of-fold
   prediction for every scorable cell over the same folds. The combiner is handed those predictions,
   the response, the mask and the fold map, and never a model.
+- `timesift()` evaluates the procedure nested. Within each outer fold it draws an inner map of
+  `inner` folds on the training targets, as `select_grain()` draws one, cross-validates every
+  candidate on it, chooses one by `rule` on the inner scores, and fits the stack's weights on the
+  inner out-of-fold predictions over the inner mask; every candidate is then refitted on the outer
+  training targets and predicts the test fold, which gives each candidate's outer out-of-fold
+  prediction, the selected candidate's and the stack's under that fold's weights. The estimate is
+  both of those held-out predictions scored under every registered metric, and the run's own where
+  it is a function, with the interval across variables; one outer fold's choice, weights and
+  held-out predictions do not move when that fold's responses change. `inner` left unset is 5, and
+  `inner = NULL` / `inner=None` runs no search and makes no estimate. With one candidate there is
+  no search and the candidate is its own choice. `choice` is the rule applied to the outer scores,
+  with the outer folds as its split, and the stack a prediction goes through is fitted on the outer
+  out-of-fold predictions, so neither is the one the estimate was read under.
 - The combiner minimises the loss of the head the run was fitted under. `ensemble()` left without
   a `response` takes the run's, and one naming a different head is refused before anything is
   fitted; `ensemble_fit()` called on its own reads an unnamed head as `presence_absence`.
@@ -836,7 +850,7 @@ call site.
 | a learner of your own | `learner()`, a constructor taking the fit and the predict | `Learner`, the dataclass, built directly with the same fields |
 | a learner's own training settings | a `control` field holding a partly specified `train_control()` | its `params`, beside the architecture |
 | the occlusion profile | `occlusion()`, an S3 generic with methods on a run and on a ladder | `occlusion()`, one function taking either |
-| the report on a run | `summary()`, a method on the base generic, printing the candidates and the ensemble | `summary()`, one function returning the text, with `candidate_table()` and `ensemble_row()` for the two tables it prints |
+| the report on a run | `summary()`, a method on the base generic, printing the candidates and the procedure | `summary()`, one function returning the text, with `candidate_table()` and `procedure_table()` for the two tables it prints |
 | predicting new targets | `predict()`, a method on the base generic | `.predict()`, a method on the fit |
 | a set of learners, or of representations | `c()`, an S3 method on each spec class | a `list`, and `+` between two of them |
 

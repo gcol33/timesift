@@ -281,5 +281,5 @@
 .interval_target <- function(interval) {
   switch(interval,
          variables = "the spread across the variables of this dataset, fitted and scored on these units and folds",
-         nested_cv = "the procedure's risk on a new sample of this size, by nested cross-validation")
+         nested_cv = "the procedure's risk on a new sample of this size, by nested cross-validation (experimental: below nominal coverage in the package's benchmark)")
 }

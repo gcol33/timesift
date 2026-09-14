@@ -147,6 +147,12 @@ def ensemble_fit(oof: dict, y, cells, folds, spec=None, scores=None) -> Stack:
     ``oof`` is one ``[target, response]`` matrix per candidate, in the response's own row order.
     Only the cells the mask admits are read, so every candidate is weighted on the same cells its
     score was read on.
+
+    The weights are fitted to the response on those predictions, so the combination scored against
+    the same response is scored on the data its weights were fitted to, and that score is
+    optimistic. ``timesift`` evaluates the stack the other way: each outer fold's weights are
+    fitted on inner out-of-fold predictions of its training targets and applied to the outer test
+    fold.
     """
     spec = as_ensemble(ensemble() if spec is None else spec)
     if spec is None:
@@ -237,9 +243,12 @@ def simplex_weights(p: np.ndarray, y: np.ndarray, loss: dict, iterations: int = 
             break
         g = g / largest
         while True:
-            moved_to = w * np.exp(-step * g)
-            moved_to = moved_to / moved_to.sum()
-            moved = loss["value"](p @ moved_to, y)
+            # A step grown past what exp() can hold gives inf / inf, which the finiteness check
+            # below refuses and halves, so the overflow is the step being too long and not an error.
+            with np.errstate(over="ignore", invalid="ignore"):
+                moved_to = w * np.exp(-step * g)
+                moved_to = moved_to / moved_to.sum()
+                moved = loss["value"](p @ moved_to, y)
             if np.isfinite(moved) and moved <= value:
                 break
             step *= 0.5

@@ -154,7 +154,7 @@ baseline <- grain_ladder(
   features, y,
   list(elastic_net = elasticnet(alpha = 0.5, n_inner = 5, squares = TRUE),
        stepwise = stepwise(max_terms = 3, degree = 2)),
-  folds = folds)
+  folds = folds, metric = "tss")
 ```
 
 Both redo their predictor selection inside every fold, on the training plots only, which is the
@@ -202,7 +202,7 @@ ladder_input <- timesift_set(lapply(binning, function(w) {
   bind_channels(x, calendar_channels(x))
 }))
 
-grid <- grain_ladder(ladder_input, y, encoders, folds = folds)
+grid <- grain_ladder(ladder_input, y, encoders, folds = folds, metric = "tss")
 summary(grid)
 ```
 
@@ -212,7 +212,7 @@ prediction there, so averaging the eleven and choosing a threshold afterwards is
 one model rather than as a vote between eleven decisions.
 
 ```{r ensemble-arm}
-lad <- grain_ladder(ladder_input, y, members, folds = folds)
+lad <- grain_ladder(ladder_input, y, members, folds = folds, metric = "tss")
 oof <- attr(lad, "predictions")
 arms <- paste("week", names(members), sep = "|")
 
@@ -289,7 +289,7 @@ weekly <- grain_matrix(readings, logger_ID, date, temp, grain = "week",
                         stats = c("cold_day", "mean", "warm_day"))
 series <- grain_ladder(timesift_set(list(series = weekly)), y,
                        list(elastic_net = elasticnet(alpha = 0.5, n_inner = 5, squares = TRUE)),
-                       folds = folds)
+                       folds = folds, metric = "tss")
 ```
 
 157 weeks by three channels is 471 numbers per plot, and with their squares the penalised fit reads

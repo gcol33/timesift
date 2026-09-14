@@ -1,11 +1,28 @@
 #' Fit and compare representations of time-varying data
 #'
-#' One call from two tables to a scored comparison. `targets` is one row per thing to predict and
-#' `series` is the long, time-stamped record belonging to those rows. Every representation in
-#' `sift` is built, every learner in `models` is fitted on the ones it can read, each on the same
-#' folds and restricted to the same scorable cells, and the out-of-fold predictions are stacked
-#' into an ensemble. What comes back says where predictive skill saturates as the record is read
-#' more coarsely, which is the measurement the package exists for.
+#' One call from two tables to a scored comparison and a held-out estimate of choosing among it.
+#' `targets` is one row per thing to predict and `series` is the long, time-stamped record belonging
+#' to those rows. Every representation in `sift` is built and every learner in `models` is paired
+#' with the ones it can read; each pair is a candidate.
+#'
+#' Within each outer fold of `resampling` the training targets are split again into `inner` folds.
+#' Every candidate is cross-validated on that inner split, the rule picks one on its inner score,
+#' and the stack's weights are fitted on the inner out-of-fold predictions. Every candidate is then
+#' refitted on the whole outer training set and predicts the outer test fold, and the selected
+#' candidate's prediction and the prediction combined under that fold's weights are kept. Nothing
+#' the outer test fold holds enters the choice or the weights it is scored under, so `estimate` is
+#' of the procedure, selection and stacking included, which is what an ecologist applying it to a
+#' new site would run.
+#'
+#' The same refits give every candidate an out-of-fold prediction on the outer folds, and `scores`
+#' holds those. They say where predictive skill saturates as the record is read more coarsely, which
+#' is the measurement the package exists for, but the highest of them is a number the held-out
+#' targets helped choose: read the candidates for the shape of the comparison and `estimate` for
+#' the level. With `inner = NULL` no inner search is run, the candidates are compared on the outer
+#' folds alone and no estimate is made.
+#'
+#' The cost is `v_outer * (v_inner + 1) * candidates` fits for the evaluation and one refit per
+#' candidate on every target, against `v_outer * candidates` for the comparison alone.
 #'
 #' @param targets A data frame, one row per prediction target.
 #' @param series A long data frame of readings, or `NULL` to fit on `static` alone.
@@ -24,14 +41,23 @@
 #'   A [grains()] or [lookbacks()] set, a set from [c()], a bare vector of grain names, a single
 #'   representation, or a list of them. Defaults to `grains("auto")`.
 #' @param ensemble `TRUE` for the default stack, `FALSE` for none, or an [ensemble()] spec.
-#' @param resampling [cv()], [grouped_cv()], a fold vector, or a [fold_map()] result.
+#' @param resampling The outer split: [cv()], [grouped_cv()], a fold vector, or a [fold_map()]
+#'   result.
+#' @param inner Number of inner folds the choice and the stack's weights are made on inside each
+#'   outer training set, a function of the outer training response returning a fold map for those
+#'   targets, or `NULL` to compare the candidates on the outer folds without an estimate. A count
+#'   deals the inner folds by the grouping the outer split carries, as [select_grain()] does.
+#' @param rule How a candidate is chosen from its inner scores, `"argmax"` or
+#'   `"coarsest_adequate"`, as in [select_grain()].
 #' @param response Name of the registered response head.
 #' @param metric Name of a registered metric, or a function of `(y, p)`, or `NULL` for the
-#'   response head's own. Whichever it is, it travels with the fit and is what every later
-#'   rescoring reads; a function is reported as `<function>`.
+#'   response head's own. It is what the candidates are chosen on and what the report reads.
+#'   Whichever it is, it travels with the fit and is what every later rescoring reads; a function is
+#'   reported as `<function>`. The estimate is also reported under every registered metric.
 #' @param control [train_control()], the training settings every neural learner reads.
 #' @param keep_fits Keep every per-fold fitted candidate beside the refits.
-#' @param verbose Report each candidate as it runs.
+#' @param seed Seed for the inner splits. Each outer fold splits under `seed` plus its position.
+#' @param verbose Report each outer fold as it runs.
 #'
 #' @section Rules the entry point enforces:
 #' `static` is never implicit: a column of `targets` that is neither the response, the identifier
@@ -54,9 +80,26 @@
 #' pair is skipped and reported once by name; named explicitly through a learner's `data =` it is
 #' an error.
 #'
-#' @return A `timesift` object: a list carrying `candidates`, `scores`, `oof`, `representations`,
-#'   `stack`, `weights`, `models`, `folds`, `cells`, `y`, and the `metric`, `response`, `spec` and
-#'   `call` it was asked for.
+#' @return A `timesift` object, a list carrying:
+#'   * `estimate`: the held-out score of the selected candidate (`arm = "selected"`) and of the
+#'     stack (`arm = "ensemble"`), one row per metric, with the standard error and the 95% interval
+#'     across response variables. An interval across the variables of this dataset, not one for a
+#'     new sample: every variable is fitted and scored on the same targets and folds, so the error
+#'     they share is not in it. `NULL` with `inner = NULL`.
+#'   * `selected`: one row per outer fold, the candidate it chose, the inner score it chose on, the
+#'     highest inner score and that score's standard error; `inner`: every candidate's inner score
+#'     in every outer fold; `fold_weights`: the stack's weights in every outer fold, one row per
+#'     fold. All `NULL` with `inner = NULL`.
+#'   * `predictions`: the held-out prediction of every target under the selected candidate and under
+#'     the stack.
+#'   * `candidates`, `scores` and `oof`: every candidate, its per-cell scores on the outer folds and
+#'     its outer out-of-fold predictions.
+#'   * `choice`, `models`, `stack` and `weights`: the procedure applied to every target, which is
+#'     what [predict()] uses. Every candidate is refitted on all of them; `choice` is the candidate
+#'     the rule takes on the outer scores, with the outer folds as the split it chooses on, and
+#'     `stack` holds weights fitted on the outer out-of-fold predictions.
+#'   * `representations`, `fits`, `folds`, `cells`, `y`, and the `metric`, `response`, `spec` and
+#'     `call` it was asked for.
 #'
 #' @seealso [build_representation()] for the array a candidate reads, [fold_map()] for the splits.
 #'
@@ -82,9 +125,11 @@
 timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL,
                      target_time = NULL, static = NULL,
                      models = NULL, sift = NULL, ensemble = TRUE,
-                     resampling = cv(), response = "presence_absence", metric = NULL,
-                     control = train_control(), keep_fits = FALSE, verbose = TRUE) {
+                     resampling = cv(), inner = 5L, rule = c("argmax", "coarsest_adequate"),
+                     response = "presence_absence", metric = NULL,
+                     control = train_control(), keep_fits = FALSE, seed = 1L, verbose = TRUE) {
   call <- match.call()
+  rule <- match.arg(rule)
   env <- parent.frame()
   if (!is.data.frame(targets)) {
     stop("`targets` must be a data frame, one row per prediction target, got ",
@@ -183,55 +228,170 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
          "for the counts; a rarer response needs fewer folds, or a response present somewhere.",
          call. = FALSE)
   }
+  metric_arg <- metric
   metric <- .as_metric(metric, head$metric)
   score <- metric$fn
   levels <- sort(unique(f))
-
-  oof <- list()
-  scores <- list()
-  models_out <- list()
-  fits <- list()
-  for (i in seq_len(nrow(fitted))) {
-    cand <- fitted$candidate[i]
-    learner <- learners[[fitted$learner[i]]]
-    x_array <- built[[fitted$representation[i]]]
-    if (verbose) {
-      message("fitting ", fitted$learner[i], " on the ", fitted$representation[i],
-              " representation")
-    }
-    run <- .fit_candidate(learner, x_array, y_matrix, f, levels, response, control, keep_fits,
-                          verbose, group = group)
-    oof[[cand]] <- run$oof
-    scores[[cand]] <- .candidate_scores(cand, fitted$representation[i], fitted$learner[i],
-                                        y_matrix, run$oof, f, levels, cells, score)
-    if (keep_fits) {
-      fits[[cand]] <- run$fits
-    }
-    models_out[[cand]] <- fit_learner(learner, x_array, y_matrix, response = response,
-                                      control = control, group = group)
+  nested <- !is.null(inner)
+  stacking <- !isFALSE(ensemble) && nrow(fitted) >= 2L
+  if (!isFALSE(ensemble) && !stacking && verbose) {
+    message("no ensemble: stacking needs at least two candidates.")
   }
-  scores <- do.call(rbind, scores)
+  if (nested && nrow(fitted) < 2L && verbose) {
+    message("one candidate, so there is nothing to choose between inside the training folds.")
+  }
+
+  # The candidate set as the selection engine reads it: `grain` names the representation array, and
+  # the order the candidates were declared in is both the fitting order and the order a tie falls in.
+  pairs <- data.frame(grain = fitted$representation, learner = fitted$learner,
+                      stringsAsFactors = FALSE)
+  ctx <- .selection_context(built, y_matrix, learners, pairs, pairs, rule,
+                            if (nested) .inner_splitter(inner, group) else NULL,
+                            response, metric_arg %||% head$metric, control, group)
+  n_cand <- nrow(fitted)
+  blank <- matrix(NA_real_, nrow = nrow(y_matrix), ncol = ncol(y_matrix),
+                  dimnames = dimnames(y_matrix))
+  oof <- stats::setNames(rep(list(blank), n_cand), fitted$candidate)
+  fits <- stats::setNames(rep(list(list()), n_cand), fitted$candidate)
+  p_selected <- p_ensemble <- blank
+  chosen <- inner_rows <- fold_weights <- vector("list", length(levels))
+
+  for (i in seq_along(levels)) {
+    k <- levels[i]
+    started <- Sys.time()
+    train <- which(f != k)
+    test <- which(f == k)
+    search <- if (nested && n_cand >= 2L) .inner_search(ctx, train, seed + i, fold = k) else NULL
+    refit <- .refit_candidates(ctx, seq_len(n_cand), train, test)
+    for (j in seq_len(n_cand)) {
+      held <- refit$preds[[j]]
+      oof[[j]][rownames(held), colnames(held)] <- held
+      if (keep_fits) {
+        fits[[j]][[as.character(k)]] <- refit$fits[[j]]
+      }
+    }
+    if (nested) {
+      won <- search$won %||% 1L
+      held <- refit$preds[[won]]
+      p_selected[rownames(held), colnames(held)] <- held
+      chosen[[i]] <- .fold_choice(k, fitted[won, ], search, length(train), length(test))
+      if (!is.null(search)) {
+        inner_rows[[i]] <- .fold_inner(search$grid, fitted)
+      }
+      if (stacking) {
+        st <- .fold_stack(search$lad, fitted, y_matrix[train, , drop = FALSE], ensemble)
+        combined <- ensemble_combine(st, stats::setNames(refit$preds, fitted$candidate))
+        p_ensemble[rownames(combined), colnames(combined)] <- combined
+        fold_weights[[i]] <- as.data.frame(as.list(c(fold = k, st$weights)), check.names = FALSE)
+      }
+    }
+    if (verbose) {
+      message(sprintf("fold %s of %d%s, %.0f s", k, length(levels),
+                      if (nested) paste0(" selected ", fitted$candidate[search$won %||% 1L]) else "",
+                      as.numeric(difftime(Sys.time(), started, units = "secs"))))
+    }
+  }
+
+  scores <- do.call(rbind, lapply(seq_len(n_cand), function(j) {
+    .candidate_scores(fitted$candidate[j], fitted$representation[j], fitted$learner[j],
+                      y_matrix, oof[[j]], f, levels, cells, score)
+  }))
   rownames(scores) <- NULL
 
-  stack <- NULL
-  if (!isFALSE(ensemble)) {
-    if (length(oof) < 2L) {
-      if (verbose) {
-        message("no ensemble: stacking needs at least two candidates.")
-      }
-    } else {
-      stack <- ensemble_fit(oof = oof, y = y_matrix, cells = cells, folds = folds,
-                            spec = ensemble, scores = scores)
-    }
+  if (verbose) {
+    message("refitting every candidate on all ", nrow(y_matrix), " targets")
+  }
+  models_out <- stats::setNames(lapply(seq_len(n_cand), function(j) {
+    fit_learner(learners[[fitted$learner[j]]], built[[fitted$representation[j]]], y_matrix,
+                response = response, control = control, group = group)
+  }), fitted$candidate)
+  stack <- if (stacking) {
+    ensemble_fit(oof = oof, y = y_matrix, cells = cells, folds = folds, spec = ensemble,
+                 scores = scores)
   }
 
-  structure(list(candidates = grid, scores = scores, oof = oof, representations = built,
-                 stack = stack, weights = stack$weights, models = models_out,
+  estimate <- selected <- inner_table <- weights_table <- predictions <- NULL
+  if (nested) {
+    predictions <- list(selected = p_selected)
+    estimate <- .run_estimate("selected", y_matrix, p_selected, f, levels, cells, metric)
+    if (stacking) {
+      predictions$ensemble <- p_ensemble
+      estimate <- rbind(estimate,
+                        .run_estimate("ensemble", y_matrix, p_ensemble, f, levels, cells, metric))
+      weights_table <- do.call(rbind, fold_weights)
+    }
+    selected <- do.call(rbind, chosen)
+    inner_table <- if (n_cand >= 2L) do.call(rbind, inner_rows)
+  }
+
+  structure(list(estimate = estimate, selected = selected, inner = inner_table,
+                 fold_weights = weights_table, predictions = predictions,
+                 candidates = grid, scores = scores, oof = oof,
+                 choice = .run_choice(scores, fitted, ctx), models = models_out,
+                 stack = stack, weights = stack$weights, representations = built,
                  fits = if (keep_fits) fits else NULL,
                  folds = folds, cells = cells, y = y_matrix,
                  metric = metric$name, scorer = score, response = response, spec = spec,
                  call = call),
             class = "timesift")
+}
+
+# ---- the nested evaluation -----------------------------------------------------------------------
+
+.fold_choice <- function(k, row, search, n_train, n_test) {
+  won <- search$won
+  data.frame(fold = k, candidate = row$candidate, representation = row$representation,
+             learner = row$learner,
+             inner_score = if (is.null(won)) NA_real_ else search$grid$score[won],
+             inner_best = if (is.null(won)) NA_real_ else search$grid$score[search$best],
+             inner_se = if (is.null(won)) NA_real_ else search$grid$se[search$best],
+             n_train = n_train, n_test = n_test, stringsAsFactors = FALSE)
+}
+
+.fold_inner <- function(grid, fitted) {
+  data.frame(fold = grid$fold, candidate = fitted$candidate, representation = grid$grain,
+             learner = grid$learner, score = grid$score, se = grid$se,
+             n_variable = grid$n_variable, stringsAsFactors = FALSE)
+}
+
+# The weights one outer fold is combined under, fitted on the inner out-of-fold predictions of its
+# own training targets over the inner split's scorable cells. The combiner never sees a prediction
+# for a target of the outer test fold, nor that target's response.
+.fold_stack <- function(lad, fitted, y_train, spec) {
+  arms <- paste(fitted$representation, fitted$learner, sep = "|")
+  inner_oof <- stats::setNames(attr(lad, "predictions")[arms], fitted$candidate)
+  rows <- lad[!is.na(match(paste(lad$grain, lad$learner, sep = "|"), arms)), , drop = FALSE]
+  inner_scores <- data.frame(candidate = paste(rows$learner, rows$grain, sep = " / "),
+                             variable = rows$variable, fold = rows$fold, score = rows$score,
+                             scorable = rows$scorable, stringsAsFactors = FALSE)
+  ensemble_fit(oof = inner_oof, y = y_train[rownames(inner_oof[[1L]]), , drop = FALSE],
+               cells = attr(lad, "cells"), folds = attr(lad, "folds"), spec = spec,
+               scores = inner_scores)
+}
+
+# One arm of the estimate under every registered metric, and under the run's own where that is a
+# function no registry holds, so the number the choice was made on is always one of the rows.
+.run_estimate <- function(arm, y, p, f, levels, cells, metric) {
+  out <- .nested_estimate(y, p, f, levels, cells)
+  if (!metric$name %in% out$metric) {
+    out <- rbind(out, .estimate_row(metric$name, .score_arm(arm, arm, y, p, f, levels, cells,
+                                                            metric$fn)))
+  }
+  cbind(arm = arm, out, stringsAsFactors = FALSE)
+}
+
+# The procedure applied to every target: the rule, read on the outer scores with the outer folds as
+# the split it chooses on. One candidate is its own choice.
+.run_choice <- function(scores, fitted, ctx) {
+  if (nrow(fitted) < 2L) {
+    return(fitted$candidate[1L])
+  }
+  lad <- data.frame(grain = scores$representation, learner = scores$learner,
+                    variable = scores$variable, fold = scores$fold, score = scores$score,
+                    scorable = scores$scorable, stringsAsFactors = FALSE)
+  grid <- .join_candidates(ctx$candidates, summary.timesift_ladder(lad), .inner_se(lad),
+                           NA_integer_)
+  fitted$candidate[.choose_candidate(grid, ctx$size, ctx$rule)]
 }
 
 # The value columns of the series. A caller who names them is held to them; a caller who does not
@@ -511,7 +671,8 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 #' @param targets A data frame of targets, carrying the identifier, the anchor and the static
 #'   columns the fit was given.
 #' @param series The long table of readings for those targets, or `NULL` for a targets-only fit.
-#' @param candidate `"ensemble"`, or the name of one candidate.
+#' @param candidate `"ensemble"`, the stack refitted on every target; `"selected"`, the candidate
+#'   the rule chose on every target (`object$choice`); or the name of one candidate.
 #' @param ... Ignored.
 #'
 #' @return A `[target, response]` matrix of predictions, named by target and in the order the fit
@@ -523,10 +684,12 @@ predict.timesift <- function(object, targets, series = NULL, candidate = "ensemb
   spec <- object$spec
   if (identical(candidate, "ensemble")) {
     if (is.null(object$stack)) {
-      stop("this fit carries no ensemble; name a candidate: ",
+      stop("this fit carries no ensemble; name a candidate or \"selected\": ",
            .listing(names(object$models)), ".", call. = FALSE)
     }
-    members <- names(object$oof)
+    members <- names(object$stack$weights)
+  } else if (identical(candidate, "selected")) {
+    members <- object$choice
   } else {
     members <- candidate
   }

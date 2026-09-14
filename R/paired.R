@@ -6,10 +6,13 @@
 #' variable over its folds, and summarises those per-variable means, the variables being the
 #' independent replicates.
 #'
-#' Pairing also cancels what a threshold-selected metric carries in its level. TSS read at the
-#' threshold that maximises it is biased upward where presences are thin, both arms carry the same
-#' bias on the same cell, and it cancels in the difference. That is why the levels a ladder reports
-#' are upper bounds while the differences between arms are read at face value.
+#' Pairing removes the variation between variables and the part of a threshold-selected metric's
+#' bias that the design sets, but not the part that belongs to each arm. TSS read at the threshold
+#' that maximises it is biased upward where presences are thin, and how far depends on how an arm's
+#' predictions are distributed as well as on how many presences the cell holds, so two arms of
+#' equal skill on the same cell can carry different biases. A difference in TSS can therefore favour
+#' one arm with no difference in skill behind it. A threshold-free metric such as [roc_auc()] has no
+#' cut to choose, and a TSS contrast is best read beside the same contrast under it.
 #'
 #' An arm is named whole, by its grain and its learner. A learner named alone would have to take
 #' its best grain, and that grain is chosen on the held-out scores the contrast is then read off:
@@ -163,9 +166,11 @@ paired_contrast <- function(ladder, a, b, interval = c("variables", "nested_cv")
 #' read back exactly as [grain_ladder()] reports it. The gap between what comes back and the truth
 #' planted is the inflation.
 #'
-#' It cancels in the paired differences [paired_contrast()] takes, since both arms carry it on the
-#' same cell. It does not cancel in a level, so a level is an upper bound on the skill a population
-#' has.
+#' The inflation is an expectation. A level read on one design is optimistic on average, not a
+#' bound every reading sits above: a single level can fall below the population skill. The model
+#' planted here is one distribution of predictions, and another at the same skill inflates by a
+#' different amount, which is also why a paired difference [paired_contrast()] takes is not free of
+#' it.
 #'
 #' @inheritParams scorable_cells
 #' @param skill Population skill values to plant.
@@ -230,10 +235,10 @@ tss_inflation <- function(y, folds, skill = c(0.6, 0.7, 0.9), replicates = 200L,
 #' that map: given a level actually read off a ladder, it solves for the population skill whose
 #' expected reported level equals it.
 #'
-#' It answers the question a level raises once the inflation is known, and it is the only honest
-#' way to read a level as a statement about a population rather than about a scoring rule. It says
-#' nothing about a difference between two arms, where the inflation cancels and the reported number
-#' stands as it is.
+#' It answers the question a level raises once the inflation is known, under the distribution of
+#' predictions [tss_inflation()] plants; a model whose predictions are distributed otherwise is
+#' inflated by a different amount. It does not correct a difference between two arms, whose
+#' inflations need not be equal.
 #'
 #' @inheritParams tss_inflation
 #' @param observed Reported levels to invert.

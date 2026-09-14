@@ -16,13 +16,14 @@ import pytest
 from timesift import (Ladder, Response, fold_map, paired_contrast, read_cells, read_folds,
                        read_response, scorable_cells, tss_inflation, write_cells, write_folds,
                        write_response)
-from timesift.metrics import decision_threshold, kappa_score, roc_auc, tss
+from timesift.metrics import average_precision, decision_threshold, kappa_score, roc_auc, tss
 
 FIXTURES = Path(__file__).resolve().parents[2] / "inst" / "spec" / "fixtures"
 
 METRIC_FNS = {
     "tss": tss,
     "roc_auc": roc_auc,
+    "average_precision": average_precision,
     "kappa": lambda y, p: kappa_score(y, p, "prevalence"),
     "kappa_youden": lambda y, p: kappa_score(y, p, "youden"),
     "threshold_youden": lambda y, p: decision_threshold(y, p, "youden"),

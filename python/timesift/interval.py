@@ -45,7 +45,8 @@ def interval_target(interval: str) -> str:
     if interval == "variables":
         return ("the spread across the variables of this dataset, fitted and scored on these "
                 "units and folds")
-    return "the procedure's risk on a new sample of this size, by nested cross-validation"
+    return ("the procedure's risk on a new sample of this size, by nested cross-validation "
+            "(experimental: below nominal coverage in the package's benchmark)")
 
 
 def ncv_maps(y, f, group, repeats: int, seed: int) -> list[np.ndarray]:

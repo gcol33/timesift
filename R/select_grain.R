@@ -48,8 +48,11 @@
 #' It is an interval over the variables of this dataset, and not an interval for what the
 #' procedure would score on a new sample.
 #'
-#' `interval = "nested_cv"` adds one that is, by the nested cross-validation of Bates, Hastie and
-#' Tibshirani (2024). Inside every repetition, each outer training set is cross-validated again
+#' `interval = "nested_cv"` adds one that is meant to be, by the nested cross-validation of Bates,
+#' Hastie and Tibshirani (2024). It is experimental. In the selection benchmark under
+#' `inst/benchmark/`, at one repetition, its coverage of a nominal 95% ran from 84% to 96% across
+#' twelve designs and fell detectably below nominal in nine of them, so it is not yet an interval to
+#' report. Inside every repetition, each outer training set is cross-validated again
 #' over the remaining folds of the same map, which gives the mean squared error of a
 #' cross-validation estimate as the difference of two terms it can estimate: the squared gap
 #' between the inner estimate and the held-out fold's score, less the variance of that fold's
@@ -103,7 +106,7 @@
 #'   inside the training data.
 #' @param interval Which interval to report beside the across-variable one, which is always
 #'   reported: `"variables"` for that one alone, or `"nested_cv"` for an interval for the
-#'   procedure's risk. See What the interval is for.
+#'   procedure's risk, which is experimental. See What the interval is for.
 #' @param repeats Repetitions of the nested cross-validation, each on its own fold map. The first
 #'   is the map the estimate was computed on.
 #' @param response Name of the registered response head.
@@ -193,10 +196,8 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
   if (nrow(candidates) < 2L) {
     stop("selection needs at least two candidates; got one grain and one learner.", call. = FALSE)
   }
-  size <- .candidate_size(set, candidates)
-  ctx <- list(set = set, y = y, learners = learners, candidates = candidates, size = size,
-              rule = rule, inner_split = inner_split, response = response, metric = metric,
-              control = control, group = group)
+  ctx <- .selection_context(set, y, learners, candidates, .cross_pairs(set, learners), rule,
+                            inner_split, response, metric, control, group)
 
   levels <- sort(unique(f))
   p <- matrix(NA_real_, nrow = length(units), ncol = ncol(y),
@@ -485,32 +486,59 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
   out
 }
 
+# What one fit of a selection procedure reads. `candidates` is the set in the order a tie is broken
+# in, its `grain` naming the representation and its `learner` the learner; `pairs` is the same set
+# in the order it is fitted in.
+.selection_context <- function(set, y, learners, candidates, pairs, rule, inner_split, response,
+                               metric, control, group) {
+  list(set = set, y = y, learners = learners, candidates = candidates, pairs = pairs,
+       size = .candidate_size(set, candidates), rule = rule, inner_split = inner_split,
+       response = response, metric = metric, control = control, group = group)
+}
+
 # One fit of the whole procedure: the inner search on the training units, the rule, the refit of
 # the chosen candidate on all of them, and its predictions for the test units. The outer folds of
 # select_grain() and every fit of its nested cross-validation go through this.
 .select_once <- function(ctx, train, test, split_seed, fold = NA_integer_) {
+  search <- .inner_search(ctx, train, split_seed, fold)
+  refit <- .refit_candidates(ctx, search$won, train, test)
+  c(search, list(fit = refit$fits[[1L]], pred = refit$preds[[1L]]))
+}
+
+# The search half of a selection: every candidate cross-validated on an inner map drawn on the
+# training units, and the rule applied to those inner scores. The selector sees the training units
+# and nothing else: the inner map is drawn on them, and the representation it searches over is cut
+# to them before any fitting happens.
+.inner_search <- function(ctx, train, split_seed, fold = NA_integer_) {
   y_train <- ctx$y[train, , drop = FALSE]
-  # The selector sees the training units and nothing else: the inner map is drawn on them, and the
-  # representation it searches over is cut to them before any fitting happens.
-  lad <- grain_ladder(.subset_set(ctx$set, train), y_train, ctx$learners,
-                      folds = ctx$inner_split(y_train, split_seed, train),
-                      response = ctx$response, metric = ctx$metric, control = ctx$control,
-                      verbose = FALSE)
+  lad <- .ladder(.subset_set(ctx$set, train), y_train, ctx$learners, ctx$pairs,
+                 folds = ctx$inner_split(y_train, split_seed, train),
+                 response = ctx$response, metric = ctx$metric, control = ctx$control,
+                 verbose = FALSE)
   grid <- .join_candidates(ctx$candidates, summary(lad), .inner_se(lad), fold)
   if (all(!is.finite(grid$score))) {
     stop("no candidate scored inside the training data of ",
          if (is.na(fold)) "a fit of the nested cross-validation" else paste("fold", fold),
          ". Widen the inner folds or drop the variables that cannot be scored.", call. = FALSE)
   }
-  best <- .first_best(grid$score)
-  won <- .choose_candidate(grid, ctx$size, ctx$rule)
-  # The refit is the inner ladder's own fitting path, so the procedure's held-out predictions are
-  # the ones its chosen candidate would have made rather than a second fitting path's.
-  x_won <- ctx$set[[grid$grain[won]]]
-  fit <- fit_learner(ctx$learners[[grid$learner[won]]], .subset_units(x_won, train), y_train,
-                     response = ctx$response, control = ctx$control, group = ctx$group[train])
-  pred <- if (length(test)) stats::predict(fit, .subset_units(x_won, test)) else NULL
-  list(lad = lad, grid = grid, best = best, won = won, fit = fit, pred = pred)
+  list(lad = lad, grid = grid, best = .first_best(grid$score),
+       won = .choose_candidate(grid, ctx$size, ctx$rule))
+}
+
+# The refit half: the named candidates, rows of `ctx$candidates`, each fitted on every training unit
+# and asked for the test units. This is the fitting path of the inner ladder itself, so a selected
+# candidate's held-out prediction is the one it would have made there.
+.refit_candidates <- function(ctx, rows, train, test) {
+  y_train <- ctx$y[train, , drop = FALSE]
+  out <- lapply(rows, function(r) {
+    x <- ctx$set[[ctx$candidates$grain[r]]]
+    fit <- fit_learner(ctx$learners[[ctx$candidates$learner[r]]], .subset_units(x, train),
+                       y_train, response = ctx$response, control = ctx$control,
+                       group = ctx$group[train])
+    pred <- if (length(test)) stats::predict(fit, .subset_units(x, test)) else NULL
+    list(fit = fit, pred = pred)
+  })
+  list(fits = lapply(out, `[[`, "fit"), preds = lapply(out, `[[`, "pred"))
 }
 
 # The candidate set keeps the order its grains and its learners were declared in, so which

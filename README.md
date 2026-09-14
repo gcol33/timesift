@@ -7,8 +7,10 @@
 `timesift` fits and compares representations of time-varying data against a prediction target.
 Give it one row per thing to predict and a long table of time-stamped readings belonging to those
 rows. It builds each candidate representation, fits the learners you name on every one they can
-read, scores them all on one set of held-out folds, and stacks the out-of-fold predictions into an
-ensemble. What comes back says how much of the record the prediction actually needed.
+read, and scores them all on one set of held-out folds. Inside each training fold it chooses a
+candidate and fits the stack's weights on an inner split, so the score it reports for the chosen
+candidate and for the ensemble covers the choosing. What comes back says how much of the record the
+prediction actually needed, and what the whole procedure scores on targets it did not see.
 
 The same calls exist in both languages over one shared C++ core, and the fixtures under
 `inst/spec/fixtures/` hold the two to the same numbers.
@@ -71,27 +73,35 @@ fit = ts.timesift(
 </tr>
 </table>
 
-`fit` prints every candidate it fitted, the score each reached on the held-out folds, and the
-weights the stack gave them:
+`fit` prints every candidate it fitted and the score each reached on the held-out folds, then the
+held-out score of the procedure that chooses among them and of the stack, both chosen and weighted
+inside each training fold:
 
 ```r
 fit
-#> timesift  80 targets, 4 responses, 5-fold random CV, tss
+#> timesift  80 targets, 4 responses, 10-fold random CV, roc_auc
 #>
+#> candidates, scored on the outer folds
 #> candidate                    mean    won  responses
-#> elasticnet / month          0.261      0  separate
-#> forest / month              0.364      0  separate
-#> forest / week               0.391      1  separate
-#> elasticnet / day            0.445      2  separate
-#> elasticnet / week           0.464      0  separate
-#> forest / day                0.504      1  separate
-#> ensemble                    0.524      -
+#> elasticnet / day            0.873      0  separate
+#> forest / month              0.904      1  separate
+#> forest / day                0.924      0  separate
+#> forest / week               0.929      1  separate
+#> elasticnet / week           0.930      1  separate
+#> elasticnet / month          0.938      1  separate
 #>
-#> weights  forest / day 0.59   elasticnet / day 0.28   elasticnet / week 0.13
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                    0.934  se 0.015
+#> ensemble                    0.919  se 0.020
+#> selected elasticnet / month in 8, forest / day in 2 of 10 folds
+#>
+#> choice on every target  elasticnet / month
+#> weights on every target  elasticnet / month 0.98   forest / month 0.02
 ```
 
 `predict(fit, new_plots, new_logger)` rebuilds every member's representation for the new rows and
-predicts through the ensemble.
+predicts through the ensemble fitted on every target; `candidate = "selected"` predicts with the
+chosen candidate.
 
 ## Four things, and one contract
 
@@ -104,6 +114,11 @@ A candidate is one representation paired with one learner, and every candidate e
 out-of-fold prediction for every scorable cell over the same folds. Comparison, ensembling and
 importance read those predictions and nothing else, which is what lets a penalised regression on
 monthly features and a convolution on the unreduced record be compared and then combined.
+
+The comparison and the estimate are kept apart. The candidates' scores on the outer folds are the
+comparison, and the best of them was picked out on the folds it is scored on. The `selected` and
+`ensemble` rows are chosen and weighted inside each outer training fold, on an inner split of it,
+and scored on the outer fold once, so they are the numbers to report.
 
 ## Representations
 
@@ -171,9 +186,11 @@ through its twenty-fourth of that day's mean.
 ## The ensemble
 
 `ensemble()` combines the candidates by stacking: non-negative weights summing to one, fitted on
-the out-of-fold predictions alone, minimising the response head's own loss over the scorable cells.
+out-of-fold predictions alone, minimising the response head's own loss over the scorable cells.
 `"mean"`, `"median"` and `"weighted"` combine without fitting. The combiner is handed the
-predictions, the response, the fold map and the mask, and never a model.
+predictions, the response, the fold map and the mask, and never a model. The ensemble's reported
+score uses weights fitted inside each outer training fold; the weights `ensemble_weights()` returns
+are fitted on every target, for prediction.
 
 ```r
 ensemble_weights(fit)
@@ -182,8 +199,9 @@ ensemble_weights(fit)
 ## Ecology, and what the study found
 
 Species distribution modelling from microclimate loggers is the application the package was built
-for and the setting it ships defaults for: presence-absence, a joint multi-label head, and the true
-skill statistic. On 894 alpine plots, 101 species and three years of hourly soil temperature:
+for and the setting it ships defaults for: presence-absence, a joint multi-label head, and AUC with
+the true skill statistic beside it. On 894 alpine plots, 101 species and three years of hourly soil
+temperature:
 
 - The full hourly series was the best input for none of three architectures. Reading every hour
   cost the convolutional network 0.048 TSS against its own best grain.
@@ -194,13 +212,15 @@ skill statistic. On 894 alpine plots, 101 species and three years of hourly soil
   hand-built features (-0.002 TSS, p = 0.63), so the gain came from convolution reading the series
   at a coarse grain rather than from the model being a network.
 
-## The score you report is an upper bound
+## A maximised TSS is optimistic
 
 TSS is read at the threshold that maximises it, chosen on the same held-out units the score is read
-on. That inflates the level where presences are thin: on the Schrankogel design, by 0.110 when the
-truth is 0.60. `tss_inflation()` measures it for your design, `implied_skill()` says what
-population skill a level you read is consistent with, and `paired_contrast()` is where it cancels,
-because both arms carry the same bias on the same cell.
+on. That inflates the level where presences are thin: on the Schrankogel design, by 0.110 on
+average when the truth is 0.60. `tss_inflation()` measures it for your design and `implied_skill()`
+says what population skill a level you read is consistent with. How large the inflation is depends
+on how a model's predictions are distributed, so two models of equal skill can carry different
+inflations and a paired TSS difference is not free of it. That is why runs are scored by AUC by
+default, with TSS beside it.
 
 ## The two languages agree
 

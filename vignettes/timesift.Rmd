@@ -69,9 +69,27 @@ fit
 ```
 
 Every representation named in `sift` was built, and `models` defaulting to `list(elasticnet())`,
-a penalised logistic regression was fitted on each of them over the same five folds and the
-out-of-fold predictions were stacked. `won` is how many responses a candidate scored highest on,
-and `responses` says whether one fitted model covered them all or one was fitted per response.
+a penalised logistic regression was fitted on each of them over the same five folds. The report has
+two parts.
+
+The candidates are the comparison. Each is scored on the five outer folds, on the same cells, so
+their means can be read against each other across grains. `won` is how many responses a candidate
+scored highest on, and `responses` says whether one fitted model covered them all or one was fitted
+per response. The highest of those means was picked out on the folds it is scored on, so it is not
+the number to report.
+
+The procedure rows are. Inside each outer training fold the candidates were cross-validated again
+on five inner folds, one was chosen on its inner score and the stack's weights were fitted on the
+inner out-of-fold predictions; the choice and the weights then predicted the outer test fold once.
+`selected` and `ensemble` are those held-out scores, choosing and weighting included.
+
+```{r estimate}
+fit$estimate[c("arm", "metric", "score", "se", "lower", "upper")]
+fit$selected[c("fold", "candidate", "inner_score")]
+```
+
+The interval is across the six responses of this dataset, all fitted and scored on the same plots
+and folds, so it does not carry the error those share.
 
 A column of `targets` reaches the model only where `static` names it: `elevation` is a predictor
 here because it was asked for, and a column of notes sitting beside it would not be.
@@ -82,12 +100,13 @@ fit$candidates[c("candidate", "representation", "bins", "channels", "status")]
 
 Two channels at every grain: the binned temperature, and elevation held constant across the bins.
 
-```{r plot-run, fig.alt = "Mean true skill statistic against representation, with the level the combination reached drawn across it."}
+```{r plot-run, fig.alt = "Mean AUC against representation, with the level the combination reached drawn across it."}
 plot(fit)
 ```
 
 `predict()` rebuilds each member's representation for new rows from the settings its own arm was
-built with, and combines them through the ensemble.
+built with, and combines them through the ensemble refitted on every target; `candidate =
+"selected"` predicts with the candidate the rule chose on every target instead.
 
 ```{r predict}
 p <- predict(fit, targets, series)
@@ -194,10 +213,13 @@ summary(both)
 
 ## The combination
 
-The combiner is handed the out-of-fold predictions, the response, the mask and the fold map, and
+The combiner is handed out-of-fold predictions, the response, the mask and the fold map, and
 never a model. `"stack"` fits non-negative weights summing to one by minimising the response
 head's own loss over the scorable cells; `"mean"`, `"median"` and `"weighted"` combine without
-fitting anything.
+fitting anything. The weights below are fitted on the outer out-of-fold predictions of every
+target and are what `predict()` uses. The ensemble's score is not read with them, because they were
+fitted to the responses it would be scored against; each outer fold's weights are in
+`fit$fold_weights`.
 
 ```{r weights}
 ensemble_weights(fit)
@@ -218,10 +240,12 @@ score is then read on. That inflates the level, and by more the fewer presences 
 tss_inflation(fit$y, fit$folds, skill = c(0.6, 0.9), replicates = 100)
 ```
 
-The inflation is common to every candidate scored the same way, so it cancels in a paired
-difference. It does not cancel in a level, so a level is an upper bound on the skill a population
-has, and `implied_skill()` inverts the map to say which population skills a level read is
-consistent with.
+The inflation is an average over the planted model's predictions: a level is optimistic in
+expectation, and `implied_skill()` inverts the map to say which population skills a level read is
+consistent with. Its size depends on how a model's predictions are distributed as well as on the
+presence counts, so two candidates of equal skill scored on the same cells can be inflated by
+different amounts, and a paired difference in TSS is not free of it. That is why a run is scored by
+AUC unless told otherwise.
 
 ## The arrays on their own
 

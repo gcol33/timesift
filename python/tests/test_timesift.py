@@ -199,7 +199,8 @@ def test_a_lookback_fits_on_repeated_targets_grouped_by_their_unit():
     t = repeated_targets()
     fit = timesift(t, series(), y="sp_*", id="plot", time="when", target_time="visit",
                    models=[learner()], sift=lookbacks("10 days", "20 days"),
-                   resampling=grouped_cv("plot", v=3, seed=2), ensemble=False, verbose=False)
+                   resampling=grouped_cv("plot", v=3, seed=2), inner=None, ensemble=False,
+                   verbose=False)
     assert fit.y.units == tuple(str(i + 1) for i in range(12))
     assert list(fit.candidates["candidate"]) == [f"stub{SEPARATOR}10 days",
                                                  f"stub{SEPARATOR}20 days"]
@@ -368,7 +369,8 @@ def test_the_combiner_minimises_the_loss_of_the_head_the_run_was_fitted_under(te
     two = [learner("a"), learner("b", multi="joint")]
 
     fitted(models=two, ensemble=True, response="gauss_test")
-    assert seen == ["gauss_test"]
+    # Once inside every outer fold and once on every target, and under the run's head each time.
+    assert seen == ["gauss_test"] * (len(set(FOLDS)) + 1)
     fitted(models=two, ensemble=True)
     assert seen[-1] == "presence_absence"
     # Naming the run's own head is the same thing said twice, and is not a contradiction.
@@ -458,3 +460,147 @@ def test_a_grouped_run_hands_every_fit_the_grouping_of_the_units_it_is_fitted_on
     seen.clear()
     fitted(models=[recorder])
     assert all(group is None for _, group in seen)
+
+
+# ---- the nested evaluation ----------------------------------------------------------------------
+
+WIDE = tuple(f"p{i:02d}" for i in range(1, 49))
+WIDE_FOLDS = [1, 2, 3] * 16
+
+
+def wide_targets(flip_fold=None) -> dict:
+    """48 plots and three responses tied to the plot's level, which is what the stub reads."""
+    rng = np.random.default_rng(11)
+    level = np.arange(len(WIDE), dtype=float)
+    out = {"plot": list(WIDE)}
+    for j, name in enumerate(("sp_a", "sp_b", "sp_c")):
+        z = (level - level.mean()) / level.std() * (1 if j % 2 == 0 else -1)
+        v = rng.binomial(1, 1 / (1 + np.exp(-2 * z))).astype(float)
+        if flip_fold is not None:
+            held = np.asarray(WIDE_FOLDS) == flip_fold
+            v[held] = 1 - v[held]
+        out[name] = list(v)
+    return out
+
+
+def first_bin(name="first") -> Learner:
+    """The stub reading the first bin alone, so it and the stub disagree and a stack of the two has
+    weights to choose."""
+    def reduce(x):
+        return x.values[:, 0, 0]
+
+    def fit(x, y, **_):
+        d = np.column_stack([np.ones(x.values.shape[0]), reduce(x)])
+        return dict(beta=np.linalg.lstsq(d, y, rcond=None)[0])
+
+    def predict(model, x):
+        d = np.column_stack([np.ones(x.values.shape[0]), reduce(x)])
+        return 1.0 / (1.0 + np.exp(-(d @ model["beta"])))
+
+    return Learner(name=name, fit=fit, predict=predict, reads="tabular", multi="separate")
+
+
+def wide_series(days: int = 30) -> dict:
+    """The plot's level in every hour, and on the first day a disturbance of its own, so a learner
+    reading the first bin and one reading the mean see different things."""
+    rng = np.random.default_rng(12)
+    t = START + np.arange(days * 24) * np.timedelta64(3600, "s")
+    first = np.arange(len(t)) < 24
+    values = [i / 10 + 3 * rng.normal() * first + np.sin(np.arange(len(t)) / 13.0)
+              for i in range(len(WIDE))]
+    return {"plot": np.repeat(np.asarray(WIDE), len(t)), "when": np.tile(t, len(WIDE)),
+            "temp": np.concatenate(values)}
+
+
+def wide(**given):
+    settings = dict(y="sp_*", id="plot", time="when", models=[learner("a"), first_bin("b")],
+                    sift=grains("day", "week"), resampling=WIDE_FOLDS, inner=3,
+                    verbose=False)
+    settings.update(given)
+    return timesift(given.pop("targets", None) or wide_targets(), wide_series(),
+                    **{k: v for k, v in settings.items() if k != "targets"})
+
+
+def test_the_selected_arm_is_the_selection_select_grain_makes_on_the_same_split():
+    from timesift.representation import timesift_set
+    from timesift.selection import SELECTED_ARM, select_grain
+    fit = wide(models=[learner()], ensemble=False, seed=5)
+    sel = select_grain(timesift_set(fit.representations), fit.y, [learner()], folds=fit.folds,
+                       inner=3, seed=5, metric="roc_auc", verbose=False)
+    assert [r["representation"] for r in fit.selected] == [r["grain"] for r in sel.selected]
+    assert np.allclose([r["inner_score"] for r in fit.selected],
+                       [r["inner_score"] for r in sel.selected])
+    assert np.allclose(fit.predictions["selected"], sel.scores.predictions[SELECTED_ARM])
+    ours = {r["metric"]: r["score"] for r in fit.estimate if r["arm"] == "selected"}
+    theirs = {r["metric"]: r["score"] for r in sel.estimate}
+    assert ours.keys() == theirs.keys()
+    assert all(np.isclose(ours[k], theirs[k], equal_nan=True) for k in ours)
+
+
+def test_an_outer_test_folds_responses_reach_neither_its_choice_nor_its_weights():
+    base = wide()
+    moved = wide(targets=wide_targets(flip_fold=1))
+    pick = [r for r in base.selected if r["fold"] == 1]
+    assert [r for r in moved.selected if r["fold"] == 1] == pick
+    assert [w for w in moved.fold_weights if w["fold"] == 1] == \
+        [w for w in base.fold_weights if w["fold"] == 1]
+    held = np.asarray(WIDE_FOLDS) == 1
+    for arm in ("selected", "ensemble"):
+        assert np.allclose(moved.predictions[arm][held], base.predictions[arm][held])
+
+
+def test_the_ensemble_is_not_scored_with_weights_fitted_to_the_responses_it_is_scored_on():
+    from timesift.stack import ensemble_combine
+    fit = wide()
+    in_sample = ensemble_combine(fit.stack, fit.oof)
+    assert not np.allclose(in_sample, fit.predictions["ensemble"])
+    assert len(fit.fold_weights) == len(set(WIDE_FOLDS))
+    for w in fit.fold_weights:
+        assert sum(v for k, v in w.items() if k != "fold") == pytest.approx(1.0, abs=1e-6)
+    assert {r["arm"] for r in fit.estimate} == {"selected", "ensemble"}
+
+
+def test_a_run_without_an_inner_split_compares_the_candidates_and_estimates_nothing():
+    fit = wide(inner=None)
+    assert fit.estimate is None and fit.selected is None and fit.fold_weights is None
+    assert fit.stack is not None
+    assert "procedure" not in repr(fit)
+
+
+def noise_learner(name: str, offset: float) -> Learner:
+    """Predictions that are a fixed function of the unit's name and carry no signal."""
+    def fit(x, y, **_):
+        return dict(n=y.shape[1])
+
+    def predict(model, x):
+        key = np.asarray([sum((i + 1) * ord(c) for i, c in enumerate(str(u))) for u in x.units],
+                         dtype=float)
+        return (np.sin(np.outer(key, np.arange(1, model["n"] + 1)) * (offset + 1.7)) + 1) / 2
+
+    return Learner(name=name, fit=fit, predict=predict, reads="tabular", multi="joint")
+
+
+def test_choosing_among_candidates_that_carry_no_signal_is_not_reported_as_skill():
+    # Eight candidates predicting noise: the best of them on the outer folds is selected on the
+    # folds it is scored on and sits above one half, while the procedure that chooses inside the
+    # training folds is scored on folds its choice never saw and centres on one half.
+    from timesift.report import candidate_table, procedure_table
+    from timesift.response import Response, fold_map
+    plots = tuple(f"p{i:03d}" for i in range(90))
+    models = [noise_learner(f"n{i}", i) for i in range(1, 9)]
+    best, nested = [], []
+    for r in range(1, 21):
+        rng = np.random.default_rng(400 + r)
+        values = rng.binomial(1, 0.4, (90, 6)).astype(float)
+        t = {"plot": list(plots), **{f"sp{j}": list(values[:, j - 1]) for j in range(1, 7)}}
+        folds = fold_map(Response(values, plots, tuple(f"sp{j}" for j in range(1, 7))), v=5,
+                         seed=r)
+        fit = timesift(t, series(days=14, plots=plots), y="sp*", id="plot", time="when",
+                       models=models, sift=grains("week"), ensemble=False, resampling=folds,
+                       inner=4, verbose=False)
+        best.append(max(row["mean"] for row in candidate_table(fit)))
+        nested.append(procedure_table(fit)[0]["mean"])
+    best, nested = np.asarray(best), np.asarray(nested)
+    se = nested.std(ddof=1) / np.sqrt(len(nested))
+    assert abs(nested.mean() - 0.5) < 2.5 * se
+    assert (best - nested).mean() > 0.02

@@ -34,9 +34,11 @@ at the cell sizes and presence counts of the response and fold map supplied, and
 read back exactly as \code{\link[=grain_ladder]{grain_ladder()}} reports it. The gap between what comes back and the truth
 planted is the inflation.
 
-It cancels in the paired differences \code{\link[=paired_contrast]{paired_contrast()}} takes, since both arms carry it on the
-same cell. It does not cancel in a level, so a level is an upper bound on the skill a population
-has.
+The inflation is an expectation. A level read on one design is optimistic on average, not a
+bound every reading sits above: a single level can fall below the population skill. The model
+planted here is one distribution of predictions, and another at the same skill inflates by a
+different amount, which is also why a paired difference \code{\link[=paired_contrast]{paired_contrast()}} takes is not free of
+it.
 }
 \examples{
 set.seed(1)

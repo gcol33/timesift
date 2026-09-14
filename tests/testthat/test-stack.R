@@ -244,40 +244,75 @@ report_learner <- function(offset = 0) {
   )
 }
 
-test_that("the report is one row per candidate, one for the ensemble, and the weights", {
-  fit <- run_fixture()
+# A run through the entry point itself, on the report learners, so the procedure rows are the ones
+# the nested evaluation writes.
+nested_run <- function(ensemble = TRUE, inner = 3L) {
+  sim <- sim_series(n_unit = 60L, days = 90L, seed = 96L)
+  y <- sim_response(sim, n_var = 4L, seed = 97L)
+  targets <- cbind(data.frame(plot = rownames(y), stringsAsFactors = FALSE), as.data.frame(y))
+  timesift(targets, sim$readings, y = starts_with("sp"), id = plot, time = t,
+           models = list(constant = report_learner(), tilted = report_learner(0.4)),
+           sift = grains("week", "month"), ensemble = ensemble,
+           resampling = fold_map(y, v = 3L, seed = 4L), inner = inner, control = NULL,
+           verbose = FALSE)
+}
+
+test_that("the report is one row per candidate, one per procedure arm, and the weights", {
+  fit <- nested_run()
   s <- summary(fit)
   expect_s3_class(s, "timesift_summary")
-  expect_named(s, c("candidate", "mean", "won", "responses"))
-  expect_equal(nrow(s), nrow(fit$candidates) + 1L)
-  expect_equal(s$candidate[nrow(s)], "ensemble")
-  expect_true(is.na(s$won[nrow(s)]))
-  expect_equal(s$responses[s$candidate != "ensemble"],
-               rep("separate", nrow(fit$candidates)))
+  expect_named(s, c("candidate", "mean", "se", "won", "responses", "scored"))
+  expect_equal(nrow(s), nrow(fit$candidates) + 2L)
+  expect_equal(s$candidate[s$scored == "nested"], c("selected", "ensemble"))
+  expect_true(all(is.na(s$won[s$scored == "nested"])))
+  cand <- s[s$scored == "outer folds", ]
+  expect_equal(cand$responses, rep("separate", nrow(fit$candidates)))
   # every response is won by exactly one candidate
-  expect_equal(sum(s$won, na.rm = TRUE), ncol(fit$y))
-  expect_true(all(diff(s$mean) >= 0))
+  expect_equal(sum(cand$won), ncol(fit$y))
+  expect_true(all(diff(cand$mean) >= 0))
   expect_identical(attr(s, "weights"), ensemble_weights(fit))
+  expect_identical(attr(s, "choice"), fit$choice)
 })
 
-test_that("the ensemble row is the combined prediction scored on the run's own cells", {
-  fit <- run_fixture()
+test_that("the procedure rows are the held-out predictions scored on the run's own cells", {
+  fit <- nested_run()
   s <- summary(fit)
-  combined <- ensemble_combine(fit$stack, fit$oof)
   f <- .as_folds(fit$folds, rownames(fit$y))
-  rows <- .score_arm("ensemble", "ensemble", fit$y, combined, f, sort(unique(f)), fit$cells,
-                     .metrics_reg$get(fit$metric))
-  expect_equal(s$mean[s$candidate == "ensemble"], mean(.cell_means(rows)$score))
-  expect_equal(sum(rows$scorable), sum(fit$cells$scorable))
+  for (arm in c("selected", "ensemble")) {
+    rows <- .score_arm(arm, arm, fit$y, fit$predictions[[arm]], f, sort(unique(f)), fit$cells,
+                       fit$scorer)
+    expect_equal(s$mean[s$candidate == arm], mean(.cell_means(rows)$score))
+    expect_equal(sum(rows$scorable), sum(fit$cells$scorable))
+  }
 })
 
-test_that("a run with no combiner reports its candidates and no ensemble row", {
-  fit <- run_fixture(stack = FALSE)
+test_that("the ensemble is not scored with weights fitted to the responses it is scored on", {
+  fit <- nested_run()
+  in_sample <- ensemble_combine(fit$stack, fit$oof)
+  expect_false(isTRUE(all.equal(in_sample, fit$predictions$ensemble)))
+  expect_equal(nrow(fit$fold_weights), length(unique(unclass(fit$folds))))
+  expect_equal(rowSums(fit$fold_weights[names(fit$stack$weights)]),
+               rep(1, nrow(fit$fold_weights)), tolerance = 1e-6)
+})
+
+test_that("a run with no combiner reports its candidates and the selected arm alone", {
+  fit <- nested_run(ensemble = FALSE)
   s <- summary(fit)
-  expect_equal(nrow(s), nrow(fit$candidates))
+  expect_equal(nrow(s), nrow(fit$candidates) + 1L)
   expect_false("ensemble" %in% s$candidate)
   expect_null(attr(s, "weights"))
   expect_null(ensemble_weights(fit))
+  expect_null(fit$fold_weights)
+})
+
+test_that("a run without an inner split compares the candidates and estimates nothing", {
+  fit <- nested_run(inner = NULL)
+  s <- summary(fit)
+  expect_null(fit$estimate)
+  expect_null(fit$selected)
+  expect_equal(nrow(s), nrow(fit$candidates))
+  expect_false(is.null(fit$stack))
+  expect_true(is.na(.ensemble_estimate(fit)))
 })
 
 test_that("a candidate nothing could be fitted for is listed rather than dropped", {
@@ -294,12 +329,14 @@ test_that("a candidate nothing could be fitted for is listed rather than dropped
 })
 
 test_that("the report says what the run read and what it found", {
-  fit <- run_fixture()
+  fit <- nested_run()
   out <- utils::capture.output(print(summary(fit)))
-  expect_match(out[1L], "^timesift  56 targets, 4 responses, 3-fold random CV, tss$")
-  expect_true(any(grepl("^candidate", out)))
-  expect_true(any(grepl("^weights", out)))
-  expect_true(any(grepl("ensemble", out)))
+  expect_match(out[1L], "^timesift  60 targets, 4 responses, 3-fold random CV, roc_auc$")
+  expect_true(any(grepl("^candidates, scored on the outer folds", out)))
+  expect_true(any(grepl("^procedure, chosen and weighted inside each outer training fold", out)))
+  expect_true(any(grepl("^weights on every target", out)))
+  expect_true(any(grepl("^ensemble", out)))
+  expect_true(any(grepl("^selected .* of 3 folds$", out)))
   expect_true(any(grepl("constant / week", out, fixed = TRUE)))
 })
 

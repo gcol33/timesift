@@ -17,8 +17,8 @@ from .response import (Folds, Response, align_folds, as_response, fold_map,
                        scorable_cells)
 
 __all__ = ["Ladder", "aligned_predictions", "concat_ladders", "grain_ladder", "implied_skill",
-           "ladder_from_rows", "learner_dict", "mean_se", "out_of_fold", "paired_contrast",
-           "per_variable", "place", "score_arm", "score_predictions",
+           "ladder_from_rows", "ladder_over", "learner_dict", "mean_se", "out_of_fold",
+           "paired_contrast", "per_variable", "place", "score_arm", "score_predictions",
            "scored_cells", "table_columns", "tss_inflation", "variable_means"]
 
 
@@ -95,6 +95,23 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
     """
     check_interval(interval)
     grains = timesift_set(x)
+    learners = learner_dict(learners)
+    pairs = [(w, name) for w in grains for name in learners]
+    return ladder_over(grains, y, learners, pairs, folds=folds, response=response, metric=metric,
+                       control=control, keep_fits=keep_fits, interval=interval, repeats=repeats,
+                       seed=seed, verbose=verbose)
+
+
+def ladder_over(grains, y, learners: dict, pairs, folds=None, response: str = "presence_absence",
+                metric=None, control=None, keep_fits: bool = False, interval: str = "variables",
+                repeats: int = 1, seed: int = 1, verbose: bool = True) -> Ladder:
+    """The ladder over an explicit list of ``(grain, learner)`` pairs.
+
+    A ladder asks for the full cross of its grains and learners; a run asks for the pairs whose
+    learner can read the representation, and the search inside every outer training set of a
+    selection asks for whichever of the two its caller holds. All three go through this one fold
+    loop and this one scoring rule.
+    """
     units = grains.units
     spec = RESPONSES.get(response)
     y = spec["prepare"](as_response(y)).align(units)
@@ -104,25 +121,24 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
     f = folds.fold
     cells = spec["cells"](y, folds)
     score, metric_name = resolve_metric(metric, spec["metric"])
-    learners = learner_dict(learners)
     levels = np.unique(f)
 
     grain, learner, variable, fold, value, ok = [], [], [], [], [], []
     predictions, fits = {}, {}
-    for w, m in grains.items():
-        for name, ln in learners.items():
-            arm = f"{w}|{name}"
-            if verbose:
-                print(f"fitting {name} at the {w} grain")
-            p, per_fold = out_of_fold(m, y, f, levels, ln, response, control, keep_fits,
-                                      group=folds.group)
-            for k, fit in per_fold.items():
-                fits[f"{arm}|{k}"] = fit
-            predictions[arm] = p
-            scored = score_arm(w, name, y, p, f, levels, cells, score)
-            for key, into in (("grain", grain), ("learner", learner), ("variable", variable),
-                              ("fold", fold), ("score", value), ("scorable", ok)):
-                into.extend(scored[key])
+    for w, name in pairs:
+        m, ln = grains[w], learners[name]
+        arm = f"{w}|{name}"
+        if verbose:
+            print(f"fitting {name} at the {w} grain")
+        p, per_fold = out_of_fold(m, y, f, levels, ln, response, control, keep_fits,
+                                  group=folds.group)
+        for k, fit in per_fold.items():
+            fits[f"{arm}|{k}"] = fit
+        predictions[arm] = p
+        scored = score_arm(w, name, y, p, f, levels, cells, score)
+        for key, into in (("grain", grain), ("learner", learner), ("variable", variable),
+                          ("fold", fold), ("score", value), ("scorable", ok)):
+            into.extend(scored[key])
 
     # Nested cross-validation refits every arm inside every outer training set of every
     # repetition, and keeps the predictions paired_contrast reads the interval off.
@@ -130,20 +146,20 @@ def grain_ladder(x, y, learners, folds=None, response: str = "presence_absence",
     if interval == "nested_cv":
         maps = ncv_module.ncv_maps(y, f, folds.group, repeats, seed)
         kept = {}
-        for w, m in grains.items():
-            for name, ln in learners.items():
-                arm = f"{w}|{name}"
-                if verbose:
-                    print(f"nested cross-validation of {arm}: {len(maps)} repetition(s)")
+        for w, name in pairs:
+            m, ln = grains[w], learners[name]
+            arm = f"{w}|{name}"
+            if verbose:
+                print(f"nested cross-validation of {arm}: {len(maps)} repetition(s)")
 
-                def fit_predict(train, test, tag, m=m, ln=ln):
-                    fit = fit_learner(ln, m.take_units(train), y.take_units(train),
-                                      response=response, control=control,
-                                      group=_group_of(folds.group, train))
-                    return aligned_predictions(fit, m, y, test)
+            def fit_predict(train, test, tag, m=m, ln=ln):
+                fit = fit_learner(ln, m.take_units(train), y.take_units(train),
+                                  response=response, control=control,
+                                  group=_group_of(folds.group, train))
+                return aligned_predictions(fit, m, y, test)
 
-                kept[arm] = ncv_module.keep_runs(
-                    ncv_module.ncv_collect(fit_predict, y, maps, predictions[arm]))
+            kept[arm] = ncv_module.keep_runs(
+                ncv_module.ncv_collect(fit_predict, y, maps, predictions[arm]))
         ncv = ncv_module.record(y, maps, kept)
 
     return ladder_from_rows(dict(grain=grain, learner=learner, variable=variable, fold=fold,
@@ -260,7 +276,7 @@ def _check_finite(unsettled, grain, learner) -> None:
                      "with no score in it.")
 
 
-def score_predictions(y, p, folds, cells=None, metric: str = "tss") -> dict:
+def score_predictions(y, p, folds, cells=None, metric: str = "roc_auc") -> dict:
     """Score held-out predictions on the cells the mask allows.
 
     The scoring every arm of a ladder and every candidate of a run goes through, reachable on its
@@ -371,12 +387,15 @@ def paired_contrast(ladder: Ladder, a: str, b: str, interval: str = "variables")
     """The difference between two arms, taken inside each cell both scored.
 
     Two arms scored on the same held-out units do not necessarily have the same set of defined
-    cells, so a difference of two marginal means is not a difference between the arms. Pairing also
-    cancels what a threshold-selected metric carries in its level, since both arms carry the same
-    bias on the same cell.
+    cells, so a difference of two marginal means is not a difference between the arms. Pairing
+    removes the variation between variables and the part of a threshold-selected metric's bias
+    that the design sets, but not the part that belongs to each arm: how far TSS read at its best
+    cut is inflated depends on how an arm's predictions are distributed as well as on the presence
+    counts, so two arms of equal skill on the same cell can carry different biases. A TSS contrast
+    is best read beside the same contrast under ``roc_auc``, which has no cut to choose.
 
     Each arm is named whole, ``grain|learner``. A learner named alone would take its best grain,
-    chosen on the scores the contrast is then read off, and pairing does not cancel that choice;
+    chosen on the scores the contrast is then read off, and pairing does not remove that choice;
     ``select_grain`` chooses a grain on inner folds instead and contrasts the selection through
     ``compare``. The interval is Student's t on one degree of freedom fewer than there are
     variables, and ``p_method`` says whether the signed-rank p-value is ``"exact"`` or the
@@ -424,8 +443,10 @@ def tss_inflation(y: Response, folds, skill=(0.6, 0.7, 0.9), replicates: int = 2
 
     Predictions are simulated under a normal model whose population skill is exactly the value
     planted, at the cell sizes and presence counts of this design, and read back the way a ladder
-    reports a level. The gap is the inflation. It cancels in a paired difference and does not
-    cancel in a level, so a level is an upper bound on the skill a population has.
+    reports a level. The gap is the inflation. It is an expectation: a level is optimistic on
+    average, not a bound every reading sits above. The model planted is one distribution of
+    predictions, and another at the same skill inflates by a different amount, which is also why a
+    paired difference is not free of it.
     """
     cells = scorable_cells(y, folds)
     keep = cells.scorable
@@ -459,9 +480,9 @@ def implied_skill(y: Response, folds, observed, grid=None, replicates: int = 200
     """What population skill a level actually read is consistent with.
 
     ``tss_inflation`` maps a population skill to the level a design reports for it; this inverts
-    that map. It is the only honest way to read a level as a statement about a population rather
-    than about a scoring rule, and it says nothing about a difference between two arms, where the
-    inflation cancels and the reported number stands as it is.
+    that map, under the distribution of predictions ``tss_inflation`` plants; a model whose
+    predictions are distributed otherwise is inflated by a different amount. It does not correct a
+    difference between two arms, whose inflations need not be equal.
     """
     grid = np.arange(0, 0.96, 0.05) if grid is None else np.asarray(grid, dtype=float)
     forward = tss_inflation(y, folds, skill=grid, replicates=replicates, seed=seed)

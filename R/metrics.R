@@ -1,8 +1,8 @@
 #' The true skill statistic
 #'
 #' Sensitivity plus specificity minus one, at the threshold that maximises it. This is the metric
-#' species distribution modelling reports, and the one the shipped presence-absence response is
-#' scored by.
+#' species distribution modelling reports. The shipped presence-absence response is scored by
+#' [roc_auc()] instead, which chooses no threshold, and TSS is reported beside it.
 #'
 #' A cut may only fall between distinct predictions: units sharing a prediction are decided
 #' together, so the same score comes back whatever order they arrived in. A cell holding only
@@ -10,8 +10,10 @@
 #'
 #' The threshold is chosen on the same units the score is then read on, which is how the metric is
 #' defined in the literature and how it is defined here, and it inflates the level where presences
-#' are thin. [tss_inflation()] measures that inflation for a given design, and it cancels in the
-#' paired differences [paired_contrast()] takes. Given a `threshold` learned elsewhere, the score
+#' are thin. [tss_inflation()] measures that inflation for a given design. How large it is depends
+#' on how a model's predictions are distributed as well as on the design, so two models of equal
+#' skill scored on the same cells can carry different inflations, and a paired difference in TSS is
+#' not free of it. Given a `threshold` learned elsewhere, the score
 #' is read at that cut instead, which is what [select_grain()] reports under `threshold =` with a
 #' cut learned on the inner folds.
 #'
@@ -68,6 +70,34 @@ roc_auc <- function(y, p) {
   n_pos <- sum(y == 1L)
   n_neg <- length(y) - n_pos
   (sum(rank(p)[y == 1L]) - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
+}
+
+#' Average precision
+#'
+#' The area under the precision-recall curve, as the step sum over the distinct predictions: at
+#' each, the precision of calling every unit at or above it a presence, weighted by the share of
+#' presences that cut adds. Units sharing a prediction enter together, so the order they arrived in
+#' does not move the score. Its floor is the prevalence rather than one half, which makes it the
+#' reading of how well presences are ranked above absences where presences are rare, and it is
+#' reported beside [roc_auc()] for that reason.
+#'
+#' @inheritParams tss
+#'
+#' @return One number, or `NA` where the cell defines none.
+#'
+#' @examples
+#' average_precision(c(0, 0, 1, 1), c(0.1, 0.2, 0.8, 0.9))
+#' average_precision(c(0, 1, 0, 1), c(0.1, 0.2, 0.8, 0.9))
+#'
+#' @export
+average_precision <- function(y, p) {
+  s <- .sweep(y, p)
+  if (is.null(s)) {
+    return(NA_real_)
+  }
+  precision <- s$tp / (s$tp + s$fp)
+  gained <- diff(c(0, s$tp)) / s$n_pos
+  sum(gained * precision)
 }
 
 #' Cohen's kappa, and where two models disagree

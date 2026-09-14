@@ -8,6 +8,7 @@ utils::globalVariables("self")
 .onLoad <- function(libname, pkgname) {
   register_metric("tss", tss)
   register_metric("roc_auc", roc_auc)
+  register_metric("average_precision", average_precision)
   register_metric("kappa", function(y, p) kappa_score(y, p, "prevalence"))
   register_metric("kappa_youden", function(y, p) kappa_score(y, p, "youden"))
 

@@ -55,7 +55,7 @@ SECTIONS = (
              "across a set of grains on its own.",
         names=("timesift", "Timesift", "TimesiftSpec", "n_targets",
                "target_labels", "select_columns", "column_names", "summary", "candidate_table",
-               "ensemble_row", "ensemble", "ensemble_fit", "ensemble_combine",
+               "procedure_table", "ensemble", "ensemble_fit", "ensemble_combine",
                "ensemble_weights", "EnsembleSpec", "Stack", "grain_ladder", "fit_learner",
                "select_grain", "Ladder", "Fit", "Selection"),
     ),
@@ -72,7 +72,7 @@ SECTIONS = (
         title="Python: scoring and comparison",
         desc="The metrics, the paired contrast between two arms on matched cells, the inflation "
              "of a score read at its own best threshold, and what a fitted model read.",
-        names=("tss", "roc_auc", "kappa_score", "cohen_kappa", "decision_threshold",
+        names=("tss", "roc_auc", "average_precision", "kappa_score", "cohen_kappa", "decision_threshold",
                "model_agreement", "score_predictions", "paired_contrast", "tss_inflation",
                "implied_skill", "occlusion"),
     ),

@@ -124,7 +124,7 @@ test_that("the contrast against a ladder runs through paired_contrast on matched
 test_that("a comparator scored by another metric is refused", {
   f <- selection_fixture()
   lad <- suppressWarnings(grain_ladder(f$x, f$y, selection_learner(), folds = f$folds,
-                                        metric = "roc_auc", verbose = FALSE))
+                                        metric = "tss", verbose = FALSE))
   expect_error(select_grain(f$x, f$y, selection_learner(), folds = f$folds, inner = 3L,
                             compare = lad, verbose = FALSE),
                "same metric")

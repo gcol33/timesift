@@ -22,12 +22,12 @@ from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
 from .learners import (Fit, Learner, cnn, elasticnet, fit_learner, flatten, forest, mlp,
                        rescnn, stepwise)
-from .metrics import (cohen_kappa, decision_threshold, kappa_score, model_agreement,
-                      roc_auc, tss)
+from .metrics import (average_precision, cohen_kappa, decision_threshold, kappa_score,
+                      model_agreement, roc_auc, tss)
 from .occlusion import feature_matrix
 from .registry import (get_learner, learners, metrics, register_learner, register_metric,
                        register_response, resolve_metric, responses)
-from .report import (candidate_table, ensemble_row, ensemble_weights, occlusion,
+from .report import (candidate_table, ensemble_weights, occlusion, procedure_table,
                      summary)
 from .representation import (DAY_LEVEL_STATS, GRAINS, STATS, Coverage, TimesiftMatrix,
                              TimesiftSet, bind_channels, calendar_channels, coverage,
@@ -51,6 +51,7 @@ __version__ = _installed_version("timesift")
 # The R package does the same at load, in `zzz.R`.
 register_metric("tss", tss)
 register_metric("roc_auc", roc_auc)
+register_metric("average_precision", average_precision)
 register_metric("kappa", lambda y, p: kappa_score(y, p, "prevalence"))
 register_metric("kappa_youden", lambda y, p: kappa_score(y, p, "youden"))
 
@@ -69,15 +70,17 @@ __all__ = [
     "Ladder", "Learner", "PRESENCE_ABSENCE", "Representation", "Resampling", "Response", "STATS",
     "Selection", "Sift", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
+    "average_precision",
     "bind_channels", "build_representation", "calendar_channels", "candidate_table", "cnn",
     "cohen_kappa", "column_names", "coverage", "cv", "decision_threshold", "digest_array",
     "elasticnet",
-    "ensemble", "ensemble_combine", "ensemble_fit", "ensemble_row", "ensemble_weights",
+    "ensemble", "ensemble_combine", "ensemble_fit", "ensemble_weights",
     "expand_sift", "feature_matrix", "fit_learner", "flatten", "fold_map", "forest",
     "get_learner", "grain",
     "grain_ladder", "grain_matrix", "grains", "grouped_cv", "implied_skill", "kappa_score",
     "learners", "lookback", "lookback_matrix", "lookbacks", "metrics", "mlp", "model_agreement",
     "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "positive_weights",
+    "procedure_table",
     "read_cells",
     "read_folds", "read_response", "register_learner", "register_metric", "register_response",
     "rescnn", "resolve_folds", "resolve_metric", "responses", "roc_auc", "scorable_cells",

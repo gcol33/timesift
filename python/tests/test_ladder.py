@@ -360,7 +360,8 @@ def test_score_predictions_takes_a_mask_and_a_metric_of_its_own():
     assert not any(rows["scorable"])
     assert all(np.isnan(v) for v in rows["score"])
     assert not np.allclose(score_predictions(y, p, folds, metric="roc_auc")["score"],
-                           score_predictions(y, p, folds)["score"], equal_nan=True)
+                           score_predictions(y, p, folds, metric="tss")["score"],
+                           equal_nan=True)
     with pytest.raises(KeyError, match="unknown metric"):
         score_predictions(y, p, folds, metric="nope")
 

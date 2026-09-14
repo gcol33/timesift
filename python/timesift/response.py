@@ -324,7 +324,7 @@ PRESENCE_ABSENCE = dict(
     prepare=lambda y: as_response(y).check_presence_absence(),
     activation="sigmoid",
     loss="binary_cross_entropy",
-    metric="tss",
+    metric="roc_auc",
     weights=positive_weights,
     cells=lambda y, folds: scorable_cells(y, folds),
 )

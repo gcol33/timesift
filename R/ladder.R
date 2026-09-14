@@ -24,7 +24,8 @@
 #' @param keep_fits Keep every per-fold fitted model, which is what lets [occlusion()] read a
 #'   fitted model without refitting it.
 #' @param interval `"nested_cv"` refits every arm inside every outer training set, which is what
-#'   [paired_contrast()] reads an interval for the difference in risk off. `"variables"`, the
+#'   [paired_contrast()] reads an interval for the difference in risk off. That interval is
+#'   experimental; see [select_grain()] for its measured coverage. `"variables"`, the
 #'   default, fits nothing further, and a contrast is then read across the response variables.
 #' @param repeats Repetitions of the nested cross-validation, each on its own fold map. The first
 #'   is the map the ladder was cross-validated on.
@@ -59,6 +60,25 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
                           verbose = TRUE) {
   interval <- .check_interval(interval[1L])
   set <- .as_set(x)
+  learners <- .learner_list(learners)
+  .ladder(set, y, learners, .cross_pairs(set, learners), folds = folds, response = response,
+          metric = metric, control = control, keep_fits = keep_fits, interval = interval,
+          repeats = repeats, seed = seed, verbose = verbose)
+}
+
+# Every grain with every learner, grain by grain, which is the grid a ladder is asked for.
+.cross_pairs <- function(set, learners) {
+  data.frame(grain = rep(names(set), each = length(learners)),
+             learner = rep(names(learners), times = length(set)), stringsAsFactors = FALSE)
+}
+
+# The ladder over an explicit list of (grain, learner) pairs. A ladder asks for the full cross of
+# its grains and learners; a run asks for the pairs whose learner can read the representation, and
+# the search inside every outer training set of a selection asks for whichever of the two its
+# caller holds. All three go through this one fold loop and this one scoring rule.
+.ladder <- function(set, y, learners, pairs, folds = NULL, response = "presence_absence",
+                    metric = NULL, control = train_control(), keep_fits = FALSE,
+                    interval = "variables", repeats = 1L, seed = 1L, verbose = TRUE) {
   units <- dimnames(set[[1L]])[[1L]]
   spec <- .responses_reg$get(response)
   y <- .align_response(spec$prepare(y), units)
@@ -70,29 +90,28 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
   cells <- spec$cells(y, stats::setNames(f, units))
   metric <- .as_metric(metric, spec$metric)
   score <- metric$fn
-  learners <- .learner_list(learners)
 
   levels <- sort(unique(f))
   rows <- list()
   preds <- list()
   fits <- list()
-  for (w in names(set)) {
-    for (ln in names(learners)) {
-      arm <- paste(w, ln, sep = "|")
-      if (verbose) {
-        message("fitting ", ln, " at the ", w, " grain")
-      }
-      # One fold loop for the package: a learner declaring one model per response is fitted that
-      # way whichever door it came in by, and the ladder and a whole run cannot drift apart on
-      # what a declared field means.
-      run <- .fit_candidate(learners[[ln]], set[[w]], y, f, levels, response, control = control,
-                            keep_fits = keep_fits, verbose = verbose, group = group)
-      preds[[arm]] <- run$oof
-      for (k in names(run$fits)) {
-        fits[[paste(arm, k, sep = "|")]] <- run$fits[[k]]
-      }
-      rows[[arm]] <- .as_grain_rows(.score_arm(w, ln, y, run$oof, f, levels, cells, score))
+  for (i in seq_len(nrow(pairs))) {
+    w <- pairs$grain[i]
+    ln <- pairs$learner[i]
+    arm <- paste(w, ln, sep = "|")
+    if (verbose) {
+      message("fitting ", ln, " at the ", w, " grain")
     }
+    # One fold loop for the package: a learner declaring one model per response is fitted that
+    # way whichever door it came in by, and the ladder and a whole run cannot drift apart on
+    # what a declared field means.
+    run <- .fit_candidate(learners[[ln]], set[[w]], y, f, levels, response, control = control,
+                          keep_fits = keep_fits, verbose = verbose, group = group)
+    preds[[arm]] <- run$oof
+    for (k in names(run$fits)) {
+      fits[[paste(arm, k, sep = "|")]] <- run$fits[[k]]
+    }
+    rows[[arm]] <- .as_grain_rows(.score_arm(w, ln, y, run$oof, f, levels, cells, score))
   }
   out <- do.call(rbind, rows)
   rownames(out) <- NULL
@@ -103,20 +122,20 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
   if (interval == "nested_cv") {
     maps <- .ncv_maps(y, f, group, repeats, seed)
     kept <- list()
-    for (w in names(set)) {
-      for (ln in names(learners)) {
-        arm <- paste(w, ln, sep = "|")
-        if (verbose) {
-          message("nested cross-validation of ", arm, ": ", length(maps), " repetition(s)")
-        }
-        runs <- .ncv_collect(function(train, test, tag) {
-          fit <- fit_learner(learners[[ln]], .subset_units(set[[w]], train),
-                             y[train, , drop = FALSE], response = response, control = control,
-                             group = group[train])
-          stats::predict(fit, .subset_units(set[[w]], test))
-        }, y, maps, preds[[arm]])
-        kept[[arm]] <- .ncv_keep(runs)
+    for (i in seq_len(nrow(pairs))) {
+      w <- pairs$grain[i]
+      ln <- pairs$learner[i]
+      arm <- paste(w, ln, sep = "|")
+      if (verbose) {
+        message("nested cross-validation of ", arm, ": ", length(maps), " repetition(s)")
       }
+      runs <- .ncv_collect(function(train, test, tag) {
+        fit <- fit_learner(learners[[ln]], .subset_units(set[[w]], train),
+                           y[train, , drop = FALSE], response = response, control = control,
+                           group = group[train])
+        stats::predict(fit, .subset_units(set[[w]], test))
+      }, y, maps, preds[[arm]])
+      kept[[arm]] <- .ncv_keep(runs)
     }
     ncv <- .ncv_record(y, maps, kept)
   }
@@ -205,7 +224,7 @@ grain_ladder <- function(x, y, learners, folds = NULL, response = "presence_abse
 #' head(score_predictions(y, p, fold_map(y, v = 3)))
 #'
 #' @export
-score_predictions <- function(y, p, folds, cells = NULL, metric = "tss") {
+score_predictions <- function(y, p, folds, cells = NULL, metric = "roc_auc") {
   y <- .as_response(y)
   f <- .as_folds(folds, rownames(y))
   p <- as.matrix(p)[rownames(y), colnames(y), drop = FALSE]

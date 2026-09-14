@@ -25,6 +25,19 @@ roc_auc(y, p)
 
 The area under the ROC curve, as the rank sum of the presences. Ties take the average rank.
 
+## `average_precision()`
+
+```python
+average_precision(y, p)
+```
+
+The area under the precision-recall curve, as the step sum over the distinct predictions.
+
+At each distinct prediction, the precision of calling every unit at or above it a presence,
+weighted by the share of presences that cut adds. Units sharing a prediction enter together.
+Its floor is the prevalence rather than one half, which makes it the reading of how well
+presences are ranked above absences where presences are rare.
+
 ## `kappa_score()`
 
 ```python
@@ -60,7 +73,7 @@ Agreement between two models' decisions, with how often each is right where they
 ## `score_predictions()`
 
 ```python
-score_predictions(y, p, folds, cells=None, metric: str = 'tss')
+score_predictions(y, p, folds, cells=None, metric: str = 'roc_auc')
 ```
 
 Score held-out predictions on the cells the mask allows.
@@ -80,12 +93,15 @@ paired_contrast(ladder: Ladder, a: str, b: str, interval: str = 'variables')
 The difference between two arms, taken inside each cell both scored.
 
 Two arms scored on the same held-out units do not necessarily have the same set of defined
-cells, so a difference of two marginal means is not a difference between the arms. Pairing also
-cancels what a threshold-selected metric carries in its level, since both arms carry the same
-bias on the same cell.
+cells, so a difference of two marginal means is not a difference between the arms. Pairing
+removes the variation between variables and the part of a threshold-selected metric's bias
+that the design sets, but not the part that belongs to each arm: how far TSS read at its best
+cut is inflated depends on how an arm's predictions are distributed as well as on the presence
+counts, so two arms of equal skill on the same cell can carry different biases. A TSS contrast
+is best read beside the same contrast under `roc_auc`, which has no cut to choose.
 
 Each arm is named whole, `grain|learner`. A learner named alone would take its best grain,
-chosen on the scores the contrast is then read off, and pairing does not cancel that choice;
+chosen on the scores the contrast is then read off, and pairing does not remove that choice;
 `select_grain` chooses a grain on inner folds instead and contrasts the selection through
 `compare`. The interval is Student's t on one degree of freedom fewer than there are
 variables, and `p_method` says whether the signed-rank p-value is `"exact"` or the
@@ -113,8 +129,10 @@ How much a threshold chosen on the scored units inflates the level it reports.
 
 Predictions are simulated under a normal model whose population skill is exactly the value
 planted, at the cell sizes and presence counts of this design, and read back the way a ladder
-reports a level. The gap is the inflation. It cancels in a paired difference and does not
-cancel in a level, so a level is an upper bound on the skill a population has.
+reports a level. The gap is the inflation. It is an expectation: a level is optimistic on
+average, not a bound every reading sits above. The model planted is one distribution of
+predictions, and another at the same skill inflates by a different amount, which is also why a
+paired difference is not free of it.
 
 ## `implied_skill()`
 
@@ -132,9 +150,9 @@ implied_skill(
 What population skill a level actually read is consistent with.
 
 `tss_inflation` maps a population skill to the level a design reports for it; this inverts
-that map. It is the only honest way to read a level as a statement about a population rather
-than about a scoring rule, and it says nothing about a difference between two arms, where the
-inflation cancels and the reported number stands as it is.
+that map, under the distribution of predictions `tss_inflation` plants; a model whose
+predictions are distributed otherwise is inflated by a different amount. It does not correct a
+difference between two arms, whose inflations need not be equal.
 
 ## `occlusion()`
 
