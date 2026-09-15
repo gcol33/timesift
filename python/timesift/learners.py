@@ -480,14 +480,14 @@ def _torch_loss(net, loss_fn, xt, yt, wt, idx_all, batch_size, device) -> float:
 
 
 def _validation_split(y: np.ndarray, val_frac: float, rng, group=None) -> np.ndarray:
-    """The inner validation set, one unit drawn from each of ``n_val`` equal-count strata of the
-    response total, so the split carries every level of the response in proportion.
+    """The inner validation set, ``val_frac`` of the units drawn by a plain random permutation.
 
-    A plain random draw from a rare response can leave the fitting units with no presence to
-    learn from, and the validation loss it early-stops on is then read off nothing. Under a
-    grouping the draw is over the groups, each carrying the mean of its rows' totals, and the rows
-    of a drawn group are held out together: a unit the outer folds kept whole is not split across
-    the fit and the loss it stops on.
+    Under a grouping the draw is over the groups, and the rows of a drawn group are held out
+    together: a unit the outer folds kept whole is not split across the fit and the loss it stops
+    on. A draw stratified on the response total was tried and dropped for this: on the Schrankogel
+    weekly arm the plain permutation reads 0.0047 AUC above it, five seeds each, p = 0.019
+    (``inst/reproduce/README.md``). A single rare response can still draw no presence into the
+    validation set here, where the stratified draw guaranteed one.
     """
     if group is None:
         key = np.arange(y.shape[0])
@@ -497,10 +497,7 @@ def _validation_split(y: np.ndarray, val_frac: float, rng, group=None) -> np.nda
     n_val = max(1, int(round(val_frac * n)))
     if val_frac <= 0 or n - n_val < 2:
         return np.empty(0, dtype=int)
-    total = np.asarray([y[key == k].sum(axis=1).mean() for k in range(n)])
-    ranked = np.lexsort((rng.permutation(n), total))
-    stratum = np.ceil(np.arange(1, n + 1) * n_val / n).astype(int)
-    drawn = np.array([rng.choice(ranked[stratum == s]) for s in range(1, n_val + 1)])
+    drawn = rng.permutation(n)[:n_val]
     return np.flatnonzero(np.isin(key, drawn))
 
 

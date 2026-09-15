@@ -173,7 +173,7 @@ baseline <- grain_ladder(
 Both redo their predictor selection inside every fold, on the training
 plots only, which is the footing the encoders are fitted on. The
 encoders are the three the paper reports, at the settings it reports
-them at, which are the defaults here:
+them at, which are the constructors’ defaults here:
 
 ``` r
 
@@ -195,11 +195,19 @@ flattens the channels through two hidden layers of 512 and 256 units.
 How all three are trained is
 [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md).
 Its defaults are AdamW at a learning rate of 1e-3 with weight decay
-1e-4, cosine annealing over 60 epochs, early stopping after ten epochs
+1e-4, cosine annealing over 60 epochs, and a per-species positive-class
+weight capped at 50. The study also stopped early, after ten epochs
 without an improvement on an inner validation split of 15 percent of the
-fitting plots, and a per-species positive-class weight capped at 50. The
-encoders of the study read batches of 32 plots, which the grid asks for;
-the default is 64.
+fitting plots, under which the validation loss is read as the fitting
+loss is. The package default holds no split back and keeps the last
+epoch, so the study’s rule is a control of its own, which every call
+below is handed. The encoders of the study read batches of 32 plots,
+which the grid asks for; the default is 64.
+
+``` r
+
+study <- train_control(val_frac = 0.15, early_stopping = 10L)
+```
 
 The eleven members of the paper’s ensemble are the same architectures at
 three widths, three kernel widths and three seeds, trained with weight
@@ -229,7 +237,7 @@ ladder_input <- timesift_set(lapply(binning, function(w) {
   bind_channels(x, calendar_channels(x))
 }))
 
-grid <- grain_ladder(ladder_input, y, encoders, folds = folds, metric = "tss")
+grid <- grain_ladder(ladder_input, y, encoders, folds = folds, metric = "tss", control = study)
 summary(grid)
 ```
 
@@ -242,7 +250,7 @@ decisions.
 
 ``` r
 
-lad <- grain_ladder(ladder_input, y, members, folds = folds, metric = "tss")
+lad <- grain_ladder(ladder_input, y, members, folds = folds, metric = "tss", control = study)
 oof <- attr(lad, "predictions")
 arms <- paste("week", names(members), sep = "|")
 
@@ -311,7 +319,7 @@ inner_split <- function(y_train) {
 }
 
 selection <- select_grain(candidates, y, cnn(epochs = 60, batch_size = 32),
-                          folds = folds, inner = inner_split, metric = "roc_auc")
+                          folds = folds, inner = inner_split, metric = "roc_auc", control = study)
 selection$selected
 ```
 

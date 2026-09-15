@@ -267,9 +267,12 @@ rare response weighs is the response head’s, not a training setting.</p>
 <p><code>batch_size</code> is the most targets an optimiser step reads:
 the fitting targets are cut into as few batches of at most that many as
 they divide into, of as equal a length as they can be.
-<code>val_frac</code> is held back from every fit alike, the fit on all
-targets a run ends with included, one target from each of as many
-equal-count strata of the response total as the set holds.</p>
+<code>val_frac</code> is held back from every fit alike by a plain
+random permutation, the fit on all targets a run ends with included, and
+<code>early_stopping</code> is read only on that set. At the default of
+0 nothing is held back: every fitting target is trained on, the whole
+budget runs, and the fit keeps the last epoch, where the cosine schedule
+has annealed the learning rate to zero.</p>
 <p><code>device</code> is <code>"auto"</code> for the graphics processor
 where there is one, NVIDIA’s or Apple’s, or the name of a device to
 train on. A fitted encoder carries the setting rather than the device it

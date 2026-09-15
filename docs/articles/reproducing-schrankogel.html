@@ -308,7 +308,7 @@ scored on the same cells by the same rule.</p>
 <p>Both redo their predictor selection inside every fold, on the
 training plots only, which is the footing the encoders are fitted on.
 The encoders are the three the paper reports, at the settings it reports
-them at, which are the defaults here:</p>
+them at, which are the constructors’ defaults here:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">encoders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mlp <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">mlp</a></span><span class="op">(</span><span class="op">)</span>, cnn <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">cnn</a></span><span class="op">(</span><span class="op">)</span>, rescnn <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">rescnn</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="../reference/torch_learners.html">cnn()</a></code> is four blocks of a one-dimensional convolution of
@@ -321,15 +321,20 @@ gates, pooling average and maximum together. <code><a href="../reference/torch_l
 the channels through two hidden layers of 512 and 256 units.</p>
 <p>How all three are trained is <code><a href="../reference/train_control.html">train_control()</a></code>. Its
 defaults are AdamW at a learning rate of 1e-3 with weight decay 1e-4,
-cosine annealing over 60 epochs, early stopping after ten epochs without
-an improvement on an inner validation split of 15 percent of the fitting
-plots, and a per-species positive-class weight capped at 50. The
-encoders of the study read batches of 32 plots, which the grid asks for;
-the default is 64.</p>
+cosine annealing over 60 epochs, and a per-species positive-class weight
+capped at 50. The study also stopped early, after ten epochs without an
+improvement on an inner validation split of 15 percent of the fitting
+plots, under which the validation loss is read as the fitting loss is.
+The package default holds no split back and keeps the last epoch, so the
+study’s rule is a control of its own, which every call below is handed.
+The encoders of the study read batches of 32 plots, which the grid asks
+for; the default is 64.</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">study</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/train_control.html">train_control</a></span><span class="op">(</span>val_frac <span class="op">=</span> <span class="fl">0.15</span>, early_stopping <span class="op">=</span> <span class="fl">10L</span><span class="op">)</span></span></code></pre></div>
 <p>The eleven members of the paper’s ensemble are the same architectures
 at three widths, three kernel widths and three seeds, trained with
 weight averaging over the tail of the epoch budget:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">members</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">16L</span>, <span class="fl">32L</span>, <span class="fl">64L</span>, <span class="fl">128L</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">32L</span>, <span class="fl">64L</span>, <span class="fl">128L</span>, <span class="fl">256L</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">16L</span>, <span class="fl">32L</span>, <span class="fl">64L</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>         <span class="kw">function</span><span class="op">(</span><span class="va">ch</span><span class="op">)</span> <span class="fu"><a href="../reference/torch_learners.html">cnn</a></span><span class="op">(</span>channels <span class="op">=</span> <span class="va">ch</span>, swa <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -344,13 +349,13 @@ weight averaging over the tail of the epoch budget:</p>
 <p>The ladder is one call. Each grain is built once, the calendar
 channels are joined to it, and every encoder is fitted at every rung on
 the one fold map and the one mask.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ladder_input</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift_set.html">timesift_set</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">binning</span>, <span class="kw">function</span><span class="op">(</span><span class="va">w</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">readings</span>, <span class="va">logger_ID</span>, <span class="va">date</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="va">w</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="../reference/bind_channels.html">bind_channels</a></span><span class="op">(</span><span class="va">x</span>, <span class="fu"><a href="../reference/calendar_channels.html">calendar_channels</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">grid</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_ladder.html">grain_ladder</a></span><span class="op">(</span><span class="va">ladder_input</span>, <span class="va">y</span>, <span class="va">encoders</span>, folds <span class="op">=</span> <span class="va">folds</span>, metric <span class="op">=</span> <span class="st">"tss"</span><span class="op">)</span></span>
+<span><span class="va">grid</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_ladder.html">grain_ladder</a></span><span class="op">(</span><span class="va">ladder_input</span>, <span class="va">y</span>, <span class="va">encoders</span>, folds <span class="op">=</span> <span class="va">folds</span>, metric <span class="op">=</span> <span class="st">"tss"</span>, control <span class="op">=</span> <span class="va">study</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">grid</span><span class="op">)</span></span></code></pre></div>
 <p>The ensemble is one further arm on the same rungs. Each member runs
 as an arm of its own, and their held-out predictions are averaged: a
@@ -358,8 +363,8 @@ member’s out-of-fold prediction on a fold is its held-out prediction
 there, so averaging the eleven and choosing a threshold afterwards is
 the set scored as one model rather than as a vote between eleven
 decisions.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">lad</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_ladder.html">grain_ladder</a></span><span class="op">(</span><span class="va">ladder_input</span>, <span class="va">y</span>, <span class="va">members</span>, folds <span class="op">=</span> <span class="va">folds</span>, metric <span class="op">=</span> <span class="st">"tss"</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">lad</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_ladder.html">grain_ladder</a></span><span class="op">(</span><span class="va">ladder_input</span>, <span class="va">y</span>, <span class="va">members</span>, folds <span class="op">=</span> <span class="va">folds</span>, metric <span class="op">=</span> <span class="st">"tss"</span>, control <span class="op">=</span> <span class="va">study</span><span class="op">)</span></span>
 <span><span class="va">oof</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">lad</span>, <span class="st">"predictions"</span><span class="op">)</span></span>
 <span><span class="va">arms</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"week"</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">members</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"|"</span><span class="op">)</span></span>
 <span></span>
@@ -383,7 +388,7 @@ demonstration is this call rather than a description of it.</p>
 seven windows, the reading-level extremes and their three-channel pair
 from the half-daily window up, and the two day-level pairs from the
 weekly window up, since those reduce to whole days first.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">summaries</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="st">"mean"</span>, min <span class="op">=</span> <span class="st">"min"</span>, max <span class="op">=</span> <span class="st">"max"</span>,</span>
 <span>                  minmeanmax <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"min"</span>, <span class="st">"mean"</span>, <span class="st">"max"</span><span class="op">)</span>,</span>
 <span>                  dailyextreme <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"mean_daily_min"</span>, <span class="st">"mean"</span>, <span class="st">"mean_daily_max"</span><span class="op">)</span>,</span>
@@ -405,7 +410,7 @@ the reproduction script; <code><a href="../reference/select_grain.html">select_g
 <code>inner</code> as a function of the training response, so reading
 that file back is what makes the inner splits the study’s own rather
 than a fresh deal.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">inner</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/utils/read.table.html" class="external-link">read.csv</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"reproduce"</span>, <span class="st">"inner_folds.csv"</span>, package <span class="op">=</span> <span class="st">"timesift"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">inner</span><span class="op">$</span><span class="va">logger_ID</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">inner</span><span class="op">$</span><span class="va">logger_ID</span><span class="op">)</span></span>
 <span></span>
@@ -418,7 +423,7 @@ than a fresh deal.</p>
 <span><span class="op">}</span></span>
 <span></span>
 <span><span class="va">selection</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/select_grain.html">select_grain</a></span><span class="op">(</span><span class="va">candidates</span>, <span class="va">y</span>, <span class="fu"><a href="../reference/torch_learners.html">cnn</a></span><span class="op">(</span>epochs <span class="op">=</span> <span class="fl">60</span>, batch_size <span class="op">=</span> <span class="fl">32</span><span class="op">)</span>,</span>
-<span>                          folds <span class="op">=</span> <span class="va">folds</span>, inner <span class="op">=</span> <span class="va">inner_split</span>, metric <span class="op">=</span> <span class="st">"roc_auc"</span><span class="op">)</span></span>
+<span>                          folds <span class="op">=</span> <span class="va">folds</span>, inner <span class="op">=</span> <span class="va">inner_split</span>, metric <span class="op">=</span> <span class="st">"roc_auc"</span>, control <span class="op">=</span> <span class="va">study</span><span class="op">)</span></span>
 <span><span class="va">selection</span><span class="op">$</span><span class="va">selected</span></span></code></pre></div>
 <p>That is ten outer folds by five inner folds by 33 candidates, plus
 one refit per outer fold: 1,660 encoder fits, which is an overnight run
@@ -431,7 +436,7 @@ visible.</p>
 <p>The arm that choice is read against is the penalised model on the
 same weekly three-channel series, which is the study’s own
 comparison:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">weekly</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">readings</span>, <span class="va">logger_ID</span>, <span class="va">date</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span>,</span>
 <span>                        stats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cold_day"</span>, <span class="st">"mean"</span>, <span class="st">"warm_day"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">series</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_ladder.html">grain_ladder</a></span><span class="op">(</span><span class="fu"><a href="../reference/timesift_set.html">timesift_set</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>series <span class="op">=</span> <span class="va">weekly</span><span class="op">)</span><span class="op">)</span>, <span class="va">y</span>,</span>
@@ -448,7 +453,7 @@ A fitted network does not: its weights depend on the library that
 trained it and on the device it trained on. The reproduction script
 therefore records both beside every number it writes, in
 <code>run.meta</code>:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">torch</span><span class="fu">::</span><span class="fu">torch_config</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">libtorch_version</span></span>
 <span><span class="fu">torch</span><span class="fu">::</span><span class="fu"><a href="https://torch.mlverse.org/docs/reference/cuda_is_available.html" class="external-link">cuda_is_available</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>The study’s grid ran on one CUDA device; a run on a processor gives
@@ -464,7 +469,7 @@ model on the per-cell scores,
 <code>score ~ grain + (1 | species) + (1 | fold)</code> by restricted
 maximum likelihood, with Dunnett’s many-to-one procedure against the
 reference:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/grain_contrasts.html">grain_contrasts</a></span><span class="op">(</span><span class="va">grid</span>, learner <span class="op">=</span> <span class="st">"cnn"</span><span class="op">)</span></span></code></pre></div>
 <p>The design is balanced at 101 species by ten folds by seven grains,
 so each grain is compared within a species and within a fold.
@@ -476,7 +481,7 @@ tables stacked.</p>
 <h2 id="running-it">Running it<a class="anchor" aria-label="anchor" href="#running-it"></a>
 </h2>
 <p>The driver is installed with the package:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"reproduce"</span>, <span class="st">"schrankogel.R"</span>, package <span class="op">=</span> <span class="st">"timesift"</span><span class="op">)</span></span></code></pre></div>
 <pre><code>Rscript schrankogel.R &lt;deposit_dir&gt; &lt;out_dir&gt; \
   --stages=contract,representation,baseline,networks,contrasts,inflation \

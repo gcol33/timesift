@@ -277,3 +277,11 @@ On the card the random split moves the level as far as the weighting does, and a
 together sit 0.0026 above the weighting alone (p = 0.039), where on the processor trajectories
 the split moved nothing detectable. The weighted package reads 0.0003 from the pipeline's
 eleven-run mean. The selection stage rerun under `a212771` is in the table above.
+
+The package draws the inner validation set by a plain random permutation from this version on,
+where it drew one unit from each of `n_val` equal-count strata of the response total before: the
+margin is the same as the weighting's, and it is real on the card even where the standardisation
+change is not. The stratified draw's reason still stands for a single rare response fitted alone,
+which is the case the docstring's own test covers: it guaranteed the response a presence in every
+validation set, and the plain draw can miss it. On the Schrankogel weekly arm that is 101
+responses sharing one draw, and the level moved the direction the evidence pointed.

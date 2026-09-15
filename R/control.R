@@ -20,9 +20,8 @@
 #'   still restores the epoch with the lowest validation loss.
 #' @param val_frac Share of the fitting targets held back as an inner validation set, used for
 #'   early stopping and for nothing else. It is never scored as a result. The set is drawn from
-#'   every fit alike, one target from each of as many equal-count strata of the response total as
-#'   the set holds, so the fit on all targets that a run ends with also trains on the rest. At the
-#'   default of 0 nothing is held back: every fitting target is trained on, the whole budget runs,
+#'   every fit alike by a plain random permutation, so the fit on all targets that a run ends with
+#'   also trains on the rest. At the default of 0 nothing is held back: every fitting target is trained on, the whole budget runs,
 #'   and the fit keeps the last epoch, where the cosine schedule has annealed the learning rate to
 #'   zero. On the Schrankogel weekly arm that epoch scores 0.007 AUC above the epoch early stopping
 #'   keeps on a 15 percent split, and within 0.001 of the best epoch read on the test folds.

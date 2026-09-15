@@ -264,12 +264,13 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   total / length(idx_all)
 }
 
-# The inner validation set, one unit drawn from each of `n_val` equal-count strata of the response
-# total, so the split carries every level of the response in proportion. A plain random draw from
-# a rare response can leave the fitting units with no presence to learn from, and the validation
-# loss it early-stops on is then read off nothing. Under a grouping the draw is over the groups,
-# each carrying the mean of its rows' totals, and the rows of a drawn group are held out together:
-# a unit the outer folds kept whole is not split across the fit and the loss it stops on.
+# The inner validation set, `val_frac` of the units drawn by a plain random permutation. Under a
+# grouping the draw is over the groups, and the rows of a drawn group are held out together: a
+# unit the outer folds kept whole is not split across the fit and the loss it stops on. A draw
+# stratified on the response total was tried and dropped for this: on the Schrankogel weekly arm
+# the plain permutation reads 0.0047 AUC above it, five seeds each, p = 0.019
+# (`inst/reproduce/README.md`). A single rare response can still draw no presence into the
+# validation set here, where the stratified draw guaranteed one.
 .validation_split <- function(y, val_frac, group = NULL) {
   key <- if (is.null(group)) seq_len(nrow(y)) else match(group, unique(group))
   n <- max(key)
@@ -277,12 +278,7 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   if (val_frac <= 0 || n - n_val < 2L) {
     return(integer(0))
   }
-  total <- as.numeric(tapply(rowSums(y), key, mean))
-  ranked <- order(total, sample.int(n), method = "radix")
-  stratum <- ceiling(seq_len(n) * n_val / n)
-  drawn <- vapply(split(ranked, stratum), function(members) {
-    if (length(members) == 1L) members else sample(members, 1L)
-  }, integer(1L))
+  drawn <- sample.int(n)[seq_len(n_val)]
   sort(which(key %in% drawn), method = "radix")
 }
 

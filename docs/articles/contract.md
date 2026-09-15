@@ -941,18 +941,27 @@ the difference is recorded here rather than found at a call site.
   tree’s bootstrap, which is what ranger’s case weights are and what the
   Python side’s forest does with its own draw, because scikit-learn’s
   forest grows the same pure-leaved tree under any sample weight. The
-  shipped presence-absence head weights each presence by the ratio of
-  absences to presences among the fitting units, capped at 50, and each
-  absence by one; a head without a weights function fits unweighted. On
-  both sides.
+  weights function takes the response and a mask of the rows the model
+  is fitted on, reads whatever it reads off those rows alone, and
+  weights every row. The shipped presence-absence head weights each
+  presence by the ratio of absences to presences among the fitting
+  units, capped at 50, and each absence by one; a head without a weights
+  function fits unweighted. On both sides.
 - The encoders standardise every channel by its own centre and sample
   standard deviation over every unit and bin of the fitting units; the
-  inner validation set is one unit from each of as many equal-count
-  strata of the response total as it holds; the fitting units are cut
-  into as few batches of at most `batch_size` rows as they divide into,
-  of as equal a length as they can be; the snapshot early stopping
-  restores, and the running average `swa` keeps, are copies of the
-  weights and never the storage the optimiser updates.
+  inner validation set is a plain random draw of the fitting units, and
+  the loss read on it, which the early stopping watches, is weighted by
+  the head as the fitting loss is, with the fitting units alone in the
+  count the weights are made from; the fitting units are cut into as few
+  batches of at most `batch_size` rows as they divide into, of as equal
+  a length as they can be; the snapshot early stopping restores, and the
+  running average `swa` keeps, are copies of the weights and never the
+  storage the optimiser updates.
+- The default training control holds no inner validation set back, so an
+  encoder trains every fitting unit for the whole budget and keeps the
+  last epoch; the patience is read only where `val_frac` holds a set
+  back, and a patience that never runs out still restores the epoch of
+  lowest validation loss. On both sides.
 - A `static` column enters the array as a channel holding the same
   number in every bin, which is the constant an encoder reads beside the
   readings. Flattening the bins into a block of features reads such a

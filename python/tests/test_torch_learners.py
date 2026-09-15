@@ -264,16 +264,19 @@ def test_the_averaged_weights_batch_norm_statistics_are_the_plain_mean_over_the_
     assert net[0].momentum == 0.1
 
 
-def test_the_inner_validation_set_is_drawn_from_every_level_of_the_response():
+def test_the_inner_validation_set_is_drawn_by_a_plain_random_permutation():
     from timesift.learners import _validation_split
     y = np.column_stack([np.r_[np.ones(6), np.zeros(54)], np.zeros(60)])
     rng = np.random.default_rng(1)
-    for _ in range(20):
-        val = _validation_split(y, 1 / 6, rng)
-        assert len(val) == 10
-        # The last of the ten strata is the six presences alone, so every draw carries exactly
-        # one presence into the validation set.
-        assert y[val, 0].sum() == 1
+    draws = [tuple(sorted(_validation_split(y, 1 / 6, rng))) for _ in range(200)]
+    assert all(len(d) == 10 for d in draws)
+    assert len(set(draws)) > 1
+    # Six presences among sixty units and a tenth held back: a stratified draw guaranteed one
+    # presence in the set, a plain draw of ten misses them all about a third of the time and
+    # catches at least one the rest.
+    presence_counts = [y[list(d), 0].sum() for d in draws]
+    assert any(c == 0 for c in presence_counts)
+    assert any(c >= 1 for c in presence_counts)
     assert len(_validation_split(y, 0, rng)) == 0
     assert len(_validation_split(y[:2], 0.5, rng)) == 0
 

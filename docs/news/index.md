@@ -4,6 +4,42 @@
 
 ### Changed
 
+- [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md)
+  holds no inner validation set back by default (`val_frac = 0`, was
+  0.15): an encoder trains every fitting target for the whole epoch
+  budget and keeps the last epoch, where the cosine schedule has
+  annealed the learning rate to zero. On the Schrankogel weekly
+  three-channel arm that epoch reads 0.8803 AUC against 0.8729 for early
+  stopping on a 15 percent split and 0.8813 for the best epoch read on
+  the test folds. `early_stopping = Inf` with a split held back still
+  restores the epoch of lowest validation loss (0.8760 there). The
+  study’s rule is `train_control(val_frac = 0.15, early_stopping = 10)`,
+  which the reproduction driver passes. On both sides.
+- The encoders read the inner validation loss that early stopping
+  watches under the head’s case weights, as they read the fitting loss,
+  so the epoch kept is the one the fit’s own objective prefers. The
+  weights are still read off the fitting units alone: a response head’s
+  `weights` now takes `(y, fitting)`, with `fitting` marking the rows
+  the model is fitted on, and
+  [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
+  gains the same argument. Read unweighted, the validation loss of a
+  presence-absence fit is dominated by the absences of the rare
+  responses the fit was told to weigh up and stops at an earlier epoch:
+  on the Schrankogel weekly three-channel arm the change is worth about
+  0.003 AUC, which is the gap to the analysis pipeline’s encoder
+  ([\#75](https://github.com/gcol33/timesift/issues/75)). On both sides.
+- The inner validation set `val_frac` holds back is now drawn by a plain
+  random permutation, not by one unit from each of `n_val` equal-count
+  strata of the response total. Five seeds each of the fixed Schrankogel
+  weekly three-channel arm, package recipe otherwise unchanged: the
+  plain draw reads 0.8721 AUC against the stratified draw’s 0.8674
+  (+0.0047, Welch p = 0.019), the same margin the validation-loss
+  weighting is worth. The stratified draw guaranteed a rare response a
+  presence in every validation set; the plain draw can still miss one,
+  and no longer guarantees it.
+  `train_control(val_frac = 0.15, early_stopping = 10)` is unaffected by
+  name, only by what the split under it now does
+  ([\#75](https://github.com/gcol33/timesift/issues/75)). On both sides.
 - [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
   now estimates the procedure it runs. Inside each outer fold of
   `resampling` the training targets are split again into `inner` folds

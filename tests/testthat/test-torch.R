@@ -257,17 +257,18 @@ test_that("the device is resolved once, from the control", {
   expect_equal(train_control()$device, "auto")
 })
 
-test_that("the inner validation set is drawn from every level of the response", {
+test_that("the inner validation set is drawn by a plain random permutation", {
   set.seed(1)
   y <- cbind(c(rep(1, 6), rep(0, 54)), 0)
-  for (i in 1:20) {
-    val <- .validation_split(y, 1 / 6)
-    expect_length(val, 10L)
-    # Six presences among sixty units and ten validation units: the last of the ten strata is
-    # the six presences alone, so every draw carries exactly one presence into the validation
-    # set, where a plain draw of ten would miss them all about a third of the time.
-    expect_equal(sum(y[val, 1L]), 1)
-  }
+  draws <- lapply(1:200, function(i) sort(.validation_split(y, 1 / 6)))
+  expect_true(all(lengths(draws) == 10L))
+  expect_gt(length(unique(draws)), 1L)
+  # Six presences among sixty units and ten validation units: a stratified draw guaranteed one
+  # presence in the set, a plain draw of ten misses them all about a third of the time and
+  # catches at least one the rest.
+  presence_counts <- vapply(draws, function(val) sum(y[val, 1L]), numeric(1L))
+  expect_true(any(presence_counts == 0))
+  expect_true(any(presence_counts >= 1))
   expect_length(.validation_split(y, 0), 0L)
   expect_length(.validation_split(y[1:2, , drop = FALSE], 0.5), 0L)
 })

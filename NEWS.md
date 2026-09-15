@@ -19,6 +19,14 @@
   weigh up and stops at an earlier epoch: on the Schrankogel weekly three-channel arm the change
   is worth about 0.003 AUC, which is the gap to the analysis pipeline's encoder (#75). On both
   sides.
+* The inner validation set `val_frac` holds back is now drawn by a plain random permutation, not
+  by one unit from each of `n_val` equal-count strata of the response total. Five seeds each of
+  the fixed Schrankogel weekly three-channel arm, package recipe otherwise unchanged: the plain
+  draw reads 0.8721 AUC against the stratified draw's 0.8674 (+0.0047, Welch p = 0.019), the same
+  margin the validation-loss weighting is worth. The stratified draw guaranteed a rare response a
+  presence in every validation set; the plain draw can still miss one, and no longer guarantees
+  it. `train_control(val_frac = 0.15, early_stopping = 10)` is unaffected by name, only by what the
+  split under it now does (#75). On both sides.
 * `timesift()` now estimates the procedure it runs. Inside each outer fold of `resampling` the
   training targets are split again into `inner` folds (5 by default), every candidate is
   cross-validated there, `rule` chooses one on its inner score and the stack's weights are fitted

@@ -112,8 +112,11 @@ default metric name; and <code>cells(y, folds)</code>, returning the mask of sco
 learner that ships reads <code>loss</code> and <code>activation</code> from here: the encoders train under the loss
 and predict through the activation, and the learners fitting one model per response take the
 family the loss names, logistic or Gaussian. The combiner minimises the same loss. An
-optional <code>weights(y)</code> returns a <code>[unit, variable]</code> matrix of case weights every learner fits
-under; the shipped head's is <code><a href="positive_weights.html">positive_weights()</a></code>, and a head without one fits unweighted.</p></dd>
+optional <code>weights(y, fitting)</code> returns a <code>[unit, variable]</code> matrix of case weights every
+learner fits under, with <code>fitting</code> a logical vector marking the rows the model is fitted on:
+whatever the head reads off the response, it reads off those rows, and it weights every row,
+so an encoder's inner validation loss is weighted as its fit is. The shipped head's is
+<code><a href="positive_weights.html">positive_weights()</a></code>, and a head without one fits unweighted.</p></dd>
 
 
 <dt id="arg-overwrite">overwrite<a class="anchor" aria-label="anchor" href="#arg-overwrite"></a></dt>

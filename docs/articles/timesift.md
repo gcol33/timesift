@@ -307,7 +307,7 @@ train_control(epochs = 200L, device = "cpu")
 #>   learning_rate   0.001   (default)
 #>   weight_decay    1e-04   (default)
 #>   early_stopping  10   (default)
-#>   val_frac        0.15   (default)
+#>   val_frac        0   (default)
 #>   device          cpu
 #>   seed            1   (default)
 #>   swa             FALSE   (default)
