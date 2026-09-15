@@ -224,11 +224,44 @@ bench_assert_package <- function(pkg_dir, dirty) {
          "install.packages(\"", pkg_dir, "\", repos = NULL, type = \"source\").",
          call. = FALSE)
   }
+  stale <- bench_stale_functions(pkg_dir)
+  if (length(stale)) {
+    stop("the installed timesift is not the checkout at ", pkg_dir, ": ", length(stale),
+         " function(s) differ, among them ", paste(utils::head(stale, 5L), collapse = ", "),
+         ". Install the checkout before running the benchmark.", call. = FALSE)
+  }
   if (identical(BENCH$scale, "full") && isTRUE(dirty)) {
     stop("the checkout at ", pkg_dir, " has uncommitted changes, and a full-scale run stamps its ",
          "commit onto every row. Commit, or run --scale=smoke.", call. = FALSE)
   }
   invisible(TRUE)
+}
+
+# Every top-level function the checkout's R/ defines is compared, formals and body, with the one
+# the installed namespace holds. The version string cannot tell two builds of 0.2.0 apart; the
+# code can. Returns the names that are missing from the namespace or differ from the checkout.
+bench_stale_functions <- function(pkg_dir) {
+  ns <- asNamespace("timesift")
+  files <- list.files(file.path(pkg_dir, "R"), pattern = "[.][Rr]$", full.names = TRUE)
+  stale <- character()
+  for (file in files) {
+    for (expr in parse(file, keep.source = FALSE)) {
+      defines <- is.call(expr) && (identical(expr[[1L]], as.name("<-")) ||
+                                     identical(expr[[1L]], as.name("="))) &&
+        is.name(expr[[2L]]) && is.call(expr[[3L]]) &&
+        identical(expr[[3L]][[1L]], as.name("function"))
+      if (!defines) next
+      name <- as.character(expr[[2L]])
+      checkout <- eval(expr[[3L]], baseenv())
+      installed <- get0(name, envir = ns, inherits = FALSE)
+      if (!is.function(installed) ||
+          !identical(formals(checkout), formals(installed)) ||
+          !identical(body(checkout), body(utils::removeSource(installed)))) {
+        stale <- c(stale, name)
+      }
+    }
+  }
+  stale
 }
 
 # The candidate set actually searched is read back off the selection and checked against the one
