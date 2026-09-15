@@ -184,24 +184,33 @@ seed, so the two differ by sqrt(2) times that spread, and the tolerance is three
 AUC and 0.0145 TSS. Each species is held to the same rule at its own spread, and the check is
 how many of the 101 sit inside their band, with five allowed outside.
 
-| quantity | pipeline | this run | tolerance | inside |
-|---|---|---|---|---|
-| outer folds selecting a weekly candidate | 10 of 10 | 9 of 10, fold 6 monthly | exact | no |
-| the selected procedure, AUC | 0.8770 | 0.8704 | 0.0087 | yes |
-| the selected procedure, TSS | 0.7098 | 0.7012 | 0.0145 | yes |
-| species inside their own band, AUC | 101 | 100 | 96 | yes |
-| species inside their own band, TSS | 101 | 99 | 96 | yes |
-| the weekly series elastic net, TSS | 0.6962 | 0.6973 | 0.002 | yes |
-| the weekly series elastic net, AUC | 0.8680 | 0.8682 | 0.002 | yes |
-| its species inside their own band, TSS | 101 | 101 | 96 | yes |
-| the procedure over the series elastic net, AUC | +0.0090 (0.0055 to 0.0124) | +0.0022 (-0.0018 to 0.0062) | 0.0087 | yes |
+The stage was run a second time on 2026-09-15, on another L40S under the same R, torch, libtorch
+and CUDA, with the package at `a212771`, which weights the
+validation loss early stopping watches (below), from the same deposit, fold map and inner
+partition, in 17.4 hours; its files are under `dev_notes/repro-lisc/selection33_fixed/`.
+
+| quantity | pipeline | 2026-09-12, `5f0a5a6` | 2026-09-15, `a212771` | tolerance | inside |
+|---|---|---|---|---|---|
+| outer folds selecting a weekly candidate | 10 of 10 | 9 of 10, fold 6 monthly | 10 of 10 | exact | no, yes |
+| the selected procedure, AUC | 0.8770 | 0.8704 | 0.8717 | 0.0087 | yes |
+| the selected procedure, TSS | 0.7098 | 0.7012 | 0.7022 | 0.0145 | yes |
+| species inside their own band, AUC | 101 | 100 | 101 | 96 | yes |
+| species inside their own band, TSS | 101 | 99 | 101 | 96 | yes |
+| the weekly series elastic net, TSS | 0.6962 | 0.6973 | 0.6973 | 0.002 | yes |
+| the weekly series elastic net, AUC | 0.8680 | 0.8682 | 0.8682 | 0.002 | yes |
+| its species inside their own band, TSS | 101 | 101 | 101 | 96 | yes |
+| the procedure over the series elastic net, AUC | +0.0090 (0.0055 to 0.0124) | +0.0022 (-0.0018 to 0.0062) | +0.0034 (-0.0003 to 0.0072) | 0.0087 | yes |
 
 Which weekly summary won differs between the two in most folds, as the script expects: the top
-inner scores sit within a thousandth of each other. The package's inner scores are level with the
-pipeline's, fold for fold, to within 0.006; its held-out level sits 0.0065 AUC below the
-pipeline's single run, inside the spread of a fitted encoder, and in the same direction in 83 of
-the 101 species. The margin over the series elastic net is inside the tolerance and, unlike the
-pipeline's, does not separate from zero across species. What this measures is the two
+inner scores sit within a thousandth of each other. In the first run the package's inner scores
+were level with the pipeline's, fold for fold, to within 0.006, and its held-out level sat 0.0065
+AUC below the pipeline's single run, in the same direction in 83 of the 101 species. Under the
+weighted validation loss every outer fold selects a weekly candidate, the inner scores sit above
+the pipeline's in all ten folds by 0.0007 to 0.0047, and the held-out level sits 0.0053 AUC below
+the pipeline's single run (per species mean -0.0053, standard deviation 0.0097), below it in 71
+of the 101 species; the pipeline's run sits at the high end of its own eleven, 0.8777 for the fixed
+weekly encoder against their mean of 0.8735. In both runs the margin over the series elastic net is
+inside the tolerance and, unlike the pipeline's, does not separate from zero across species. What this measures is the two
 implementations of one procedure on one dataset; it does not measure agreement between a fitted
 R network and a fitted Python network, which the seed spread above says is not a thing to
 measure.
@@ -267,4 +276,4 @@ rule. Welch tests against the package's recipe:
 On the card the random split moves the level as far as the weighting does, and all three
 together sit 0.0026 above the weighting alone (p = 0.039), where on the processor trajectories
 the split moved nothing detectable. The weighted package reads 0.0003 from the pipeline's
-eleven-run mean. The selection stage is being rerun under `a212771`.
+eleven-run mean. The selection stage rerun under `a212771` is in the table above.
