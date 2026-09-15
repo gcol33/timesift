@@ -776,6 +776,10 @@ call site.
   few batches of at most `batch_size` rows as they divide into, of as equal a length as they can
   be; the snapshot early stopping restores, and the running average `swa` keeps, are copies of
   the weights and never the storage the optimiser updates.
+- The default training control holds no inner validation set back, so an encoder trains every
+  fitting unit for the whole budget and keeps the last epoch; the patience is read only where
+  `val_frac` holds a set back, and a patience that never runs out still restores the epoch of
+  lowest validation loss. On both sides.
 - A `static` column enters the array as a channel holding the same number in every bin, which is
   the constant an encoder reads beside the readings. Flattening the bins into a block of features
   reads such a channel once, so a static predictor is one column of the design however many bins

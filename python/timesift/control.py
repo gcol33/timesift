@@ -22,7 +22,7 @@ class TrainControl:
     learning_rate: float = 1e-3
     weight_decay: float = 1e-4
     early_stopping: int = 10
-    val_frac: float = 0.15
+    val_frac: float = 0.0
     device: str = "auto"
     seed: int = 1
     swa: bool = False
@@ -73,7 +73,9 @@ def train_control(**settings) -> TrainControl:
     few batches of at most that many as they divide into, of as equal a length as they can be.
     ``val_frac`` is held back from every fit alike, the fit on all targets a run ends with
     included, one target from each of as many equal-count strata of the response total as the
-    set holds.
+    set holds, and ``early_stopping`` is read only on that set. At the default of 0 nothing is held
+    back: every fitting target is trained on, the whole budget runs, and the fit keeps the last
+    epoch, where the cosine schedule has annealed the learning rate to zero.
 
     ``device`` is ``"auto"`` for the graphics processor where there is one, NVIDIA's or Apple's,
     or the name of a device to train on. A fitted encoder carries the setting rather than the

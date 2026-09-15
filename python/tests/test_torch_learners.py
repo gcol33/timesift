@@ -184,6 +184,18 @@ def test_a_snapshot_of_the_weights_is_a_copy_and_not_the_optimisers_storage():
     assert torch.equal(net.weight, before["weight"])
 
 
+def test_the_default_holds_no_validation_set_back_and_keeps_the_last_epoch():
+    x, y, _ = fixture(n_unit=30, days=60)
+    assert TrainControl().val_frac == train_control().val_frac == 0
+    # A patience of one would stop and restore an earlier epoch wherever a validation loss is
+    # read, so a default fit equal to it is one that read none and kept the epoch the budget
+    # ended on.
+    default = fit_learner(mlp(epochs=6, learning_rate=0.5, seed=2), x, y).predict(x)
+    impatient = fit_learner(mlp(epochs=6, learning_rate=0.5, seed=2, early_stopping=1),
+                            x, y).predict(x)
+    assert np.allclose(default, impatient)
+
+
 def test_early_stopping_restores_the_best_epoch_rather_than_the_last_one():
     from timesift.learners import _validation_split
     x, y, _ = fixture(n_unit=30, days=60)

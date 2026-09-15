@@ -2,6 +2,14 @@
 
 ## Changed
 
+* `train_control()` holds no inner validation set back by default (`val_frac = 0`, was 0.15): an
+  encoder trains every fitting target for the whole epoch budget and keeps the last epoch, where
+  the cosine schedule has annealed the learning rate to zero. On the Schrankogel weekly
+  three-channel arm that epoch reads 0.8803 AUC against 0.8729 for early stopping on a 15 percent
+  split and 0.8813 for the best epoch read on the test folds. `early_stopping = Inf` with a split
+  held back still restores the epoch of lowest validation loss (0.8760 there). The study's rule is
+  `train_control(val_frac = 0.15, early_stopping = 10)`, which the reproduction driver passes. On
+  both sides.
 * The encoders read the inner validation loss that early stopping watches under the head's case
   weights, as they read the fitting loss, so the epoch kept is the one the fit's own objective
   prefers. The weights are still read off the fitting units alone: a response head's `weights`

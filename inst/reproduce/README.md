@@ -230,6 +230,7 @@ standardisation, the random split and the two together, give at the species leve
 |---|---|---|
 | the package's, validation loss unweighted | 0.8715 | 0.8678 to 0.8755 |
 | the pipeline's, validation loss weighted | 0.8729 | 0.8699 to 0.8753 |
+| the lowest weighted validation loss over the whole budget | 0.8760 | 0.8726 to 0.8781 |
 | the last epoch of the schedule | 0.8803 | 0.8787 to 0.8820 |
 | the best epoch, read on the test fold | 0.8813 | 0.8798 to 0.8829 |
 
@@ -241,13 +242,18 @@ standardisation and the split move the unweighted level by less than the seed sp
 0.8755 under the package's own recipe, 0.8678 to 0.8725 under the others). The last row is the
 larger finding: on this data the cosine schedule's final epoch beats either stopping rule by
 0.007 to 0.009 AUC and sits within 0.001 of the best epoch, so early stopping on 121 validation
-plots costs more than any recipe difference. Neither implementation trains that way;
-`train_control(early_stopping = Inf)` does.
+plots costs more than any recipe difference. Training the whole budget and keeping the epoch of
+lowest validation loss, which is what `early_stopping = Inf` does while a validation set is held
+back, recovers less than half of that. Neither implementation of the study trains to the last
+epoch. The package's default does from this version on: `train_control()` holds no validation set
+back, trains every fitting plot for the whole budget and keeps the last epoch, and `schrankogel.R`
+hands every encoder the study's rule as `train_control(val_frac = 0.15, early_stopping = 10)`.
 
 Five seeds of each variant were then fitted on one NVIDIA L40S
 (`dev_notes/repro-lisc/weekly_variants.sh`, `weekly_seeds_fixed.sh`), the variants under the
 build the selection stage ran on (`5f0a5a6`, whose training code is the recipe before the fix)
-and the last row under version 0.2.0. Welch tests against the package's recipe:
+and the last row under `a212771`, which weights the validation loss and keeps the study's stopping
+rule. Welch tests against the package's recipe:
 
 | recipe | mean AUC | sd | difference | p |
 |---|---|---|---|---|
@@ -256,9 +262,9 @@ and the last row under version 0.2.0. Welch tests against the package's recipe:
 | random validation split | 0.8721 | 0.0019 | +0.0047 | 0.019 |
 | weighted validation loss | 0.8729 | 0.0016 | +0.0055 | 0.009 |
 | all three | 0.8755 | 0.0017 | +0.0081 | 0.001 |
-| version 0.2.0 | 0.8738 | 0.0019 | +0.0064 | 0.004 |
+| the package, validation loss weighted | 0.8738 | 0.0019 | +0.0064 | 0.004 |
 
 On the card the random split moves the level as far as the weighting does, and all three
 together sit 0.0026 above the weighting alone (p = 0.039), where on the processor trajectories
-the split moved nothing detectable. Version 0.2.0 reads 0.0003 from the pipeline's eleven-run
-mean. The selection stage is being rerun under 0.2.0.
+the split moved nothing detectable. The weighted package reads 0.0003 from the pipeline's
+eleven-run mean. The selection stage is being rerun under `a212771`.

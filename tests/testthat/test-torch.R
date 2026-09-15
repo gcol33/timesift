@@ -90,6 +90,18 @@ test_that("a snapshot of the weights is a copy and not the storage the optimiser
   expect_equal(as.numeric(net$weight), as.numeric(before$weight))
 })
 
+test_that("the default holds no validation set back and keeps the last epoch", {
+  skip_if_no_torch()
+  f <- torch_fixture(n_unit = 30L, days = 60L)
+  # A patience of one would stop and restore an earlier epoch wherever a validation loss is read,
+  # so a default fit equal to it is one that read none and kept the epoch the budget ended on.
+  default <- stats::predict(fit_learner(mlp(epochs = 6L, learning_rate = 0.5, seed = 2L), f$x, f$y),
+                            f$x)
+  impatient <- stats::predict(fit_learner(mlp(epochs = 6L, learning_rate = 0.5, seed = 2L,
+                                              early_stopping = 1L), f$x, f$y), f$x)
+  expect_equal(default, impatient)
+})
+
 test_that("early stopping restores the best epoch rather than the last one", {
   skip_if_no_torch()
   f <- torch_fixture(n_unit = 30L, days = 60L)

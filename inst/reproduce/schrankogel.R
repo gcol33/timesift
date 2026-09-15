@@ -221,6 +221,9 @@ METRIC_NAME <- "tss"
 # The selection is made on the area under the curve, as the study's was, and the arms are reported
 # under both that and the true skill statistic.
 SELECTION_METRIC <- "roc_auc"
+# The study's encoders early-stopped on an inner validation split of 15 percent of the fitting plots,
+# after ten epochs without an improvement; the package default holds no split back.
+STUDY_CONTROL <- train_control(val_frac = 0.15, early_stopping = 10L)
 
 # The study's candidate set: every (window, summary) pair its grid holds, 33 of them. The four
 # day-level summaries need whole days, so they are defined from the weekly window up, and the two
@@ -550,7 +553,7 @@ if ("selection" %in% stages) {
   say("selecting inside each outer training set: ", length(parts), " candidates, ",
       length(unique(folds)), " outer folds, ", INNER_FOLDS, " inner folds, ", epochs, " epochs")
   selection <- select_grain(set, y, cnn(epochs = epochs, batch_size = 32L), folds = folds,
-                            inner = inner_split, metric = SELECTION_METRIC,
+                            inner = inner_split, metric = SELECTION_METRIC, control = STUDY_CONTROL,
                             compare = series_ladder_auc(series_ladder), verbose = TRUE)
   print(selection)
   write_out(selection$selected, "selection.csv")
@@ -603,7 +606,8 @@ if ("selection" %in% stages) {
 # averaging the eleven and then choosing a threshold is the set scored as one model rather than as
 # a vote between eleven decisions.
 ensemble_arm <- function(set, y, folds, members) {
-  lad <- grain_ladder(set, y, members, folds = folds, metric = METRIC_NAME)
+  lad <- grain_ladder(set, y, members, folds = folds, metric = METRIC_NAME,
+                      control = STUDY_CONTROL)
   oof <- attr(lad, "predictions")
   cells <- attr(lad, "cells")
   combined <- lapply(names(set), function(w) {
@@ -651,7 +655,8 @@ if ("networks" %in% stages) {
     rows <- list()
     if (length(encoders)) {
       rows$encoders <- as.data.frame(
-        grain_ladder(set, y, encoders, folds = folds, metric = METRIC_NAME, keep_fits = FALSE))
+        grain_ladder(set, y, encoders, folds = folds, metric = METRIC_NAME, keep_fits = FALSE,
+                     control = STUDY_CONTROL))
     }
     if ("ensemble" %in% grid_learners) {
       rows$ensemble <- ensemble_arm(set, y, folds, members)
