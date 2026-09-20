@@ -160,6 +160,20 @@ test_that("a column holding one value is carried through the penalised fit at ze
   expect_equal(fit$beta[colnames(input$x), ], without$beta)
 })
 
+test_that("a cross-validation on threads returns what one on a single thread returns", {
+  dir <- penalised_dir()
+  input <- penalised_input(dir)
+  w <- rep(1, nrow(input$x))
+  # The whole-unit path and each fold's path are one independent fit each, reading the design and
+  # sharing nothing, so running them at once is a scheduling decision and not a numerical one.
+  # Two threads rather than more: a package's own tests do not take a machine's cores.
+  serial <- .penalised_cv(input$x, input$binomial, w, "binomial", 0.5, input$fold, 5L)
+  threaded <- .penalised_cv(input$x, input$binomial, w, "binomial", 0.5, input$fold, 5L,
+                            threads = 2L)
+  expect_identical(threaded, serial)
+  expect_identical(.penalised_predict(threaded, input$x), .penalised_predict(serial, input$x))
+})
+
 test_that("the penalised learner fits over the core and carries no fitter of its own", {
   sim <- sim_series(n_unit = 60L, days = 56L, seed = 91L)
   y <- sim_response(sim, n_var = 2L, seed = 92L)

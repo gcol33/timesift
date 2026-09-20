@@ -266,13 +266,14 @@ namespace {
 
 timesift::PenaltySpec penalty_spec(double alpha, int n_lambda, double lambda_min_ratio,
                                    cpp11::sexp lambda, double thresh, bool standardize,
-                                   bool intercept, double max_pass) {
+                                   bool intercept, double max_pass, int threads) {
   timesift::PenaltySpec spec;
   spec.alpha = alpha;
   spec.n_lambda = n_lambda;
   spec.lambda_min_ratio = lambda_min_ratio;
   spec.thresh = thresh;
   spec.max_pass = static_cast<int>(max_pass);
+  spec.threads = threads;
   spec.standardize = standardize;
   spec.intercept = intercept;
   if (lambda != R_NilValue) {
@@ -328,7 +329,7 @@ cpp11::list ts_penalised_path_(cpp11::doubles x, cpp11::doubles y, cpp11::double
                                double lambda_min_ratio, cpp11::sexp lambda, double thresh,
                                bool standardize, bool intercept, double max_pass) {
   const timesift::PenaltySpec spec = penalty_spec(alpha, n_lambda, lambda_min_ratio, lambda,
-                                                  thresh, standardize, intercept, max_pass);
+                                                  thresh, standardize, intercept, max_pass, 1);
   const timesift::PenaltyPath path =
       timesift::penalised_path(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
                                static_cast<std::size_t>(p), timesift::family_from_name(family),
@@ -341,9 +342,10 @@ cpp11::list ts_penalised_cv_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles 
                              std::string family, double alpha, int n_lambda,
                              double lambda_min_ratio, cpp11::sexp lambda, double thresh,
                              bool standardize, bool intercept, cpp11::integers fold, int n_fold,
-                             double max_pass) {
+                             double max_pass, int threads) {
   const timesift::PenaltySpec spec = penalty_spec(alpha, n_lambda, lambda_min_ratio, lambda,
-                                                  thresh, standardize, intercept, max_pass);
+                                                  thresh, standardize, intercept, max_pass,
+                                                  threads);
   std::vector<std::int32_t> which(static_cast<std::size_t>(n));
   for (int i = 0; i < n; ++i) which[static_cast<std::size_t>(i)] = fold[i];
   const timesift::PenaltyCV cv =

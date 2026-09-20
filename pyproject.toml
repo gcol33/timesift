@@ -59,6 +59,7 @@ sdist.exclude = [
   "docs/",
   "src/cpp11.cpp",
   "src/ts_r.cpp",
+  "src/Makevars",
   "NAMESPACE",
   "NEWS.md",
   "CLAUDE.md",

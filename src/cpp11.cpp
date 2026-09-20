@@ -62,10 +62,10 @@ extern "C" SEXP _timesift_ts_penalised_path_(SEXP x, SEXP y, SEXP w, SEXP n, SEX
   END_CPP11
 }
 // ts_r.cpp
-cpp11::list ts_penalised_cv_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, double alpha, int n_lambda, double lambda_min_ratio, cpp11::sexp lambda, double thresh, bool standardize, bool intercept, cpp11::integers fold, int n_fold, double max_pass);
-extern "C" SEXP _timesift_ts_penalised_cv_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP alpha, SEXP n_lambda, SEXP lambda_min_ratio, SEXP lambda, SEXP thresh, SEXP standardize, SEXP intercept, SEXP fold, SEXP n_fold, SEXP max_pass) {
+cpp11::list ts_penalised_cv_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, double alpha, int n_lambda, double lambda_min_ratio, cpp11::sexp lambda, double thresh, bool standardize, bool intercept, cpp11::integers fold, int n_fold, double max_pass, int threads);
+extern "C" SEXP _timesift_ts_penalised_cv_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP alpha, SEXP n_lambda, SEXP lambda_min_ratio, SEXP lambda, SEXP thresh, SEXP standardize, SEXP intercept, SEXP fold, SEXP n_fold, SEXP max_pass, SEXP threads) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_penalised_cv_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<double>>(alpha), cpp11::as_cpp<cpp11::decay_t<int>>(n_lambda), cpp11::as_cpp<cpp11::decay_t<double>>(lambda_min_ratio), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(lambda), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<bool>>(standardize), cpp11::as_cpp<cpp11::decay_t<bool>>(intercept), cpp11::as_cpp<cpp11::decay_t<cpp11::integers>>(fold), cpp11::as_cpp<cpp11::decay_t<int>>(n_fold), cpp11::as_cpp<cpp11::decay_t<double>>(max_pass)));
+    return cpp11::as_sexp(ts_penalised_cv_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<double>>(alpha), cpp11::as_cpp<cpp11::decay_t<int>>(n_lambda), cpp11::as_cpp<cpp11::decay_t<double>>(lambda_min_ratio), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(lambda), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<bool>>(standardize), cpp11::as_cpp<cpp11::decay_t<bool>>(intercept), cpp11::as_cpp<cpp11::decay_t<cpp11::integers>>(fold), cpp11::as_cpp<cpp11::decay_t<int>>(n_fold), cpp11::as_cpp<cpp11::decay_t<double>>(max_pass), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
   END_CPP11
 }
 // ts_r.cpp
@@ -89,7 +89,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_bin_starts_",        (DL_FUNC) &_timesift_ts_bin_starts_,         4},
     {"_timesift_ts_coverage_",          (DL_FUNC) &_timesift_ts_coverage_,           8},
     {"_timesift_ts_penalised_coef_",    (DL_FUNC) &_timesift_ts_penalised_coef_,     5},
-    {"_timesift_ts_penalised_cv_",      (DL_FUNC) &_timesift_ts_penalised_cv_,      16},
+    {"_timesift_ts_penalised_cv_",      (DL_FUNC) &_timesift_ts_penalised_cv_,      17},
     {"_timesift_ts_penalised_path_",    (DL_FUNC) &_timesift_ts_penalised_path_,    14},
     {"_timesift_ts_penalised_predict_", (DL_FUNC) &_timesift_ts_penalised_predict_,  7},
     {"_timesift_ts_reduce_",            (DL_FUNC) &_timesift_ts_reduce_,            11},

@@ -681,7 +681,7 @@ def _design(x: TimesiftMatrix, squares: bool) -> np.ndarray:
 
 
 def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, s="lambda.min", n_lambda=100,
-               thresh=1e-8, seed=1) -> Learner:
+               thresh=1e-8, threads=1, seed=1) -> Learner:
     """One penalised regression per variable, over every bin-by-channel column and, by default,
     their squares, with the penalty chosen by an inner cross-validation on the fitting units.
 
@@ -704,15 +704,21 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, s="lambda.min", n_
     sets cannot each hold two of each outcome, the fewest a logistic path is fitted to, has too
     few of one outcome to choose a penalty on. It is predicted its share among the fitting units,
     as a response holding one outcome is, and the fit names every such response in ``unfitted``.
+
+    ``threads`` is how many fits of one response's inner cross-validation run at once. The path on
+    every fitting unit and the path of each inner fold are one independent fit each, so they
+    parallelise without sharing anything, and ``n_inner + 1`` threads is as many as a response can
+    use. The default is serial, because a package does not take a machine's cores without being
+    asked. What comes back does not depend on it.
     """
     return Learner(name="elasticnet", fit=_elasticnet_fit, predict=_elasticnet_predict,
                    data=data, reads="tabular", multi="separate",
                    params=dict(alpha=alpha, n_inner=n_inner, squares=squares, s=s,
-                               n_lambda=n_lambda, thresh=thresh, seed=seed))
+                               n_lambda=n_lambda, thresh=thresh, threads=threads, seed=seed))
 
 
-def _elasticnet_fit(x, y, alpha, n_inner, squares, s, n_lambda, thresh, seed, head, variables,
-                    group=None, **_):
+def _elasticnet_fit(x, y, alpha, n_inner, squares, s, n_lambda, thresh, threads, seed, head,
+                    variables, group=None, **_):
     from .penalised import penalised_cv
     family = _family(head)
     m = _design(x, squares)
@@ -725,7 +731,7 @@ def _elasticnet_fit(x, y, alpha, n_inner, squares, s, n_lambda, thresh, seed, he
         if family == "binomial" and not _inner_fittable(yj, fold):
             return float(yj.mean())
         return penalised_cv(design, yj, w, family, alpha, fold, int(fold.max()) + 1,
-                            n_lambda=n_lambda, thresh=thresh)
+                            n_lambda=n_lambda, thresh=thresh, threads=threads)
 
     models = _fit_columns(m, y, make, _variable_seeds(seed, variables), _head_weights(head, y))
     return dict(models=models, squares=squares, s=s, n_col=m.shape[1], family=family,

@@ -38,6 +38,11 @@
 #' @param thresh Where the coordinate descent stops, read off the largest coefficient move of a
 #'   pass. The default leaves the fit as close to the optimum as glmnet's own default does; a
 #'   looser one is faster and a tighter one costs time roughly in proportion.
+#' @param threads How many fits of one response's inner cross-validation run at once. The path on
+#'   every fitting unit and the path of each inner fold are one independent fit each, so they
+#'   parallelise without sharing anything, and `n_inner + 1` threads is as many as a response can
+#'   use. The default is serial, because a package does not take a machine's cores without being
+#'   asked. What comes back does not depend on it.
 #' @param seed Seed for the inner cross-validation's fold draw, which is random and would otherwise
 #'   make the fit irreproducible.
 #'
@@ -48,14 +53,14 @@
 #'
 #' @export
 elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s = "lambda.min",
-                       n_lambda = 100L, thresh = 1e-8, seed = 1L) {
+                       n_lambda = 100L, thresh = 1e-8, threads = 1L, seed = 1L) {
   learner(
     name = "elasticnet",
     data = data, reads = "tabular", multi = "separate",
     params = list(alpha = alpha, n_inner = n_inner, squares = squares, s = s,
-                  n_lambda = n_lambda, thresh = thresh, seed = seed),
-    fit = function(x, y, alpha, n_inner, squares, s, n_lambda, thresh, seed, head, group = NULL,
-                   ...) {
+                  n_lambda = n_lambda, thresh = thresh, threads = threads, seed = seed),
+    fit = function(x, y, alpha, n_inner, squares, s, n_lambda, thresh, threads, seed, head,
+                   group = NULL, ...) {
       family <- .head_family(head)
       m <- .design(x, squares)
       if (ncol(m) < 2L) {
@@ -81,7 +86,7 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
         }
         labels <- sort(unique(inner))
         .penalised_cv(m, yj, weights[, j], family, alpha, match(inner, labels) - 1L,
-                      length(labels), n_lambda = n_lambda, thresh = thresh)
+                      length(labels), n_lambda = n_lambda, thresh = thresh, threads = threads)
       })
       unfitted <- colnames(y)[vapply(models, is.numeric, logical(1L))]
       list(models = models, squares = squares, s = s, columns = colnames(m),

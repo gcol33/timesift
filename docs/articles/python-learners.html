@@ -126,8 +126,9 @@ of your own goes through.</p>
 <span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>    s<span class="op">=</span><span class="st">'lambda.min'</span>,</span>
 <span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>    n_lambda<span class="op">=</span><span class="dv">100</span>,</span>
 <span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>    thresh<span class="op">=</span><span class="fl">1e-08</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>)</span></code></pre></div>
 <p>One penalised regression per variable, over every bin-by-channel
 column and, by default, their squares, with the penalty chosen by an
 inner cross-validation on the fitting units.</p>
@@ -154,6 +155,13 @@ of each outcome, the fewest a logistic path is fitted to, has too few of
 one outcome to choose a penalty on. It is predicted its share among the
 fitting units, as a response holding one outcome is, and the fit names
 every such response in <code>unfitted</code>.</p>
+<p><code>threads</code> is how many fits of one response’s inner
+cross-validation run at once. The path on every fitting unit and the
+path of each inner fold are one independent fit each, so they
+parallelise without sharing anything, and <code>n_inner + 1</code>
+threads is as many as a response can use. The default is serial, because
+a package does not take a machine’s cores without being asked. What
+comes back does not depend on it.</p>
 </div>
 <div class="section level2">
 <h2 id="stepwise">

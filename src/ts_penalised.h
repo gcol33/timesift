@@ -45,6 +45,7 @@ struct PenaltySpec {
                                        // ends the path; 0 to run every point
   double dev_max = 0.999;              // a fit explaining more than this ends the path
   int min_lambda = 5;                  // points fitted before either rule is read
+  int threads = 1;                     // fits of a cross-validation run at once; 1 is serial
 };
 
 // The path, with the coefficients on the scale the columns were handed over in.

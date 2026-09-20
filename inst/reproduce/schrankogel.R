@@ -32,6 +32,10 @@
 #               the selection stage chooses a candidate on; `build` deals five inner folds per
 #               outer training set with fold_map() instead.
 #   --epochs    epoch budget per network fit. Default 60, the budget the study used.
+#   --threads   how many fits of one species' inner cross-validation the penalised arms run at
+#               once. Default 1, serial. The path on every fitting plot and the path of each
+#               inner fold are one independent fit each, so `--threads=6` is as many as five
+#               inner folds can use and returns the same numbers one thread returns.
 #   --smoke     `<outer folds>,<species>`, e.g. `1,4`. A smoke run: it names every file it writes
 #               `smoke_`, records itself as a smoke run in run.meta, and makes no comparison
 #               against the study's numbers. It exists to see the stages run before an overnight
@@ -69,6 +73,7 @@ grid_grains <- split_opt("grains", "day,week,month,season,year")
 grid_learners <- split_opt("learners", "cnn")
 baseline_arms <- split_opt("baseline", "elastic_net")
 epochs <- as.integer(pick("epochs", "60"))
+threads <- as.integer(pick("threads", "1"))
 folds_from <- pick("folds", file.path(here, "folds.csv"))
 inner_from <- pick("inner", file.path(here, "inner_folds.csv"))
 smoke <- if (is.null(opt$smoke)) NULL else as.integer(split_opt("smoke", ""))
@@ -172,6 +177,10 @@ meta("R ", paste(R.version$major, R.version$minor, sep = "."), " on ", R.version
 meta("stages ", paste(stages, collapse = ","))
 meta("folds ", if (identical(folds_from, "build")) "built by fold_map()" else folds_from)
 meta("inner ", if (identical(inner_from, "build")) "dealt by fold_map()" else inner_from)
+# Recorded rather than compared: the penalised fits of a cross-validation are independent of one
+# another, so running them at once returns the same numbers, and the setting says what the run
+# cost rather than what it computed.
+meta("threads ", threads)
 if (!is.null(smoke)) {
   meta("SMOKE RUN ", smoke[1L], " outer folds and ", smoke[2L], " species; not the reproduction")
   say("SMOKE RUN: ", smoke[1L], " outer folds, ", smoke[2L],
@@ -485,7 +494,7 @@ if ("baseline" %in% stages) {
     say("fitting the aggregated-feature arms, selection redone inside every fold")
     arms <- list(
       elastic_net = elasticnet(alpha = 0.5, n_inner = INNER_FOLDS, squares = TRUE,
-                               seed = CV_SEED),
+                               threads = threads, seed = CV_SEED),
       stepwise = stepwise(max_terms = 3L, degree = 2L))[aggregated]
     baseline <- grain_ladder(features, y, arms, folds = folds, metric = METRIC_NAME)
     write_out(baseline, "baseline.csv")
@@ -509,7 +518,7 @@ if ("baseline" %in% stages) {
     series_ladder <- grain_ladder(
       timesift_set(list(series = weekly)), y,
       list(elastic_net = elasticnet(alpha = 0.5, n_inner = INNER_FOLDS, squares = TRUE,
-                                    seed = CV_SEED)),
+                                    threads = threads, seed = CV_SEED)),
       folds = folds, metric = METRIC_NAME)
     write_out(series_ladder, "baseline_series.csv")
     print(summary(series_ladder))

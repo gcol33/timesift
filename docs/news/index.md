@@ -32,6 +32,16 @@
   and `inst/spec/fixtures/penalised_*.csv` hold glmnet’s own numbers for
   both suites to assert against.
 - [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+  gains `threads`, how many fits of one response’s inner
+  cross-validation run at once. The path on every fitting unit and the
+  path of each inner fold are one independent fit each, reading the
+  design and sharing nothing, so they parallelise without any of them
+  seeing another: the result is bit-identical to the serial one, which
+  both suites assert. The default is serial. On the Schrankogel shape
+  (894 units, 942 columns, five inner folds) one cross-validated
+  binomial path takes 3.0 s serial and 0.95 s on six threads, against
+  `cv.glmnet`’s 0.92 s, choosing the same penalty at every setting.
+- [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
   gains `n_lambda` and `thresh`, and `s` now reads on the Python side
   too: the whole penalty path is kept on both, so `"lambda.1se"` or a
   penalty of a caller’s own naming a point between two of the path’s is

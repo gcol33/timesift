@@ -70,13 +70,15 @@ Held hold(ConstI32 unit, const double* value, ConstI64 when, ConstI64 local,
 // The penalised fit's settings, from the keywords the Python side names them by.
 timesift::PenaltySpec penalty_spec(double alpha, int n_lambda, double lambda_min_ratio,
                                    std::optional<std::vector<double>> lambda, double thresh,
-                                   bool standardize, bool intercept, double max_pass) {
+                                   bool standardize, bool intercept, double max_pass,
+                                   int threads) {
   timesift::PenaltySpec spec;
   spec.alpha = alpha;
   spec.n_lambda = n_lambda;
   spec.lambda_min_ratio = lambda_min_ratio;
   spec.thresh = thresh;
   spec.max_pass = static_cast<int>(max_pass);
+  spec.threads = threads;
   spec.standardize = standardize;
   spec.intercept = intercept;
   if (lambda.has_value()) spec.lambda = *lambda;
@@ -235,7 +237,7 @@ NB_MODULE(_core, m) {
               x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
               timesift::family_from_name(family),
               penalty_spec(alpha, n_lambda, lambda_min_ratio, std::move(lambda), thresh,
-                           standardize, intercept, max_pass)));
+                           standardize, intercept, max_pass, 1)));
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("alpha") = 1.0,
         nb::arg("n_lambda") = 100, nb::arg("lambda_min_ratio") = 0.0,
@@ -246,12 +248,12 @@ NB_MODULE(_core, m) {
   m.def("penalised_cv",
         [](ConstMat x, ConstF64 y, ConstF64 w, ConstI32 fold, int n_fold,
            const std::string& family, double alpha, int n_lambda, double lambda_min_ratio,
-           double thresh, bool standardize, bool intercept, double max_pass) {
+           double thresh, bool standardize, bool intercept, double max_pass, int threads) {
           const timesift::PenaltyCV cv = timesift::penalised_cv(
               x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
               timesift::family_from_name(family),
               penalty_spec(alpha, n_lambda, lambda_min_ratio, std::nullopt, thresh, standardize,
-                           intercept, max_pass),
+                           intercept, max_pass, threads),
               fold.data(), n_fold);
           nb::dict out = give(cv.path);
           out["cv_mean"] = give(std::vector<double>(cv.cv_mean));
@@ -264,7 +266,7 @@ NB_MODULE(_core, m) {
         nb::arg("family"), nb::arg("alpha") = 1.0, nb::arg("n_lambda") = 100,
         nb::arg("lambda_min_ratio") = 0.0, nb::arg("thresh") = 1e-8,
         nb::arg("standardize") = true, nb::arg("intercept") = true,
-        nb::arg("max_pass") = 1e6);
+        nb::arg("max_pass") = 1e6, nb::arg("threads") = 1);
 
   m.def("penalised_predict",
         [](ConstF64 lambda, ConstF64 a0, ConstF64 beta, const std::string& family, double at,

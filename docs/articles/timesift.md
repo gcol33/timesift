@@ -210,7 +210,7 @@ elasticnet(data = grain("month"))
 #> <timesift learner> elasticnet 
 #> reads   : tabular ; one model per response: yes, separate 
 #> data    : month 
-#> settings: alpha = 0.5, n_inner = 5, squares = TRUE, s = lambda.min, n_lambda = 100, thresh = 1e-08, seed = 1
+#> settings: alpha = 0.5, n_inner = 5, squares = TRUE, s = lambda.min, n_lambda = 100, thresh = 1e-08, threads = 1, seed = 1
 ```
 
 ## What a learner may be handed

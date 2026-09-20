@@ -37,7 +37,7 @@ def penalised_path(x, y, w=None, family="binomial", alpha=1.0, n_lambda=100, lam
 
 
 def penalised_cv(x, y, w, family, alpha, fold, n_fold, n_lambda=100, thresh=1e-8,
-                 standardize=True, intercept=True, max_pass=1e6) -> dict:
+                 standardize=True, intercept=True, max_pass=1e6, threads=1) -> dict:
     """The path fitted on every unit, and the same penalties scored on units held out fold by
     fold. ``fold`` is one 0-based fold index per unit, which is what keeps a grouping whole: the
     caller deals the folds, not this."""
@@ -46,7 +46,7 @@ def penalised_cv(x, y, w, family, alpha, fold, n_fold, n_lambda=100, thresh=1e-8
                              np.asarray(w, dtype=np.float64),
                              np.ascontiguousarray(fold, dtype=np.int32), int(n_fold), family,
                              alpha, int(n_lambda), 0.0, float(thresh), bool(standardize),
-                             bool(intercept), float(max_pass))
+                             bool(intercept), float(max_pass), int(threads))
     fit = _shape(out)
     fit["cv_mean"] = out["cv_mean"]
     fit["cv_sd"] = out["cv_sd"]

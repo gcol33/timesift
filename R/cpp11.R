@@ -32,8 +32,8 @@ ts_penalised_path_ <- function(x, y, w, n, p, family, alpha, n_lambda, lambda_mi
   .Call(`_timesift_ts_penalised_path_`, x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, max_pass)
 }
 
-ts_penalised_cv_ <- function(x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, fold, n_fold, max_pass) {
-  .Call(`_timesift_ts_penalised_cv_`, x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, fold, n_fold, max_pass)
+ts_penalised_cv_ <- function(x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, fold, n_fold, max_pass, threads) {
+  .Call(`_timesift_ts_penalised_cv_`, x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, fold, n_fold, max_pass, threads)
 }
 
 ts_penalised_predict_ <- function(lambda, a0, beta, family, at, newx, n) {

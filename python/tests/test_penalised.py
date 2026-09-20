@@ -195,6 +195,22 @@ def planted(n_unit=60, days=56, noise=1.0, seed=17):
         y, tuple(units), ("sp1", "sp2"))
 
 
+def test_a_cross_validation_on_threads_returns_what_one_on_a_single_thread_returns(
+        penalised_input):
+    # The whole-unit path and each fold's path are one independent fit each, reading the design
+    # and sharing nothing, so running them at once is a scheduling decision and not a numerical
+    # one. Two threads rather than more: a package's own tests do not take a machine's cores.
+    data = penalised_input
+    w = np.ones(len(data["binomial"]))
+    serial = penalised_cv(data["x"], data["binomial"], w, "binomial", 0.5, data["fold"], 5)
+    threaded = penalised_cv(data["x"], data["binomial"], w, "binomial", 0.5, data["fold"], 5,
+                            threads=2)
+    for key in ("lambda_", "a0", "beta", "cv_mean", "cv_sd", "df", "dev_ratio"):
+        assert np.array_equal(threaded[key], serial[key]), key
+    assert threaded["lambda_min"] == serial["lambda_min"]
+    assert threaded["lambda_1se"] == serial["lambda_1se"]
+
+
 def test_the_penalised_learner_fits_over_the_core_and_carries_no_fitter_of_its_own():
     x, y = planted()
     learner = elasticnet()

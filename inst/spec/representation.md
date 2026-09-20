@@ -711,6 +711,10 @@ acceptance criterion for replacing it was agreement with it rather than an elast
 - The folds are dealt by the caller and handed over as one 0-based index per unit, so a grouping
   the outer map keeps whole stays whole where the penalty is chosen. Nothing inside the core
   draws.
+- The fit on every unit and the fit of each fold are independent of one another, so `threads`
+  runs them at once. What comes back is the same numbers either way, to the bit: the fits share
+  the design they read and nothing else, and the held-out deviance is summarised after all of
+  them have finished, in fold order. Both suites assert it.
 
 ### The fixtures
 

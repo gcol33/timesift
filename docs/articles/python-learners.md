@@ -14,6 +14,7 @@ elasticnet(
     s='lambda.min',
     n_lambda=100,
     thresh=1e-08,
+    threads=1,
     seed=1,
 )
 ```
@@ -46,6 +47,13 @@ of each outcome, the fewest a logistic path is fitted to, has too few of
 one outcome to choose a penalty on. It is predicted its share among the
 fitting units, as a response holding one outcome is, and the fit names
 every such response in `unfitted`.
+
+`threads` is how many fits of one response’s inner cross-validation run
+at once. The path on every fitting unit and the path of each inner fold
+are one independent fit each, so they parallelise without sharing
+anything, and `n_inner + 1` threads is as many as a response can use.
+The default is serial, because a package does not take a machine’s cores
+without being asked. What comes back does not depend on it.
 
 ## `stepwise()`
 

@@ -10,6 +10,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # project directory, so the project directory is the repository.
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(nanobind CONFIG REQUIRED)
+# The penalised fit runs the folds of a cross-validation on threads through `std::thread`, which
+# on a toolchain whose standard library reaches pthreads has to be linked against.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
 nanobind_add_module(_core NB_STATIC
   src/ts_core.cpp
@@ -18,4 +22,5 @@ nanobind_add_module(_core NB_STATIC
   python/ts_py.cpp)
 
 target_include_directories(_core PRIVATE src)
+target_link_libraries(_core PRIVATE Threads::Threads)
 install(TARGETS _core LIBRARY DESTINATION timesift)

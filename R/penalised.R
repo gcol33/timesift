@@ -15,10 +15,11 @@
 }
 
 .penalised_cv <- function(x, y, w, family, alpha, fold, n_fold, n_lambda = 100L, thresh = 1e-8,
-                          standardize = TRUE, intercept = TRUE, max_pass = 1e6) {
+                          standardize = TRUE, intercept = TRUE, max_pass = 1e6,
+                          threads = 1L) {
   fit <- ts_penalised_cv_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x), family,
                           alpha, as.integer(n_lambda), 0, NULL, thresh, standardize, intercept,
-                          as.integer(fold), as.integer(n_fold), max_pass)
+                          as.integer(fold), as.integer(n_fold), max_pass, as.integer(threads))
   out <- .penalised_shape(fit, colnames(x))
   out$cv_mean <- fit$cv_mean
   out$cv_sd <- fit$cv_sd

@@ -1,9 +1,12 @@
 #include "ts_penalised.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <system_error>
+#include <thread>
 
 namespace timesift {
 namespace {
@@ -611,50 +614,119 @@ PenaltyCV penalised_cv(const double* x, const double* y, const double* w, std::s
                        std::size_t p, Family family, const PenaltySpec& spec,
                        const std::int32_t* fold, std::int32_t n_fold) {
   if (n_fold < 2) throw Error("a cross-validated penalty needs at least two folds.");
-  PenaltyCV out;
-  out.path = penalised_path(x, y, w, n, p, family, spec);
-  const std::size_t k = out.path.lambda.size();
+  const std::size_t folds = static_cast<std::size_t>(n_fold);
+
+  // Which units each fold holds back, settled before anything is fitted so the fits are
+  // independent of each other and of the order they are run in.
+  struct Fold {
+    std::vector<std::size_t> in, held_out;
+    PenaltyPath fit;
+    std::exception_ptr failure;
+  };
+  std::vector<Fold> held(folds);
+  for (std::size_t i = 0; i < n; ++i) {
+    const std::int32_t f = fold[i];
+    if (f < 0 || static_cast<std::size_t>(f) >= folds) {
+      throw Error("a fold index of a cross-validated penalty is outside the folds it declares.");
+    }
+    for (std::size_t g = 0; g < folds; ++g) {
+      (static_cast<std::size_t>(f) == g ? held[g].held_out : held[g].in).push_back(i);
+    }
+  }
+  for (std::size_t g = 0; g < folds; ++g) {
+    if (held[g].in.empty() || held[g].held_out.empty()) {
+      throw Error("a fold of a cross-validated penalty holds every unit or none of them.");
+    }
+  }
 
   // Each fold is fitted the way the whole-unit path was, along a path of its own, and is then
   // read at the whole-unit path's penalties. A fold holds different units, so the largest penalty
   // that leaves every coefficient at zero is a different number there; aligning the folds on the
   // penalty rather than on the point of the path is what keeps the held-out deviance a function
   // of the penalty, and it is what glmnet aligns on.
-  std::vector<double> fold_sum(static_cast<std::size_t>(n_fold), 0.0);
-  std::vector<double> fold_mean(static_cast<std::size_t>(n_fold) * k, 0.0);
-  std::vector<double> train_x, train_y, train_w, test_x, predicted;
-  for (std::int32_t f = 0; f < n_fold; ++f) {
-    std::vector<std::size_t> in, held_out;
-    for (std::size_t i = 0; i < n; ++i) {
-      if (fold[i] == f) held_out.push_back(i); else in.push_back(i);
+  auto fit_fold = [&](std::size_t g) {
+    Fold& one = held[g];
+    try {
+      const std::size_t nt = one.in.size();
+      std::vector<double> train_x(nt * p), train_y(nt), train_w(nt);
+      for (std::size_t j = 0; j < p; ++j) {
+        for (std::size_t a = 0; a < nt; ++a) train_x[a + j * nt] = x[one.in[a] + j * n];
+      }
+      for (std::size_t a = 0; a < nt; ++a) {
+        train_y[a] = y[one.in[a]];
+        train_w[a] = w == nullptr ? 1.0 : w[one.in[a]];
+      }
+      one.fit = penalised_path(train_x.data(), train_y.data(), train_w.data(), nt, p, family,
+                               spec);
+    } catch (...) {
+      one.failure = std::current_exception();
     }
-    if (in.empty() || held_out.empty()) {
-      throw Error("a fold of a cross-validated penalty holds every unit or none of them.");
+  };
+
+  // The whole-unit fit and the folds are one independent fit each, so they run at once where the
+  // caller asked for it. Nothing is shared but the design they read, and what each returns is a
+  // function of its own units alone, so a run on many threads returns the numbers a run on one
+  // returns.
+  PenaltyCV out;
+  const int workers = std::max(1, spec.threads);
+  if (workers <= 1) {
+    out.path = penalised_path(x, y, w, n, p, family, spec);
+    for (std::size_t g = 0; g < folds; ++g) fit_fold(g);
+  } else {
+    std::atomic<std::size_t> next{0};
+    auto take = [&]() {
+      for (;;) {
+        const std::size_t g = next.fetch_add(1);
+        if (g >= folds) return;
+        fit_fold(g);
+      }
+    };
+    std::vector<std::thread> pool;
+    const std::size_t spare = std::min<std::size_t>(static_cast<std::size_t>(workers) - 1, folds);
+    pool.reserve(spare);
+    // A machine that will not give another thread is a reason to run on fewer, not to fail: what
+    // is left goes to the threads that did start and to this one.
+    for (std::size_t t = 0; t < spare; ++t) {
+      try {
+        pool.emplace_back(take);
+      } catch (const std::system_error&) {
+        break;
+      }
     }
-    const std::size_t nt = in.size(), nh = held_out.size();
-    train_x.assign(nt * p, 0.0);
+    std::exception_ptr failure;
+    try {
+      out.path = penalised_path(x, y, w, n, p, family, spec);
+    } catch (...) {
+      failure = std::current_exception();
+    }
+    take();
+    for (std::thread& t : pool) t.join();
+    if (failure) std::rethrow_exception(failure);
+  }
+  for (std::size_t g = 0; g < folds; ++g) {
+    if (held[g].failure) std::rethrow_exception(held[g].failure);
+  }
+  const std::size_t k = out.path.lambda.size();
+
+  std::vector<double> fold_sum(folds, 0.0);
+  std::vector<double> fold_mean(folds * k, 0.0);
+  std::vector<double> test_x, predicted;
+  for (std::size_t g = 0; g < folds; ++g) {
+    const Fold& one = held[g];
+    const std::size_t nh = one.held_out.size();
     test_x.assign(nh * p, 0.0);
     for (std::size_t j = 0; j < p; ++j) {
-      for (std::size_t a = 0; a < nt; ++a) train_x[a + j * nt] = x[in[a] + j * n];
-      for (std::size_t a = 0; a < nh; ++a) test_x[a + j * nh] = x[held_out[a] + j * n];
+      for (std::size_t a = 0; a < nh; ++a) test_x[a + j * nh] = x[one.held_out[a] + j * n];
     }
-    train_y.resize(nt);
-    train_w.resize(nt);
-    for (std::size_t a = 0; a < nt; ++a) {
-      train_y[a] = y[in[a]];
-      train_w[a] = w == nullptr ? 1.0 : w[in[a]];
-    }
-    const PenaltyPath fit =
-        penalised_path(train_x.data(), train_y.data(), train_w.data(), nt, p, family, spec);
     double weight = 0.0;
-    for (std::size_t a = 0; a < nh; ++a) weight += w == nullptr ? 1.0 : w[held_out[a]];
-    fold_sum[static_cast<std::size_t>(f)] = weight;
+    for (std::size_t a = 0; a < nh; ++a) weight += w == nullptr ? 1.0 : w[one.held_out[a]];
+    fold_sum[g] = weight;
     predicted.resize(nh);
     for (std::size_t l = 0; l < k; ++l) {
-      penalised_predict(fit, out.path.lambda[l], test_x.data(), nh, predicted.data());
-      double held = 0.0;
+      penalised_predict(one.fit, out.path.lambda[l], test_x.data(), nh, predicted.data());
+      double score = 0.0;
       for (std::size_t a = 0; a < nh; ++a) {
-        const std::size_t i = held_out[a];
+        const std::size_t i = one.held_out[a];
         const double wi = w == nullptr ? 1.0 : w[i];
         double raw;
         if (family == Family::gaussian) {
@@ -664,34 +736,29 @@ PenaltyCV penalised_cv(const double* x, const double* y, const double* w, std::s
           const double q = std::min(std::max(predicted[a], kCVProbFloor), 1.0 - kCVProbFloor);
           raw = -2.0 * (y[i] * std::log(q) + (1.0 - y[i]) * std::log(1.0 - q));
         }
-        held += wi * raw;
+        score += wi * raw;
       }
-      fold_mean[static_cast<std::size_t>(f) + l * static_cast<std::size_t>(n_fold)] =
-          weight > 0.0 ? held / weight : 0.0;
+      fold_mean[g + l * folds] = weight > 0.0 ? score / weight : 0.0;
     }
   }
 
   // The held-out deviance is summarised over the folds rather than over the units: a fold is one
   // reading of the penalty, and its spread over the folds is what the standard error is of.
   double total = 0.0;
-  for (std::int32_t f = 0; f < n_fold; ++f) total += fold_sum[static_cast<std::size_t>(f)];
+  for (std::size_t g = 0; g < folds; ++g) total += fold_sum[g];
   out.cv_mean.assign(k, 0.0);
   out.cv_sd.assign(k, 0.0);
   for (std::size_t l = 0; l < k; ++l) {
     double mean = 0.0;
-    for (std::int32_t f = 0; f < n_fold; ++f) {
-      const std::size_t a = static_cast<std::size_t>(f);
-      mean += fold_sum[a] * fold_mean[a + l * static_cast<std::size_t>(n_fold)];
-    }
+    for (std::size_t g = 0; g < folds; ++g) mean += fold_sum[g] * fold_mean[g + l * folds];
     mean /= total;
     double spread = 0.0;
-    for (std::int32_t f = 0; f < n_fold; ++f) {
-      const std::size_t a = static_cast<std::size_t>(f);
-      const double e = fold_mean[a + l * static_cast<std::size_t>(n_fold)] - mean;
-      spread += fold_sum[a] * e * e;
+    for (std::size_t g = 0; g < folds; ++g) {
+      const double e = fold_mean[g + l * folds] - mean;
+      spread += fold_sum[g] * e * e;
     }
     out.cv_mean[l] = mean;
-    out.cv_sd[l] = std::sqrt(spread / total / static_cast<double>(n_fold - 1));
+    out.cv_sd[l] = std::sqrt(spread / total / static_cast<double>(folds - 1));
   }
 
   out.index_min = 0;
