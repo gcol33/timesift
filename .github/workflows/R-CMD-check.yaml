@@ -46,7 +46,13 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck
+          # CRAN's macOS builder compresses some of its binaries with zstd, a format pak cannot
+          # extract, so a dependency served that way stops the job before anything of ours is
+          # compiled (r-lib/pkgdepends#485). The two it serves that way today are built from
+          # source there instead.
+          extra-packages: >-
+            any::rcmdcheck${{ runner.os == 'macOS' &&
+            ', standard::knitr?source, standard::xfun?source' || '' }}
           needs: check
 
       # glmnet, lme4, lmerTest and emmeans arrive with the suggested dependencies above, so the
