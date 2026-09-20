@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -899,10 +899,13 @@ its position from one:</p>
 <p>The binning and the reduction are one implementation:
 <code>src/ts_core.cpp</code> and <code>src/ts_calendar.cpp</code>,
 compiled into the R package by R itself and into the Python extension by
-CMake. What each language holds above it is the boundary, which resolves
-the columns, resolves the zone and wraps the result. The two agree by
-construction rather than by two implementations being checked against
-each other after the fact.</p>
+CMake. So is the penalised fit, <code>src/ts_penalised.cpp</code>, for
+the same reason: it is the arm the networks are measured against, and a
+baseline that moved between the languages would make the tool the
+confound. What each language holds above them is the boundary, which
+resolves the columns, resolves the zone, deals the folds and wraps the
+result. The two agree by construction rather than by two implementations
+being checked against each other after the fact.</p>
 <p>The digests did not stop meaning anything when that happened. The
 implementations they used to compare are kept as test oracles,
 <code>tests/testthat/helper-oracle.R</code> and
@@ -922,7 +925,10 @@ the other language. <strong>The file format below is what makes that
 possible</strong>, and both sides carry the reader and the writer for
 all three.</p>
 <p>A model fitted in one language and a model fitted in the other cannot
-be byte-identical and are not required to be.</p>
+be byte-identical and are not required to be. The penalised fit is the
+one model that is: it goes through the shared core, so the two sides
+return the same coefficients from the same design, and what is stated
+below is how far either sits from glmnet rather than from the other.</p>
 </div>
 <div class="section level2">
 <h2 id="the-file-format-of-the-three-artifacts">The file format of the three artifacts<a class="anchor" aria-label="anchor" href="#the-file-format-of-the-three-artifacts"></a>
@@ -1222,6 +1228,131 @@ inflation to within 0.02 at each planted skill</strong>, which is well
 inside the Monte Carlo error of either one alone and far below the
 +0.110 the claim rests on. A disagreement beyond that is a bug in one of
 them, not sampling.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="the-penalised-fit">The penalised fit<a class="anchor" aria-label="anchor" href="#the-penalised-fit"></a>
+</h2>
+<p><code><a href="../reference/elasticnet.html">elasticnet()</a></code> is one elastic net per response, over
+<code>src/ts_penalised.cpp</code>, which both languages compile. Its
+conventions are glmnet’s, because that is what the arm has always been
+and the acceptance criterion for replacing it was agreement with it
+rather than an elastic net of our own.</p>
+<ul>
+<li>Case weights are normalised to sum to one, and the objective is the
+mean deviance halved for a Gaussian family and the mean negative log
+likelihood for a binomial one, plus
+<code>lambda * (alpha * sum |b| + (1 - alpha) / 2 * sum b^2)</code>.</li>
+<li>Every column is centred on its weighted mean and divided by its
+weighted standard deviation, taken with those weights and no correction
+for degrees of freedom. A Gaussian response is centred and scaled the
+same way, which is what puts the reported penalties on the response’s
+own scale. A column holding one value has no spread to divide by, is
+left out of the descent, and is reported at zero.</li>
+<li>A penalty factor, where one is given, is rescaled to sum to the
+number of columns, so a factor of one everywhere gives the path no
+factor gives.</li>
+<li>The path is <code>n_lambda</code> penalties, geometric from the
+smallest that leaves every coefficient at zero down by a ratio of
+<code>1e-4</code> where there are more units than columns and
+<code>1e-2</code> otherwise. The largest is
+<code>max_j |g_j| / (vp_j * max(alpha, 1e-3))</code> on the standardised
+scale, with the floor under the mixing that gives a ridge a finite
+start.</li>
+<li>The path ends early where a step explains almost nothing more: a
+Gaussian family reads that share against the deviance explained so far
+and a binomial one reads it outright, which is the difference glmnet’s
+two solvers carry. It also ends where a fit explains more than
+<code>0.999</code> of the null deviance. Neither rule is read before the
+fifth point, and neither applies to a path of supplied penalties.</li>
+<li>The fit is iteratively reweighted least squares with a cyclic
+coordinate descent inside it, warm-started along the path, restricted by
+Tibshirani’s sequential strong rule and checked against the optimality
+condition on every column the rule discarded. A reweighting is judged on
+the first sweep after it: one that moves nothing is a fixed point.</li>
+<li>A cross-validated penalty fits each fold along a path of its own and
+reads it at the whole-unit path’s penalties, interpolating between the
+two points around each, which is what <code>cv.glmnet</code> aligns on.
+The held-out deviance is averaged within a fold and then across the
+folds, weighted by each fold’s weight, and its standard error is the
+spread across the folds over <code>nfolds - 1</code>.
+<code>lambda.min</code> is the largest penalty of least held-out
+deviance and <code>lambda.1se</code> the largest within one standard
+error of it.</li>
+<li>The folds are dealt by the caller and handed over as one 0-based
+index per unit, so a grouping the outer map keeps whole stays whole
+where the penalty is chosen. Nothing inside the core draws.</li>
+</ul>
+<div class="section level3">
+<h3 id="the-fixtures">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures"></a>
+</h3>
+<p><code>penalised_input.csv</code> holds the design both suites fit: a
+weekly representation of eighty simulated records, flattened, with the
+square of every column beside it, which is what
+<code><a href="../reference/elasticnet.html">elasticnet()</a></code> penalises over. The squares are the scale case
+the standardisation exists for, a reading of ten degrees and its square
+of a hundred, and the weekly bins of one record are collinear the way
+adjacent bins are. Beside it are a binomial response, the continuous
+driver it was generated from, a case weight per unit and a five-fold
+map.</p>
+<p><code>penalised_cases.csv</code> names twelve cases, each family at
+each of three mixings with and without the weights, and carries the
+convergence threshold and the pass budget the reference was read at and
+the tolerances a suite is allowed. <code>penalised_path.csv</code> holds
+glmnet’s coefficients, its intercept and the objective at every tenth
+point of each case’s path, and <code>penalised_cv.csv</code> holds the
+path’s length and the penalty the cross-validation chose.</p>
+</div>
+<div class="section level3">
+<h3 id="how-exactly-1">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-1"></a>
+</h3>
+<p>Not byte-exactly, and not by digest. Two implementations of a
+coordinate descent settle at the same point to the tolerance they are
+run at and no closer, so what is required is a distance:</p>
+<ul>
+<li>
+<strong>The path’s length and its penalties are exact</strong>, to
+<code>1e-10</code> relative. They follow from the gradient at the null
+model and a geometric ratio, so a difference there is a difference in
+the conventions rather than in the descent.</li>
+<li>
+<strong>The objective is what is pinned tightly.</strong> A suite’s
+fit may sit no more than <code>1e-6</code> above glmnet’s at the same
+penalty. Sitting below it is the fit being closer to the optimum than
+the reference, which is the direction the arm is allowed to move in;
+sitting above it is the arm being weakened, which is the thing this
+replacement was not allowed to do. Measured at a matched threshold of
+<code>1e-14</code>, the core sits between <code>3e-13</code> and
+<code>2e-7</code> above glmnet across the twelve cases.</li>
+<li>
+<strong>A coefficient is allowed <code>1e-4</code></strong>, against
+the largest coefficient of the case. It is looser than the objective on
+purpose: two nearly identical columns split one coefficient between them
+differently in any two descents, and that split is not determined to the
+precision the fit is. On a design without collinear columns the two
+agree far closer, to <code>2e-6</code> at a matched threshold of
+<code>1e-14</code>.</li>
+<li>
+<strong>The cross-validated penalty is exact.</strong>
+<code>lambda.min</code> and <code>lambda.1se</code> are the same point
+of the same path in all twelve cases, and the held-out deviance agrees
+to <code>1e-4</code> relative.</li>
+</ul>
+<p>One point of the path is different by construction, and only for a
+ridge. glmnet fits its first point at a penalty of <code>9.9e35</code>
+and reports it under the largest penalty that would have left every
+coefficient at zero. Above a mixing of zero those are the same fit,
+because the threshold holds every coefficient down at that penalty; at a
+mixing of zero there is no threshold, and the core solves the point it
+reports while glmnet reports a fit made at an infinite penalty. The
+fixtures therefore start at the second point, and the difference at the
+first is asserted to be small rather than absent.</p>
+<p>The reference is generated with glmnet’s own pass budget raised well
+above its default. At the threshold the reference is read at, a
+collinear design runs past that default, and glmnet then warns,
+truncates the path and returns the penalties it did reach; the generator
+refuses any reference glmnet warned about, so a fixture can never encode
+a failure both implementations would have to reproduce to match.</p>
 </div>
 </div>
 <div class="section level2">
@@ -1757,17 +1888,6 @@ on the object it is called on.</td>
 selection. Python has no non-standard evaluation, so a selection there
 is a name, a list of names, a glob such as <code>"sp_*"</code> or a
 predicate on the name, resolved by <code>select_columns()</code>.</td>
-</tr>
-<tr class="odd">
-<td><code>elasticnet(s =)</code></td>
-<td>glmnet keeps the whole penalty path and <code>s</code> names the
-point on it to predict at. scikit-learn’s cross-validated fits refit at
-the best penalty and keep only that one, so there is no path there to
-name a point of. Both sides otherwise fit the same model: one penalised
-regression per variable over every column and, by default, their
-squares, on a design standardised before it is penalised, with the
-mixing given by <code>alpha</code> and the penalty chosen by an inner
-cross-validation on the fitting units.</td>
 </tr>
 </tbody>
 </table>

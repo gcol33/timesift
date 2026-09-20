@@ -11,13 +11,13 @@ Source:
 [`inst/CITATION`](https://github.com/gcol33/timesift/blob/HEAD/inst/CITATION)
 
 Colling, G. (2026). timesift: Learn Predictive Representations of
-Time-Varying Data. R package version 0.2.0.
+Time-Varying Data. R package version 0.3.0.
 https://gillescolling.com/timesift/
 
     @Manual{,
       title = {timesift: Learn Predictive Representations of Time-Varying Data},
       author = {Gilles Colling},
       year = {2026},
-      note = {R package version 0.2.0},
+      note = {R package version 0.3.0},
       url = {https://gillescolling.com/timesift/},
     }

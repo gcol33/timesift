@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -179,7 +179,7 @@ hour-to-hour noise an order of magnitude larger.</p>
 <span><span class="co">#&gt; selected elasticnet / month in 5 of 5 folds</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; choice on every target  elasticnet / month</span></span>
-<span><span class="co">#&gt; weights on every target  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.01</span></span></code></pre></div>
+<span><span class="co">#&gt; weights on every target  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.02</span></span></code></pre></div>
 <p>Every representation named in <code>sift</code> was built, and
 <code>models</code> defaulting to <code>list(elasticnet())</code>, a
 penalised logistic regression was fitted on each of them over the same
@@ -339,7 +339,7 @@ chose on every target instead.</p>
 <code class="sourceCode R"><span><span class="va">p</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">targets</span>, <span class="va">series</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">p</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        sp1   sp2   sp3   sp4</span></span>
-<span><span class="co">#&gt; p001 0.180 0.884 0.304 0.879</span></span>
+<span><span class="co">#&gt; p001 0.181 0.884 0.304 0.879</span></span>
 <span><span class="co">#&gt; p002 0.566 0.576 0.584 0.694</span></span>
 <span><span class="co">#&gt; p003 0.040 0.924 0.185 0.949</span></span></code></pre></div>
 </div>
@@ -384,8 +384,7 @@ pinned to:</p>
 <span><span class="co">#&gt; &lt;timesift learner&gt; elasticnet </span></span>
 <span><span class="co">#&gt; reads   : tabular ; one model per response: yes, separate </span></span>
 <span><span class="co">#&gt; data    : month </span></span>
-<span><span class="co">#&gt; settings: alpha = 0.5, n_inner = 5, squares = TRUE, s = lambda.min, seed = 1 </span></span>
-<span><span class="co">#&gt; needs   : glmnet</span></span></code></pre></div>
+<span><span class="co">#&gt; settings: alpha = 0.5, n_inner = 5, squares = TRUE, s = lambda.min, n_lambda = 100, thresh = 1e-08, seed = 1</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="what-a-learner-may-be-handed">What a learner may be handed<a class="anchor" aria-label="anchor" href="#what-a-learner-may-be-handed"></a>
@@ -444,6 +443,15 @@ and <code><a href="../reference/torch_learners.html">rescnn()</a></code> read a 
 so every response is predicted together from a shared embedding. Pooling
 strength across responses is what makes the rarer ones learnable at
 these sample sizes.</p>
+<p><code><a href="../reference/elasticnet.html">elasticnet()</a></code> is the arm a network is measured against,
+so it is fitted by the same compiled core the Python package calls
+rather than by a fitter on either side: the penalty path, the
+standardisation and the cross-validated choice of penalty are one
+implementation, and the two languages return the same coefficients for
+the same design. <code>s</code> reads that fit at
+<code>"lambda.min"</code>, at <code>"lambda.1se"</code>, or at a penalty
+of your own, and <code>thresh</code> trades how close the descent
+settles to the optimum against what it costs.</p>
 <p>Architecture belongs to the constructor and training belongs to
 <code><a href="../reference/train_control.html">train_control()</a></code>, which every neural learner of a run reads.
 A learner given a control of its own overrides the run’s on the settings
@@ -520,7 +528,7 @@ in <code>fit$fold_weights</code>.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/ensemble_weights.html">ensemble_weights</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   elasticnet / day  elasticnet / week elasticnet / month </span></span>
-<span><span class="co">#&gt;         0.01476295         0.30154490         0.68369215</span></span></code></pre></div>
+<span><span class="co">#&gt;         0.01545023         0.30136974         0.68318003</span></span></code></pre></div>
 <p>The weights say how much of the combination each candidate carries,
 and a weight at zero is one the combination reached past. Where the
 ensemble line of the plot above sits over every curve the candidates are
@@ -650,8 +658,8 @@ fall in score as that bin’s weight. Nothing is refitted.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span><span class="va">weight</span> <span class="op">~</span> <span class="va">part</span>, <span class="va">weight</span>, <span class="va">mean</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                   part     weight</span></span>
 <span><span class="co">#&gt; 1 2021-09-01T00:00:00Z 0.09523258</span></span>
-<span><span class="co">#&gt; 2 2021-10-01T00:00:00Z 0.11486486</span></span>
-<span><span class="co">#&gt; 3 2021-11-01T00:00:00Z 0.07108554</span></span>
+<span><span class="co">#&gt; 2 2021-10-01T00:00:00Z 0.11467438</span></span>
+<span><span class="co">#&gt; 3 2021-11-01T00:00:00Z 0.07128131</span></span>
 <span><span class="co">#&gt; 4 2021-12-01T00:00:00Z 0.05093959</span></span></code></pre></div>
 <p>Holding a channel back instead asks what each statistic of a grain
 carries, which is the question behind keeping a bin’s extremes at

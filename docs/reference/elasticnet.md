@@ -16,6 +16,8 @@ elasticnet(
   n_inner = 5L,
   squares = TRUE,
   s = "lambda.min",
+  n_lambda = 100L,
+  thresh = 1e-08,
   seed = 1L
 )
 ```
@@ -42,7 +44,20 @@ elasticnet(
 
 - s:
 
-  Which penalty of the inner path to predict at.
+  Which penalty of the inner path to predict at: `"lambda.min"`,
+  `"lambda.1se"`, or a penalty of its own, which is interpolated between
+  the two points of the path around it.
+
+- n_lambda:
+
+  Points of the penalty path.
+
+- thresh:
+
+  Where the coordinate descent stops, read off the largest coefficient
+  move of a pass. The default leaves the fit as close to the optimum as
+  glmnet's own default does; a looser one is faster and a tighter one
+  costs time roughly in proportion.
 
 - seed:
 
@@ -75,6 +90,14 @@ This is the aggregate-feature side of the comparison the package was
 built for, and it is the fair opponent for a network: a per-fold
 discrete selector pays selection variance a network never pays, so
 beating that one is not a matched result.
+
+The path is fitted by the same core the Python package calls, so the two
+return the same coefficients for the same input. Its conventions are
+glmnet's, which is what the arm is measured against: weights normalised
+to sum to one, columns centred and scaled by their weighted mean and
+weighted standard deviation, a hundred penalties down from the smallest
+that leaves every coefficient at zero, and the held-out deviance read
+fold by fold.
 
 ## Examples
 

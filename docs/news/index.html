@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,19 @@
       <small>Source: <a href="https://github.com/gcol33/timesift/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.3.0" id="timesift-030">timesift 0.3.0<a class="anchor" aria-label="anchor" href="#timesift-030"></a></h2>
+<div class="section level3">
+<h3 id="changed-0-3-0">Changed<a class="anchor" aria-label="anchor" href="#changed-0-3-0"></a></h3>
+<ul><li>
+<code><a href="../reference/elasticnet.html">elasticnet()</a></code> is one implementation in both languages. The elastic net is now <code>src/ts_penalised.cpp</code>, compiled into the R package and into the Python extension beside the binning, in place of <code><a href="https://glmnet.stanford.edu/reference/cv.glmnet.html" class="external-link">glmnet::cv.glmnet()</a></code> on one side and scikit-learn’s <code>LogisticRegressionCV</code> on the other. Those were different algorithms: a different optimiser, a different parametrisation of the penalty, ten penalty values against a hundred, and different conventions for standardisation, so the same call returned different coefficients in the two languages. The penalised arm is what the networks are measured against, which made it the worst place for the twin to diverge. <code>glmnet</code> and <code>scikit-learn</code> drop out of the learner’s <code>needs</code>; <code>scikit-learn</code> is still what <code><a href="../reference/forest.html">forest()</a></code> fits on (<a href="https://github.com/gcol33/timesift/issues/76" class="external-link">#76</a>).</li>
+<li>The core’s conventions are glmnet’s, and the replacement was held to reproducing it rather than to being an elastic net of its own. At a matched convergence threshold of <code>1e-14</code> the path’s length and its penalties agree exactly, the cross-validated <code>lambda.min</code> and <code>lambda.1se</code> are the same point of the same path in all twelve fixture cases, and the penalised objective sits between <code>3e-13</code> and <code>2e-7</code> of glmnet’s. Coefficients agree to <code>2e-6</code> where no two columns are collinear and to <code>1e-4</code> on the collinear fixture design, where the split between two nearly identical columns is not determined to the precision the fit is. <code>inst/spec/representation.md</code> states all of it, and <code>inst/spec/fixtures/penalised_*.csv</code> hold glmnet’s own numbers for both suites to assert against.</li>
+<li>
+<code><a href="../reference/elasticnet.html">elasticnet()</a></code> gains <code>n_lambda</code> and <code>thresh</code>, and <code>s</code> now reads on the Python side too: the whole penalty path is kept on both, so <code>"lambda.1se"</code> or a penalty of a caller’s own naming a point between two of the path’s is read the way <code>predict(s =)</code> reads one.</li>
+<li>A fitted penalised model is arrays rather than a fitter’s object, so it round trips through <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code> and <code>pickle</code> and predicts on a machine that has neither <code>glmnet</code> nor <code>scikit-learn</code>.</li>
+<li>The reproduction’s elastic-net row, 0.686 against the published 0.687, was read under glmnet and is untested under the shared core. The prior is that it does not move: the core picks the same penalty as <code>cv.glmnet</code> in all twelve fixture cases, well inside the 0.002 the driver compares at. <code>inst/reproduce/schrankogel.R --stages=baseline</code> against the deposit settles it.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.0" id="timesift-020">timesift 0.2.0<a class="anchor" aria-label="anchor" href="#timesift-020"></a></h2>
 <div class="section level3">

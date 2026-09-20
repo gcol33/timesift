@@ -6,7 +6,16 @@ your own goes through.
 ## `elasticnet()`
 
 ``` python
-elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, seed=1)
+elasticnet(
+    data=None,
+    alpha=0.5,
+    n_inner=5,
+    squares=True,
+    s='lambda.min',
+    n_lambda=100,
+    thresh=1e-08,
+    seed=1,
+)
 ```
 
 One penalised regression per variable, over every bin-by-channel column
@@ -20,11 +29,15 @@ cross-entropy loss, linear under a squared-error one, and so are the
 case weights, `timesift.response.positive_weights` under
 presence-absence, which every learner that ships fits under.
 
-The design is standardised before it is penalised, as it is on the R
-side, so a column is not penalised for the scale it was recorded on. The
-penalty itself is the one the inner cross-validation refits at; where R
-takes a named point of the path through `s`, scikit-learn keeps only
-that one, so there is nothing to name here.
+The path is fitted by the same core the R package calls, so the two
+return the same coefficients for the same input. Its conventions are
+glmnet’s, which is what the arm is measured against: weights normalised
+to sum to one, columns centred and scaled by their weighted mean and
+weighted standard deviation, a hundred penalties down from the smallest
+that leaves every coefficient at zero, and the held-out deviance read
+fold by fold. `s` is where the fit is read: `"lambda.min"`,
+`"lambda.1se"`, or a penalty of its own, which is interpolated between
+the two points of the path around it.
 
 The inner folds are dealt for each response and stratified on it, so a
 rare outcome is spread over them as evenly as its count allows. A

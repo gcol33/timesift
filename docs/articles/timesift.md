@@ -72,7 +72,7 @@ fit
 #> selected elasticnet / month in 5 of 5 folds
 #> 
 #> choice on every target  elasticnet / month
-#> weights on every target  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.01
+#> weights on every target  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.02
 ```
 
 Every representation named in `sift` was built, and `models` defaulting
@@ -155,7 +155,7 @@ chose on every target instead.
 p <- predict(fit, targets, series)
 round(p[1:3, 1:4], 3)
 #>        sp1   sp2   sp3   sp4
-#> p001 0.180 0.884 0.304 0.879
+#> p001 0.181 0.884 0.304 0.879
 #> p002 0.566 0.576 0.584 0.694
 #> p003 0.040 0.924 0.185 0.949
 ```
@@ -210,8 +210,7 @@ elasticnet(data = grain("month"))
 #> <timesift learner> elasticnet 
 #> reads   : tabular ; one model per response: yes, separate 
 #> data    : month 
-#> settings: alpha = 0.5, n_inner = 5, squares = TRUE, s = lambda.min, seed = 1 
-#> needs   : glmnet
+#> settings: alpha = 0.5, n_inner = 5, squares = TRUE, s = lambda.min, n_lambda = 100, thresh = 1e-08, seed = 1
 ```
 
 ## What a learner may be handed
@@ -291,6 +290,16 @@ and
 read a sequence with a joint multi-label head, so every response is
 predicted together from a shared embedding. Pooling strength across
 responses is what makes the rarer ones learnable at these sample sizes.
+
+[`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+is the arm a network is measured against, so it is fitted by the same
+compiled core the Python package calls rather than by a fitter on either
+side: the penalty path, the standardisation and the cross-validated
+choice of penalty are one implementation, and the two languages return
+the same coefficients for the same design. `s` reads that fit at
+`"lambda.min"`, at `"lambda.1se"`, or at a penalty of your own, and
+`thresh` trades how close the descent settles to the optimum against
+what it costs.
 
 Architecture belongs to the constructor and training belongs to
 [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md),
@@ -377,7 +386,7 @@ it would be scored against; each outer fold’s weights are in
 
 ensemble_weights(fit)
 #>   elasticnet / day  elasticnet / week elasticnet / month 
-#>         0.01476295         0.30154490         0.68369215
+#>         0.01545023         0.30136974         0.68318003
 ```
 
 The weights say how much of the combination each candidate carries, and
@@ -535,8 +544,8 @@ weight <- occlusion(kept, "elasticnet / month", permutations = 5)
 head(aggregate(weight ~ part, weight, mean), 4)
 #>                   part     weight
 #> 1 2021-09-01T00:00:00Z 0.09523258
-#> 2 2021-10-01T00:00:00Z 0.11486486
-#> 3 2021-11-01T00:00:00Z 0.07108554
+#> 2 2021-10-01T00:00:00Z 0.11467438
+#> 3 2021-11-01T00:00:00Z 0.07128131
 #> 4 2021-12-01T00:00:00Z 0.05093959
 ```
 
