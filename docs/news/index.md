@@ -50,12 +50,11 @@
   it round trips through
   [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) and `pickle` and
   predicts on a machine that has neither `glmnet` nor `scikit-learn`.
-- The reproduction’s elastic-net row, 0.686 against the published 0.687,
-  was read under glmnet and is untested under the shared core. The prior
-  is that it does not move: the core picks the same penalty as
-  `cv.glmnet` in all twelve fixture cases, well inside the 0.002 the
-  driver compares at. `inst/reproduce/schrankogel.R --stages=baseline`
-  against the deposit settles it.
+- The reproduction’s elastic-net row reads the same under the shared
+  core as it did under glmnet:
+  `inst/reproduce/schrankogel.R --stages=baseline` against the deposit
+  gives 0.68605 on the 188 aggregates, 0.00095 from the published 0.687
+  and inside the 0.002 the driver compares at.
 
 ## timesift 0.2.0
 

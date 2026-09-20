@@ -245,14 +245,11 @@ every step. Verified against the deposit on 2026-09-02, matching the paper exact
 | elastic net on the 188 aggregates | 0.687 | 0.686 |
 
 The elastic net sits 0.001 low because the two runs seed the inner cross-validation's random fold
-draw differently; nothing else in the table carries randomness. That row was read under glmnet and
-is untested under the shared core, which landed after it. The prior is that it does not move: the
-core picks the same `lambda.min` and `lambda.1se` as `cv.glmnet` in all twelve fixture cases and
-its coefficients agree to 1e-4 on a collinear design, both well inside the 0.002 the driver
-compares at. Rerunning `inst/reproduce/schrankogel.R --stages=baseline` against the deposit settles
-it. The stepwise arm and the network grid have not been rerun here either: forward selection over
-188 columns is many hours single-threaded, and the encoders want the graphics processor they had
-in the study.
+draw differently; nothing else in the table carries randomness. That row was first read when
+`elasticnet()` called glmnet, and has since been read again under the shared core: 0.68605 against
+the published 0.687, the same 0.686 as before and inside the 0.002 the driver compares at. The
+stepwise arm and the network grid have not been rerun here: forward selection over 188 columns is
+many hours single-threaded, and the encoders want the graphics processor they had in the study.
 
 ## Related
 

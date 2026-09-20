@@ -87,7 +87,7 @@
 <li>
 <code><a href="../reference/elasticnet.html">elasticnet()</a></code> gains <code>n_lambda</code> and <code>thresh</code>, and <code>s</code> now reads on the Python side too: the whole penalty path is kept on both, so <code>"lambda.1se"</code> or a penalty of a caller’s own naming a point between two of the path’s is read the way <code>predict(s =)</code> reads one.</li>
 <li>A fitted penalised model is arrays rather than a fitter’s object, so it round trips through <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code> and <code>pickle</code> and predicts on a machine that has neither <code>glmnet</code> nor <code>scikit-learn</code>.</li>
-<li>The reproduction’s elastic-net row, 0.686 against the published 0.687, was read under glmnet and is untested under the shared core. The prior is that it does not move: the core picks the same penalty as <code>cv.glmnet</code> in all twelve fixture cases, well inside the 0.002 the driver compares at. <code>inst/reproduce/schrankogel.R --stages=baseline</code> against the deposit settles it.</li>
+<li>The reproduction’s elastic-net row reads the same under the shared core as it did under glmnet: <code>inst/reproduce/schrankogel.R --stages=baseline</code> against the deposit gives 0.68605 on the 188 aggregates, 0.00095 from the published 0.687 and inside the 0.002 the driver compares at.</li>
 </ul></div>
 </div>
     <div class="section level2">

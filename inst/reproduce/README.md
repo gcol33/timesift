@@ -161,6 +161,10 @@ cross-validation whose folds are drawn at random, and the two runs seed that str
 the study seeded one stream across its parallel workers, this one seeds once per fitted fold. The
 counts and the representation carry no such randomness and reproduce exactly.
 
+That row was read when `elasticnet()` called glmnet. It was read again on 2026-09-20 under the
+shared penalised core, on the same deposit and the same fold map, and gives 0.68605: the same
+figure, 0.00095 from the published one and inside the 0.002 the script compares at.
+
 The stepwise arm and the network grid have not been rerun here. Forward selection over 188 columns
 is many hours single-threaded, and the encoders want the graphics processor they had in the
 study.
