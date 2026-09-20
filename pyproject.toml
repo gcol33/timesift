@@ -18,11 +18,8 @@ dependencies = ["numpy>=1.24", "tzdata; platform_system == 'Windows'"]
 
 [project.optional-dependencies]
 torch = ["torch>=2.0"]
-# 1.8 is where `l1_ratios` alone selects the elastic net. Under the versions before it the
-# mixing is read only beside `penalty="elasticnet"` and is otherwise warned about and ignored,
-# so `alpha` would silently do nothing and the learner would fit an L2-only logistic. Branching
-# on the version would be two paths to keep true; the floor is one.
-sklearn = ["scikit-learn>=1.8"]
+# The trees `forest()` grows, and nothing else: the penalised fit is the shared core.
+sklearn = ["scikit-learn>=1.0"]
 # pandas is what a user's table is, so the suite reads one through `timesift()`; the package
 # itself never imports it.
 test = ["pytest>=8.0", "pandas>=2.0"]
@@ -40,6 +37,8 @@ sdist.include = [
   "src/ts_core.cpp",
   "src/ts_calendar.cpp",
   "src/ts_core.h",
+  "src/ts_penalised.cpp",
+  "src/ts_penalised.h",
   "python/ts_py.cpp",
   "python/tests/**",
   "inst/spec/**",

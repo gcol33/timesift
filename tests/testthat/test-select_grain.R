@@ -187,7 +187,6 @@ planted_response <- function(sim, n_var = 8L, strength = 3, seed = 82L) {
 }
 
 test_that("the grain the response was generated at is selected above chance", {
-  skip_if_not_installed("glmnet")
   sim <- planted_grain()
   y <- planted_response(sim)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("day", "week", "month"))
@@ -202,7 +201,6 @@ test_that("the grain the response was generated at is selected above chance", {
 })
 
 test_that("the nested estimate stays under what choosing on the held-out units would have paid", {
-  skip_if_not_installed("glmnet")
   sim <- planted_grain(seed = 83L)
   y <- planted_response(sim, seed = 84L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("day", "week", "month"))
@@ -232,7 +230,6 @@ test_that("the nested estimate stays under what choosing on the held-out units w
 })
 
 test_that("a fold's held-out predictions are those of the candidate it selected", {
-  skip_if_not_installed("glmnet")
   sim <- planted_grain(n_unit = 48L, days = 90L, seed = 87L)
   y <- planted_response(sim, n_var = 4L, seed = 88L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("week", "month"))
@@ -254,7 +251,6 @@ test_that("a fold's held-out predictions are those of the candidate it selected"
 })
 
 test_that("with no signal at any grain the procedure scores at the design's own floor", {
-  skip_if_not_installed("glmnet")
   sim <- planted_grain(seed = 85L)
   set.seed(86)
   y <- matrix(stats::rbinom(length(sim$units) * 4L, 1L, 0.35), ncol = 4L,
@@ -314,7 +310,6 @@ test_that("the one-standard-error rule takes the coarsest candidate inside the b
 })
 
 test_that("the coarsest adequate grain is the generating grain or coarser where the profile is flat", {
-  skip_if_not_installed("glmnet")
   # The grain-invariant control of simulate_records(): the driver is the unit's constant offset,
   # which every grain reports exactly, so no candidate is better than another inside the training
   # data beyond noise. The mechanism is anchored on one season, which is the generating grain.
@@ -340,7 +335,6 @@ test_that("the coarsest adequate grain is the generating grain or coarser where 
 })
 
 test_that("where one candidate clearly separates, the coarsest adequate rule is the argmax", {
-  skip_if_not_installed("glmnet")
   # The season mechanism on the anomaly alone: one season bin carries the driver, and the year bin,
   # which averages four seasons over a unit offset the driver does not read, carries almost
   # nothing. The year is the coarser candidate and the rule must not take it.

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "ts_core.h"
+#include "ts_penalised.h"
 
 namespace nb = nanobind;
 
@@ -19,6 +20,7 @@ namespace {
 using ConstI32 = nb::ndarray<const std::int32_t, nb::ndim<1>, nb::c_contig, nb::device::cpu>;
 using ConstI64 = nb::ndarray<const std::int64_t, nb::ndim<1>, nb::c_contig, nb::device::cpu>;
 using ConstF64 = nb::ndarray<const double, nb::ndim<1>, nb::c_contig, nb::device::cpu>;
+using ConstMat = nb::ndarray<const double, nb::ndim<2>, nb::f_contig, nb::device::cpu>;
 
 // Hands a vector to NumPy and lets the capsule free it when the array goes.
 template <typename T>
@@ -65,10 +67,52 @@ Held hold(ConstI32 unit, const double* value, ConstI64 when, ConstI64 local,
   return h;
 }
 
+// The penalised fit's settings, from the keywords the Python side names them by.
+timesift::PenaltySpec penalty_spec(double alpha, int n_lambda, double lambda_min_ratio,
+                                   std::optional<std::vector<double>> lambda, double thresh,
+                                   bool standardize, bool intercept, double max_pass) {
+  timesift::PenaltySpec spec;
+  spec.alpha = alpha;
+  spec.n_lambda = n_lambda;
+  spec.lambda_min_ratio = lambda_min_ratio;
+  spec.thresh = thresh;
+  spec.max_pass = static_cast<int>(max_pass);
+  spec.standardize = standardize;
+  spec.intercept = intercept;
+  if (lambda.has_value()) spec.lambda = *lambda;
+  return spec;
+}
+
+nb::dict give(const timesift::PenaltyPath& path) {
+  nb::dict out;
+  out["lambda"] = give(std::vector<double>(path.lambda));
+  out["a0"] = give(std::vector<double>(path.a0));
+  out["beta"] = give(std::vector<double>(path.beta));
+  out["df"] = give(std::vector<std::int32_t>(path.df));
+  out["dev_ratio"] = give(std::vector<double>(path.dev_ratio));
+  out["null_deviance"] = path.null_deviance;
+  out["passes"] = path.passes;
+  out["n_column"] = static_cast<std::int64_t>(path.n_column);
+  out["family"] = std::string(timesift::family_name(path.family));
+  return out;
+}
+
+timesift::PenaltyPath take(ConstF64 lambda, ConstF64 a0, ConstF64 beta,
+                           const std::string& family) {
+  timesift::PenaltyPath path;
+  path.family = timesift::family_from_name(family);
+  path.lambda.assign(lambda.data(), lambda.data() + lambda.size());
+  path.a0.assign(a0.data(), a0.data() + a0.size());
+  path.beta.assign(beta.data(), beta.data() + beta.size());
+  path.n_column = path.lambda.empty() ? 0 : path.beta.size() / path.lambda.size();
+  return path;
+}
+
 }  // namespace
 
 NB_MODULE(_core, m) {
-  m.doc() = "The binning and the reduction, shared with the R package as src/ts_core.cpp.";
+  m.doc() = "The binning, the reduction and the penalised fit, shared with the R package as "
+            "src/ts_core.cpp and src/ts_penalised.cpp.";
 
   nb::register_exception_translator(
       [](const std::exception_ptr& p, void*) {
@@ -182,4 +226,63 @@ NB_MODULE(_core, m) {
           return give(std::move(out));
         },
         nb::arg("bins"), nb::arg("grain"), nb::arg("year_month"), nb::arg("year_day"));
+
+  m.def("penalised_path",
+        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, double alpha,
+           int n_lambda, double lambda_min_ratio, std::optional<std::vector<double>> lambda,
+           double thresh, bool standardize, bool intercept, double max_pass) {
+          return give(timesift::penalised_path(
+              x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
+              timesift::family_from_name(family),
+              penalty_spec(alpha, n_lambda, lambda_min_ratio, std::move(lambda), thresh,
+                           standardize, intercept, max_pass)));
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("alpha") = 1.0,
+        nb::arg("n_lambda") = 100, nb::arg("lambda_min_ratio") = 0.0,
+        nb::arg("lambda") = nb::none(), nb::arg("thresh") = 1e-8,
+        nb::arg("standardize") = true, nb::arg("intercept") = true,
+        nb::arg("max_pass") = 1e6);
+
+  m.def("penalised_cv",
+        [](ConstMat x, ConstF64 y, ConstF64 w, ConstI32 fold, int n_fold,
+           const std::string& family, double alpha, int n_lambda, double lambda_min_ratio,
+           double thresh, bool standardize, bool intercept, double max_pass) {
+          const timesift::PenaltyCV cv = timesift::penalised_cv(
+              x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
+              timesift::family_from_name(family),
+              penalty_spec(alpha, n_lambda, lambda_min_ratio, std::nullopt, thresh, standardize,
+                           intercept, max_pass),
+              fold.data(), n_fold);
+          nb::dict out = give(cv.path);
+          out["cv_mean"] = give(std::vector<double>(cv.cv_mean));
+          out["cv_sd"] = give(std::vector<double>(cv.cv_sd));
+          out["index_min"] = static_cast<std::int64_t>(cv.index_min);
+          out["index_1se"] = static_cast<std::int64_t>(cv.index_1se);
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("fold"), nb::arg("n_fold"),
+        nb::arg("family"), nb::arg("alpha") = 1.0, nb::arg("n_lambda") = 100,
+        nb::arg("lambda_min_ratio") = 0.0, nb::arg("thresh") = 1e-8,
+        nb::arg("standardize") = true, nb::arg("intercept") = true,
+        nb::arg("max_pass") = 1e6);
+
+  m.def("penalised_predict",
+        [](ConstF64 lambda, ConstF64 a0, ConstF64 beta, const std::string& family, double at,
+           ConstMat newx) {
+          const timesift::PenaltyPath path = take(lambda, a0, beta, family);
+          std::vector<double> out(newx.shape(0));
+          timesift::penalised_predict(path, at, newx.data(), newx.shape(0), out.data());
+          return give(std::move(out));
+        },
+        nb::arg("lambda"), nb::arg("a0"), nb::arg("beta"), nb::arg("family"), nb::arg("at"),
+        nb::arg("newx"));
+
+  m.def("penalised_coef",
+        [](ConstF64 lambda, ConstF64 a0, ConstF64 beta, const std::string& family, double at) {
+          const timesift::PenaltyPath path = take(lambda, a0, beta, family);
+          std::vector<double> coef(path.n_column + 1, 0.0);
+          timesift::penalised_coef(path, at, coef.data(), coef.data() + 1);
+          return give(std::move(coef));
+        },
+        nb::arg("lambda"), nb::arg("a0"), nb::arg("beta"), nb::arg("family"), nb::arg("at"));
 }

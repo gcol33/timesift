@@ -34,7 +34,7 @@ Taking the best-observed grain as the reference is a choice that favours the ref
 this beside the paired differences \code{\link[=paired_contrast]{paired_contrast()}} gives, which single out no grain.
 }
 \examples{
-\dontshow{if (all(vapply(c("glmnet", "lme4", "lmerTest", "emmeans"), requireNamespace, logical(1), quietly = TRUE))) withAutoprint(\{ # examplesIf}
+\dontshow{if (all(vapply(c("lme4", "lmerTest", "emmeans"), requireNamespace, logical(1), quietly = TRUE))) withAutoprint(\{ # examplesIf}
 \donttest{
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)

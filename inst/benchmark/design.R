@@ -238,8 +238,8 @@ bench_assert_package <- function(pkg_dir, dirty) {
 }
 
 # Every top-level function the checkout's R/ defines is compared, formals and body, with the one
-# the installed namespace holds. The version string cannot tell two builds of 0.2.0 apart; the
-# code can. Returns the names that are missing from the namespace or differ from the checkout.
+# the installed namespace holds. The version string cannot tell two builds of one version apart;
+# the code can. Returns the names that are missing from the namespace or differ from the checkout.
 bench_stale_functions <- function(pkg_dir) {
   ns <- asNamespace("timesift")
   files <- list.files(file.path(pkg_dir, "R"), pattern = "[.][Rr]$", full.names = TRUE)

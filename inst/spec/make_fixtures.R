@@ -633,3 +633,143 @@ write_fixture(
 cat("wrote the response, the fold map, the mask,",
     nrow(utils::read.csv(file.path(out_dir, "metrics.csv"))),
     "metric values, the contrast and the inflation", "\n")
+
+# ---------------------------------------------------------------------------------------------
+# The penalised fit.
+#
+# These are not digests. Two implementations of a coordinate descent settle at the same point to
+# the tolerance they are run at, never to the last bit, so what is pinned is the reference itself
+# and the distance a suite may sit from it. The reference is glmnet's, because the penalised arm
+# is the baseline the networks are measured against and the point of the shared core is that it
+# does not weaken it: a suite that reproduces these numbers reproduces glmnet.
+#
+# The design is the one `elasticnet()` penalises over: a weekly representation and the square of
+# every column beside it. The squares are the scale case the standardisation exists for, and the
+# weekly bins of one record are collinear the way adjacent bins are, so a suite that skipped the
+# standardisation fails and one that stops the descent early fails on the split between two
+# collinear columns.
+if (!requireNamespace("glmnet", quietly = TRUE)) {
+  stop("the penalised fixtures are the reference glmnet gives, so it has to be installed to ",
+       "regenerate them.", call. = FALSE)
+}
+
+PEN_THRESH <- 1e-14
+# glmnet's own pass budget, raised well above its default: at the tolerance the reference is read
+# at, a collinear design runs past the default and glmnet then warns, truncates the path and
+# returns the penalties it did reach. A reference that quietly carried one of those would be a
+# fixture both implementations had to reproduce a failure to match.
+PEN_MAXIT <- 1e7
+# The objective both implementations minimise, on glmnet's own scale: the mean deviance halved
+# for a Gaussian family and the mean negative log likelihood for a binomial one, plus the penalty.
+# It is what the fixture pins tightly. A coefficient is not: two nearly identical columns split
+# one coefficient between them differently in any two descents, and the split is not determined
+# to the precision the fit is, so that is asserted at a looser tolerance beside this one.
+pen_objective <- function(x, y, w, family, alpha, lambda, a0, beta) {
+  wn <- w / sum(w)
+  eta <- a0 + as.numeric(x %*% beta)
+  fit <- if (family == "gaussian") sum(wn * (y - eta)^2) / 2 else
+    -sum(wn * (y * eta - log1p(exp(eta))))
+  fit + lambda * (alpha * sum(abs(beta)) + (1 - alpha) / 2 * sum(beta^2))
+}
+
+settled <- function(expr) {
+  withCallingHandlers(expr, warning = function(cond) {
+    stop("glmnet did not settle while the penalised reference was generated: ",
+         conditionMessage(cond), call. = FALSE)
+  })
+}
+
+# The design is a representation rather than a table of draws: a weekly grain over a simulated
+# record, flattened, with the square of every column beside it, which is what `elasticnet()`
+# penalises over. The squares are the scale case the standardisation exists for, a reading of ten
+# degrees and its square of a hundred, and the weekly bins of one record are collinear the way
+# adjacent bins are. Both suites read the design from the fixture, so the Python side needs no
+# record simulator of its own to sit on the same numbers.
+#
+# The records come from `simulate_records()` rather than from the suite's own helper, whose units
+# differ by one number and whose weekly bins are therefore a rank-one design no coordinate
+# descent settles on.
+pen_sim <- simulate_records(n = 80L, mechanism = "lag", variables = 1L, prevalence = 0.35,
+                            auc = 0.8, days = 70L, step_hours = 6, seed = 20260918L, draw = 3L)
+pen_x <- .design(grain_matrix(pen_sim$readings, unit, time, reading, grain = "week"),
+                 squares = TRUE)
+pen_x[] <- round(pen_x, 6)
+PEN_N <- nrow(pen_x)
+PEN_P <- ncol(pen_x)
+pen_units <- rownames(pen_x)
+pen_y_binomial <- as.numeric(pen_sim$y[, 1L])
+# The continuous case is the driver the response was generated from, which is a real function of
+# the record rather than a second draw beside it.
+pen_y_gaussian <- round(as.numeric(pen_sim$driver[, 1L]), 6)
+set.seed(20260918L)
+pen_w <- round(stats::runif(PEN_N, 0.3, 3), 6)
+pen_fold <- sample(rep_len(0:4, PEN_N))
+
+# The column names carry the bin and the channel each predictor came from, which is what says the
+# design is a representation and not a matrix of numbers.
+pen_input <- data.frame(unit = pen_units, stringsAsFactors = FALSE)
+for (j in seq_len(PEN_P)) pen_input[[colnames(pen_x)[j]]] <- sprintf("%.12g", pen_x[, j])
+pen_input$y_gaussian <- sprintf("%.12g", pen_y_gaussian)
+pen_input$y_binomial <- pen_y_binomial
+pen_input$w <- sprintf("%.12g", pen_w)
+pen_input$fold <- pen_fold
+write_fixture(pen_input, "penalised_input.csv")
+
+PEN_CASES <- do.call(rbind, lapply(c("gaussian", "binomial"), function(family) {
+  do.call(rbind, lapply(c(1, 0.5, 0), function(alpha) {
+    do.call(rbind, lapply(c(FALSE, TRUE), function(weighted) {
+      data.frame(case = sprintf("%s_a%02d_%s", family, round(alpha * 10),
+                                if (weighted) "weighted" else "flat"),
+                 family = family, alpha = alpha, weighted = weighted,
+                 stringsAsFactors = FALSE)
+    }))
+  }))
+}))
+
+pen_path_rows <- list()
+pen_cv_rows <- list()
+for (i in seq_len(nrow(PEN_CASES))) {
+  row <- PEN_CASES[i, ]
+  y <- if (row$family == "binomial") pen_y_binomial else pen_y_gaussian
+  w <- if (row$weighted) pen_w else rep(1, PEN_N)
+  fit <- settled(glmnet::glmnet(pen_x, y, family = row$family, alpha = row$alpha, weights = w,
+                                control = list(thresh = PEN_THRESH, maxit = PEN_MAXIT)))
+  beta <- as.matrix(fit$beta)
+  # The path's first point is left out. glmnet fits it at a penalty of 9.9e35 and reports it
+  # under the largest penalty that leaves every coefficient at zero, which is the same fit for
+  # any mixing above zero and is not the same fit for a ridge, where nothing is ever exactly
+  # zero. The core solves that point, so a ridge disagrees with glmnet there by construction.
+  points <- unique(c(seq(2L, length(fit$lambda), by = 10L), length(fit$lambda)))
+  pen_path_rows[[i]] <- data.frame(
+    case = row$case, point = points,
+    lambda = sprintf("%.12g", fit$lambda[points]),
+    a0 = sprintf("%.12g", as.numeric(fit$a0)[points]),
+    objective = sprintf("%.12g", vapply(points, function(k)
+      pen_objective(pen_x, y, w, row$family, row$alpha, fit$lambda[k], fit$a0[k], beta[, k]),
+      numeric(1L))),
+    matrix(sprintf("%.12g", beta[, points]), nrow = length(points), byrow = TRUE,
+           dimnames = list(NULL, paste0("b", seq_len(PEN_P)))),
+    stringsAsFactors = FALSE)
+  cv <- settled(glmnet::cv.glmnet(pen_x, y, family = row$family, alpha = row$alpha, weights = w,
+                                  foldid = pen_fold + 1L, type.measure = "deviance",
+                                  control = list(thresh = PEN_THRESH, maxit = PEN_MAXIT)))
+  pen_cv_rows[[i]] <- data.frame(
+    case = row$case, n_point = length(fit$lambda),
+    lambda_min = sprintf("%.12g", cv$lambda.min), lambda_1se = sprintf("%.12g", cv$lambda.1se),
+    index_min = which(cv$lambda == cv$lambda.min), index_1se = which(cv$lambda == cv$lambda.1se),
+    cv_min = sprintf("%.12g", min(cv$cvm)),
+    cv_sd_min = sprintf("%.12g", cv$cvsd[which.min(cv$cvm)]),
+    stringsAsFactors = FALSE)
+}
+
+write_fixture(
+  data.frame(PEN_CASES[, c("case", "family", "alpha", "weighted")],
+             thresh = sprintf("%.12g", PEN_THRESH), max_pass = sprintf("%.12g", PEN_MAXIT),
+             tolerance = 1e-4, objective_tolerance = 1e-6, stringsAsFactors = FALSE),
+  "penalised_cases.csv"
+)
+write_fixture(do.call(rbind, pen_path_rows), "penalised_path.csv")
+write_fixture(do.call(rbind, pen_cv_rows), "penalised_cv.csv")
+
+cat("wrote", nrow(PEN_CASES), "penalised cases,",
+    nrow(do.call(rbind, pen_path_rows)), "reference coefficients\n")

@@ -6,6 +6,7 @@ import importlib.util
 
 import numpy as np
 import pytest
+from dataclasses import replace
 
 from timesift.control import train_control
 from timesift.learners import (Learner, elasticnet, fit_learner, flatten, forest, stepwise,
@@ -140,30 +141,38 @@ def test_a_separated_or_unsettled_fit_is_refused_rather_than_returned():
     assert fit is not None and np.isfinite(fit["aic"])
 
 
-@needs_sklearn
-def test_the_penalised_fit_uses_the_mixing_it_was_given_and_a_standardised_design():
+def test_the_penalised_fit_uses_the_mixing_it_was_given():
     x, y = planted(n_unit=30, days=28, seed=41)
+    sparsity = {}
     for alpha in (0.2, 0.9):
         model = fit_learner(elasticnet(alpha=alpha, n_inner=3), x, y).model
-        scaler, penalised = model["models"][0][0], model["models"][0][-1]
-        assert float(np.asarray(penalised.l1_ratio_).ravel()[0]) == alpha
-
-        # The scaler travels with the fit, so new units are mapped through the centre and the
-        # spread the model was fitted at rather than through their own.
-        design = scaler.transform(_design(x, model["squares"]))
-        assert np.allclose(design.mean(axis=0), 0, atol=1e-8)
-        assert np.allclose(design.std(axis=0), 1, atol=1e-8)
+        fit = model["models"][0]
+        at = int(np.argmin(np.abs(fit["lambda_"] - fit["lambda_min"])))
+        sparsity[alpha] = int(fit["df"][at])
+    # A mixing nearer the lasso shrinks more coefficients all the way to zero.
+    assert sparsity[0.9] < sparsity[0.2]
 
 
-@needs_sklearn
+def test_the_penalised_design_is_standardised_so_a_columns_scale_does_not_reach_the_fit():
+    x, y = planted(n_unit=30, days=28, seed=41)
+    fit = fit_learner(elasticnet(n_inner=3), x, y)
+    # The same record with one bin recorded on a different scale. A penalty that is one number
+    # over every column would cost that column a thousandth of what it costs the others if the
+    # design were not standardised.
+    rescaled = replace(x, values=x.values.copy())
+    rescaled.values[:, 0, 0] *= 1000.0
+    other = fit_learner(elasticnet(n_inner=3), rescaled, y)
+    assert other.predict(rescaled) == pytest.approx(fit.predict(x), abs=1e-6)
+
+
 def test_the_inner_folds_spread_a_rare_outcome_and_one_too_rare_to_choose_a_penalty_on_is_named():
     from timesift.learners import _inner_fittable, _inner_folds
     # Five presences over five inner folds: a plain deal puts two in one fold about four draws in
     # five, the stratified one puts one in each.
     yj = np.r_[np.ones(5), np.zeros(45)]
-    cv = _inner_folds(yj, 5, 11)
-    assert sorted(int(yj[test].sum()) for _, test in cv) == [1] * 5
-    assert _inner_fittable(yj, cv)
+    fold = _inner_folds(yj, 5, 11)
+    assert sorted(int(yj[fold == k].sum()) for k in np.unique(fold)) == [1] * 5
+    assert _inner_fittable(yj, fold)
     two = np.r_[np.ones(2), np.zeros(48)]
     assert not _inner_fittable(two, _inner_folds(two, 5, 11))
 
@@ -174,7 +183,6 @@ def test_the_inner_folds_spread_a_rare_outcome_and_one_too_rare_to_choose_a_pena
     assert np.allclose(fit.predict(x)[:, 1], 2 / 50)
 
 
-@needs_sklearn
 def test_a_setting_given_at_fit_time_overrides_the_one_the_learner_carries():
     x, y = planted(n_unit=24, days=28)
     overridden = fit_learner(elasticnet(), x, y, squares=False)
@@ -183,7 +191,6 @@ def test_a_setting_given_at_fit_time_overrides_the_one_the_learner_carries():
     assert np.allclose(overridden.predict(x), built.predict(x))
 
 
-@needs_sklearn
 def test_the_settings_a_learner_carries_are_the_ones_it_reports():
     learner = elasticnet(alpha=0.25, n_inner=3)
     assert learner.params["alpha"] == 0.25

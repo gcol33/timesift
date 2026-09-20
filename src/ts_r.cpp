@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "ts_core.h"
+#include "ts_penalised.h"
 
 namespace {
 
@@ -257,4 +258,122 @@ cpp11::doubles ts_year_phase_(cpp11::doubles bin_start, cpp11::doubles bin_end) 
     out[static_cast<R_xlen_t>(n + i)] = year_cos[i];
   }
   return out;
+}
+
+// The penalised fit, from the same core the Python side calls. The design arrives as the
+// column-major buffer an R matrix already is, so nothing is copied to reach the descent.
+namespace {
+
+timesift::PenaltySpec penalty_spec(double alpha, int n_lambda, double lambda_min_ratio,
+                                   cpp11::sexp lambda, double thresh, bool standardize,
+                                   bool intercept, double max_pass) {
+  timesift::PenaltySpec spec;
+  spec.alpha = alpha;
+  spec.n_lambda = n_lambda;
+  spec.lambda_min_ratio = lambda_min_ratio;
+  spec.thresh = thresh;
+  spec.max_pass = static_cast<int>(max_pass);
+  spec.standardize = standardize;
+  spec.intercept = intercept;
+  if (lambda != R_NilValue) {
+    cpp11::doubles given(lambda);
+    for (R_xlen_t i = 0; i < given.size(); ++i) spec.lambda.push_back(given[i]);
+  }
+  return spec;
+}
+
+cpp11::writable::doubles give(const std::vector<double>& from) {
+  cpp11::writable::doubles out(static_cast<R_xlen_t>(from.size()));
+  for (std::size_t i = 0; i < from.size(); ++i) out[static_cast<R_xlen_t>(i)] = from[i];
+  return out;
+}
+
+cpp11::writable::integers give(const std::vector<std::int32_t>& from) {
+  cpp11::writable::integers out(static_cast<R_xlen_t>(from.size()));
+  for (std::size_t i = 0; i < from.size(); ++i) out[static_cast<R_xlen_t>(i)] = from[i];
+  return out;
+}
+
+cpp11::writable::list give(const timesift::PenaltyPath& path) {
+  using namespace cpp11::literals;
+  return cpp11::writable::list({
+    "lambda"_nm = give(path.lambda),
+    "a0"_nm = give(path.a0),
+    "beta"_nm = give(path.beta),
+    "df"_nm = give(path.df),
+    "dev_ratio"_nm = give(path.dev_ratio),
+    "null_deviance"_nm = cpp11::as_sexp(path.null_deviance),
+    "passes"_nm = cpp11::as_sexp(path.passes),
+    "n_column"_nm = cpp11::as_sexp(static_cast<int>(path.n_column)),
+    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(path.family)))
+  });
+}
+
+timesift::PenaltyPath take(cpp11::doubles lambda, cpp11::doubles a0, cpp11::doubles beta,
+                           const std::string& family) {
+  timesift::PenaltyPath path;
+  path.family = timesift::family_from_name(family);
+  for (R_xlen_t i = 0; i < lambda.size(); ++i) path.lambda.push_back(lambda[i]);
+  for (R_xlen_t i = 0; i < a0.size(); ++i) path.a0.push_back(a0[i]);
+  for (R_xlen_t i = 0; i < beta.size(); ++i) path.beta.push_back(beta[i]);
+  path.n_column = path.lambda.empty() ? 0 : path.beta.size() / path.lambda.size();
+  return path;
+}
+
+}  // namespace
+
+[[cpp11::register]]
+cpp11::list ts_penalised_path_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                               std::string family, double alpha, int n_lambda,
+                               double lambda_min_ratio, cpp11::sexp lambda, double thresh,
+                               bool standardize, bool intercept, double max_pass) {
+  const timesift::PenaltySpec spec = penalty_spec(alpha, n_lambda, lambda_min_ratio, lambda,
+                                                  thresh, standardize, intercept, max_pass);
+  const timesift::PenaltyPath path =
+      timesift::penalised_path(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
+                               static_cast<std::size_t>(p), timesift::family_from_name(family),
+                               spec);
+  return give(path);
+}
+
+[[cpp11::register]]
+cpp11::list ts_penalised_cv_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                             std::string family, double alpha, int n_lambda,
+                             double lambda_min_ratio, cpp11::sexp lambda, double thresh,
+                             bool standardize, bool intercept, cpp11::integers fold, int n_fold,
+                             double max_pass) {
+  const timesift::PenaltySpec spec = penalty_spec(alpha, n_lambda, lambda_min_ratio, lambda,
+                                                  thresh, standardize, intercept, max_pass);
+  std::vector<std::int32_t> which(static_cast<std::size_t>(n));
+  for (int i = 0; i < n; ++i) which[static_cast<std::size_t>(i)] = fold[i];
+  const timesift::PenaltyCV cv =
+      timesift::penalised_cv(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
+                             static_cast<std::size_t>(p), timesift::family_from_name(family),
+                             spec, which.data(), n_fold);
+  using namespace cpp11::literals;
+  cpp11::writable::list out = give(cv.path);
+  out.push_back("cv_mean"_nm = give(cv.cv_mean));
+  out.push_back("cv_sd"_nm = give(cv.cv_sd));
+  out.push_back("index_min"_nm = cpp11::as_sexp(static_cast<int>(cv.index_min) + 1));
+  out.push_back("index_1se"_nm = cpp11::as_sexp(static_cast<int>(cv.index_1se) + 1));
+  return out;
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_penalised_predict_(cpp11::doubles lambda, cpp11::doubles a0,
+                                     cpp11::doubles beta, std::string family, double at,
+                                     cpp11::doubles newx, int n) {
+  const timesift::PenaltyPath path = take(lambda, a0, beta, family);
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::penalised_predict(path, at, REAL_RO(newx.data()), static_cast<std::size_t>(n), out.data());
+  return give(out);
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_penalised_coef_(cpp11::doubles lambda, cpp11::doubles a0, cpp11::doubles beta,
+                                  std::string family, double at) {
+  const timesift::PenaltyPath path = take(lambda, a0, beta, family);
+  std::vector<double> coef(path.n_column + 1, 0.0);
+  timesift::penalised_coef(path, at, coef.data(), coef.data() + 1);
+  return give(coef);
 }

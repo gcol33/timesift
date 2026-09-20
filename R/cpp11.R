@@ -27,3 +27,19 @@ ts_year_fraction_ <- function(bin_start, bin_end) {
 ts_year_phase_ <- function(bin_start, bin_end) {
   .Call(`_timesift_ts_year_phase_`, bin_start, bin_end)
 }
+
+ts_penalised_path_ <- function(x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, max_pass) {
+  .Call(`_timesift_ts_penalised_path_`, x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, max_pass)
+}
+
+ts_penalised_cv_ <- function(x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, fold, n_fold, max_pass) {
+  .Call(`_timesift_ts_penalised_cv_`, x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, fold, n_fold, max_pass)
+}
+
+ts_penalised_predict_ <- function(lambda, a0, beta, family, at, newx, n) {
+  .Call(`_timesift_ts_penalised_predict_`, lambda, a0, beta, family, at, newx, n)
+}
+
+ts_penalised_coef_ <- function(lambda, a0, beta, family, at) {
+  .Call(`_timesift_ts_penalised_coef_`, lambda, a0, beta, family, at)
+}

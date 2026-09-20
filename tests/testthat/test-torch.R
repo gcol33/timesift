@@ -241,7 +241,6 @@ test_that("the run's control trains the encoder and the encoder's own control ov
 })
 
 test_that("a learner with no training settings of its own is never handed a control", {
-  skip_if_not_installed("glmnet")
   sim <- sim_series(n_unit = 30L, days = 40L, seed = 89L)
   y <- sim_response(sim, n_var = 1L, seed = 90L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")

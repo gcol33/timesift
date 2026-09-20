@@ -18,7 +18,6 @@ slow_signal <- function(n_unit = 60L, days = 168L, noise = 20, seed = 71L) {
 }
 
 test_that("a signal buried in hourly noise is found once the record is averaged", {
-  skip_if_not_installed("glmnet")
   sim <- slow_signal()
   sign <- rep(c(1, -1), length.out = 8L)
   y <- matrix(stats::rbinom(length(sim$warmth) * 8L, 1L,
@@ -37,7 +36,6 @@ test_that("a signal buried in hourly noise is found once the record is averaged"
 })
 
 test_that("a response with no cause in the record scores at chance", {
-  skip_if_not_installed("glmnet")
   sim <- slow_signal(seed = 72L)
   set.seed(73)
   y <- matrix(stats::rbinom(length(sim$units) * 3L, 1L, 0.35), ncol = 3L,
@@ -54,7 +52,6 @@ test_that("a response with no cause in the record scores at chance", {
 })
 
 test_that("keeping the extremes of a grain recovers what averaging removed", {
-  skip_if_not_installed("glmnet")
   # Units differ in how cold one day of each week is, and the other six days carry exactly the
   # compensating warmth, so every week has the same mean whatever the unit. The grain mean is then
   # blind to the difference by construction and the grain's coldest day is not.

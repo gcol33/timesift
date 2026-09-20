@@ -21,7 +21,7 @@
 #' @return A data frame of one row per grain: the estimated marginal mean difference from the
 #'   reference, its interval, and the adjusted p-value. Needs `lme4`, `lmerTest` and `emmeans`.
 #'
-#' @examplesIf all(vapply(c("glmnet", "lme4", "lmerTest", "emmeans"), requireNamespace, logical(1), quietly = TRUE))
+#' @examplesIf all(vapply(c("lme4", "lmerTest", "emmeans"), requireNamespace, logical(1), quietly = TRUE))
 #' \donttest{
 #' set.seed(1)
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)

@@ -25,7 +25,6 @@ test_that("occlusion needs the fits the ladder was told to keep", {
 })
 
 test_that("the bin a signal was planted in is the bin the profile weights", {
-  skip_if_not_installed("glmnet")
   sim <- planted_series()
   y <- matrix(stats::rbinom(length(sim$warmth) * 2L, 1L,
                             stats::plogis(3 * c(sim$warmth, -sim$warmth))),
@@ -43,7 +42,6 @@ test_that("the bin a signal was planted in is the bin the profile weights", {
 })
 
 test_that("every substitute runs and reports the same parts", {
-  skip_if_not_installed("glmnet")
   sim <- planted_series(n_unit = 40L, seed = 62L)
   y <- matrix(stats::rbinom(length(sim$warmth) * 2L, 1L,
                             stats::plogis(3 * c(sim$warmth, -sim$warmth))),
@@ -60,7 +58,6 @@ test_that("every substitute runs and reports the same parts", {
 })
 
 test_that("the profile is read by the metric the fit was scored under", {
-  skip_if_not_installed("glmnet")
   sim <- planted_series(n_unit = 40L, seed = 64L)
   y <- matrix(stats::rbinom(length(sim$warmth) * 2L, 1L,
                             stats::plogis(3 * c(sim$warmth, -sim$warmth))),
@@ -93,7 +90,6 @@ test_that("the profile is read by the metric the fit was scored under", {
 })
 
 test_that("holding a channel back asks what the statistic carries", {
-  skip_if_not_installed("glmnet")
   sim <- planted_series(n_unit = 40L, seed = 63L)
   y <- matrix(stats::rbinom(length(sim$warmth) * 2L, 1L,
                             stats::plogis(3 * c(sim$warmth, -sim$warmth))),

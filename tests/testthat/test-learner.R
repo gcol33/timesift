@@ -73,7 +73,6 @@ test_that("a scaler is computed on what it is given and applied to something els
 })
 
 test_that("the penalised learner fits, predicts and refuses a different representation", {
-  skip_if_not_installed("glmnet")
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 31L)
   y <- sim_response(sim, n_var = 2L, seed = 32L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
@@ -86,7 +85,6 @@ test_that("the penalised learner fits, predicts and refuses a different represen
 })
 
 test_that("the inner folds spread a rare outcome, and one too rare to choose a penalty on is named", {
-  skip_if_not_installed("glmnet")
   # Five presences over five inner folds: a plain deal puts two in one fold about four draws in
   # five, the stratified one puts one in each.
   yj <- c(rep(1, 5L), rep(0, 45L))
@@ -100,8 +98,8 @@ test_that("the inner folds spread a rare outcome, and one too rare to choose a p
   units <- dimnames(x)[[1L]]
   y <- cbind(common = rep(c(1, 0), 25L), rare = c(1, 1, rep(0, 48L)))
   rownames(y) <- units
-  # The common response carries no signal, and glmnet may warn that the far end of its path did
-  # not converge. What is asserted is that the rare response no longer stops the fit.
+  # The common response carries no signal, so the far end of its path is nearly flat. What is
+  # asserted is that the rare response no longer stops the fit.
   fit <- suppressWarnings(fit_learner(elasticnet(), x, y))
   expect_identical(fit$model$unfitted, "rare")
   p <- stats::predict(fit, x)
@@ -149,12 +147,11 @@ test_that("a column holding one value is not offered to the forward search", {
 })
 
 test_that("the penalised learner reports what its fitter refuses instead of a constant", {
-  skip_if_not_installed("glmnet")
   sim <- sim_series(n_unit = 40L, days = 60L, seed = 39L)
   y <- sim_response(sim, n_var = 1L, seed = 40L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "month")
-  # One inner fold cannot be cross-validated over, and that is glmnet's to say. Swallowed, it
-  # would have come back as a constant predictor and been scored and stacked as a candidate.
+  # One inner fold cannot be cross-validated over, and the fit says so. Swallowed, it would have
+  # come back as a constant predictor and been scored and stacked as a candidate.
   expect_error(fit_learner(elasticnet(n_inner = 1L), x, y))
 })
 
@@ -251,7 +248,6 @@ test_that("an architecture constructor carries architecture and its training set
 })
 
 test_that("a setting given at fit time overrides the one a linear learner carries", {
-  skip_if_not_installed("glmnet")
   sim <- sim_series(n_unit = 40L, days = 40L, seed = 43L)
   y <- sim_response(sim, n_var = 1L, seed = 44L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
@@ -263,7 +259,6 @@ test_that("a setting given at fit time overrides the one a linear learner carrie
 })
 
 test_that("predicting a single unit returns one row and not one column", {
-  skip_if_not_installed("glmnet")
   sim <- sim_series(n_unit = 24L, days = 40L)
   y <- sim_response(sim, n_var = 3L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
@@ -281,7 +276,6 @@ test_that("predicting a single unit returns one row and not one column", {
 })
 
 test_that("the per-response learners fit the family the response head's loss names", {
-  skip_if_not_installed("glmnet")
   skip_if_not_installed("ranger")
   local_response("continuous_test", list(
     prepare = function(y) .as_response(y), activation = "identity",
@@ -405,8 +399,7 @@ test_that("a fit read back through its reference keeps the settings held at NULL
   expect_equal(stats::predict(again, case$x), stats::predict(fit, case$x))
 })
 
-test_that("the penalised learner refuses a design of one column rather than surfacing glmnet's", {
-  skip_if_not_installed("glmnet")
+test_that("the penalised learner refuses a design of one column in its own words", {
   sim <- sim_series(n_unit = 20L, days = 40L, seed = 61L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "year")
   y <- sim_response(sim, n_var = 2L, seed = 62L)
@@ -470,16 +463,14 @@ test_that("the head owns what a rare response weighs", {
 })
 
 test_that("every shipped learner fits a rare response under the head's weight", {
-  skip_if_not_installed("glmnet")
   skip_if_not_installed("ranger")
   head <- .responses_reg$get("presence_absence")
   local_response("unweighted_test", head[setdiff(names(head), "weights")])
   sim <- sim_series(n_unit = 60L, days = 28L, seed = 71L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
   # A rare response drawn on the warmth, so every learner has a signal to read and none of them
-  # a column that separates it, which the forward search refuses. Enough presences that glmnet
-  # sees eight of a class in every inner fold; its warning below that is a verdict on the
-  # fixture rather than on the weights.
+  # a column that separates it, which the forward search refuses. Enough presences that every
+  # inner fold of the penalised arm holds some of each outcome.
   set.seed(72)
   present <- stats::rbinom(60L, 1L, stats::plogis(3 * sim$warmth - 1.5)) == 1
   stopifnot(sum(present) >= 15L, sum(present) <= 30L)

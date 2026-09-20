@@ -12,7 +12,7 @@
 #'
 #' @return The summary table the plot is drawn from, invisibly.
 #'
-#' @examplesIf requireNamespace("glmnet", quietly = TRUE)
+#' @examples
 #' set.seed(1)
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
 #' units <- sprintf("p%02d", 1:60)

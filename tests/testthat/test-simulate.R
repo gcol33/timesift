@@ -114,7 +114,6 @@ test_that("the offset carries the response only when it is asked to", {
 })
 
 test_that("a learner finds the planted grain end to end", {
-  skip_if_not_installed("glmnet")
   sim <- simulate_records(n = 300L, mechanism = "event", variables = 4L, days = 120L,
                           auc = 0.9, sensor_sd = 0.05, seed = 13L)
   x <- grain_matrix(sim$readings, unit, time, reading, grain = c("day", "year"), stats = "mean")

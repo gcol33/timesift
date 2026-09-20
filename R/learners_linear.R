@@ -20,13 +20,24 @@
 #' fair opponent for a network: a per-fold discrete selector pays selection variance a network
 #' never pays, so beating that one is not a matched result.
 #'
+#' The path is fitted by the same core the Python package calls, so the two return the same
+#' coefficients for the same input. Its conventions are glmnet's, which is what the arm is
+#' measured against: weights normalised to sum to one, columns centred and scaled by their
+#' weighted mean and weighted standard deviation, a hundred penalties down from the smallest that
+#' leaves every coefficient at zero, and the held-out deviance read fold by fold.
+#'
 #' @param data A representation the learner is pinned to, or `NULL` to run across every
 #'   representation of the run.
 #' @param alpha Elastic-net mixing, `1` lasso and `0` ridge.
 #' @param n_inner Folds of the inner cross-validation that chooses the penalty.
 #' @param squares Add the square of every column, giving the same quadratic capacity a
 #'   second-order polynomial term would.
-#' @param s Which penalty of the inner path to predict at.
+#' @param s Which penalty of the inner path to predict at: `"lambda.min"`, `"lambda.1se"`, or a
+#'   penalty of its own, which is interpolated between the two points of the path around it.
+#' @param n_lambda Points of the penalty path.
+#' @param thresh Where the coordinate descent stops, read off the largest coefficient move of a
+#'   pass. The default leaves the fit as close to the optimum as glmnet's own default does; a
+#'   looser one is faster and a tighter one costs time roughly in proportion.
 #' @param seed Seed for the inner cross-validation's fold draw, which is random and would otherwise
 #'   make the fit irreproducible.
 #'
@@ -37,13 +48,14 @@
 #'
 #' @export
 elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s = "lambda.min",
-                       seed = 1L) {
+                       n_lambda = 100L, thresh = 1e-8, seed = 1L) {
   learner(
     name = "elasticnet",
     data = data, reads = "tabular", multi = "separate",
-    needs = "glmnet",
-    params = list(alpha = alpha, n_inner = n_inner, squares = squares, s = s, seed = seed),
-    fit = function(x, y, alpha, n_inner, squares, s, seed, head, group = NULL, ...) {
+    params = list(alpha = alpha, n_inner = n_inner, squares = squares, s = s,
+                  n_lambda = n_lambda, thresh = thresh, seed = seed),
+    fit = function(x, y, alpha, n_inner, squares, s, n_lambda, thresh, seed, head, group = NULL,
+                   ...) {
       family <- .head_family(head)
       m <- .design(x, squares)
       if (ncol(m) < 2L) {
@@ -60,16 +72,16 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
         if (length(unique(yj)) < 2L) {
           return(mean(yj))
         }
-        # The inner folds are dealt here rather than by cv.glmnet, so a grouping the outer folds
-        # keep whole stays whole where the penalty is chosen, and a rare outcome is spread over
-        # them rather than left to a plain deal.
+        # The inner folds are dealt here rather than inside the path, so a grouping the outer
+        # folds keep whole stays whole where the penalty is chosen, and a rare outcome is spread
+        # over them rather than left to a plain deal.
         inner <- .inner_folds(yj, n_inner, seeds[j], group)
         if (identical(family, "binomial") && !.inner_fittable(yj, inner)) {
           return(mean(yj))
         }
-        set.seed(seeds[j])
-        glmnet::cv.glmnet(m, yj, family = family, alpha = alpha, weights = weights[, j],
-                          foldid = inner, type.measure = "deviance")
+        labels <- sort(unique(inner))
+        .penalised_cv(m, yj, weights[, j], family, alpha, match(inner, labels) - 1L,
+                      length(labels), n_lambda = n_lambda, thresh = thresh)
       })
       unfitted <- colnames(y)[vapply(models, is.numeric, logical(1L))]
       list(models = models, squares = squares, s = s, columns = colnames(m),
@@ -79,7 +91,7 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
       m <- .design(x, model$squares)
       .as_predictions(vapply(model$models, function(f) {
         if (is.numeric(f)) rep(f, nrow(m))
-        else as.numeric(stats::predict(f, m, s = model$s, type = "response"))
+        else .penalised_predict(f, m, model$s)
       }, numeric(nrow(m))), nrow(m))
     }
   )

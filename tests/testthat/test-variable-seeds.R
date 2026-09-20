@@ -24,7 +24,6 @@ test_that("a response with no name falls back to its position", {
 # would be the same number for every response and a seed read off a shared stream would make a
 # response's fit depend on the responses fitted before it.
 test_that("a penalised fit of one response is the same fitted alone or beside others", {
-  skip_if_not_installed("glmnet")
   sim <- sim_series(n_unit = 60L, days = 60L)
   y <- sim_response(sim, n_var = 4L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")

@@ -157,7 +157,7 @@
 #' @seealso [grain_ladder()] for the grid this selects from, and [paired_contrast()] for the
 #'   comparison the `contrast` element holds.
 #'
-#' @examplesIf requireNamespace("glmnet", quietly = TRUE)
+#' @examples
 #' set.seed(1)
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
 #' units <- sprintf("p%02d", 1:60)
@@ -370,7 +370,7 @@ summary.timesift_selection <- function(object, ...) {
 #'
 #' @return The table of inner scores the plot is drawn from, invisibly.
 #'
-#' @examplesIf requireNamespace("glmnet", quietly = TRUE)
+#' @examples
 #' set.seed(1)
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
 #' units <- sprintf("p%02d", 1:60)

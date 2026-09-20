@@ -1,3 +1,37 @@
+# timesift 0.3.0
+
+## Changed
+
+* `elasticnet()` is one implementation in both languages. The elastic net is now
+  `src/ts_penalised.cpp`, compiled into the R package and into the Python extension beside the
+  binning, in place of `glmnet::cv.glmnet()` on one side and scikit-learn's
+  `LogisticRegressionCV` on the other. Those were different algorithms: a different optimiser, a
+  different parametrisation of the penalty, ten penalty values against a hundred, and different
+  conventions for standardisation, so the same call returned different coefficients in the two
+  languages. The penalised arm is what the networks are measured against, which made it the
+  worst place for the twin to diverge. `glmnet` and `scikit-learn` drop out of the learner's
+  `needs`; `scikit-learn` is still what `forest()` fits on (#76).
+* The core's conventions are glmnet's, and the replacement was held to reproducing it rather than
+  to being an elastic net of its own. At a matched convergence threshold of `1e-14` the path's
+  length and its penalties agree exactly, the cross-validated `lambda.min` and `lambda.1se` are
+  the same point of the same path in all twelve fixture cases, and the penalised objective sits
+  between `3e-13` and `2e-7` of glmnet's. Coefficients agree to `2e-6` where no two columns are
+  collinear and to `1e-4` on the collinear fixture design, where the split between two nearly
+  identical columns is not determined to the precision the fit is.
+  `inst/spec/representation.md` states all of it, and
+  `inst/spec/fixtures/penalised_*.csv` hold glmnet's own numbers for both suites to assert
+  against.
+* `elasticnet()` gains `n_lambda` and `thresh`, and `s` now reads on the Python side too: the
+  whole penalty path is kept on both, so `"lambda.1se"` or a penalty of a caller's own naming a
+  point between two of the path's is read the way `predict(s =)` reads one.
+* A fitted penalised model is arrays rather than a fitter's object, so it round trips through
+  `saveRDS()` and `pickle` and predicts on a machine that has neither `glmnet` nor
+  `scikit-learn`.
+* The reproduction's elastic-net row, 0.686 against the published 0.687, was read under glmnet and
+  is untested under the shared core. The prior is that it does not move: the core picks the same
+  penalty as `cv.glmnet` in all twelve fixture cases, well inside the 0.002 the driver compares
+  at. `inst/reproduce/schrankogel.R --stages=baseline` against the deposit settles it.
+
 # timesift 0.2.0
 
 ## Changed

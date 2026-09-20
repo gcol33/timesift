@@ -158,7 +158,6 @@ test_that("the plot returns what it drew", {
 })
 
 test_that("a ladder on which nothing was scorable reports no level rather than failing", {
-  skip_if_not_installed("glmnet")
   sim <- sim_series(n_unit = 24L, days = 40L)
   y <- sim_response(sim)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("week", "month"))
@@ -238,7 +237,6 @@ test_that("score_predictions() refuses a prediction that is not a number on a sc
 })
 
 test_that("learners arrive as a character vector of registered names, as the docs say", {
-  skip_if_not_installed("glmnet")
   skip_if_not_installed("ranger")
   f <- ladder_fixture()
   x <- timesift_set(list(week = f$x$week))

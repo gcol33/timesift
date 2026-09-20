@@ -103,7 +103,7 @@
 #'
 #' @seealso [build_representation()] for the array a candidate reads, [fold_map()] for the splits.
 #'
-#' @examplesIf requireNamespace("glmnet", quietly = TRUE)
+#' @examples
 #' set.seed(1)
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 90)
 #' units <- sprintf("p%02d", 1:30)

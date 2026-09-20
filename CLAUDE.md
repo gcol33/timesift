@@ -56,6 +56,7 @@ copy still matched. The project directory is the repository, and there is one co
 timesift/
   src/                the shared core, compiled into both languages
     ts_core.h ts_calendar.cpp ts_core.cpp
+    ts_penalised.h ts_penalised.cpp
     ts_r.cpp          the cpp11 wrapper; cpp11.cpp is generated
   R/                  R package source
   tests/testthat/     including helper-oracle.R, the pure-R implementation
@@ -77,16 +78,21 @@ timesift/
 ## The contract between the two languages
 
 `grain_matrix()` in R and `grain_matrix()` in Python must return the **same numbers** for the
-same input, and so must `lookback_matrix()`. This is not a nicety: the whole claim of the package
-is that the grain is what matters, so two implementations that bin differently would make the tool
-the confound.
+same input, and so must `lookback_matrix()` and `elasticnet()`. This is not a nicety: the whole
+claim of the package is that the grain is what matters, so two implementations that bin
+differently would make the tool the confound, and the penalised arm is what the networks are
+measured against.
 
 `inst/spec/representation.md` is the normative description. `inst/spec/fixtures/` holds a small
 input series and the digests of every grain-by-statistic combination. Both test suites read those
 fixtures and assert against the same digests. A change to binning that is not reflected in the
 fixtures is a bug in whichever language changed.
 
-Models cannot be byte-identical across torch and libtorch and are not required to be.
+The penalised fit is pinned as a distance rather than as a digest: two coordinate descents settle
+at the same point to the tolerance they are run at and no closer. `penalised_cases.csv`,
+`penalised_path.csv` and `penalised_cv.csv` hold glmnet's own coefficients, objective and chosen
+penalty, and both suites assert against them. Neural models cannot be byte-identical across torch
+and libtorch and are not required to be.
 
 ## API
 
@@ -176,6 +182,11 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   resolves the columns and the zone above it and wraps the result below it, and that is all either
   holds. A calendar bug fixed in one place is fixed in both, which is the whole reason it is there:
   the four it replaced each existed twice.
+- **So is the penalised fit.** `src/ts_penalised.cpp` is the elastic net both `elasticnet()`s call:
+  iteratively reweighted least squares with a cyclic coordinate descent inside it, along a warm-
+  started path, under glmnet's conventions. It is the arm the networks are measured against, so a
+  baseline that moved between the languages would make the tool the confound in the other
+  direction. The folds are dealt above it and handed over; nothing inside it draws.
 - **The pure-R and pure-NumPy implementations are kept as test oracles**, never reachable at
   runtime. The NumPy one was written from the spec rather than from the R source, so it is the
   evidence that the spec is complete; one shared binary would otherwise make the agreement between
@@ -203,16 +214,16 @@ to do with neural networks.
 
 ## Status
 
-Version 0.2.0. Not on CRAN or PyPI yet. The version went down at the rename: 0.1.0 was a first
+Version 0.3.0. Not on CRAN or PyPI yet. The version went down at the rename: 0.1.0 was a first
 release under a new name and a general contract, not a fourth release of `climgrain`. `DESCRIPTION`
 is where the string is written and `pyproject.toml` reads it from there, so a bump is one edit.
 
 The build order is done on both sides: the representation and the fixtures, the lookback, the fold
-map and the scorable-cell mask, the ladder and its plot, the learner registry, the torch learners,
-the stack, and above them the paired contrast, the mixed-model grain contrast, the occlusion
-profile and the inflation of a self-selected threshold. The Python side carries the same except the
-mixed model, and reproduces every one of the 257 representation digests, 29 of which pin a zone
-other than UTC.
+map and the scorable-cell mask, the ladder and its plot, the learner registry, the penalised fit,
+the torch learners, the stack, and above them the paired contrast, the mixed-model grain contrast,
+the occlusion profile and the inflation of a self-selected threshold. The Python side carries the
+same except the mixed model, and reproduces every one of the 257 representation digests, 29 of
+which pin a zone other than UTC, and every one of the 12 penalised cases.
 
 Both sides run on one C++ core. The implementations that used to be compared are kept as oracles
 the suites check the core against. The last section of `inst/spec/representation.md` says what each
@@ -234,9 +245,14 @@ every step. Verified against the deposit on 2026-09-02, matching the paper exact
 | elastic net on the 188 aggregates | 0.687 | 0.686 |
 
 The elastic net sits 0.001 low because the two runs seed the inner cross-validation's random fold
-draw differently; nothing else in the table carries randomness. The stepwise arm and the network
-grid have not been rerun here: forward selection over 188 columns is many hours single-threaded,
-and the encoders want the graphics processor they had in the study.
+draw differently; nothing else in the table carries randomness. That row was read under glmnet and
+is untested under the shared core, which landed after it. The prior is that it does not move: the
+core picks the same `lambda.min` and `lambda.1se` as `cv.glmnet` in all twelve fixture cases and
+its coefficients agree to 1e-4 on a collinear design, both well inside the 0.002 the driver
+compares at. Rerunning `inst/reproduce/schrankogel.R --stages=baseline` against the deposit settles
+it. The stepwise arm and the network grid have not been rerun here either: forward selection over
+188 columns is many hours single-threaded, and the encoders want the graphics processor they had
+in the study.
 
 ## Related
 

@@ -202,7 +202,6 @@ smaller training sets.
 }
 
 \examples{
-\dontshow{if (requireNamespace("glmnet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 set.seed(1)
 t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
 units <- sprintf("p\%02d", 1:60)
@@ -218,7 +217,7 @@ sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), inner = 3,
                     verbose = FALSE)
 sel
 sel$estimate
-\dontshow{\}) # examplesIf}
+
 }
 \references{
 Bates, S., Hastie, T. and Tibshirani, R. (2024). Cross-validation: what does it

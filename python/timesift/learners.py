@@ -626,21 +626,23 @@ def rescnn(data=None, channels=(32, 64, 128, 256), blocks_per_stage=2, kernel=7,
 # matrix is put back together, so the difference between them is the model and nothing else. A
 # response with one outcome among the fitting units has no model to fit and is predicted its own
 # share, which is the level a fitted model would collapse to.
-def _inner_folds(yj: np.ndarray, v: int, seed: int, group=None) -> list:
-    """Inner folds for a fit that chooses a setting by cross-validation inside itself, as the
-    (train, test) pairs scikit-learn takes: dealt for one response under the fit's own seed, over
-    the groups where the outer map carries a grouping, and stratified on the response, so a rare
-    outcome is spread over the inner folds as evenly as its count allows."""
+def _inner_folds(yj: np.ndarray, v: int, seed: int, group=None) -> np.ndarray:
+    """Inner folds for a fit that chooses a setting by cross-validation inside itself: one 0-based
+    fold index per unit, dealt for one response under the fit's own seed, over the groups where
+    the outer map carries a grouping, and stratified on the response, so a rare outcome is spread
+    over the inner folds as evenly as its count allows."""
     from .response import _deal_response
     fold = _deal_response(yj, v, seed, None if group is None else list(group))
-    return [(np.flatnonzero(fold != k), np.flatnonzero(fold == k)) for k in np.unique(fold)]
+    labels = np.unique(fold)
+    return np.searchsorted(labels, fold).astype(np.int32)
 
 
-def _inner_fittable(yj: np.ndarray, cv: list) -> bool:
+def _inner_fittable(yj: np.ndarray, fold: np.ndarray) -> bool:
     """Whether every inner training set of a presence-absence response holds at least two of each
     outcome, the fewest a logistic path is fitted to. A response short of that has too few of one
     outcome to choose a penalty on."""
-    return all((yj[train] == 1).sum() >= 2 and (yj[train] == 0).sum() >= 2 for train, _ in cv)
+    return all((yj[fold != k] == 1).sum() >= 2 and (yj[fold != k] == 0).sum() >= 2
+               for k in np.unique(fold))
 
 
 def _fit_columns(m: np.ndarray, y: np.ndarray, make, seeds, weights) -> list:
@@ -678,7 +680,8 @@ def _design(x: TimesiftMatrix, squares: bool) -> np.ndarray:
     return np.hstack([m, m ** 2]) if squares else m
 
 
-def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, seed=1) -> Learner:
+def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, s="lambda.min", n_lambda=100,
+               thresh=1e-8, seed=1) -> Learner:
     """One penalised regression per variable, over every bin-by-channel column and, by default,
     their squares, with the penalty chosen by an inner cross-validation on the fitting units.
 
@@ -688,64 +691,53 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, seed=1) -> Learner
     one, and so are the case weights, :func:`~timesift.response.positive_weights` under
     presence-absence, which every learner that ships fits under.
 
-    The design is standardised before it is penalised, as it is on the R side, so a column is
-    not penalised for the scale it was recorded on. The penalty itself is the one the inner
-    cross-validation refits at; where R takes a named point of the path through ``s``,
-    scikit-learn keeps only that one, so there is nothing to name here.
+    The path is fitted by the same core the R package calls, so the two return the same
+    coefficients for the same input. Its conventions are glmnet's, which is what the arm is
+    measured against: weights normalised to sum to one, columns centred and scaled by their
+    weighted mean and weighted standard deviation, a hundred penalties down from the smallest
+    that leaves every coefficient at zero, and the held-out deviance read fold by fold. ``s`` is
+    where the fit is read: ``"lambda.min"``, ``"lambda.1se"``, or a penalty of its own, which is
+    interpolated between the two points of the path around it.
 
     The inner folds are dealt for each response and stratified on it, so a rare outcome is spread
     over them as evenly as its count allows. A presence-absence response whose inner training
-    sets cannot each hold two of each outcome, the fewest a logistic path is fitted to, has too few
-    of one outcome to choose a penalty on. It is predicted its share among the fitting units, as a
-    response holding one outcome is, and the fit names every such response in ``unfitted``.
+    sets cannot each hold two of each outcome, the fewest a logistic path is fitted to, has too
+    few of one outcome to choose a penalty on. It is predicted its share among the fitting units,
+    as a response holding one outcome is, and the fit names every such response in ``unfitted``.
     """
     return Learner(name="elasticnet", fit=_elasticnet_fit, predict=_elasticnet_predict,
-                   needs=("sklearn",), data=data, reads="tabular", multi="separate",
-                   params=dict(alpha=alpha, n_inner=n_inner, squares=squares,
-                               seed=seed))
+                   data=data, reads="tabular", multi="separate",
+                   params=dict(alpha=alpha, n_inner=n_inner, squares=squares, s=s,
+                               n_lambda=n_lambda, thresh=thresh, seed=seed))
 
 
-def _elasticnet_fit(x, y, alpha, n_inner, squares, seed, head, variables, group=None, **_):
-    from sklearn.linear_model import ElasticNetCV, LogisticRegressionCV
-    from sklearn.pipeline import make_pipeline
-    from sklearn.preprocessing import StandardScaler
+def _elasticnet_fit(x, y, alpha, n_inner, squares, s, n_lambda, thresh, seed, head, variables,
+                    group=None, **_):
+    from .penalised import penalised_cv
     family = _family(head)
     m = _design(x, squares)
 
-    # The penalty is one number over every column, so what it costs a column depends on that
-    # column's scale: unstandardised, the squares of hourly temperatures are penalised as if they
-    # were a different predictor from the readings themselves. Standardising is what glmnet does
-    # by default on the R side, and the scaler travels with the fit so new units are mapped
-    # through the centre and the spread the model was fitted at rather than through their own.
-    # The inner folds are dealt here rather than by scikit-learn, so a grouping the outer folds
+    # The inner folds are dealt here rather than inside the path, so a grouping the outer folds
     # keep whole stays whole where the penalty is chosen, and a rare outcome is spread over them
     # rather than left to a plain deal.
     def make(design, yj, seed_j, w):
-        cv = _inner_folds(yj, n_inner, seed_j, group)
-        if family == "binomial" and not _inner_fittable(yj, cv):
+        fold = _inner_folds(yj, n_inner, seed_j, group)
+        if family == "binomial" and not _inner_fittable(yj, fold):
             return float(yj.mean())
-        # The penalty is chosen on the held-out log loss, the binary cross-entropy the head fits
-        # toward and the deviance cv.glmnet chooses by on the R side. Accuracy, scikit-learn's
-        # default, is a step function of the penalty, and the point it picks moves with the fold
-        # draw by orders of magnitude.
-        if family == "binomial":
-            return make_pipeline(StandardScaler(), LogisticRegressionCV(
-                Cs=10, cv=cv, solver="saga", l1_ratios=[alpha], max_iter=5000,
-                scoring="neg_log_loss", random_state=seed_j)).fit(
-                    design, yj, logisticregressioncv__sample_weight=w)
-        return make_pipeline(StandardScaler(),
-                             ElasticNetCV(l1_ratio=alpha, cv=cv, max_iter=5000,
-                                          random_state=seed_j)).fit(
-                                              design, yj, elasticnetcv__sample_weight=w)
+        return penalised_cv(design, yj, w, family, alpha, fold, int(fold.max()) + 1,
+                            n_lambda=n_lambda, thresh=thresh)
 
     models = _fit_columns(m, y, make, _variable_seeds(seed, variables), _head_weights(head, y))
-    return dict(models=models, squares=squares, n_col=m.shape[1], family=family,
+    return dict(models=models, squares=squares, s=s, n_col=m.shape[1], family=family,
                 unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)])
 
 
 def _elasticnet_predict(model, x):
-    return _predict_columns(model["models"], _design(x, model["squares"]), model["n_col"],
-                            model["family"])
+    from .penalised import penalised_predict
+    m = _design(x, model["squares"])
+    return np.column_stack([
+        np.full(m.shape[0], f) if isinstance(f, float) else penalised_predict(f, m, model["s"])
+        for f in model["models"]])
 
 
 def forest(data=None, trees=500, mtry=None, min_node=1, seed=1) -> Learner:
