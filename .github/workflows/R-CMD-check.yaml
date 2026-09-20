@@ -44,16 +44,27 @@ jobs:
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
 
+      # CRAN's macOS builder compresses some of its binaries with zstd, which pak refuses to
+      # extract, and it stops there rather than reaching for the source package, so a dependency
+      # served that way ends the job before anything of ours is compiled (r-lib/pkgdepends#485).
+      # Base R reads the format, so that platform installs its dependencies with it. Naming the
+      # affected packages as `?source` instead does not work: pak drops the parameter where the
+      # package is also reached as somebody else's dependency.
       - uses: r-lib/actions/setup-r-dependencies@v2
+        if: runner.os != 'macOS'
         with:
-          # CRAN's macOS builder compresses some of its binaries with zstd, a format pak cannot
-          # extract, so a dependency served that way stops the job before anything of ours is
-          # compiled (r-lib/pkgdepends#485). The two it serves that way today are built from
-          # source there instead.
-          extra-packages: >-
-            any::rcmdcheck${{ runner.os == 'macOS' &&
-            ', standard::knitr?source, standard::xfun?source' || '' }}
+          extra-packages: any::rcmdcheck
           needs: check
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          lib <- Sys.getenv("R_LIBS_USER")
+          dir.create(lib, recursive = TRUE, showWarnings = FALSE)
+          .libPaths(c(lib, .libPaths()))
+          install.packages(c("remotes", "rcmdcheck"))
+          remotes::install_deps(dependencies = TRUE)
+        shell: Rscript {0}
 
       # glmnet, lme4, lmerTest and emmeans arrive with the suggested dependencies above, so the
       # vignettes are built here rather than skipped as they are locally.
