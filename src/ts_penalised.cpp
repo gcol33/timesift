@@ -69,6 +69,28 @@ double total(const double* a, std::size_t n) {
   return s;
 }
 
+// The maps the descent lives on beside the inner products: a case's own arithmetic, over every
+// case. Two cases are written per turn of the loop, which is what lets the compiler issue the two
+// as one at the optimisation R builds a package at; each case is still the expression it was, in
+// the order it was, so the numbers are the ones a case-at-a-time loop gives.
+void add_scaled(double* out, const double* a, double b, std::size_t n) {
+  std::size_t i = 0;
+  for (; i + 2 <= n; i += 2) {
+    out[i] += b * a[i];
+    out[i + 1] += b * a[i + 1];
+  }
+  for (; i < n; ++i) out[i] += b * a[i];
+}
+
+void add_scaled3(double* out, const double* a, const double* c, double b, std::size_t n) {
+  std::size_t i = 0;
+  for (; i + 2 <= n; i += 2) {
+    out[i] += b * a[i] * c[i];
+    out[i + 1] += b * a[i + 1] * c[i + 1];
+  }
+  for (; i < n; ++i) out[i] += b * a[i] * c[i];
+}
+
 double log1pexp(double x) {
   if (x > 0.0) return x + std::log1p(std::exp(-x));
   return std::log1p(std::exp(x));
@@ -160,8 +182,9 @@ Design build_design(const double* x, const double* w_in, std::size_t n, std::siz
 }
 
 // The state a warm start carries from one penalty to the next: the coefficients on the
-// standardised scale, which columns the descent may move at this penalty, and which have ever
-// left zero.
+// standardised scale, which columns the descent has been offered, and which have ever left zero.
+// Both sets only grow along the path, so a column offered at one penalty is offered at every
+// penalty below it.
 struct Coefs {
   double a0 = 0.0;
   std::vector<double> b;
@@ -203,9 +226,7 @@ double quadratic_solve(const Design& d, double lambda, double alpha, bool interc
     const double delta = bj - fit.b[j];
     if (delta == 0.0) return;
     fit.b[j] = bj;
-    double* res = r.data();
-    const double* weight = v.data();
-    for (std::size_t i = 0; i < n; ++i) res[i] -= delta * weight[i] * col[i];
+    add_scaled3(r.data(), v.data(), col, -delta, n);
     dlx = std::max(dlx, xv[j] * delta * delta);
     if (!fit.ever[j]) {
       fit.ever[j] = 1;
@@ -218,7 +239,7 @@ double quadratic_solve(const Design& d, double lambda, double alpha, bool interc
     const double delta = total(r.data(), n) / sv;
     if (delta == 0.0) return;
     fit.a0 += delta;
-    for (std::size_t i = 0; i < n; ++i) r[i] -= delta * v[i];
+    add_scaled(r.data(), v.data(), -delta, n);
     dlx = std::max(dlx, sv * delta * delta);
   };
 
@@ -234,9 +255,7 @@ double quadratic_solve(const Design& d, double lambda, double alpha, bool interc
     // offered set is swept again only to see whether a column outside them has started to move.
     for (;;) {
       double inner = 0.0;
-      for (std::size_t k = 0; k < fit.active.size(); ++k) {
-        if (fit.offered[fit.active[k]]) step(fit.active[k], inner);
-      }
+      for (std::size_t k = 0; k < fit.active.size(); ++k) step(fit.active[k], inner);
       shift(inner);
       if (--budget < 0) throw Error("a penalised fit did not settle inside its pass budget.");
       if (inner < thresh) break;
@@ -252,9 +271,7 @@ void linear_predictor(const Design& d, const Coefs& fit, std::vector<double>& et
     const std::size_t j = fit.active[k];
     const double bj = fit.b[j];
     if (bj == 0.0) continue;
-    const double* col = d.column(j);
-    double* out = eta.data();
-    for (std::size_t i = 0; i < n; ++i) out[i] += bj * col[i];
+    add_scaled(eta.data(), d.column(j), bj, n);
   }
 }
 
@@ -457,33 +474,38 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
     }
   };
 
+  if (family == Family::binomial) reweight();
+
   for (std::size_t k = 0; k < path.size(); ++k) {
     const double lambda = path[k];
 
     // The residual is rebuilt from the coefficients at every penalty rather than carried forward,
     // because a residual updated in place along a hundred warm starts drifts from the one those
-    // coefficients imply.
+    // coefficients imply. A binomial fit ends every penalty on a reweighting, which is that same
+    // rebuild off the same coefficients, so it is read once before the path and carried by those.
     if (family == Family::gaussian) {
       linear_predictor(d, fit, eta);
       for (std::size_t i = 0; i < n; ++i) r[i] = d.w[i] * (yt[i] - eta[i]);
-    } else {
-      reweight();
     }
 
     // Tibshirani's sequential strong rule: a column whose gradient at the penalty just fitted is
     // further than one step of the path from the threshold is offered to the descent, and the
     // rest are left out. It is a screen rather than a decision, and whatever it discards is
     // tested against the optimality condition below and taken back where it was wrong.
-    gradient();
+    //
+    // The screen only ever adds, so a column already offered stays offered and is not tested
+    // again. What that buys is the gradient: the only columns the rule reads are the ones the
+    // optimality test at the penalty just fitted read as well, so `grad` is current where it is
+    // needed and the path costs one sweep over the columns rather than two.
     const double bound = spec.alpha * (2.0 * lambda - previous_lambda);
-    std::fill(fit.offered.begin(), fit.offered.end(), 0);
-    fit.candidates.clear();
-    for (std::size_t k2 = 0; k2 < fit.active.size(); ++k2) fit.offer(fit.active[k2]);
+    const std::size_t offered_before = fit.candidates.size();
     for (std::size_t j = 0; j < p; ++j) {
       if (!d.usable[j] || fit.offered[j]) continue;
       if (!(d.vp[j] > 0.0) || std::fabs(grad[j]) > d.vp[j] * bound) fit.offer(j);
     }
-    std::sort(fit.candidates.begin(), fit.candidates.end());
+    if (fit.candidates.size() != offered_before) {
+      std::sort(fit.candidates.begin(), fit.candidates.end());
+    }
 
     for (;;) {
       if (family == Family::gaussian) {
@@ -508,7 +530,8 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
       bool recovered = false;
       for (std::size_t j = 0; j < p; ++j) {
         if (!d.usable[j] || fit.offered[j]) continue;
-        if (std::fabs(dot(r.data(), d.column(j), n)) > d.vp[j] * spec.alpha * lambda) {
+        grad[j] = dot(r.data(), d.column(j), n);
+        if (std::fabs(grad[j]) > d.vp[j] * spec.alpha * lambda) {
           fit.offer(j);
           recovered = true;
         }
@@ -521,7 +544,9 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
       }
     }
 
-    linear_predictor(d, fit, eta);
+    // A binomial fit leaves the loop on a reweighting, which read the linear predictor off the
+    // same coefficients; a Gaussian one leaves it on a descent, and has to read it here.
+    if (family == Family::gaussian) linear_predictor(d, fit, eta);
     std::int32_t nonzero = 0;
     for (std::size_t j = 0; j < p; ++j) {
       if (fit.b[j] != 0.0) ++nonzero;
@@ -599,8 +624,7 @@ void penalised_predict(const PenaltyPath& path, double lambda, const double* x, 
   for (std::size_t i = 0; i < n; ++i) out[i] = a0;
   for (std::size_t j = 0; j < p; ++j) {
     if (beta[j] == 0.0) continue;
-    const double* col = x + j * n;
-    for (std::size_t i = 0; i < n; ++i) out[i] += beta[j] * col[i];
+    add_scaled(out, x + j * n, beta[j], n);
   }
   if (path.family == Family::binomial) {
     for (std::size_t i = 0; i < n; ++i) {
