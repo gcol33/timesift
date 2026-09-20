@@ -204,12 +204,9 @@ struct Coefs {
 // coordinate descent. `v` is the weight of the quadratic and `r` its residual already multiplied
 // by that weight, so a case the family has pinned carries a gradient and no curvature, which is
 // what glmnet does with a fitted probability at zero or one.
-// Returns the largest move of its first sweep, which is what says whether the reweighting that
-// set `v` and `r` had anything left to do: a reweighting whose first sweep moves nothing is a
-// fixed point of the reweighted least squares, and that is the test the step is judged on.
-double quadratic_solve(const Design& d, double lambda, double alpha, bool intercept,
-                       double thresh, int& budget, const std::vector<double>& v,
-                       const std::vector<double>& xv, std::vector<double>& r, Coefs& fit) {
+void quadratic_solve(const Design& d, double lambda, double alpha, bool intercept, double thresh,
+                     int& budget, const std::vector<double>& v, const std::vector<double>& xv,
+                     std::vector<double>& r, Coefs& fit) {
   const std::size_t n = d.n;
   const double sv = total(v.data(), n);
 
@@ -243,12 +240,10 @@ double quadratic_solve(const Design& d, double lambda, double alpha, bool interc
     dlx = std::max(dlx, sv * delta * delta);
   };
 
-  double first = -1.0;
   for (;;) {
     double dlx = 0.0;
     for (std::size_t k = 0; k < fit.candidates.size(); ++k) step(fit.candidates[k], dlx);
     shift(dlx);
-    if (first < 0.0) first = dlx;
     if (--budget < 0) throw Error("a penalised fit did not settle inside its pass budget.");
     if (dlx < thresh) break;
     // The columns that have left zero are then cycled on their own until they settle, and the
@@ -261,7 +256,6 @@ double quadratic_solve(const Design& d, double lambda, double alpha, bool interc
       if (inner < thresh) break;
     }
   }
-  return first;
 }
 
 void linear_predictor(const Design& d, const Coefs& fit, std::vector<double>& eta) {
@@ -372,6 +366,10 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
   }
 
   std::vector<double> v(n), r(n), xv(p, 0.0), eta(n, 0.0), grad(p, 0.0);
+  // The coefficients a reweighted least squares step started from, which is what it is judged on.
+  // A column outside the active set is at zero and has never been written here, so a column that
+  // leaves zero inside a step is read against the zero it started at.
+  std::vector<double> started(p, 0.0);
   Coefs fit;
   fit.b.assign(p, 0.0);
   fit.ever.assign(p, 0);
@@ -511,18 +509,32 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
       if (family == Family::gaussian) {
         quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r, fit);
       } else {
+        // A reweighted least squares is settled when a step of it moves nothing, and what that is
+        // read on is the step's own move: the coefficients it started from against the ones it
+        // reached, over the columns that have left zero and over the intercept, on the same scale
+        // the descent inside it stops at. Reading it instead on what a further step finds to do
+        // costs a whole step -- a reweighting, a curvature and a sweep over every column offered
+        // -- at every penalty, to learn that there was nothing.
         for (int it = 0;; ++it) {
-          reweight();
-          curvature();
-          if (quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r,
-                              fit) < tolerance) {
-            break;
+          const double started_at = fit.a0;
+          for (std::size_t k2 = 0; k2 < fit.active.size(); ++k2) {
+            started[fit.active[k2]] = fit.b[fit.active[k2]];
           }
+          curvature();
+          quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r, fit);
+          reweight();
+          const double shift = fit.a0 - started_at;
+          double moved = total(v.data(), n) * shift * shift;
+          for (std::size_t k2 = 0; k2 < fit.active.size(); ++k2) {
+            const std::size_t j = fit.active[k2];
+            const double delta = fit.b[j] - started[j];
+            moved = std::max(moved, xv[j] * delta * delta);
+          }
+          if (moved < tolerance) break;
           if (it + 1 >= spec.max_irls) {
             throw Error("a binomial penalised fit did not settle at one penalty.");
           }
         }
-        reweight();
       }
 
       // What the screen left out, tested: a column outside the offered set whose gradient is over
