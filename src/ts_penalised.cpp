@@ -100,20 +100,28 @@ double log1pexp(double x) {
 // weighted standard deviation, so a penalty that is one number over every column costs a column
 // the same whatever it was recorded on. A column holding one value has no spread to divide by and
 // is carried through at zero.
+//
+// A Gaussian fit's quadratic weight is the case weight, which does not move along the path, so its
+// root is folded into every column and into the intercept's own column: the quadratic then has
+// unit weight, and a coordinate's step reads the column and the residual and nothing beside them.
+// A binomial fit's weight moves with every reweighting, and its columns are the standardised ones
+// with an intercept column of ones.
 struct Design {
   std::size_t n = 0;
   std::size_t p = 0;
+  bool folded = false;
   std::vector<double> xt;            // [n, p] column-major
   std::vector<double> centre, scale;
   std::vector<std::uint8_t> usable;
   std::vector<double> vp;            // penalty factor, rescaled to sum to p
   std::vector<double> w;             // case weights, summing to one
+  std::vector<double> lead;          // the intercept's column
 
   const double* column(std::size_t j) const { return xt.data() + j * n; }
 };
 
 Design build_design(const double* x, const double* w_in, std::size_t n, std::size_t p,
-                    const PenaltySpec& spec) {
+                    const PenaltySpec& spec, bool folded) {
   Design d;
   d.n = n;
   d.p = p;
@@ -129,6 +137,11 @@ Design build_design(const double* x, const double* w_in, std::size_t n, std::siz
   }
   if (!(total > 0.0)) throw Error("a penalised fit was handed case weights that sum to zero.");
   for (std::size_t i = 0; i < n; ++i) d.w[i] /= total;
+  d.folded = folded;
+  d.lead.assign(n, 1.0);
+  if (folded) {
+    for (std::size_t i = 0; i < n; ++i) d.lead[i] = std::sqrt(d.w[i]);
+  }
 
   d.xt.assign(n * p, 0.0);
   d.centre.assign(p, 0.0);
@@ -156,6 +169,9 @@ Design build_design(const double* x, const double* w_in, std::size_t n, std::siz
     d.scale[j] = spec.standardize ? spread : 1.0;
     double* out = d.xt.data() + j * n;
     for (std::size_t i = 0; i < n; ++i) out[i] = (col[i] - centre) / d.scale[j];
+    if (folded) {
+      for (std::size_t i = 0; i < n; ++i) out[i] *= d.lead[i];
+    }
   }
 
   d.vp.assign(p, 1.0);
@@ -203,12 +219,15 @@ struct Coefs {
 // One weighted least squares elastic net over the columns the caller has offered, by cyclic
 // coordinate descent. `v` is the weight of the quadratic and `r` its residual already multiplied
 // by that weight, so a case the family has pinned carries a gradient and no curvature, which is
-// what glmnet does with a fitted probability at zero or one.
+// what glmnet does with a fitted probability at zero or one. A folded design carries its weight in
+// its columns, and `v` is not read.
 void quadratic_solve(const Design& d, double lambda, double alpha, bool intercept, double thresh,
                      int& budget, const std::vector<double>& v, const std::vector<double>& xv,
                      std::vector<double>& r, Coefs& fit) {
   const std::size_t n = d.n;
-  const double sv = total(v.data(), n);
+  const double* lead = d.lead.data();
+  const double* lead_v = d.folded ? lead : v.data();
+  const double sv = dot(lead, lead_v, n);
 
   auto step = [&](std::size_t j, double& dlx) {
     if (!(xv[j] > 0.0)) return;
@@ -223,7 +242,11 @@ void quadratic_solve(const Design& d, double lambda, double alpha, bool intercep
     const double delta = bj - fit.b[j];
     if (delta == 0.0) return;
     fit.b[j] = bj;
-    add_scaled3(r.data(), v.data(), col, -delta, n);
+    if (d.folded) {
+      add_scaled(r.data(), col, -delta, n);
+    } else {
+      add_scaled3(r.data(), v.data(), col, -delta, n);
+    }
     dlx = std::max(dlx, xv[j] * delta * delta);
     if (!fit.ever[j]) {
       fit.ever[j] = 1;
@@ -233,10 +256,10 @@ void quadratic_solve(const Design& d, double lambda, double alpha, bool intercep
 
   auto shift = [&](double& dlx) {
     if (!intercept || !(sv > 0.0)) return;
-    const double delta = total(r.data(), n) / sv;
+    const double delta = dot(lead, r.data(), n) / sv;
     if (delta == 0.0) return;
     fit.a0 += delta;
-    add_scaled(r.data(), v.data(), -delta, n);
+    add_scaled(r.data(), lead_v, -delta, n);
     dlx = std::max(dlx, sv * delta * delta);
   };
 
@@ -258,9 +281,12 @@ void quadratic_solve(const Design& d, double lambda, double alpha, bool intercep
   }
 }
 
+// The linear predictor over the design's own columns, so on a folded design it is the predictor
+// times the root of each case weight.
 void linear_predictor(const Design& d, const Coefs& fit, std::vector<double>& eta) {
   const std::size_t n = d.n;
-  eta.assign(n, fit.a0);
+  eta.resize(n);
+  for (std::size_t i = 0; i < n; ++i) eta[i] = fit.a0 * d.lead[i];
   for (std::size_t k = 0; k < fit.active.size(); ++k) {
     const std::size_t j = fit.active[k];
     const double bj = fit.b[j];
@@ -318,7 +344,7 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
                       "nothing to penalise against.");
   }
 
-  const Design d = build_design(x, w, n, p, spec);
+  const Design d = build_design(x, w, n, p, spec, family == Family::gaussian);
   const std::size_t max_active = spec.max_active == 0 ? p : spec.max_active;
 
   // The response on the scale the descent reads it. A Gaussian response is centred and scaled the
@@ -374,15 +400,19 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
   fit.b.assign(p, 0.0);
   fit.ever.assign(p, 0);
   fit.offered.assign(p, 0);
+  // A Gaussian fit's residual is read on the folded scale, the root of each case weight times the
+  // response less the predictor, which is what the folded columns read against.
+  std::vector<double> yw;
   if (family == Family::gaussian) {
+    yw.resize(n);
     for (std::size_t i = 0; i < n; ++i) {
-      v[i] = d.w[i];
-      r[i] = d.w[i] * yt[i];
+      yw[i] = d.lead[i] * yt[i];
+      r[i] = yw[i];
     }
     // The curvature of a Gaussian fit does not move along the path, so it is read once.
     for (std::size_t j = 0; j < p; ++j) {
       if (!d.usable[j]) continue;
-      xv[j] = dot3(v.data(), d.column(j), d.column(j), n);
+      xv[j] = dot(d.column(j), d.column(j), n);
     }
   } else {
     if (spec.intercept) fit.a0 = std::log(pbar / (1.0 - pbar));
@@ -477,15 +507,6 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
   for (std::size_t k = 0; k < path.size(); ++k) {
     const double lambda = path[k];
 
-    // The residual is rebuilt from the coefficients at every penalty rather than carried forward,
-    // because a residual updated in place along a hundred warm starts drifts from the one those
-    // coefficients imply. A binomial fit ends every penalty on a reweighting, which is that same
-    // rebuild off the same coefficients, so it is read once before the path and carried by those.
-    if (family == Family::gaussian) {
-      linear_predictor(d, fit, eta);
-      for (std::size_t i = 0; i < n; ++i) r[i] = d.w[i] * (yt[i] - eta[i]);
-    }
-
     // Tibshirani's sequential strong rule: a column whose gradient at the penalty just fitted is
     // further than one step of the path from the threshold is offered to the descent, and the
     // rest are left out. It is a screen rather than a decision, and whatever it discards is
@@ -555,13 +576,19 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
       std::sort(fit.candidates.begin(), fit.candidates.end());
       if (family == Family::gaussian) {
         linear_predictor(d, fit, eta);
-        for (std::size_t i = 0; i < n; ++i) r[i] = d.w[i] * (yt[i] - eta[i]);
+        for (std::size_t i = 0; i < n; ++i) r[i] = yw[i] - eta[i];
       }
     }
 
-    // A binomial fit leaves the loop on a reweighting, which read the linear predictor off the
-    // same coefficients; a Gaussian one leaves it on a descent, and has to read it here.
-    if (family == Family::gaussian) linear_predictor(d, fit, eta);
+    // The residual is rebuilt from the coefficients at every penalty rather than carried forward,
+    // because a residual updated in place along a hundred warm starts drifts from the one those
+    // coefficients imply. A binomial fit leaves the loop above on a reweighting, which is that
+    // rebuild; a Gaussian one leaves it on a descent and is rebuilt here, once, which is what the
+    // deviance is read off and what the next penalty opens on.
+    if (family == Family::gaussian) {
+      linear_predictor(d, fit, eta);
+      for (std::size_t i = 0; i < n; ++i) r[i] = yw[i] - eta[i];
+    }
     std::int32_t nonzero = 0;
     for (std::size_t j = 0; j < p; ++j) {
       if (fit.b[j] != 0.0) ++nonzero;
@@ -570,10 +597,7 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
 
     double dev = 0.0;
     if (family == Family::gaussian) {
-      for (std::size_t i = 0; i < n; ++i) {
-        const double e = yt[i] - eta[i];
-        dev += d.w[i] * e * e;
-      }
+      dev = dot(r.data(), r.data(), n);
     } else {
       for (std::size_t i = 0; i < n; ++i) dev += d.w[i] * (yt[i] * eta[i] - log1pexp(eta[i]));
       dev *= -2.0;
