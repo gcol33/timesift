@@ -132,10 +132,14 @@ The paper's other three schemes are the same call with different `stats`: `"min"
 
 An encoder that ends in global pooling discards when a thermal event happened, so the position of
 each bin in the year is supplied as two channels. They are the time index of each bin, not a
-summary of the readings, so they add no hand-built thermal feature to the network arm.
+summary of the readings, so they add no hand-built thermal feature to the network arm. At the
+hourly rung the study's networks also read the position of each reading in the day, which is two
+more channels of the same kind.
 
 ```{r channels}
 input <- bind_channels(reported, calendar_channels(reported))
+hourly <- grain_matrix(readings, logger_ID, date, temp, grain = "native")
+hourly_input <- bind_channels(hourly, calendar_channels(hourly, cycles = c("year", "day")))
 ```
 
 ## The arms
@@ -150,11 +154,23 @@ rownames(agg) <- as.character(agg$logger_ID)
 features <- feature_matrix(as.matrix(agg[rownames(y), setdiff(names(agg), "logger_ID")]),
                            label = "aggregates")
 
-baseline <- grain_ladder(
-  features, y,
-  list(elastic_net = elasticnet(alpha = 0.5, n_inner = 5, squares = TRUE),
-       stepwise = stepwise(max_terms = 3, degree = 2)),
+elastic_net <- grain_ladder(
+  features, y, list(elastic_net = elasticnet(alpha = 0.5, n_inner = 5, squares = TRUE)),
   folds = folds, metric = "tss")
+```
+
+The study's forward selection fitted each species unweighted, where its elastic net and its
+encoders weighted each presence by the ratio of absences to presences, which is what the shipped
+presence-absence head does. The stepwise arm is fitted under a head that differs from the shipped
+one in that alone:
+
+```{r stepwise}
+register_response("presence_absence_unweighted", list(
+  prepare = function(y) y, activation = "sigmoid", loss = "binary_cross_entropy",
+  metric = "roc_auc", cells = scorable_cells))
+stepwise_arm <- grain_ladder(
+  features, y, list(stepwise = stepwise(max_terms = 3, degree = 2)),
+  folds = folds, metric = "tss", response = "presence_absence_unweighted")
 ```
 
 Both redo their predictor selection inside every fold, on the training plots only, which is the
@@ -184,17 +200,31 @@ batches of 32 plots, which the grid asks for; the default is 64.
 study <- train_control(val_frac = 0.15, early_stopping = 10L)
 ```
 
-The eleven members of the paper's ensemble are the same architectures at three widths, three kernel
-widths and three seeds, trained with weight averaging over the tail of the epoch budget:
+The eleven members of the paper's ensemble are seven convolutional and four residual networks,
+each at its own window, width, kernel, dropout and seed, trained with weight averaging over the
+tail of the epoch budget. On the window mean they read the daily, weekly and half-daily windows;
+on the coldest-day reading the half-daily and daily members move to weekly and the weekly ones to
+monthly:
 
 ```{r ensemble}
-members <- c(
-  lapply(list(c(16L, 32L, 64L, 128L), c(32L, 64L, 128L, 256L), c(16L, 32L, 64L)),
-         function(ch) cnn(channels = ch, swa = TRUE)),
-  lapply(c(5L, 7L, 9L), function(k) cnn(kernel = k, swa = TRUE)),
-  lapply(c(1L, 2L, 3L), function(s) cnn(swa = TRUE, seed = s)),
-  lapply(c(1L, 2L), function(s) rescnn(swa = TRUE, seed = s)))
-names(members) <- sprintf("m%02d", seq_along(members))
+members <- data.frame(
+  architecture = c(rep("cnn", 7), rep("rescnn", 4)),
+  window_mean = c("day", "day", "day", "day", "week", "week", "halfday", "day", "day", "day",
+                  "week"),
+  window_extremeday = c("week", "week", "week", "week", "month", "month", "week", "week", "week",
+                        "week", "month"),
+  kernel = c(7, 7, 7, 11, 7, 7, 7, 5, 7, 11, 7),
+  dropout = c(rep(0.3, 7), rep(0.2, 4)),
+  seed = c(1234, 11, 22, 33, 44, 66, 77, 88, 99, 101, 111))
+members$channels <- list(c(16, 32, 64, 128, 128), c(16, 32, 64, 128), c(32, 64, 128, 256),
+                         c(16, 32, 64, 128), c(16, 32, 64, 128), c(32, 64, 128, 256),
+                         c(16, 32, 64, 128), c(32, 64, 128, 256), c(32, 64, 128, 256),
+                         c(32, 64, 128, 256), c(32, 64, 128, 256))
+member <- function(i) {
+  arch <- if (members$architecture[i] == "cnn") cnn else rescnn
+  arch(channels = members$channels[[i]], kernel = members$kernel[i],
+       dropout = members$dropout[i], batch_size = 32, swa = TRUE, seed = members$seed[i])
+}
 ```
 
 ## The grid
@@ -203,27 +233,29 @@ The ladder is one call. Each grain is built once, the calendar channels are join
 every encoder is fitted at every rung on the one fold map and the one mask.
 
 ```{r grid}
-ladder_input <- timesift_set(lapply(binning, function(w) {
-  x <- grain_matrix(readings, logger_ID, date, temp, grain = w)
-  bind_channels(x, calendar_channels(x))
-}))
+ladder_input <- timesift_set(setNames(lapply(names(binning), function(w) {
+  x <- grain_matrix(readings, logger_ID, date, temp, grain = binning[[w]])
+  bind_channels(x, calendar_channels(x, cycles = if (w == "native") c("year", "day") else "year"))
+}), names(binning)))
 
 grid <- grain_ladder(ladder_input, y, encoders, folds = folds, metric = "tss", control = study)
 summary(grid)
 ```
 
-The ensemble is one further arm on the same rungs. Each member runs as an arm of its own, and their
+The ensemble is one further arm. Each member runs as an arm of its own at its own window, and their
 held-out predictions are averaged: a member's out-of-fold prediction on a fold is its held-out
 prediction there, so averaging the eleven and choosing a threshold afterwards is the set scored as
 one model rather than as a vote between eleven decisions.
 
 ```{r ensemble-arm}
-lad <- grain_ladder(ladder_input, y, members, folds = folds, metric = "tss", control = study)
-oof <- attr(lad, "predictions")
-arms <- paste("week", names(members), sep = "|")
-
-stack <- ensemble_fit(oof[arms], y, attr(lad, "cells"), folds, spec = ensemble("mean"))
-combined <- ensemble_combine(stack, oof[arms])
+oof <- lapply(seq_len(nrow(members)), function(i) {
+  w <- members$window_mean[i]
+  lad <- grain_ladder(ladder_input[w], y, list(m = member(i)), folds = folds, metric = "tss",
+                      control = study)
+  attr(lad, "predictions")[[1]]
+})
+stack <- ensemble_fit(oof, y, scorable_cells(y, folds), folds, spec = ensemble("mean"))
+combined <- ensemble_combine(stack, oof)
 ```
 
 `combined` is then scored on the same cells and by the same metric as every other arm, which is
@@ -320,10 +352,18 @@ rather than to the digit.
 
 The table of every grain against its architecture's best is a mixed model on the per-cell scores,
 `score ~ grain + (1 | species) + (1 | fold)` by restricted maximum likelihood, with Dunnett's
-many-to-one procedure against the reference:
+many-to-one procedure against the reference. The paper's table is in AUC, so the grid's held-out
+predictions are read under it first:
 
 ```{r contrasts}
-grain_contrasts(grid, learner = "cnn")
+grid_auc <- do.call(rbind, lapply(names(attr(grid, "predictions")), function(arm) {
+  at <- strsplit(arm, "|", fixed = TRUE)[[1]]
+  cbind(grain = at[1], learner = at[2],
+        score_predictions(y, attr(grid, "predictions")[[arm]], folds, scorable_cells(y, folds),
+                          "roc_auc"))
+}))
+grid_auc <- structure(grid_auc, class = c("timesift_ladder", "data.frame"), metric = "roc_auc")
+grain_contrasts(grid_auc, learner = "cnn", reference = "week")
 ```
 
 The design is balanced at 101 species by ten folds by seven grains, so each grain is compared

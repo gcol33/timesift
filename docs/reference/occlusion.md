@@ -104,6 +104,14 @@ mean removes all between-unit variation while keeping the shape of the
 year. Replacing the bin by each unit's own mean over the record keeps
 how warm a unit is and removes only that bin's departure from it.
 
+A bin is held back whole: a permutation moves every channel of the bin
+together, so a unit is shown another unit's week rather than a coldest
+day from one unit beside a warmest day from another. A channel that is
+the same for every unit, as
+[`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
+are, says where the bin sits rather than what a unit read there, and is
+left in place.
+
 Read with `over = "channel"` the same machinery asks what each statistic
 of a grain carries, holding one channel back across the whole record
 instead of one bin across all channels.

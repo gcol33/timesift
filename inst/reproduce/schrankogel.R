@@ -234,6 +234,36 @@ SELECTION_METRIC <- "roc_auc"
 # after ten epochs without an improvement; the package default holds no split back.
 STUDY_CONTROL <- train_control(val_frac = 0.15, early_stopping = 10L)
 
+# The study's forward selection fitted every species unweighted (baseline/06_descriptor_reselect.R
+# of the study code), where the shipped head weights each presence by the ratio of absences to
+# presences, as the study's elastic net and encoders did. The stepwise arm runs under a head that
+# differs from the shipped one in that alone.
+UNWEIGHTED <- "presence_absence_unweighted"
+register_response(UNWEIGHTED, list(prepare = function(y) y, activation = "sigmoid",
+                                   loss = "binary_cross_entropy", metric = SELECTION_METRIC,
+                                   cells = scorable_cells), overwrite = TRUE)
+
+# The eleven members of the study's ensemble (S2, the table of members): each has its own window,
+# read once as the window mean and once as the coldest day, mean and warmest day, which moves the
+# half-daily and daily members to weekly and the weekly members to monthly.
+ENSEMBLE_MEMBERS <- data.frame(
+  member = sprintf("m%02d", 1:11),
+  architecture = c(rep("cnn", 7L), rep("rescnn", 4L)),
+  window_mean = c("day", "day", "day", "day", "week", "week", "halfday", "day", "day", "day",
+                  "week"),
+  window_extremeday = c("week", "week", "week", "week", "month", "month", "week", "week", "week",
+                        "week", "month"),
+  kernel = c(7L, 7L, 7L, 11L, 7L, 7L, 7L, 5L, 7L, 11L, 7L),
+  dropout = c(rep(0.3, 7L), rep(0.2, 4L)),
+  seed = c(1234L, 11L, 22L, 33L, 44L, 66L, 77L, 88L, 99L, 101L, 111L),
+  stringsAsFactors = FALSE)
+ENSEMBLE_MEMBERS$channels <- list(c(16L, 32L, 64L, 128L, 128L), c(16L, 32L, 64L, 128L),
+                                  c(32L, 64L, 128L, 256L), c(16L, 32L, 64L, 128L),
+                                  c(16L, 32L, 64L, 128L), c(32L, 64L, 128L, 256L),
+                                  c(16L, 32L, 64L, 128L), c(32L, 64L, 128L, 256L),
+                                  c(32L, 64L, 128L, 256L), c(32L, 64L, 128L, 256L),
+                                  c(32L, 64L, 128L, 256L))
+
 # The study's candidate set: every (window, summary) pair its grid holds, 33 of them. The four
 # day-level summaries need whole days, so they are defined from the weekly window up, and the two
 # reading-level extremes from the half-daily window up; the mean is defined everywhere. Written as
@@ -290,10 +320,43 @@ REFERENCE <- list(
   series_tss = mean(REFERENCE_SPECIES$series_tss),
   margin_auc = mean(REFERENCE_SPECIES$selection_auc - REFERENCE_SPECIES$series_auc),
   margin_tss = mean(REFERENCE_SPECIES$selection_tss - REFERENCE_SPECIES$series_tss),
-  aggregates_tss = 0.687)
+  aggregates_tss = 0.687,
+  stepwise_tss = 0.662,
+  stepwise_auc = 0.844,
+  fixed_weekly_tss = 0.712,
+  fixed_weekly_auc = 0.878,
+  ensemble_mean_tss = 0.720,
+  ensemble_extremeday_tss = 0.727,
+  ensemble_extremeday_auc = 0.887)
+
+# The study's network grid on the window mean (S12, the grid table): mean AUC and mean TSS per
+# architecture and window over the 101 species, and each window's AUC against its architecture's
+# best from the mixed model (S12, the contrast table), the best window reading zero.
+REFERENCE_GRID <- data.frame(
+  learner = rep(c("mlp", "cnn", "rescnn"), each = 7L),
+  grain = rep(c("native", "halfday", "day", "week", "month", "season", "year"), 3L),
+  auc = c(0.789, 0.859, 0.859, 0.853, 0.847, 0.838, 0.815,
+          0.842, 0.858, 0.862, 0.875, 0.864, 0.852, 0.821,
+          0.858, 0.865, 0.863, 0.864, 0.860, 0.846, 0.813),
+  tss = c(0.600, 0.684, 0.685, 0.676, 0.665, 0.651, 0.618,
+          0.658, 0.682, 0.689, 0.706, 0.691, 0.670, 0.626,
+          0.681, 0.692, 0.688, 0.690, 0.686, 0.662, 0.616),
+  vs_best_auc = c(-0.071, -0.000, 0, -0.006, -0.012, -0.021, -0.044,
+                  -0.032, -0.017, -0.012, 0, -0.010, -0.023, -0.054,
+                  -0.007, 0, -0.002, -0.001, -0.005, -0.019, -0.052),
+  stringsAsFactors = FALSE)
+
+# The stepwise arm draws nothing at random, so it is held to the rounding of the published figure.
+# A network's level is held to the spread of the fixed weekly encoder, the one arm whose spread
+# over refits was measured; the other windows and architectures are assumed to spread as it does,
+# and the ensemble, an average of eleven fits, spreads less. A window's distance from its
+# architecture's best is a difference of two such levels in each run, so the two runs differ by
+# twice the spread of one, and the tolerance is three of those.
 TOLERANCE <- list(level_auc = 3 * sqrt(2) * run_sd("level_auc"),
                   level_tss = 3 * sqrt(2) * run_sd("level_tss"),
+                  vs_best_auc = 3 * 2 * run_sd("level_auc"),
                   elastic_net = 0.002,
+                  stepwise = 0.001,
                   # The share of species a run may leave outside their own three-spread band.
                   species_outside = 0.05)
 
@@ -441,25 +504,51 @@ build <- function(grain, stats) {
   x
 }
 
-# One arm's held-out predictions read under a metric other than the one it was scored by. The
-# predictions are the arm's own, so this rescores rather than refits.
+# What an encoder reads: the reading with the bin's place in the year beside it, and at the hourly
+# rung its place in the day as well, which is the five channels the study's hourly networks read.
+# The half-daily rung alternates between the two halves of the day and the study gave it no day
+# channel, so neither does this.
+with_calendar <- function(x, grain) {
+  bind_channels(x, calendar_channels(x, cycles = if (grain == "native") c("year", "day") else
+    "year"))
+}
+
+# Held-out predictions, named `<grain>|<learner>`, as a ladder scored under `metric`. The
+# predictions are the arms' own, so this rescores rather than refits: it is how an arm fitted once
+# is read under both the metric the selection is made on and the one the grid is reported in.
+ladder_under <- function(predictions, metric) {
+  rows <- lapply(names(predictions), function(arm) {
+    at <- strsplit(arm, "|", fixed = TRUE)[[1L]]
+    cbind(grain = at[1L], learner = at[2L],
+          score_predictions(y, predictions[[arm]], folds, cells, metric), stringsAsFactors = FALSE)
+  })
+  structure(do.call(rbind, rows), class = c("timesift_ladder", "data.frame"), metric = metric,
+            response = "presence_absence")
+}
+
+as_ladder <- function(rows, metric) {
+  structure(rows, class = c("timesift_ladder", "data.frame"), metric = metric,
+            response = "presence_absence")
+}
+
+# One arm's level, read the way summary() reads every level: per species first, then over species.
+level_of <- function(rows, arm) {
+  level <- summary(as_ladder(rows, METRIC_NAME))
+  hit <- level$score[paste(level$grain, level$learner, sep = "|") == arm]
+  if (length(hit)) hit[1L] else NA_real_
+}
+
 rescore <- function(ladder, arm, metric) {
-  rows <- score_predictions(y, attr(ladder, "predictions")[[arm]], folds, cells, metric)
-  mean(tapply(rows$score[!is.na(rows$score)], rows$variable[!is.na(rows$score)], mean))
+  level_of(ladder_under(attr(ladder, "predictions")[arm], metric), arm)
 }
 
 # The series arm as an arm of the metric the selection is made on, so the contrast between the two
-# is read on one metric. Its predictions are the ones the arm already made; only the reading of
-# them changes.
+# is read on one metric.
 series_ladder_auc <- function(lad) {
   if (is.null(lad)) {
     return(NULL)
   }
-  rows <- score_predictions(y, attr(lad, "predictions")[["series|elastic_net"]], folds, cells,
-                            SELECTION_METRIC)
-  structure(cbind(grain = "series", learner = "elastic_net", rows, stringsAsFactors = FALSE),
-            class = c("timesift_ladder", "data.frame"), metric = SELECTION_METRIC,
-            response = "presence_absence")
+  ladder_under(attr(lad, "predictions")["series|elastic_net"], SELECTION_METRIC)
 }
 
 series_ladder <- NULL
@@ -492,18 +581,34 @@ if ("baseline" %in% stages) {
 
     features <- feature_matrix(agg, label = "aggregates")
     say("fitting the aggregated-feature arms, selection redone inside every fold")
+    # Each arm under the head the study fitted it under: the elastic net weighted, the forward
+    # selection unweighted.
     arms <- list(
-      elastic_net = elasticnet(alpha = 0.5, n_inner = INNER_FOLDS, squares = TRUE,
-                               threads = threads, seed = CV_SEED),
-      stepwise = stepwise(max_terms = 3L, degree = 2L))[aggregated]
-    baseline <- grain_ladder(features, y, arms, folds = folds, metric = METRIC_NAME)
+      elastic_net = list(learner = elasticnet(alpha = 0.5, n_inner = INNER_FOLDS, squares = TRUE,
+                                              threads = threads, seed = CV_SEED),
+                         response = "presence_absence"),
+      stepwise = list(learner = stepwise(max_terms = 3L, degree = 2L),
+                      response = UNWEIGHTED))[aggregated]
+    ladders <- lapply(names(arms), function(a) {
+      grain_ladder(features, y, stats::setNames(list(arms[[a]]$learner), a), folds = folds,
+                   metric = METRIC_NAME, response = arms[[a]]$response)
+    })
+    names(ladders) <- names(arms)
+    baseline <- as_ladder(do.call(rbind, lapply(ladders, as.data.frame)), METRIC_NAME)
+    rownames(baseline) <- NULL
     write_out(baseline, "baseline.csv")
     print(summary(baseline))
-    level <- summary(baseline)
     if ("elastic_net" %in% aggregated) {
       compare_with("the 188 aggregates, elastic net, TSS",
-                   level$score[level$learner == "elastic_net"], REFERENCE$aggregates_tss,
+                   level_of(baseline, "aggregates|elastic_net"), REFERENCE$aggregates_tss,
                    TOLERANCE$elastic_net)
+    }
+    if ("stepwise" %in% aggregated) {
+      compare_with("the 188 aggregates, stepwise, TSS", level_of(baseline, "aggregates|stepwise"),
+                   REFERENCE$stepwise_tss, TOLERANCE$stepwise)
+      compare_with("the 188 aggregates, stepwise, AUC",
+                   rescore(ladders$stepwise, "aggregates|stepwise", SELECTION_METRIC),
+                   REFERENCE$stepwise_auc, TOLERANCE$stepwise)
     }
   }
 
@@ -548,7 +653,7 @@ if ("selection" %in% stages) {
     spec <- CANDIDATE_SUMMARIES[[summary_name]]
     for (w in intersect(spec$grains, grid_grains)) {
       x <- build(w, spec$stats)
-      parts[[paste(w, summary_name, sep = ".")]] <- bind_channels(x, calendar_channels(x))
+      parts[[paste(w, summary_name, sep = ".")]] <- with_calendar(x, w)
     }
   }
   if (identical(sort(grid_grains), sort(names(EXPECTED_BINS)))) {
@@ -610,83 +715,142 @@ if ("selection" %in% stages) {
 
 # ---- the network grid ---------------------------------------------------------------------
 
-# The member set as arms of the run, and their held-out predictions averaged into one further arm
-# per grain. A member's out-of-fold prediction on a fold is its held-out prediction there, so
-# averaging the eleven and then choosing a threshold is the set scored as one model rather than as
-# a vote between eleven decisions.
-ensemble_arm <- function(set, y, folds, members) {
-  lad <- grain_ladder(set, y, members, folds = folds, metric = METRIC_NAME,
-                      control = STUDY_CONTROL)
-  oof <- attr(lad, "predictions")
-  cells <- attr(lad, "cells")
-  combined <- lapply(names(set), function(w) {
-    arms <- paste(w, names(members), sep = "|")
-    stack <- ensemble_fit(oof[arms], y, cells, folds, spec = ensemble("mean"))
-    cbind(grain = w, learner = "ensemble",
-          score_predictions(y, ensemble_combine(stack, oof[arms]), folds, cells,
-                            METRIC_NAME), stringsAsFactors = FALSE)
-  })
-  rbind(as.data.frame(lad), do.call(rbind, combined))
+# The grid reads the record two ways: the window mean at every window, and the coldest day, mean and
+# warmest day from the weekly window up. The second reading's arms are named `<window>.extremeday`,
+# so an arm of one reading is never mistaken for the same window's arm of the other once the two
+# files are read together.
+READINGS <- list(mean = list(stats = "mean", suffix = ""),
+                 extremeday = list(stats = REPORTED_STATS, suffix = ".extremeday"))
+
+# Every input a network reads is the reading at a window with its calendar channels beside it,
+# built once however many arms read it.
+network_input <- local({
+  built <- list()
+  function(w, stats) {
+    key <- paste(w, paste(stats, collapse = "+"))
+    if (is.null(built[[key]])) {
+      built[[key]] <<- with_calendar(build(w, stats), w)
+    }
+    built[[key]]
+  }
+})
+
+ensemble_member <- function(m) {
+  arch <- if (m$architecture == "cnn") cnn else rescnn
+  arch(channels = m$channels[[1L]], kernel = m$kernel, dropout = m$dropout, epochs = epochs,
+       batch_size = 32L, swa = TRUE, seed = m$seed)
+}
+
+# The study's ensemble at one reading: each member fitted at its own window, and the members'
+# held-out probabilities averaged with equal weight into one further arm. A member's out-of-fold
+# prediction on a fold is its held-out prediction there, so averaging the eleven and then choosing
+# a threshold is the set scored as one model rather than as a vote between eleven decisions.
+ensemble_predictions <- function(reading) {
+  spec <- READINGS[[reading]]
+  windows <- ENSEMBLE_MEMBERS[[paste0("window_", reading)]]
+  predictions <- list()
+  for (i in seq_len(nrow(ENSEMBLE_MEMBERS))) {
+    m <- ENSEMBLE_MEMBERS[i, ]
+    name <- paste0(windows[i], spec$suffix)
+    say("ensemble member ", m$member, ", ", m$architecture, " at ", name)
+    lad <- grain_ladder(timesift_set(stats::setNames(list(network_input(windows[i], spec$stats)),
+                                                     name)),
+                        y, stats::setNames(list(ensemble_member(m)), m$member), folds = folds,
+                        metric = METRIC_NAME, keep_fits = FALSE, control = STUDY_CONTROL)
+    predictions[[paste(name, m$member, sep = "|")]] <- attr(lad, "predictions")[[1L]]
+  }
+  stack <- ensemble_fit(predictions, y, cells, folds, spec = ensemble("mean"))
+  predictions[[paste0("members", spec$suffix, "|ensemble")]] <- ensemble_combine(stack, predictions)
+  predictions
 }
 
 if ("networks" %in% stages) {
-  # The eleven-member set of the study spans two architectures, three widths and three seeds, and
-  # is trained with weight averaging. Members were chosen on inner-validation strength and on
-  # architectural diversity, never on the held-out folds.
-  members <- c(
-    lapply(list(c(16L, 32L, 64L, 128L), c(32L, 64L, 128L, 256L), c(16L, 32L, 64L)),
-           function(ch) cnn(channels = ch, epochs = epochs, batch_size = 32L, swa = TRUE)),
-    lapply(c(5L, 7L, 9L),
-           function(k) cnn(kernel = k, epochs = epochs, batch_size = 32L, swa = TRUE)),
-    lapply(c(1L, 2L, 3L),
-           function(sd) cnn(epochs = epochs, batch_size = 32L, swa = TRUE, seed = sd)),
-    lapply(c(1L, 2L),
-           function(sd) rescnn(epochs = epochs, batch_size = 32L, swa = TRUE, seed = sd)))
-  names(members) <- sprintf("m%02d", seq_along(members))
-
   encoders <- list(mlp = mlp(epochs = epochs),
                    cnn = cnn(epochs = epochs, batch_size = 32L),
                    rescnn = rescnn(epochs = epochs, batch_size = 32L))[intersect(grid_learners,
                                                                c("mlp", "cnn", "rescnn"))]
-  for (statistic in c("mean", "extremeday")) {
-    grains <- if (statistic == "mean") grid_grains else
+  for (reading in names(READINGS)) {
+    spec <- READINGS[[reading]]
+    grains <- if (reading == "mean") grid_grains else
       intersect(grid_grains, c("week", "month", "season", "year"))
-    if (!length(grains)) {
-      next
-    }
-    stats_used <- if (statistic == "mean") "mean" else REPORTED_STATS
-    say("network grid on the ", statistic, " reading: ", paste(grains, collapse = ", "))
-    set <- timesift_set(stats::setNames(
-      lapply(grains, function(w) {
-        x <- build(w, stats_used)
-        bind_channels(x, calendar_channels(x))
-      }), grains))
-    rows <- list()
-    if (length(encoders)) {
-      rows$encoders <- as.data.frame(
-        grain_ladder(set, y, encoders, folds = folds, metric = METRIC_NAME, keep_fits = FALSE,
-                     control = STUDY_CONTROL))
+    predictions <- list()
+    if (length(encoders) && length(grains)) {
+      say("network grid on the ", reading, " reading: ", paste(grains, collapse = ", "))
+      set <- timesift_set(stats::setNames(lapply(grains, network_input, stats = spec$stats),
+                                          paste0(grains, spec$suffix)))
+      lad <- grain_ladder(set, y, encoders, folds = folds, metric = METRIC_NAME, keep_fits = FALSE,
+                          control = STUDY_CONTROL)
+      predictions <- attr(lad, "predictions")
     }
     if ("ensemble" %in% grid_learners) {
-      rows$ensemble <- ensemble_arm(set, y, folds, members)
+      say("the eleven-member ensemble on the ", reading, " reading")
+      predictions <- c(predictions, ensemble_predictions(reading))
     }
-    grid <- structure(do.call(rbind, rows), class = c("timesift_ladder", "data.frame"),
-                      metric = METRIC_NAME, response = "presence_absence")
-    write_out(grid, paste0("networks_", statistic, ".csv"))
+    if (!length(predictions)) {
+      next
+    }
+    grid <- ladder_under(predictions, METRIC_NAME)
+    grid_auc <- ladder_under(predictions, SELECTION_METRIC)
+    write_out(grid, paste0("networks_", reading, ".csv"))
+    write_out(grid_auc, paste0("networks_", reading, "_auc.csv"))
     print(summary(grid))
+
+    if (reading == "mean") {
+      for (r in seq_len(nrow(REFERENCE_GRID))) {
+        arm <- paste(REFERENCE_GRID$grain[r], REFERENCE_GRID$learner[r], sep = "|")
+        if (arm %in% names(predictions)) {
+          compare_with(paste0("grid, ", arm, ", AUC"), level_of(grid_auc, arm),
+                       REFERENCE_GRID$auc[r], TOLERANCE$level_auc)
+          compare_with(paste0("grid, ", arm, ", TSS"), level_of(grid, arm),
+                       REFERENCE_GRID$tss[r], TOLERANCE$level_tss)
+        }
+      }
+      if ("members|ensemble" %in% names(predictions)) {
+        compare_with("ensemble, window mean, TSS", level_of(grid, "members|ensemble"),
+                     REFERENCE$ensemble_mean_tss, TOLERANCE$level_tss)
+      }
+    } else {
+      if ("week.extremeday|cnn" %in% names(predictions)) {
+        compare_with("fixed weekly coldest-day reading, AUC",
+                     level_of(grid_auc, "week.extremeday|cnn"), REFERENCE$fixed_weekly_auc,
+                     TOLERANCE$level_auc)
+        compare_with("fixed weekly coldest-day reading, TSS",
+                     level_of(grid, "week.extremeday|cnn"), REFERENCE$fixed_weekly_tss,
+                     TOLERANCE$level_tss)
+      }
+      if ("members.extremeday|ensemble" %in% names(predictions)) {
+        compare_with("ensemble, coldest-day reading, AUC",
+                     level_of(grid_auc, "members.extremeday|ensemble"),
+                     REFERENCE$ensemble_extremeday_auc, TOLERANCE$level_auc)
+        compare_with("ensemble, coldest-day reading, TSS",
+                     level_of(grid, "members.extremeday|ensemble"),
+                     REFERENCE$ensemble_extremeday_tss, TOLERANCE$level_tss)
+      }
+    }
   }
 }
 
 # ---- the contrasts every claim is made on -----------------------------------------------------
 
+# The per-cell files every level on the run's own metric is in: the aggregated-feature and series
+# arms and both readings of the network grid. The grid's AUC files hold the same arms under the
+# other metric and are read only where a comparison is made in AUC. A smoke run reads its own
+# files, as it writes them.
+LEVEL_FILES <- c("baseline", "baseline_series", "networks_mean", "networks_extremeday")
+read_levels <- function(names, metric) {
+  parts <- file.path(out_dir, paste0(if (is.null(smoke)) "" else "smoke_", names, ".csv"))
+  parts <- parts[file.exists(parts)]
+  if (!length(parts)) {
+    return(NULL)
+  }
+  as_ladder(do.call(rbind, lapply(parts, utils::read.csv, stringsAsFactors = FALSE)), metric)
+}
+
 if ("contrasts" %in% stages) {
-  parts <- list.files(out_dir, pattern = "^(baseline|networks_)", full.names = TRUE)
-  if (length(parts) < 2L) {
-    say("contrasts need at least two result files in ", out_dir, "; skipping")
+  ladder <- read_levels(LEVEL_FILES, METRIC_NAME)
+  if (is.null(ladder) || length(unique(paste(ladder$grain, ladder$learner))) < 2L) {
+    say("contrasts need at least two arms in ", out_dir, "; skipping")
   } else {
-    ladder <- do.call(rbind, lapply(parts, utils::read.csv, stringsAsFactors = FALSE))
-    ladder <- structure(ladder, class = c("timesift_ladder", "data.frame"),
-                        metric = METRIC_NAME, response = "presence_absence")
     arms <- unique(paste(ladder$grain, ladder$learner, sep = "|"))
     pairs <- utils::combn(arms, 2L, simplify = FALSE)
     out <- do.call(rbind, lapply(pairs, function(p) paired_contrast(ladder, p[1L], p[2L])))
@@ -696,19 +860,35 @@ if ("contrasts" %in% stages) {
 
 # ---- each grain against its architecture's best ----------------------------------------------
 
+# The study's table is in AUC, on the window mean, each window against the window its architecture
+# scored best at there. The same reference is taken here, so each difference is read against the
+# number the study printed beside it; whether this run's own best window is the same one is
+# reported beside the table.
 if ("grains" %in% stages) {
-  parts <- list.files(out_dir, pattern = "^networks_mean", full.names = TRUE)
-  if (!length(parts)) {
-    say("the grain contrast needs networks_mean.csv in ", out_dir, "; skipping")
+  ladder <- read_levels("networks_mean_auc", SELECTION_METRIC)
+  learners <- intersect(unique(REFERENCE_GRID$learner), unique(ladder$learner))
+  if (!length(learners)) {
+    say("the grain contrast needs networks_mean_auc.csv in ", out_dir, "; skipping")
   } else {
-    ladder <- utils::read.csv(parts[1L], stringsAsFactors = FALSE)
-    ladder <- structure(ladder, class = c("timesift_ladder", "data.frame"),
-                        metric = METRIC_NAME, response = "presence_absence")
-    out <- do.call(rbind, lapply(unique(ladder$learner), function(l)
-      grain_contrasts(ladder, learner = l)))
+    level <- summary(ladder)
+    out <- do.call(rbind, lapply(learners, function(l) {
+      ref <- REFERENCE_GRID[REFERENCE_GRID$learner == l, ]
+      reference <- ref$grain[ref$vs_best_auc == 0]
+      say(sprintf("%-38s the study's %s, this run's %s", paste0(l, " best window:"), reference,
+                  level$grain[level$learner == l & level$best]))
+      grain_contrasts(ladder, learner = l, reference = reference)
+    }))
     out$p_bh <- stats::p.adjust(out$p_value, method = "BH")
     write_out(out, "grain_contrasts.csv")
     print(out)
+    for (r in seq_len(nrow(out))) {
+      ref <- REFERENCE_GRID$vs_best_auc[REFERENCE_GRID$learner == out$learner[r] &
+                                          REFERENCE_GRID$grain == out$grain[r]]
+      if (length(ref)) {
+        compare_with(sprintf("%s, %s against %s, AUC", out$learner[r], out$grain[r],
+                             out$reference[r]), out$diff[r], ref, TOLERANCE$vs_best_auc)
+      }
+    }
   }
 }
 
@@ -722,11 +902,8 @@ if ("inflation" %in% stages) {
 
   # What a level actually read is consistent with, which is the only reading of a level that is
   # about the population rather than about the scoring rule.
-  levels_read <- list.files(out_dir, pattern = "^(baseline|networks_)", full.names = TRUE)
-  if (length(levels_read)) {
-    ladder <- do.call(rbind, lapply(levels_read, utils::read.csv, stringsAsFactors = FALSE))
-    ladder <- structure(ladder, class = c("timesift_ladder", "data.frame"),
-                        metric = METRIC_NAME, response = "presence_absence")
+  ladder <- read_levels(LEVEL_FILES, METRIC_NAME)
+  if (!is.null(ladder)) {
     reported <- summary(ladder)
     back <- implied_skill(y, folds, observed = reported$score, replicates = 500L, seed = CV_SEED)
     write_out(cbind(reported[c("learner", "grain")], back), "implied_skill.csv")

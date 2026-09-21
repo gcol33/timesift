@@ -1,3 +1,48 @@
+# timesift 0.3.1
+
+## New
+
+* `calendar_channels()` gains `cycles`. `"day"` adds `day_sin` and `day_cos`, the place of each
+  bin's midpoint in the UTC day, beside or instead of the year's pair, in the order named. It is
+  read in UTC for the reason the year is: a zone's offset and a site's longitude are the same
+  shift for every bin, where a clock's summer time would move the phase by an hour twice a year.
+  It is refused on bins a day or more apart, where every bin would sit at one place in the day.
+  One definition in the shared core serves both languages, and the fixtures pin it as they pin
+  the year's.
+
+## Fixed
+
+* `plot()` of a `select_grain()` result drew empty axes. The inner scores were matched to their
+  candidates on a label joined by a space where the candidates' was joined by a bar, so every
+  line and every circle was placed at no position. One helper now writes the label wherever a
+  selection's tables are matched, the bottom margin is sized to the longest candidate name, and
+  the table returned says where each score was drawn and which one its fold selected (#79).
+* `occlusion()` with `substitute = "permute"` permuted each channel of a held-back bin
+  separately, so a unit could be shown the coldest day of one unit beside the warmest day of
+  another, a reading no unit made. A bin is now held back whole, by one permutation per draw. A
+  channel that is the same for every unit, as the calendar channels are, is left in place when a
+  bin is held back; `unit_mean` used to replace it too, which took the bin's place in the year
+  away along with its reading (#79).
+* The Python `occlusion()` scored every cell, including the ones the scorable-cell mask leaves
+  out, so its weights could rest on cells R's did not. It now reads the mask as every score does
+  (#79).
+* `grain_contrasts()` read each grain's name back out of the contrast label emmeans writes, which
+  puts parentheses around a level holding a character it treats as an operator: a grain called
+  `month-mean` came back as `(month-mean)`. The name is now taken from the factor's levels (#79).
+* Recovery tests for `grain_contrasts()`: a planted effect per grain is recovered and its
+  intervals cover it at their stated rate over twenty seeds, and with no effect the contrast finds
+  none (#79).
+
+## The reproduction
+
+* `inst/reproduce/schrankogel.R` compares the stepwise arm and the network grid with the paper,
+  where it used to write them without a reference (#80). The stepwise arm is fitted unweighted,
+  as the study's forward selection was, under a head that differs from the shipped one in that
+  alone. The eleven-member ensemble is the study's: each member at its own window, channels,
+  kernel, dropout and seed, where the driver used to run one generic set at every window. The
+  hourly rung reads the five channels the study's hourly networks read. The grain contrast is
+  read in AUC against the window the study took as each architecture's best, as its table is.
+
 # timesift 0.3.0
 
 ## Changed

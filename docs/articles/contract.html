@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -848,6 +848,38 @@ than on the calendar, so they have no position in the year, and it
 carries no <code>bin_start</code> to read one from.</p>
 </div>
 <div class="section level3">
+<h3 id="where-a-bin-sits-in-the-day">Where a bin sits in the day<a class="anchor" aria-label="anchor" href="#where-a-bin-sits-in-the-day"></a>
+</h3>
+<p><code><a href="../reference/calendar_channels.html">calendar_channels()</a></code> takes <code>cycles</code>, the
+cycles to place each bin in, <code>year</code> by default. Naming
+<code>day</code> adds two channels, <code>day_sin</code> and
+<code>day_cos</code>, read at the same midpoint:</p>
+<pre><code>mid  = bin_start + floor((bin_end - bin_start) / 2)
+frac = (mid mod 86400) / 86400
+
+day_sin = sin(2 pi frac)
+day_cos = cos(2 pi frac)</code></pre>
+<p>with <code>mod</code> the floored remainder, so an instant before
+1970 sits at its place in its own day. The channels come two per cycle
+in the order <code>cycles</code> names them, and <code>stats</code>
+names them the same way.</p>
+<p>The day is read <strong>in UTC</strong>, as the year is. A zone moves
+the phase by its offset and a site’s longitude moves the solar day
+against UTC by a fixed amount; both are the same shift for every bin of
+a record, which a model absorbs. A local clock’s summer time would
+instead move the phase by an hour twice a year, which is a change in the
+input rather than a rotation of it.</p>
+<p>The day cycle is <strong>refused on bins that sit a day or more
+apart</strong>, read as the smallest gap between consecutive
+<code>bin_start</code>s, and on a representation of fewer than two bins,
+where no gap can be read. At a day or coarser every bin would sit at the
+same place in the day, and a constant channel is not a position. The
+half-daily grain passes and alternates between the two halves of the
+day, which is what it records. An unknown cycle name is refused. The
+fraction is pinned exactly and the two channels to the same
+<strong>1e-12</strong> as the year’s.</p>
+</div>
+<div class="section level3">
 <h3 id="putting-channels-side-by-side">Putting channels side by side<a class="anchor" aria-label="anchor" href="#putting-channels-side-by-side"></a>
 </h3>
 <p><code><a href="../reference/bind_channels.html">bind_channels()</a></code> takes two or more representations of the
@@ -1453,8 +1485,9 @@ record’s gaps are read off</td>
 <td>a channel added to an array</td>
 <td>
 <code><a href="../reference/bind_channels.html">bind_channels()</a></code>, and <code><a href="../reference/calendar_channels.html">calendar_channels()</a></code>
-for the sine and cosine of each bin’s position in the year, both as
-<strong>The channels</strong> defines them</td>
+for the sine and cosine of each bin’s position in the year and, finer
+than a day, in the day, both as <strong>The channels</strong> defines
+them</td>
 </tr>
 <tr class="even">
 <td>the penalised learner</td>
@@ -1640,6 +1673,20 @@ the one the fit was scored under, so a weight is a fall in the number
 the summary reports rather than in a second one. It reaches the response
 through the head the fit was made under, as everything else does, so a
 head that is not presence-absence is occluded like any other.</li>
+<li>An occlusion profile is read on the scorable cells alone, the mask
+of the response and the fold map, as every score is. A bin is held back
+whole: one permutation of the held-out units per draw moves every
+channel of the bin together, so no unit is shown a coldest day from one
+unit beside a warmest day from another. A channel identical across
+units, as the calendar channels are, is left in place when a bin is held
+back, since it says where the bin sits rather than what a unit read
+there; holding such a channel back across the record with
+<code>over = "channel"</code> is still asked for by name. The
+<code>fold_mean</code> and <code>unit_mean</code> substitutes draw
+nothing and are defined the same way on both sides; the
+<code>permute</code> substitute draws on each language’s own random
+stream, so its weights are the same in distribution and not draw for
+draw.</li>
 <li>The encoders take <code>swa</code> and <code>swa_start</code>: the
 schedule anneals until the averaging begins and is then held flat, the
 averaged weights get their own pass to rebuild the batch-normalisation

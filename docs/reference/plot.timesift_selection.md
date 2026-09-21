@@ -33,7 +33,9 @@ plot(x, col = NULL, ...)
 
 ## Value
 
-The table of inner scores the plot is drawn from, invisibly.
+The table of inner scores the plot is drawn from, invisibly, with `at`,
+the position of each candidate on the axis, and `selected`, whether its
+fold chose it.
 
 ## Examples
 

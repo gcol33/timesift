@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -367,12 +367,13 @@ repeats the three cases.</p>
 <h2 id="calendar_channels">
 <code>calendar_channels()</code><a class="anchor" aria-label="anchor" href="#calendar_channels"></a>
 </h2>
-<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>calendar_channels(x: TimesiftMatrix)</span></code></pre></div>
-<p>Where in the year each bin sits, as the sine and cosine of its
-fractional position.</p>
-<p>The position is read at the midpoint of the record each bin holds, on
-the Gregorian calendar in UTC. <code>inst/spec/representation.md</code>
-is the normative description.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>calendar_channels(x: TimesiftMatrix, cycles<span class="op">=</span>(<span class="st">'year'</span>,))</span></code></pre></div>
+<p>Where in the year, or the day, each bin sits, as the sine and cosine
+of its fractional position in each cycle named, in the order given.</p>
+<p>The position is read at the midpoint of the record each bin holds, in
+UTC. The day cycle reads bins that sit less than a day apart and is
+refused otherwise. <code>inst/spec/representation.md</code> is the
+normative description.</p>
 </div>
 <div class="section level2">
 <h2 id="bind_channels">

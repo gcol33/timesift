@@ -126,7 +126,7 @@ without the fitting layer.
 - [`timesift_set()`](https://gillescolling.com/timesift/reference/timesift_set.md)
   : Several built representations of the same targets
 - [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
-  : Where in the year each bin sits
+  : Where in the year, or the day, each bin sits
 - [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md)
   : Put channels side by side
 - [`feature_matrix()`](https://gillescolling.com/timesift/reference/feature_matrix.md)

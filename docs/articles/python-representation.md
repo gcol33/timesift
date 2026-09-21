@@ -259,15 +259,16 @@ repeats the three cases.
 ## `calendar_channels()`
 
 ``` python
-calendar_channels(x: TimesiftMatrix)
+calendar_channels(x: TimesiftMatrix, cycles=('year',))
 ```
 
-Where in the year each bin sits, as the sine and cosine of its
-fractional position.
+Where in the year, or the day, each bin sits, as the sine and cosine of
+its fractional position in each cycle named, in the order given.
 
-The position is read at the midpoint of the record each bin holds, on
-the Gregorian calendar in UTC. `inst/spec/representation.md` is the
-normative description.
+The position is read at the midpoint of the record each bin holds, in
+UTC. The day cycle reads bins that sit less than a day apart and is
+refused otherwise. `inst/spec/representation.md` is the normative
+description.
 
 ## `bind_channels()`
 

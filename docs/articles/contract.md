@@ -505,6 +505,39 @@ by `year_sin, year_cos`. A lookback is refused: its bins are placed
 relative to a target rather than on the calendar, so they have no
 position in the year, and it carries no `bin_start` to read one from.
 
+### Where a bin sits in the day
+
+[`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
+takes `cycles`, the cycles to place each bin in, `year` by default.
+Naming `day` adds two channels, `day_sin` and `day_cos`, read at the
+same midpoint:
+
+    mid  = bin_start + floor((bin_end - bin_start) / 2)
+    frac = (mid mod 86400) / 86400
+
+    day_sin = sin(2 pi frac)
+    day_cos = cos(2 pi frac)
+
+with `mod` the floored remainder, so an instant before 1970 sits at its
+place in its own day. The channels come two per cycle in the order
+`cycles` names them, and `stats` names them the same way.
+
+The day is read **in UTC**, as the year is. A zone moves the phase by
+its offset and a site’s longitude moves the solar day against UTC by a
+fixed amount; both are the same shift for every bin of a record, which a
+model absorbs. A local clock’s summer time would instead move the phase
+by an hour twice a year, which is a change in the input rather than a
+rotation of it.
+
+The day cycle is **refused on bins that sit a day or more apart**, read
+as the smallest gap between consecutive `bin_start`s, and on a
+representation of fewer than two bins, where no gap can be read. At a
+day or coarser every bin would sit at the same place in the day, and a
+constant channel is not a position. The half-daily grain passes and
+alternates between the two halves of the day, which is what it records.
+An unknown cycle name is refused. The fraction is pinned exactly and the
+two channels to the same **1e-12** as the year’s.
+
 ### Putting channels side by side
 
 [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md)
@@ -983,7 +1016,7 @@ the difference is recorded here rather than found at a call site.
 | an already-reduced feature table | [`feature_matrix()`](https://gillescolling.com/timesift/reference/feature_matrix.md), a one-channel array with no time axis, so a published set of aggregates can be an arm beside a grain |
 | which units reach which bins | [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md), the count of readings per unit and bin over every bin the calendar tiles the record with, which is where a refused record’s gaps are read off |
 | building one representation | [`build_representation()`](https://gillescolling.com/timesift/reference/build_representation.md) |
-| a channel added to an array | [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md), and [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md) for the sine and cosine of each bin’s position in the year, both as **The channels** defines them |
+| a channel added to an array | [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md), and [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md) for the sine and cosine of each bin’s position in the year and, finer than a day, in the day, both as **The channels** defines them |
 | the penalised learner | [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md) |
 | the forward selector | [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md) |
 | the forest | [`forest()`](https://gillescolling.com/timesift/reference/forest.md) |
@@ -1072,6 +1105,19 @@ the difference is recorded here rather than found at a call site.
   reports rather than in a second one. It reaches the response through
   the head the fit was made under, as everything else does, so a head
   that is not presence-absence is occluded like any other.
+- An occlusion profile is read on the scorable cells alone, the mask of
+  the response and the fold map, as every score is. A bin is held back
+  whole: one permutation of the held-out units per draw moves every
+  channel of the bin together, so no unit is shown a coldest day from
+  one unit beside a warmest day from another. A channel identical across
+  units, as the calendar channels are, is left in place when a bin is
+  held back, since it says where the bin sits rather than what a unit
+  read there; holding such a channel back across the record with
+  `over = "channel"` is still asked for by name. The `fold_mean` and
+  `unit_mean` substitutes draw nothing and are defined the same way on
+  both sides; the `permute` substitute draws on each language’s own
+  random stream, so its weights are the same in distribution and not
+  draw for draw.
 - The encoders take `swa` and `swa_start`: the schedule anneals until
   the averaging begins and is then held flat, the averaged weights get
   their own pass to rebuild the batch-normalisation statistics from a

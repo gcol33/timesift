@@ -25,9 +25,9 @@ map every number below was checked against, and the default.
 | `representation` | the record at all seven grains, with every bin count asserted | `representation.csv` |
 | `baseline` | the aggregated-feature arms on the deposit's 188 variables, and the penalised fit on the weekly three-channel series | `baseline.csv`, `baseline_series.csv` |
 | `selection` | the study's own procedure through `select_grain()`: 33 candidates, ten outer folds, the study's five inner folds, the convolutional encoder | `selection.csv`, `selection_inner.csv`, `selection_cells_auc.csv`, `selection_cells_tss.csv`, `selection_contrast.csv` |
-| `networks` | the encoders, and the eleven-member set, across the ladder | `networks_mean.csv`, `networks_extremeday.csv` |
+| `networks` | the encoders across the ladder, and the study's eleven-member ensemble, each under TSS and AUC | `networks_mean.csv`, `networks_extremeday.csv`, and `_auc` beside each |
 | `contrasts` | every pair of arms, paired inside each cell both scored | `contrasts.csv` |
-| `grains` | each grain against its architecture's best, from the mean-reading network grid | `grain_contrasts.csv` |
+| `grains` | each window against the window the study took as its architecture's best, in AUC on the window mean | `grain_contrasts.csv` |
 | `inflation` | what the reported levels are upper bounds on, and the level each reported score implies | `inflation.csv`, `implied_skill.csv` |
 
 The contract stage always runs, since everything downstream reads its response and its folds. The
@@ -107,14 +107,37 @@ not return the same weights.
   `rsample`.
 - `--epochs` epoch budget per network fit. Default 60, the budget the study used.
 
+## The network grid
+
+The encoders are the study's: the fully connected network at batches of 64, the two convolutional
+ones at 32, 60 epochs, early stopping on 15 percent of the fitting plots after ten epochs without
+an improvement. Every window gives them the reading with the two channels of its place in the
+year; the hourly rung adds the two of its place in the day, the five channels the study's hourly
+networks read. The coldest-day reading's arms are named `<window>.extremeday`, so the two readings'
+files can be read together without one window's arm standing in for the other's.
+
+Each network is compared with the paper's grid table, level by level, at the tolerance the fixed
+weekly encoder's spread over eleven refits gives, which is the one spread that was measured; the
+other windows and architectures are assumed to spread as it does.
+
 ## The ensemble arm
 
-Asked for with `--learners=...,ensemble`, the eleven members run as arms of their own on the same
-folds as every other arm, and one further arm per grain is the mean of their held-out predictions,
-scored on the same cells by the same metric. A member's out-of-fold prediction on a fold is its
-held-out prediction there, so averaging the eleven and choosing a threshold afterwards is the set
-scored as one model rather than as a vote between eleven decisions. All twelve arms are written, so
-a member's own level is readable beside the level the set reached.
+Asked for with `--learners=...,ensemble`, the study's eleven members run as arms of their own,
+each at its own window, channels, kernel, dropout and seed, as the paper's table of members lists
+them, and one further arm is the mean of their held-out predictions, scored on the same cells by
+the same metric. On the window mean the members read daily, weekly and half-daily windows; on the
+coldest-day reading the half-daily and daily members move to weekly and the weekly ones to
+monthly. A member's out-of-fold prediction on a fold is its held-out prediction there, so averaging
+the eleven and choosing a threshold afterwards is the set scored as one model rather than as a
+vote between eleven decisions. All twelve arms are written, so a member's own level is readable
+beside the level the set reached.
+
+## The stepwise arm
+
+The study's forward selection fitted each species unweighted, where its elastic net and its
+encoders weighted each presence by the ratio of absences to presences. `--baseline=stepwise` fits
+under a head registered in the script that differs from the shipped one in that alone. It draws
+nothing at random, so it is held to the rounding of the published 0.662.
 
 ## What it asserts before fitting anything
 

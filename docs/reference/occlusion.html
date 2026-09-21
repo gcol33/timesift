@@ -31,7 +31,7 @@ produced the reported scores rather than a fresh set of them."><style>
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -181,6 +181,10 @@ and cuts only the link between a reading and its unit. Replacing every unit by t
 mean removes all between-unit variation while keeping the shape of the year. Replacing the bin
 by each unit's own mean over the record keeps how warm a unit is and removes only that bin's
 departure from it.</p>
+<p>A bin is held back whole: a permutation moves every channel of the bin together, so a unit is
+shown another unit's week rather than a coldest day from one unit beside a warmest day from
+another. A channel that is the same for every unit, as <code><a href="calendar_channels.html">calendar_channels()</a></code> are, says where the
+bin sits rather than what a unit read there, and is left in place.</p>
 <p>Read with <code>over = "channel"</code> the same machinery asks what each statistic of a grain carries,
 holding one channel back across the whole record instead of one bin across all channels.</p>
 <p>Reached through a <code><a href="timesift.html">timesift()</a></code> run rather than through a ladder, the profile reads the per-fold
