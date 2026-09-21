@@ -91,7 +91,10 @@ grain_contrasts <- function(ladder, learner = NULL, reference = NULL, adjust = "
   names(out)[names(out) == "estimate"] <- "diff"
   names(out)[names(out) == "lower.CL"] <- "lower"
   names(out)[names(out) == "upper.CL"] <- "upper"
-  out$grain <- sub(paste0(" - ", reference, "$"), "", as.character(out$contrast))
+  # One row per grain other than the reference, in the order of the factor's levels. The grain is
+  # read from there rather than parsed back out of the contrast's label, which emmeans writes with
+  # parentheses around a level holding a character it treats as an operator.
+  out$grain <- levels(d$grain)[-1L]
   out$learner <- learner
   out$reference <- reference
   rownames(out) <- NULL

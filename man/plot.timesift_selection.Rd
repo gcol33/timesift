@@ -14,7 +14,8 @@
 \item{...}{Passed to \code{\link[graphics:plot]{graphics::plot()}}.}
 }
 \value{
-The table of inner scores the plot is drawn from, invisibly.
+The table of inner scores the plot is drawn from, invisibly, with \code{at}, the position of
+each candidate on the axis, and \code{selected}, whether its fold chose it.
 }
 \description{
 Every candidate's inner score in every outer fold, one line per outer fold, with an open circle

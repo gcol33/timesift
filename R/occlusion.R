@@ -12,6 +12,11 @@
 #' by each unit's own mean over the record keeps how warm a unit is and removes only that bin's
 #' departure from it.
 #'
+#' A bin is held back whole: a permutation moves every channel of the bin together, so a unit is
+#' shown another unit's week rather than a coldest day from one unit beside a warmest day from
+#' another. A channel that is the same for every unit, as [calendar_channels()] are, says where the
+#' bin sits rather than what a unit read there, and is left in place.
+#'
 #' Read with `over = "channel"` the same machinery asks what each statistic of a grain carries,
 #' holding one channel back across the whole record instead of one bin across all channels.
 #'
@@ -96,6 +101,7 @@ occlusion.timesift_ladder <- function(x, data, y, arm, over = c("bin", "channel"
 
   parts <- if (over == "bin") seq_len(dim(m)[2L]) else seq_len(dim(m)[3L])
   labels <- if (over == "bin") dimnames(m)[[2L]] else dimnames(m)[[3L]]
+  held <- .unit_varying(m)
 
   old <- .seed_state()
   on.exit(.restore_seed(old), add = TRUE)
@@ -117,7 +123,7 @@ occlusion.timesift_ladder <- function(x, data, y, arm, over = c("bin", "channel"
       draws <- if (substitute == "permute") permutations else 1L
       acc <- matrix(0, nrow = draws, ncol = ncol(y))
       for (r in seq_len(draws)) {
-        occluded <- .occlude(m, test, train, parts[i], over, substitute)
+        occluded <- .occlude(m, test, train, parts[i], over, substitute, held)
         acc[r, ] <- .score_columns(y[test, , drop = FALSE],
                                    stats::predict(fit, occluded), ok, score)
       }
@@ -139,7 +145,7 @@ occlusion.timesift_ladder <- function(x, data, y, arm, over = c("bin", "channel"
             substitute = substitute, metric = metric$name)
 }
 
-.occlude <- function(m, test, train, i, over, substitute) {
+.occlude <- function(m, test, train, i, over, substitute, held) {
   sub <- .subset_units(m, test)
   n <- dim(sub)[1L]
   b <- dim(sub)[2L]
@@ -153,15 +159,25 @@ occlusion.timesift_ladder <- function(x, data, y, arm, over = c("bin", "channel"
     )
     return(sub)
   }
-  for (ch in seq_len(dim(sub)[3L])) {
+  order <- if (substitute == "permute") sample.int(n) else NULL
+  for (ch in held) {
     sub[, i, ch] <- switch(
       substitute,
-      permute = sub[sample.int(n), i, ch],
+      permute = sub[order, i, ch],
       fold_mean = mean(m[train, i, ch]),
       unit_mean = rowMeans(.plane(sub, ch))
     )
   }
   sub
+}
+
+# The channels that differ between units somewhere in the record. The rest are the same for every
+# unit, as the calendar channels are, and holding a bin back leaves them where they are.
+.unit_varying <- function(m) {
+  which(vapply(seq_len(dim(m)[3L]), function(ch) {
+    p <- .plane(m, ch)
+    any(p != rep(p[1L, ], each = nrow(p)))
+  }, logical(1L)))
 }
 
 # One channel of a representation as a [unit, bin] matrix, whatever the number of bins. Dropping to

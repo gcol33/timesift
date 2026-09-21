@@ -238,7 +238,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     # The cut is learned on the selected candidate's inner out-of-fold predictions, which cover
     # the outer training units and nothing else.
     if (!is.null(threshold)) {
-      oof <- attr(lad, "predictions")[[paste(grid$grain[won], grid$learner[won], sep = "|")]]
+      oof <- attr(lad, "predictions")[[.candidate_label(grid$grain[won], grid$learner[won])]]
       cuts[i, ] <- vapply(colnames(y), function(v) {
         decision_threshold(y_train[, v], oof[rownames(y_train), v], threshold)
       }, numeric(1L))
@@ -345,12 +345,13 @@ print.timesift_selection <- function(x, ...) {
 #' @export
 summary.timesift_selection <- function(object, ...) {
   out <- object$candidates
-  key <- paste(out$grain, out$learner)
-  picked <- paste(object$selected$grain, object$selected$learner)
+  key <- .candidate_label(out$grain, out$learner)
+  picked <- .candidate_label(object$selected$grain, object$selected$learner)
   out$n_selected <- as.integer(table(factor(picked, levels = key)))
   out$share <- out$n_selected / nrow(object$selected)
   inner <- object$inner
-  mean_inner <- tapply(inner$score, paste(inner$grain, inner$learner), mean, na.rm = TRUE)
+  mean_inner <- tapply(inner$score, .candidate_label(inner$grain, inner$learner), mean,
+                       na.rm = TRUE)
   out$inner_score <- as.numeric(mean_inner[key])
   out <- out[order(-out$n_selected, -out$inner_score), ]
   rownames(out) <- NULL
@@ -368,7 +369,8 @@ summary.timesift_selection <- function(object, ...) {
 #' @param col One colour per outer fold, recycled.
 #' @param ... Passed to [graphics::plot()].
 #'
-#' @return The table of inner scores the plot is drawn from, invisibly.
+#' @return The table of inner scores the plot is drawn from, invisibly, with `at`, the position of
+#'   each candidate on the axis, and `selected`, whether its fold chose it.
 #'
 #' @examples
 #' set.seed(1)
@@ -389,32 +391,41 @@ summary.timesift_selection <- function(object, ...) {
 #' @export
 plot.timesift_selection <- function(x, col = NULL, ...) {
   inner <- x$inner
-  label <- paste(x$candidates$grain, x$candidates$learner, sep = "|")
+  label <- .candidate_label(x$candidates$grain, x$candidates$learner)
   at <- seq_along(label)
+  inner$at <- match(.candidate_label(inner$grain, inner$learner), label)
+  inner$selected <- paste(inner$fold, inner$at) %in%
+    paste(x$selected$fold, match(.candidate_label(x$selected$grain, x$selected$learner), label))
   folds <- sort(unique(inner$fold))
   if (is.null(col)) {
     col <- grDevices::hcl.colors(max(length(folds), 2L), "Dark 3")[seq_along(folds)]
   }
   col <- rep_len(col, length(folds))
 
+  # The candidate names are written up the axis, so the bottom margin is sized to the longest.
+  old <- graphics::par(mar = c(max(5.1, 1.5 + 0.8 * max(nchar(label)) * 0.55), 4.1, 2.1, 1.1))
+  on.exit(graphics::par(old), add = TRUE)
   span <- range(inner$score[is.finite(inner$score)])
-  args <- list(x = at, y = rep(NA_real_, length(at)), ylim = span, xaxt = "n",
-               xlab = "candidate", ylab = paste(attr(x, "metric"), "inside the training data"))
+  args <- list(x = at, y = rep(NA_real_, length(at)), ylim = span, xaxt = "n", xlab = "",
+               ylab = paste(attr(x, "metric"), "inside the training data"))
   do.call(graphics::plot, utils::modifyList(args, list(...)))
   graphics::axis(1L, at = at, labels = label, las = 2L, cex.axis = 0.8)
   graphics::grid(nx = NA, ny = NULL, col = "grey90", lty = 1L)
 
   for (i in seq_along(folds)) {
     rows <- inner[inner$fold == folds[i], , drop = FALSE]
-    rows <- rows[match(label, paste(rows$grain, rows$learner)), , drop = FALSE]
-    graphics::lines(at, rows$score, col = col[i], lwd = 1.5)
-    graphics::points(at, rows$score, col = col[i], pch = 19L, cex = 0.8)
-    won <- x$selected[x$selected$fold == folds[i], , drop = FALSE]
-    mark <- match(paste(won$grain, won$learner), label)
-    graphics::points(at[mark], rows$score[mark], col = col[i], pch = 1L, cex = 2.2, lwd = 2)
+    rows <- rows[order(rows$at), , drop = FALSE]
+    graphics::lines(rows$at, rows$score, col = col[i], lwd = 1.5)
+    graphics::points(rows$at, rows$score, col = col[i], pch = 19L, cex = 0.8)
+    won <- rows[rows$selected, , drop = FALSE]
+    graphics::points(won$at, won$score, col = col[i], pch = 1L, cex = 2.2, lwd = 2)
   }
   invisible(inner)
 }
+
+# A candidate is named as the ladder names an arm, grain and learner joined by a bar, wherever a
+# selection's tables are matched against each other.
+.candidate_label <- function(grain, learner) paste(grain, learner, sep = "|")
 
 # Every registered metric reads the same held-out predictions, so the estimate is reported under all
 # of them and the choice of selection metric does not decide what may be quoted.
@@ -493,7 +504,7 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
                     metric = attr(scores, "metric"), scorer = attr(scores, "scorer"),
                     response = attr(scores, "response"),
                     ncv = .ncv_join(.ncv_of(scores), .ncv_of(compare)))
-  arms <- unique(paste(compare$grain, compare$learner, sep = "|"))
+  arms <- unique(.candidate_label(compare$grain, compare$learner))
   kinds <- unique(c("variables", interval))
   out <- lapply(kinds, function(kind) {
     do.call(rbind, lapply(arms, function(a) paired_contrast(both, .selected_arm, a, kind)))
@@ -562,8 +573,8 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
 # candidate an exact tie on the inner score falls to does not depend on the session's collation the
 # way a join on the names would.
 .join_candidates <- function(candidates, grid, se, fold) {
-  key <- paste(candidates$grain, candidates$learner, sep = "|")
-  i <- match(key, paste(grid$grain, grid$learner, sep = "|"))
+  key <- .candidate_label(candidates$grain, candidates$learner)
+  i <- match(key, .candidate_label(grid$grain, grid$learner))
   candidates$score <- grid$score[i]
   candidates$se <- unname(se[key])
   candidates$n_variable <- grid$n_variable[i]
@@ -580,7 +591,7 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
     return(stats::setNames(numeric(), character()))
   }
   by_fold <- stats::aggregate(list(score = keep$score), keep[c("grain", "learner", "fold")], mean)
-  key <- paste(by_fold$grain, by_fold$learner, sep = "|")
+  key <- .candidate_label(by_fold$grain, by_fold$learner)
   vapply(split(by_fold$score, key), function(s) {
     if (length(s) < 2L) NA_real_ else stats::sd(s) / sqrt(length(s))
   }, numeric(1L))

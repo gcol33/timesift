@@ -9,7 +9,7 @@ import numpy as np
 from .ladder import _best_arm, _split_arm
 from .registry import RESPONSES, resolve_metric
 from .representation import TimesiftMatrix
-from .response import Response, align_folds, as_response
+from .response import Folds, Response, as_response
 
 __all__ = ["feature_matrix"]
 
@@ -41,7 +41,9 @@ def ladder_occlusion(ladder, x, y: Response, arm: str, over: str = "bin",
     What a held-back bin is replaced by decides what the weight means, so the substitute is part of
     the answer: ``permute`` keeps the observed readings and cuts only the link between a reading
     and its unit, ``fold_mean`` removes all between-unit variation, ``unit_mean`` keeps how warm a
-    unit is and removes only that bin's departure from it.
+    unit is and removes only that bin's departure from it. A bin is held back whole, every channel
+    of it moved by one permutation, and a channel that is the same for every unit, as the calendar
+    channels are, is left in place.
     """
     if not ladder.fits:
         raise ValueError("this ladder kept no fits; refit with grain_ladder(..., keep_fits=True)")
@@ -80,9 +82,17 @@ def occlusion_profile(fits: dict, m: TimesiftMatrix, y, folds, over: str = "bin"
 
     # The response reaches its own head's prepare, as it does everywhere else, so a head that is
     # not presence-absence can be occluded too.
-    y = RESPONSES.get(response)["prepare"](as_response(y)).align(m.units)
-    f = align_folds(folds, m.units)
+    spec = RESPONSES.get(response)
+    y = spec["prepare"](as_response(y)).align(m.units)
+    folds = Folds.coerce(folds, m.units).align(m.units)
+    f = folds.fold
     score = resolve_metric(metric)[0]
+    # The cells a score is defined on, from the response and the fold map alone, so a weight is read
+    # on the cells the ladder scored and nowhere else.
+    cells = spec["cells"](y, folds)
+    scorable = {(v, int(k)): bool(ok) for v, k, ok in zip(cells.variable, cells.fold,
+                                                           cells.scorable)}
+    held = _unit_varying(m.values)
 
     n_parts = m.values.shape[1] if over == "bin" else m.values.shape[2]
     labels = m.bins if over == "bin" else m.stats
@@ -97,18 +107,21 @@ def occlusion_profile(fits: dict, m: TimesiftMatrix, y, folds, over: str = "bin"
         test = np.flatnonzero(f == k)
         train = np.flatnonzero(f != k)
         sub = m.take_units(test)
+        ok_cell = [scorable.get((v, int(k)), False) for v in y.variables]
+
+        def score_columns(p):
+            return np.asarray([score(y.values[test, j], p[:, j]) if ok_cell[j] else np.nan
+                               for j in range(len(y.variables))])
+
         # The baseline is one prediction for the fold, not one per variable: the model reads the
         # whole block and an encoder would otherwise be rebuilt from its arrays once per response.
-        full = fit.predict(sub)
-        base = np.asarray([score(y.values[test, j], full[:, j])
-                           for j in range(len(y.variables))])
+        base = score_columns(fit.predict(sub))
         for i in range(n_parts):
             draws = permutations if substitute == "permute" else 1
             acc = np.zeros((draws, len(y.variables)))
             for r in range(draws):
-                occluded = _occlude(m, sub, train, i, over, substitute, rng)
-                p = fit.predict(occluded)
-                acc[r] = [score(y.values[test, j], p[:, j]) for j in range(len(y.variables))]
+                occluded = _occlude(m, sub, train, i, over, substitute, rng, held)
+                acc[r] = score_columns(fit.predict(occluded))
             fall = base - acc.mean(axis=0)
             ok = np.isfinite(fall)
             weight[i, ok] = np.where(np.isnan(weight[i, ok]), 0, weight[i, ok]) + fall[ok]
@@ -119,7 +132,14 @@ def occlusion_profile(fits: dict, m: TimesiftMatrix, y, folds, over: str = "bin"
     return {"part": list(labels), "variable": list(y.variables), "weight": weight}
 
 
-def _occlude(m: TimesiftMatrix, sub: TimesiftMatrix, train, i, over, substitute, rng) -> TimesiftMatrix:
+def _unit_varying(values: np.ndarray) -> np.ndarray:
+    """The channels that differ between units somewhere in the record. The rest are the same for
+    every unit, as the calendar channels are, and holding a bin back leaves them where they are."""
+    return np.flatnonzero((values != values[:1]).any(axis=(0, 1)))
+
+
+def _occlude(m: TimesiftMatrix, sub: TimesiftMatrix, train, i, over, substitute, rng,
+             held) -> TimesiftMatrix:
     values = sub.values.copy()
     n = values.shape[0]
     if over == "channel":
@@ -130,9 +150,10 @@ def _occlude(m: TimesiftMatrix, sub: TimesiftMatrix, train, i, over, substitute,
         else:
             values[:, :, i] = values[:, :, i].mean(axis=1)[:, None]
         return replace(sub, values=values)
-    for ch in range(values.shape[2]):
+    order = rng.permutation(n) if substitute == "permute" else None
+    for ch in held:
         if substitute == "permute":
-            values[:, i, ch] = values[rng.permutation(n), i, ch]
+            values[:, i, ch] = values[order, i, ch]
         elif substitute == "fold_mean":
             values[:, i, ch] = m.values[train, i, ch].mean()
         else:

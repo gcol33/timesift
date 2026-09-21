@@ -104,7 +104,17 @@ test_that("the plot draws the inner scores and returns them", {
   grDevices::dev.off()
   expect_true(file.exists(path))
   expect_equal(nrow(drawn), nrow(sel$candidates) * nrow(sel$selected))
-  expect_named(drawn, c("fold", "grain", "learner", "score", "se", "n_variable"))
+  expect_named(drawn, c("fold", "grain", "learner", "score", "se", "n_variable", "at",
+                        "selected"))
+  # Every inner score sits on its candidate's place on the axis, and each fold circles the one
+  # candidate it selected.
+  expect_false(anyNA(drawn$at))
+  expect_equal(drawn$at, match(paste(drawn$grain, drawn$learner),
+                               paste(sel$candidates$grain, sel$candidates$learner)))
+  expect_equal(as.vector(tapply(drawn$selected, drawn$fold, sum)), rep(1L, nrow(sel$selected)))
+  circled <- drawn[drawn$selected, ]
+  expect_equal(paste(circled$fold, circled$grain, circled$learner),
+               paste(sel$selected$fold, sel$selected$grain, sel$selected$learner))
   unlink(path)
 })
 

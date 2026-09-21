@@ -73,6 +73,11 @@ mean removes all between-unit variation while keeping the shape of the year. Rep
 by each unit's own mean over the record keeps how warm a unit is and removes only that bin's
 departure from it.
 
+A bin is held back whole: a permutation moves every channel of the bin together, so a unit is
+shown another unit's week rather than a coldest day from one unit beside a warmest day from
+another. A channel that is the same for every unit, as \code{\link[=calendar_channels]{calendar_channels()}} are, says where the
+bin sits rather than what a unit read there, and is left in place.
+
 Read with \code{over = "channel"} the same machinery asks what each statistic of a grain carries,
 holding one channel back across the whole record instead of one bin across all channels.
 

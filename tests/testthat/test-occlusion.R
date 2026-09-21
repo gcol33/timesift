@@ -102,3 +102,64 @@ test_that("holding a channel back asks what the statistic carries", {
   oc <- occlusion(lad, x, y, "month|elasticnet", over = "channel", permutations = 3L)
   expect_setequal(unique(oc$part), c("cold_day", "mean", "warm_day"))
 })
+
+test_that("a channel the model does not read carries no weight, and the one it reads does", {
+  sim <- planted_series(n_unit = 40L, seed = 66L)
+  y <- matrix(stats::rbinom(length(sim$warmth) * 2L, 1L,
+                            stats::plogis(3 * c(sim$warmth, -sim$warmth))),
+              ncol = 2L, dimnames = list(sim$units, c("sp1", "sp2")))
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "month",
+                     stats = c("cold_day", "mean", "warm_day"))
+  # A model that reads the warmest day and nothing else, so what every channel should cost is
+  # known exactly.
+  warm_only <- learner(
+    name = "warm_only", multi = "joint",
+    fit = function(x, y, ...) list(),
+    predict = function(model, x) {
+      s <- rowMeans(matrix(x[, , "warm_day"], nrow = dim(x)[1L]))
+      cbind(s, -s)
+    })
+  lad <- grain_ladder(x, y, list(warm_only = warm_only), folds = fold_map(y, v = 4L, seed = 6L),
+                      keep_fits = TRUE, verbose = FALSE)
+  for (s in c("permute", "fold_mean", "unit_mean")) {
+    oc <- occlusion(lad, x, y, "month|warm_only", over = "channel", substitute = s,
+                    permutations = 5L, seed = 4L)
+    weight <- vapply(split(oc$weight, oc$part), mean, numeric(1L))
+    expect_identical(unname(weight[c("cold_day", "mean")]), c(0, 0), info = s)
+    # The model reads the warmest day averaged over the record, which is what a unit's own mean
+    # keeps, so under that substitute holding it back costs nothing either.
+    if (s == "unit_mean") {
+      expect_equal(weight[["warm_day"]], 0, info = s)
+    } else {
+      expect_gt(weight[["warm_day"]], 0.05)
+    }
+  }
+})
+
+test_that("a held-back bin moves whole and leaves the calendar where it is", {
+  sim <- planted_series(n_unit = 20L, seed = 65L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "month",
+                     stats = c("cold_day", "mean", "warm_day"))
+  x <- bind_channels(x, calendar_channels(x))
+  held <- timesift:::.unit_varying(x)
+  expect_identical(dimnames(x)[[3L]][held], c("cold_day", "mean", "warm_day"))
+  test <- 1:10
+  train <- 11:20
+  set.seed(1)
+  for (s in c("permute", "fold_mean", "unit_mean")) {
+    out <- timesift:::.occlude(x, test, train, 3L, "bin", s, held)
+    expect_identical(out[, , c("year_sin", "year_cos")], x[test, , c("year_sin", "year_cos")],
+                     info = s)
+    expect_identical(out[, -3L, ], x[test, -3L, ], info = s)
+  }
+  # Every unit is shown one unit's whole bin, never channels drawn from different units.
+  out <- timesift:::.occlude(x, test, train, 3L, "bin", "permute", held)
+  shown <- out[, 3L, held]
+  source <- x[test, 3L, held]
+  from <- vapply(seq_len(nrow(shown)), function(u) {
+    hit <- which(apply(source, 1L, function(v) identical(unname(v), unname(shown[u, ]))))
+    if (length(hit) == 1L) hit else NA_integer_
+  }, integer(1L))
+  expect_false(anyNA(from))
+  expect_setequal(from, seq_along(test))
+})

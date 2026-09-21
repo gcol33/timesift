@@ -46,3 +46,54 @@ test_that("a ladder with no scored cell for a learner names the missing referenc
   lad <- structure(lad, class = c("timesift_ladder", "data.frame"), metric = "tss")
   expect_error(grain_contrasts(lad, learner = "l"), "no scored cell")
 })
+
+# A ladder whose per-cell scores are a variable's level, a fold's level, a known effect of each
+# grain and noise, which is the model grain_contrasts() fits, so its answer is known.
+planted_ladder <- function(effect, n_var = 30L, n_fold = 5L, sd = 0.03, seed = 1L) {
+  set.seed(seed)
+  grains <- names(effect)
+  cells <- expand.grid(variable = sprintf("v%02d", seq_len(n_var)), fold = seq_len(n_fold),
+                       grain = grains, stringsAsFactors = FALSE)
+  level <- stats::setNames(stats::rnorm(n_var, 0.7, 0.08), sprintf("v%02d", seq_len(n_var)))
+  shift <- stats::rnorm(n_fold, 0, 0.02)
+  cells$score <- level[cells$variable] + shift[cells$fold] + effect[cells$grain] +
+    stats::rnorm(nrow(cells), 0, sd)
+  cells$learner <- "l"
+  cells$scorable <- TRUE
+  structure(cells[c("grain", "learner", "variable", "fold", "score", "scorable")],
+            class = c("timesift_ladder", "data.frame"), metric = "roc_auc")
+}
+
+test_that("the contrast recovers a planted effect of each grain, at its stated coverage", {
+  skip_if_no_mixed_model()
+  effect <- c(week = 0, day = -0.02, month = -0.05)
+  covered <- 0L
+  for (seed in 1:20) {
+    out <- grain_contrasts(planted_ladder(effect, seed = seed), reference = "week")
+    truth <- effect[out$grain]
+    expect_true(all(abs(out$diff - truth) < 0.02), info = seed)
+    covered <- covered + sum(out$lower <= truth & truth <= out$upper)
+  }
+  # Two contrasts in each of twenty ladders, each interval at 95 percent jointly.
+  expect_gte(covered, 36L)
+})
+
+test_that("with no effect of the grain the contrast finds none", {
+  skip_if_no_mixed_model()
+  rejected <- 0L
+  for (seed in 1:20) {
+    out <- grain_contrasts(planted_ladder(c(week = 0, day = 0, month = 0), seed = seed),
+                           reference = "week")
+    rejected <- rejected + any(out$p_value < 0.05)
+  }
+  expect_lte(rejected, 3L)
+})
+
+test_that("a grain is named as the ladder names it, whatever characters it holds", {
+  skip_if_no_mixed_model()
+  effect <- c("week.extremeday" = 0, "month-mean" = -0.03, "a (b)" = -0.06, "day" = -0.01)
+  out <- grain_contrasts(planted_ladder(effect, seed = 3L), reference = "week.extremeday")
+  expect_setequal(out$grain, c("month-mean", "a (b)", "day"))
+  got <- out$diff[match(c("month-mean", "a (b)", "day"), out$grain)]
+  expect_lt(max(abs(got - c(-0.03, -0.06, -0.01))), 0.02)
+})

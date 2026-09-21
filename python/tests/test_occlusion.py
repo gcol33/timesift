@@ -159,3 +159,73 @@ def test_an_unnamed_feature_matrix_names_its_rows_from_one_as_every_other_unit_l
     from timesift.occlusion import feature_matrix
     m = feature_matrix(np.zeros((3, 2)))
     assert m.units == ("1", "2", "3")
+
+
+def test_a_channel_the_model_does_not_read_carries_no_weight_and_the_one_it_reads_does():
+    readings, y, _ = planted(n_unit=40, seed=66)
+    x = grain_matrix(readings, "id", "time", "value", grain="month",
+                     stats=["cold_day", "mean", "warm_day"])
+
+    # A model that reads the warmest day and nothing else, so what every channel should cost is
+    # known exactly.
+    def predict(model, x):
+        s = x.channel("warm_day").mean(axis=1)
+        return np.column_stack([s, -s])
+
+    warm_only = Learner(name="warm_only", multi="joint", fit=lambda x, y, **k: None,
+                        predict=predict)
+    lad = grain_ladder(x, y, {"warm_only": warm_only}, folds=fold_map(y, v=4, seed=6),
+                       keep_fits=True, verbose=False)
+    for s in ("permute", "fold_mean", "unit_mean"):
+        out = ladder_occlusion(lad, x, y, "month|warm_only", over="channel", substitute=s,
+                               permutations=5, seed=4)
+        weight = dict(zip(out["part"], np.nanmean(out["weight"], axis=1)))
+        assert weight["cold_day"] == 0 and weight["mean"] == 0, s
+        # The model reads the warmest day averaged over the record, which is what a unit's own
+        # mean keeps, so under that substitute holding it back costs nothing either.
+        if s == "unit_mean":
+            assert abs(weight["warm_day"]) < 1e-12, s
+        else:
+            assert weight["warm_day"] > 0.05, s
+
+
+def test_a_held_back_bin_moves_whole_and_leaves_the_calendar_where_it_is():
+    from timesift.occlusion import _occlude, _unit_varying
+    from timesift.representation import bind_channels, calendar_channels
+
+    readings, _, _ = planted(n_unit=20, seed=65)
+    x = grain_matrix(readings, "id", "time", "value", grain="month",
+                     stats=["cold_day", "mean", "warm_day"])
+    x = bind_channels(x, calendar_channels(x))
+    held = _unit_varying(x.values)
+    assert tuple(x.stats[i] for i in held) == ("cold_day", "mean", "warm_day")
+    test, train = np.arange(10), np.arange(10, 20)
+    sub = x.take_units(test)
+    rng = np.random.default_rng(1)
+    for s in ("permute", "fold_mean", "unit_mean"):
+        out = _occlude(x, sub, train, 2, "bin", s, rng, held).values
+        assert np.array_equal(out[:, :, 3:], sub.values[:, :, 3:])
+        assert np.array_equal(np.delete(out, 2, axis=1), np.delete(sub.values, 2, axis=1))
+    shown = _occlude(x, sub, train, 2, "bin", "permute", rng, held).values[:, 2, held]
+    source = sub.values[:, 2, held]
+    matched = [np.flatnonzero((source == row).all(axis=1)) for row in shown]
+    assert all(len(m) == 1 for m in matched)
+    assert sorted(int(m[0]) for m in matched) == list(range(10))
+
+
+def test_a_cell_the_mask_leaves_unscored_carries_no_weight():
+    readings, y, _ = planted(n_unit=30, seed=67)
+    from timesift.response import align_folds
+
+    folds = fold_map(y, v=3, seed=6)
+    f = align_folds(folds, y.units)
+    first = np.flatnonzero(f == np.unique(f)[0])
+    values = y.values.copy()
+    values[:, 1] = 0
+    values[first[:3], 1] = 1
+    y = Response(values, y.units, y.variables)
+    x = grain_matrix(readings, "id", "time", "value", grain="month")
+    lad = grain_ladder(x, y, "elasticnet", folds=folds, keep_fits=True, verbose=False)
+    out = ladder_occlusion(lad, x, y, "month|elasticnet", permutations=2, seed=4)
+    assert np.isnan(out["weight"][:, 1]).all()
+    assert np.isfinite(out["weight"][:, 0]).any()
