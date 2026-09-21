@@ -345,6 +345,10 @@ REFERENCE_GRID <- data.frame(
                   -0.032, -0.017, -0.012, 0, -0.010, -0.023, -0.054,
                   -0.007, 0, -0.002, -0.001, -0.005, -0.019, -0.052),
   stringsAsFactors = FALSE)
+# The window each architecture's row of the contrast table is read against. Named rather than
+# found as the row reading zero: the table prints the fully connected network's half-daily window
+# as -0.000 beside its daily reference.
+REFERENCE_BEST <- c(mlp = "day", cnn = "week", rescnn = "halfday")
 
 # The stepwise arm draws nothing at random, so it is held to the rounding of the published figure.
 # A network's level is held to the spread of the fixed weekly encoder, the one arm whose spread
@@ -867,17 +871,24 @@ if ("contrasts" %in% stages) {
 if ("grains" %in% stages) {
   ladder <- read_levels("networks_mean_auc", SELECTION_METRIC)
   learners <- intersect(unique(REFERENCE_GRID$learner), unique(ladder$learner))
-  if (!length(learners)) {
-    say("the grain contrast needs networks_mean_auc.csv in ", out_dir, "; skipping")
-  } else {
+  out <- NULL
+  if (length(learners)) {
     level <- summary(ladder)
     out <- do.call(rbind, lapply(learners, function(l) {
-      ref <- REFERENCE_GRID[REFERENCE_GRID$learner == l, ]
-      reference <- ref$grain[ref$vs_best_auc == 0]
+      reference <- REFERENCE_BEST[[l]]
       say(sprintf("%-38s the study's %s, this run's %s", paste0(l, " best window:"), reference,
                   level$grain[level$learner == l & level$best]))
+      if (!reference %in% ladder$grain[ladder$learner == l]) {
+        say("  ", l, " was not run at the ", reference, " window; its contrast is not read")
+        return(NULL)
+      }
       grain_contrasts(ladder, learner = l, reference = reference)
     }))
+  }
+  if (is.null(out)) {
+    say("the grain contrast needs networks_mean_auc.csv in ", out_dir, " with an architecture ",
+        "run at its reference window; skipping")
+  } else {
     out$p_bh <- stats::p.adjust(out$p_value, method = "BH")
     write_out(out, "grain_contrasts.csv")
     print(out)
