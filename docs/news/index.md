@@ -80,8 +80,11 @@
   seeing another: the result is bit-identical to the serial one, which
   both suites assert. The default is serial. On the Schrankogel shape
   (894 units, 942 columns, five inner folds) one cross-validated
-  binomial path takes 3.0 s serial and 0.95 s on six threads, against
-  `cv.glmnet`’s 0.92 s, choosing the same penalty at every setting.
+  binomial path takes 0.63 s serial and 0.15 s on six threads, against
+  `cv.glmnet`’s 0.47 s, choosing the same penalty at every setting. Both
+  are installed builds; the figures first given here were taken under
+  [`devtools::load_all()`](https://devtools.r-lib.org/reference/load_all.html),
+  which compiles the core at `-O0`.
 - [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
   gains `n_lambda` and `thresh`, and `s` now reads on the Python side
   too: the whole penalty path is kept on both, so `"lambda.1se"` or a

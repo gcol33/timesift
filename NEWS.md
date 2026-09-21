@@ -56,8 +56,10 @@
   each, reading the design and sharing nothing, so they parallelise without any of them seeing
   another: the result is bit-identical to the serial one, which both suites assert. The default
   is serial. On the Schrankogel shape (894 units, 942 columns, five inner folds) one
-  cross-validated binomial path takes 3.0 s serial and 0.95 s on six threads, against
-  `cv.glmnet`'s 0.92 s, choosing the same penalty at every setting.
+  cross-validated binomial path takes 0.63 s serial and 0.15 s on six threads, against
+  `cv.glmnet`'s 0.47 s, choosing the same penalty at every setting. Both are installed builds;
+  the figures first given here were taken under `devtools::load_all()`, which compiles the core
+  at `-O0`.
 * `elasticnet()` gains `n_lambda` and `thresh`, and `s` now reads on the Python side too: the
   whole penalty path is kept on both, so `"lambda.1se"` or a penalty of a caller's own naming a
   point between two of the path's is read the way `predict(s =)` reads one.
