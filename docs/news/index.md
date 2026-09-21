@@ -1,46 +1,5 @@
 # Changelog
 
-## timesift 0.3.1
-
-### Changed
-
-- The penalised core’s binomial fit is at glmnet’s speed on one thread,
-  at the shipped `thresh = 1e-8`, one notch tighter than glmnet’s
-  default. The path reads the columns once per penalty rather than
-  twice, a binomial fit ends each penalty on the one reweighting the
-  next penalty opens with, and a reweighted least squares step is judged
-  on its own move, which is glmnet’s test
-  ([\#77](https://github.com/gcol33/timesift/issues/77)). A Gaussian fit
-  folds the root of each case weight into the design, so a coordinate’s
-  step reads two streams where it read three.
-- The descent’s inner cycle is Anderson-extrapolated every five passes
-  (Bertrand and Massias, 2021), and the extrapolated point is taken only
-  where it lowers the penalised objective. That is what an
-  ill-conditioned design needed: a tighter threshold there multiplied
-  the passes, and now costs 2.8 to 6.9 times fewer of them. Every fit
-  sits as close to the optimum as before or closer.
-- Timings, one cross-validated path, installed builds, against
-  `cv.glmnet` at its default on the same run: 0.47 s against 0.47 to
-  0.51 s for a binomial fit on the Schrankogel shape (894 units, 942
-  columns, five inner folds), 264 ms against 228 ms for a Gaussian one
-  there (190 ms at glmnet’s own threshold of `1e-7`), and 0.12 s against
-  0.25 s for the four-response learner on a small ill-conditioned design
-  (60 units, 18 columns). Binomial fits on a well-conditioned design
-  move in the fourth decimal of a coefficient at most, and choose the
-  same penalty. The reproduction’s elastic-net row reads 0.68606 against
-  0.68605 before and the published 0.687, and runs in 21 minutes where
-  it took 94.
-- A penalised fit that does not settle at a penalty ends its path there
-  and returns the points before it, which is what glmnet does with the
-  same event, where it used to stop the whole run. A fit that does not
-  settle at the first penalty is still an error. The path records where
-  it stopped in `stalled`, a cross-validation records each fold’s in
-  `fold_stalled`, and
-  [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
-  names every response whose path ended that way in `stopped`, beside
-  `unfitted`. Fits that settle are byte-identical to before
-  ([\#78](https://github.com/gcol33/timesift/issues/78)).
-
 ## timesift 0.3.0
 
 ### Changed
@@ -78,13 +37,7 @@
   path of each inner fold are one independent fit each, reading the
   design and sharing nothing, so they parallelise without any of them
   seeing another: the result is bit-identical to the serial one, which
-  both suites assert. The default is serial. On the Schrankogel shape
-  (894 units, 942 columns, five inner folds) one cross-validated
-  binomial path takes 0.63 s serial and 0.15 s on six threads, against
-  `cv.glmnet`’s 0.47 s, choosing the same penalty at every setting. Both
-  are installed builds; the figures first given here were taken under
-  [`devtools::load_all()`](https://devtools.r-lib.org/reference/load_all.html),
-  which compiles the core at `-O0`.
+  both suites assert. The default is serial.
 - [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
   gains `n_lambda` and `thresh`, and `s` now reads on the Python side
   too: the whole penalty path is kept on both, so `"lambda.1se"` or a
@@ -99,6 +52,36 @@
   `inst/reproduce/schrankogel.R --stages=baseline` against the deposit
   gives 0.68605 on the 188 aggregates, 0.00095 from the published 0.687
   and inside the 0.002 the driver compares at.
+- The penalised core’s binomial fit is at glmnet’s speed on one thread,
+  at the shipped `thresh = 1e-8`, one notch tighter than glmnet’s
+  default. The path reads the columns once per penalty rather than
+  twice, a binomial fit ends each penalty on the one reweighting the
+  next penalty opens with, and a reweighted least squares step is judged
+  on its own move, which is glmnet’s test
+  ([\#77](https://github.com/gcol33/timesift/issues/77)). A Gaussian fit
+  folds the root of each case weight into the design, so a coordinate’s
+  step reads two streams where it read three.
+- The descent’s inner cycle is Anderson-extrapolated every five passes
+  (Bertrand and Massias, 2021), and the extrapolated point is taken only
+  where it lowers the penalised objective. That is what an
+  ill-conditioned design needed: a tighter threshold there multiplied
+  the passes, and now costs 2.8 to 6.9 times fewer of them.
+- Timings, one cross-validated path, installed builds, against
+  `cv.glmnet` at its default on the same run: 0.47 s against 0.47 to
+  0.51 s for a binomial fit on the Schrankogel shape (894 units, 942
+  columns, five inner folds), 264 ms against 228 ms for a Gaussian one
+  there (190 ms at glmnet’s own threshold of `1e-7`), and 0.12 s against
+  0.25 s for the four-response learner on a small ill-conditioned design
+  (60 units, 18 columns). The reproduction’s elastic-net row reads
+  0.68606 and runs in 21 minutes.
+- A penalised fit that does not settle at a penalty ends its path there
+  and returns the points before it, which is what glmnet does with the
+  same event. A fit that does not settle at the first penalty is an
+  error. The path records where it stopped in `stalled`, a
+  cross-validation records each fold’s in `fold_stalled`, and
+  [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+  names every response whose path ended that way in `stopped`, beside
+  `unfitted` ([\#78](https://github.com/gcol33/timesift/issues/78)).
 
 ## timesift 0.2.0
 
