@@ -94,6 +94,7 @@ nb::dict give(const timesift::PenaltyPath& path) {
   out["dev_ratio"] = give(std::vector<double>(path.dev_ratio));
   out["null_deviance"] = path.null_deviance;
   out["passes"] = path.passes;
+  out["stalled"] = path.stalled;
   out["n_column"] = static_cast<std::int64_t>(path.n_column);
   out["family"] = std::string(timesift::family_name(path.family));
   return out;
@@ -260,6 +261,7 @@ NB_MODULE(_core, m) {
           out["cv_sd"] = give(std::vector<double>(cv.cv_sd));
           out["index_min"] = static_cast<std::int64_t>(cv.index_min);
           out["index_1se"] = static_cast<std::int64_t>(cv.index_1se);
+          out["fold_stalled"] = give(std::vector<std::int32_t>(cv.fold_stalled));
           return out;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("fold"), nb::arg("n_fold"),

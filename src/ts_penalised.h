@@ -61,11 +61,16 @@ struct PenaltyPath {
   std::vector<double> dev_ratio;       // deviance explained, one per point
   double null_deviance = 0.0;
   std::int32_t passes = 0;            // coordinate descent passes the whole path took
+  std::int32_t stalled = 0;           // the 1-based point of the path the fit did not settle at,
+                                      // whose earlier points are the ones returned, as glmnet's
+                                      // jerr = -m; 0 where the path ran to its end
   Family family = Family::gaussian;
 };
 
 // Throws Error for an empty design, for a response the family cannot read, and for a fit that
-// does not settle inside `max_pass`.
+// does not settle at the first penalty of its path. A fit that does not settle at a later penalty,
+// inside `max_irls` reweightings or inside what is left of `max_pass`, ends the path there and
+// records it in `stalled`.
 PenaltyPath penalised_path(const double* x, const double* y, const double* w, std::size_t n,
                            std::size_t p, Family family, const PenaltySpec& spec);
 
@@ -75,6 +80,7 @@ struct PenaltyCV {
   std::vector<double> cv_sd;      // its standard error over the units
   std::size_t index_min = 0;      // the point of least held-out deviance
   std::size_t index_1se = 0;      // the largest penalty within one standard error of it
+  std::vector<std::int32_t> fold_stalled;  // each fold's `stalled`, in fold order
 };
 
 // The path fitted on every unit, and the same penalties scored on units held out fold by fold.

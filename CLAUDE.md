@@ -91,7 +91,9 @@ fixtures is a bug in whichever language changed.
 The penalised fit is pinned as a distance rather than as a digest: two coordinate descents settle
 at the same point to the tolerance they are run at and no closer. `penalised_cases.csv`,
 `penalised_path.csv` and `penalised_cv.csv` hold glmnet's own coefficients, objective and chosen
-penalty, and both suites assert against them. Neural models cannot be byte-identical across torch
+penalty, and both suites assert against them. `penalised_stall_input.csv` is a call captured from
+the selection benchmark on which glmnet stops two folds' paths early (#78), and
+`penalised_stall_cv.csv` the penalty cv.glmnet chooses over them. Neural models cannot be byte-identical across torch
 and libtorch and are not required to be.
 
 ## API
@@ -247,7 +249,9 @@ every step. Verified against the deposit on 2026-09-02, matching the paper exact
 The elastic net sits 0.001 low because the two runs seed the inner cross-validation's random fold
 draw differently; nothing else in the table carries randomness. That row was first read when
 `elasticnet()` called glmnet, and has since been read again under the shared core: 0.68605 against
-the published 0.687, the same 0.686 as before and inside the 0.002 the driver compares at. The
+the published 0.687, the same 0.686 as before and inside the 0.002 the driver compares at, and
+0.68606 once the inner cycle was Anderson-extrapolated (`197fd5a`, 21 minutes on six threads
+where it had taken 94). The
 stepwise arm and the network grid have not been rerun here: forward selection over 188 columns is
 many hours single-threaded, and the encoders want the graphics processor they had in the study.
 

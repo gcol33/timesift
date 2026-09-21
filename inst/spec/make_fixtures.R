@@ -773,3 +773,37 @@ write_fixture(do.call(rbind, pen_cv_rows), "penalised_cv.csv")
 
 cat("wrote", nrow(PEN_CASES), "penalised cases,",
     nrow(do.call(rbind, pen_path_rows)), "reference coefficients\n")
+
+# A penalised fit that does not settle at a penalty. `penalised_stall_input.csv` is one inner
+# cross-validation of the selection benchmark's `elasticnet-none-n300` cell, captured as it was
+# handed over (replicate 102, #78): 96 units, 7 presences weighted 12.7, eight columns. It is read
+# here rather than written, because it is the benchmark's own call and not a design this script
+# draws. glmnet does not settle on it: at the threshold the call ran at, one fold's path stops at
+# penalty 86 and another at 100, and glmnet returns the points before each. The reference is the
+# penalty cv.glmnet chooses over those truncated folds, so it is read with glmnet's warnings on,
+# which is the event being pinned.
+stall <- utils::read.csv(file.path(out_dir, "penalised_stall_input.csv"), check.names = FALSE)
+stall_x <- as.matrix(stall[, setdiff(names(stall), c("unit", "y", "w", "fold"))])
+STALL_THRESH <- 1e-8
+stall_warnings <- character()
+stall_cv <- withCallingHandlers(
+  glmnet::cv.glmnet(stall_x, stall$y, family = "binomial", alpha = 0.5, weights = stall$w,
+                    foldid = stall$fold + 1L, type.measure = "deviance",
+                    control = list(thresh = STALL_THRESH)),
+  warning = function(cond) {
+    stall_warnings <<- c(stall_warnings, conditionMessage(cond))
+    invokeRestart("muffleWarning")
+  })
+stall_stops <- sum(grepl("Convergence for [0-9]+th lambda value not reached", stall_warnings))
+if (stall_stops == 0L) {
+  stop("glmnet settled on every fold of the captured stall, so it no longer pins the event it ",
+       "was captured for.", call. = FALSE)
+}
+write_fixture(
+  data.frame(family = "binomial", alpha = 0.5, n_fold = 5L,
+             thresh = sprintf("%.12g", STALL_THRESH),
+             lambda_min = sprintf("%.12g", stall_cv$lambda.min),
+             lambda_1se = sprintf("%.12g", stall_cv$lambda.1se),
+             glmnet_stops = stall_stops, stringsAsFactors = FALSE),
+  "penalised_stall_cv.csv")
+cat("wrote the captured stall's reference,", stall_stops, "glmnet folds stopping early\n")

@@ -163,7 +163,8 @@ counts and the representation carry no such randomness and reproduce exactly.
 
 That row was read when `elasticnet()` called glmnet. It was read again on 2026-09-20 under the
 shared penalised core, on the same deposit and the same fold map, and gives 0.68605: the same
-figure, 0.00095 from the published one and inside the 0.002 the script compares at.
+figure, 0.00095 from the published one and inside the 0.002 the script compares at. On
+2026-09-21, at `197fd5a`, with the inner cycle Anderson-extrapolated, it gives 0.68606.
 
 The stepwise arm and the network grid have not been rerun here. Forward selection over 188 columns
 is many hours single-threaded, and the encoders want the graphics processor they had in the

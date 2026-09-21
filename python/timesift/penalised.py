@@ -52,6 +52,7 @@ def penalised_cv(x, y, w, family, alpha, fold, n_fold, n_lambda=100, thresh=1e-8
     fit["cv_sd"] = out["cv_sd"]
     fit["lambda_min"] = float(out["lambda"][out["index_min"]])
     fit["lambda_1se"] = float(out["lambda"][out["index_1se"]])
+    fit["fold_stalled"] = out["fold_stalled"]
     return fit
 
 
@@ -60,7 +61,7 @@ def _shape(out: dict) -> dict:
                 beta=out["beta"].reshape(len(out["lambda"]), out["n_column"]).T,
                 df=out["df"], dev_ratio=out["dev_ratio"],
                 null_deviance=out["null_deviance"], passes=out["passes"],
-                family=out["family"])
+                stalled=int(out["stalled"]), family=out["family"])
 
 
 def _penalty_at(model: dict, s) -> float:

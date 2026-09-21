@@ -305,6 +305,7 @@ cpp11::writable::list give(const timesift::PenaltyPath& path) {
     "dev_ratio"_nm = give(path.dev_ratio),
     "null_deviance"_nm = cpp11::as_sexp(path.null_deviance),
     "passes"_nm = cpp11::as_sexp(path.passes),
+    "stalled"_nm = cpp11::as_sexp(path.stalled),
     "n_column"_nm = cpp11::as_sexp(static_cast<int>(path.n_column)),
     "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(path.family)))
   });
@@ -358,6 +359,7 @@ cpp11::list ts_penalised_cv_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles 
   out.push_back("cv_sd"_nm = give(cv.cv_sd));
   out.push_back("index_min"_nm = cpp11::as_sexp(static_cast<int>(cv.index_min) + 1));
   out.push_back("index_1se"_nm = cpp11::as_sexp(static_cast<int>(cv.index_1se) + 1));
+  out.push_back("fold_stalled"_nm = give(cv.fold_stalled));
   return out;
 }
 

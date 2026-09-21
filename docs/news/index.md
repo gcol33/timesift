@@ -27,7 +27,19 @@
   0.25 s for the four-response learner on a small ill-conditioned design
   (60 units, 18 columns). Binomial fits on a well-conditioned design
   move in the fourth decimal of a coefficient at most, and choose the
-  same penalty.
+  same penalty. The reproduction’s elastic-net row reads 0.68606 against
+  0.68605 before and the published 0.687, and runs in 21 minutes where
+  it took 94.
+- A penalised fit that does not settle at a penalty ends its path there
+  and returns the points before it, which is what glmnet does with the
+  same event, where it used to stop the whole run. A fit that does not
+  settle at the first penalty is still an error. The path records where
+  it stopped in `stalled`, a cross-validation records each fold’s in
+  `fold_stalled`, and
+  [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+  names every response whose path ended that way in `stopped`, beside
+  `unfitted`. Fits that settle are byte-identical to before
+  ([\#78](https://github.com/gcol33/timesift/issues/78)).
 
 ## timesift 0.3.0
 

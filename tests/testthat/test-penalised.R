@@ -174,6 +174,63 @@ test_that("a cross-validation on threads returns what one on a single thread ret
   expect_identical(.penalised_predict(threaded, input$x), .penalised_predict(serial, input$x))
 })
 
+test_that("a penalty the fit does not settle at ends the path and keeps the points before it", {
+  dir <- penalised_dir()
+  input <- penalised_input(dir)
+  w <- rep(1, nrow(input$x))
+  full <- .penalised_path(input$x, input$binomial, w, "binomial", 0.5)
+  expect_identical(full$stalled, 0L)
+  # A pass budget that runs out halfway down the path is a penalty the fit did not settle at. The
+  # budget changes no arithmetic before it runs out, so the points returned are the full path's
+  # own first points, to the bit, and the path says which penalty it stopped at.
+  cut <- .penalised_path(input$x, input$binomial, w, "binomial", 0.5,
+                         max_pass = full$passes %/% 2L)
+  k <- length(cut$lambda)
+  expect_gt(k, 1L)
+  expect_lt(k, length(full$lambda))
+  expect_identical(cut$stalled, k + 1L)
+  expect_identical(cut$lambda, full$lambda[seq_len(k)])
+  expect_identical(cut$a0, full$a0[seq_len(k)])
+  expect_identical(cut$beta, full$beta[, seq_len(k), drop = FALSE])
+  gaussian <- .penalised_path(input$x, input$gaussian, w, "gaussian", 0.5, max_pass = 20)
+  expect_identical(gaussian$stalled, length(gaussian$lambda) + 1L)
+  # At the first penalty there is nothing before it to return.
+  expect_error(.penalised_path(input$x, input$binomial, w, "binomial", 0.5, max_pass = 0),
+               "first penalty")
+})
+
+test_that("a cross-validation reads a fold whose path ended early and says which did", {
+  dir <- penalised_dir()
+  input <- penalised_input(dir)
+  w <- rep(1, nrow(input$x))
+  full <- .penalised_path(input$x, input$binomial, w, "binomial", 0.5)
+  fit <- .penalised_cv(input$x, input$binomial, w, "binomial", 0.5, input$fold, 5L,
+                       max_pass = full$passes %/% 2L)
+  expect_length(fit$fold_stalled, 5L)
+  expect_true(all(fit$fold_stalled > 0L))
+  expect_true(all(is.finite(fit$cv_mean)))
+  expect_true(fit$lambda_min %in% fit$lambda)
+  expect_true(.penalised_stopped(fit))
+  settled <- .penalised_cv(input$x, input$binomial, w, "binomial", 0.5, input$fold, 5L)
+  expect_identical(settled$fold_stalled, rep(0L, 5L))
+  expect_false(.penalised_stopped(settled))
+})
+
+test_that("the captured call glmnet does not settle on chooses the penalty cv.glmnet chooses", {
+  dir <- penalised_dir()
+  d <- utils::read.csv(file.path(dir, "penalised_stall_input.csv"), check.names = FALSE)
+  want <- utils::read.csv(file.path(dir, "penalised_stall_cv.csv"))
+  x <- as.matrix(d[, setdiff(names(d), c("unit", "y", "w", "fold"))])
+  # One inner cross-validation of the selection benchmark (#78), on which glmnet stops two folds'
+  # paths early. It stopped the whole run here once; it has to complete, and to choose what
+  # cv.glmnet chooses over the same folds.
+  fit <- .penalised_cv(x, d$y, d$w, want$family, want$alpha, d$fold, want$n_fold,
+                       thresh = want$thresh)
+  expect_gt(want$glmnet_stops, 0L)
+  expect_equal(fit$lambda_min, want$lambda_min, tolerance = 1e-10)
+  expect_equal(fit$lambda_1se, want$lambda_1se, tolerance = 1e-10)
+})
+
 test_that("the penalised learner fits over the core and carries no fitter of its own", {
   sim <- sim_series(n_unit = 60L, days = 56L, seed = 91L)
   y <- sim_response(sim, n_var = 2L, seed = 92L)
@@ -182,6 +239,7 @@ test_that("the penalised learner fits over the core and carries no fitter of its
   expect_identical(fit$learner$needs, character(0))
   expect_true(all(vapply(fit$model$models, function(f) is.list(f) && !is.null(f$lambda_min),
                          logical(1L))))
+  expect_identical(fit$model$stopped, character(0))
   p <- stats::predict(fit, x)
   expect_equal(dim(p), c(60L, 2L))
   expect_true(all(p > 0 & p < 1))

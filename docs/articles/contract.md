@@ -874,6 +874,16 @@ was agreement with it rather than an elastic net of our own.
 - A Gaussian fit folds the root of each case weight into the
   standardised columns and into the intercept’s column, so its quadratic
   has unit weight.
+- A fit that does not settle at a penalty, inside `max_irls`
+  reweightings or inside what is left of the path’s `max_pass` passes,
+  ends the path there: the points before it are the path, and `stalled`
+  records the 1-based position of the penalty it did not settle at, `0`
+  where the path ran to its end. That is glmnet’s `jerr = -m`. A fit
+  that does not settle at the first penalty has nothing to return and is
+  an error. A cross-validation records each fold’s `stalled` in fold
+  order as `fold_stalled`, and reads a fold whose path ended early at
+  its last point for every penalty below it, as glmnet’s `predict` reads
+  a truncated path.
 - A cross-validated penalty fits each fold along a path of its own and
   reads it at the whole-unit path’s penalties, interpolating between the
   two points around each, which is what `cv.glmnet` aligns on. The

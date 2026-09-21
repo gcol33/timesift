@@ -211,12 +211,73 @@ def test_a_cross_validation_on_threads_returns_what_one_on_a_single_thread_retur
     assert threaded["lambda_1se"] == serial["lambda_1se"]
 
 
+def test_a_penalty_the_fit_does_not_settle_at_ends_the_path_and_keeps_the_points_before_it(
+        penalised_input):
+    data = penalised_input
+    w = np.ones(len(data["binomial"]))
+    full = penalised_path(data["x"], data["binomial"], w, "binomial", 0.5)
+    assert full["stalled"] == 0
+    # A pass budget that runs out halfway down the path is a penalty the fit did not settle at.
+    # The budget changes no arithmetic before it runs out, so the points returned are the full
+    # path's own first points, to the bit, and the path says which penalty it stopped at.
+    cut = penalised_path(data["x"], data["binomial"], w, "binomial", 0.5,
+                         max_pass=full["passes"] // 2)
+    k = len(cut["lambda_"])
+    assert 1 < k < len(full["lambda_"])
+    assert cut["stalled"] == k + 1
+    assert np.array_equal(cut["lambda_"], full["lambda_"][:k])
+    assert np.array_equal(cut["a0"], full["a0"][:k])
+    assert np.array_equal(cut["beta"], full["beta"][:, :k])
+    gaussian = penalised_path(data["x"], data["gaussian"], w, "gaussian", 0.5, max_pass=20)
+    assert gaussian["stalled"] == len(gaussian["lambda_"]) + 1
+    # At the first penalty there is nothing before it to return.
+    with pytest.raises(ValueError, match="first penalty"):
+        penalised_path(data["x"], data["binomial"], w, "binomial", 0.5, max_pass=0)
+
+
+def test_a_cross_validation_reads_a_fold_whose_path_ended_early_and_says_which_did(
+        penalised_input):
+    from timesift.learners import _penalised_stopped
+    data = penalised_input
+    w = np.ones(len(data["binomial"]))
+    full = penalised_path(data["x"], data["binomial"], w, "binomial", 0.5)
+    fit = penalised_cv(data["x"], data["binomial"], w, "binomial", 0.5, data["fold"], 5,
+                       max_pass=full["passes"] // 2)
+    assert len(fit["fold_stalled"]) == 5
+    assert np.all(fit["fold_stalled"] > 0)
+    assert np.all(np.isfinite(fit["cv_mean"]))
+    assert fit["lambda_min"] in fit["lambda_"]
+    assert _penalised_stopped(fit)
+    settled = penalised_cv(data["x"], data["binomial"], w, "binomial", 0.5, data["fold"], 5)
+    assert np.array_equal(settled["fold_stalled"], np.zeros(5))
+    assert not _penalised_stopped(settled)
+
+
+def test_the_captured_call_glmnet_does_not_settle_on_chooses_the_penalty_cv_glmnet_chooses():
+    rows = read_rows("penalised_stall_input.csv")
+    columns = [c for c in rows[0] if c not in ("unit", "y", "w", "fold")]
+    x = np.asfortranarray([[float(r[c]) for c in columns] for r in rows])
+    y = np.array([float(r["y"]) for r in rows])
+    w = np.array([float(r["w"]) for r in rows])
+    fold = np.array([int(r["fold"]) for r in rows], dtype=np.int32)
+    want = read_rows("penalised_stall_cv.csv")[0]
+    # One inner cross-validation of the selection benchmark (#78), on which glmnet stops two
+    # folds' paths early. It stopped the whole run here once; it has to complete, and to choose
+    # what cv.glmnet chooses over the same folds.
+    fit = penalised_cv(x, y, w, want["family"], float(want["alpha"]), fold, int(want["n_fold"]),
+                       thresh=float(want["thresh"]))
+    assert int(want["glmnet_stops"]) > 0
+    assert fit["lambda_min"] == pytest.approx(float(want["lambda_min"]), rel=1e-10)
+    assert fit["lambda_1se"] == pytest.approx(float(want["lambda_1se"]), rel=1e-10)
+
+
 def test_the_penalised_learner_fits_over_the_core_and_carries_no_fitter_of_its_own():
     x, y = planted()
     learner = elasticnet()
     assert learner.needs == ()
     fit = fit_learner(learner, x, y)
     assert all(isinstance(f, dict) and "lambda_min" in f for f in fit.model["models"])
+    assert fit.model["stopped"] == []
     p = fit.predict(x)
     assert p.shape == (len(y.units), 2)
     assert np.all((p > 0) & (p < 1))

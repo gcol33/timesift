@@ -45,6 +45,12 @@ sets cannot each hold two of each outcome, the fewest a logistic path is fitted 
 few of one outcome to choose a penalty on. It is predicted its share among the fitting units,
 as a response holding one outcome is, and the fit names every such response in `unfitted`.
 
+A reweighted fit that does not settle at a penalty ends its path there and keeps the points
+before it, which is what glmnet does with the same event, and the penalty is chosen over the
+points fitted. It happens where a rare outcome is nearly separable at the small end of the
+path. The fit names every response whose path on the fitting units, or on any inner fold,
+ended that way in `stopped`.
+
 `threads` is how many fits of one response's inner cross-validation run at once. The path on
 every fitting unit and the path of each inner fold are one independent fit each, so they
 parallelise without sharing anything, and `n_inner + 1` threads is as many as a response can

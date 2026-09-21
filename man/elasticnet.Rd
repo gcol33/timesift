@@ -66,6 +66,12 @@ cannot each hold two of each outcome, the fewest a logistic path is fitted to, h
 one outcome to choose a penalty on. It is predicted its share among the fitting units, as a
 response holding one outcome is, and the fit names every such response in \code{unfitted}.
 
+A reweighted fit that does not settle at a penalty ends its path there and keeps the points
+before it, which is what glmnet does with the same event, and the penalty is chosen over the
+points fitted. It happens where a rare outcome is nearly separable at the small end of the
+path. The fit names every response whose path on the fitting units, or on any inner fold, ended
+that way in \code{stopped}.
+
 This is the aggregate-feature side of the comparison the package was built for, and it is the
 fair opponent for a network: a per-fold discrete selector pays selection variance a network
 never pays, so beating that one is not a matched result.

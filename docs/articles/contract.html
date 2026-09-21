@@ -1281,6 +1281,17 @@ and the descent still stops only on a pass that moved nothing.</li>
 <li>A Gaussian fit folds the root of each case weight into the
 standardised columns and into the intercept’s column, so its quadratic
 has unit weight.</li>
+<li>A fit that does not settle at a penalty, inside
+<code>max_irls</code> reweightings or inside what is left of the path’s
+<code>max_pass</code> passes, ends the path there: the points before it
+are the path, and <code>stalled</code> records the 1-based position of
+the penalty it did not settle at, <code>0</code> where the path ran to
+its end. That is glmnet’s <code>jerr = -m</code>. A fit that does not
+settle at the first penalty has nothing to return and is an error. A
+cross-validation records each fold’s <code>stalled</code> in fold order
+as <code>fold_stalled</code>, and reads a fold whose path ended early at
+its last point for every penalty below it, as glmnet’s
+<code>predict</code> reads a truncated path.</li>
 <li>A cross-validated penalty fits each fold along a path of its own and
 reads it at the whole-unit path’s penalties, interpolating between the
 two points around each, which is what <code>cv.glmnet</code> aligns on.

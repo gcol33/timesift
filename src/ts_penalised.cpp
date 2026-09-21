@@ -340,8 +340,9 @@ bool extrapolate(const Design& d, double lambda, double alpha, bool intercept,
 // coordinate descent. `v` is the weight of the quadratic and `r` its residual already multiplied
 // by that weight, so a case the family has pinned carries a gradient and no curvature, which is
 // what glmnet does with a fitted probability at zero or one. A folded design carries its weight in
-// its columns, and `v` is not read.
-void quadratic_solve(const Design& d, double lambda, double alpha, bool intercept, double thresh,
+// its columns, and `v` is not read. It returns whether the descent settled before the pass budget
+// ran out.
+bool quadratic_solve(const Design& d, double lambda, double alpha, bool intercept, double thresh,
                      int& budget, const std::vector<double>& v, const std::vector<double>& xv,
                      std::vector<double>& r, Coefs& fit, Extrapolation& ex) {
   const std::size_t n = d.n;
@@ -387,7 +388,7 @@ void quadratic_solve(const Design& d, double lambda, double alpha, bool intercep
     double dlx = 0.0;
     for (std::size_t k = 0; k < fit.candidates.size(); ++k) step(fit.candidates[k], dlx);
     shift(dlx);
-    if (--budget < 0) throw Error("a penalised fit did not settle inside its pass budget.");
+    if (--budget < 0) return false;
     if (dlx < thresh) break;
     // The columns that have left zero are then cycled on their own until they settle, and the
     // offered set is swept again only to see whether a column outside them has started to move.
@@ -398,7 +399,7 @@ void quadratic_solve(const Design& d, double lambda, double alpha, bool intercep
       double inner = 0.0;
       for (std::size_t k = 0; k < fit.active.size(); ++k) step(fit.active[k], inner);
       shift(inner);
-      if (--budget < 0) throw Error("a penalised fit did not settle inside its pass budget.");
+      if (--budget < 0) return false;
       if (inner < thresh) break;
       ex.record(fit);
       if (ex.filled == Extrapolation::depth + 1) {
@@ -408,6 +409,7 @@ void quadratic_solve(const Design& d, double lambda, double alpha, bool intercep
       }
     }
   }
+  return true;
 }
 
 // The linear predictor over the design's own columns, so on a folded design it is the predictor
@@ -656,9 +658,11 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
       std::sort(fit.candidates.begin(), fit.candidates.end());
     }
 
+    bool settled = true;
     for (;;) {
       if (family == Family::gaussian) {
-        quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r, fit, ex);
+        settled = quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv,
+                                  r, fit, ex);
       } else {
         // A reweighted least squares is settled when a step of it moves nothing, and what that is
         // read on is the step's own move: the coefficients it started from against the ones it
@@ -675,7 +679,11 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
             started[fit.active[k2]] = fit.b[fit.active[k2]];
           }
           curvature();
-          quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r, fit, ex);
+          if (!quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r,
+                               fit, ex)) {
+            settled = false;
+            break;
+          }
           reweight();
           const double shift = fit.a0 - started_at;
           double moved = total(v.data(), n) * shift * shift;
@@ -686,10 +694,12 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
           }
           if (moved < tolerance) break;
           if (it + 1 >= spec.max_irls) {
-            throw Error("a binomial penalised fit did not settle at one penalty.");
+            settled = false;
+            break;
           }
         }
       }
+      if (!settled) break;
 
       // What the screen left out, tested: a column outside the offered set whose gradient is over
       // the threshold is not at zero at the optimum, so it is taken back and the penalty refitted.
@@ -708,6 +718,20 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
         linear_predictor(d, fit, eta);
         for (std::size_t i = 0; i < n; ++i) r[i] = yw[i] - eta[i];
       }
+    }
+
+    // A penalty the fit did not settle at ends the path, and the points before it are the path,
+    // which is what glmnet returns for the same event. A fit that does not settle at the first
+    // penalty has nothing to return.
+    if (!settled) {
+      if (out.lambda.empty()) {
+        throw Error(family == Family::binomial
+                        ? "a binomial penalised fit did not settle at the first penalty of its path."
+                        : "a penalised fit did not settle at the first penalty of its path inside "
+                          "its pass budget.");
+      }
+      out.stalled = static_cast<std::int32_t>(k) + 1;
+      break;
     }
 
     // The residual is rebuilt from the coefficients at every penalty rather than carried forward,
@@ -754,7 +778,7 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
     previous_lambda = lambda;
   }
   if (out.lambda.empty()) throw Error("a penalised path fitted no penalty.");
-  out.passes = spec.max_pass - budget;
+  out.passes = spec.max_pass - std::max(budget, 0);
   return out;
 }
 
@@ -899,6 +923,8 @@ PenaltyCV penalised_cv(const double* x, const double* y, const double* w, std::s
   for (std::size_t g = 0; g < folds; ++g) {
     if (held[g].failure) std::rethrow_exception(held[g].failure);
   }
+  out.fold_stalled.resize(folds);
+  for (std::size_t g = 0; g < folds; ++g) out.fold_stalled[g] = held[g].fit.stalled;
   const std::size_t k = out.path.lambda.size();
 
   std::vector<double> fold_sum(folds, 0.0);

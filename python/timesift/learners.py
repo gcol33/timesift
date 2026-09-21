@@ -705,6 +705,12 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, s="lambda.min", n_
     few of one outcome to choose a penalty on. It is predicted its share among the fitting units,
     as a response holding one outcome is, and the fit names every such response in ``unfitted``.
 
+    A reweighted fit that does not settle at a penalty ends its path there and keeps the points
+    before it, which is what glmnet does with the same event, and the penalty is chosen over the
+    points fitted. It happens where a rare outcome is nearly separable at the small end of the
+    path. The fit names every response whose path on the fitting units, or on any inner fold,
+    ended that way in ``stopped``.
+
     ``threads`` is how many fits of one response's inner cross-validation run at once. The path on
     every fitting unit and the path of each inner fold are one independent fit each, so they
     parallelise without sharing anything, and ``n_inner + 1`` threads is as many as a response can
@@ -735,7 +741,14 @@ def _elasticnet_fit(x, y, alpha, n_inner, squares, s, n_lambda, thresh, threads,
 
     models = _fit_columns(m, y, make, _variable_seeds(seed, variables), _head_weights(head, y))
     return dict(models=models, squares=squares, s=s, n_col=m.shape[1], family=family,
-                unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)])
+                unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)],
+                stopped=[str(v) for v, f in zip(variables, models) if _penalised_stopped(f)])
+
+
+def _penalised_stopped(fit) -> bool:
+    """Whether a cross-validated fit's path, on every unit or on any fold, ended at a penalty it
+    did not settle at."""
+    return isinstance(fit, dict) and (fit["stalled"] > 0 or bool(np.any(fit["fold_stalled"] > 0)))
 
 
 def _elasticnet_predict(model, x):

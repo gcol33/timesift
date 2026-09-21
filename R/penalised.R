@@ -25,14 +25,22 @@
   out$cv_sd <- fit$cv_sd
   out$lambda_min <- fit$lambda[fit$index_min]
   out$lambda_1se <- fit$lambda[fit$index_1se]
+  out$fold_stalled <- fit$fold_stalled
   out
+}
+
+# Whether a cross-validated fit's path, on every unit or on any fold, ended at a penalty it did
+# not settle at.
+.penalised_stopped <- function(fit) {
+  is.list(fit) && (fit$stalled > 0L || any(fit$fold_stalled > 0L))
 }
 
 .penalised_shape <- function(fit, columns) {
   beta <- matrix(fit$beta, nrow = fit$n_column,
                  dimnames = list(columns, NULL))
   list(lambda = fit$lambda, a0 = fit$a0, beta = beta, df = fit$df, dev_ratio = fit$dev_ratio,
-       null_deviance = fit$null_deviance, passes = fit$passes, family = fit$family)
+       null_deviance = fit$null_deviance, passes = fit$passes, stalled = fit$stalled,
+       family = fit$family)
 }
 
 # The penalty a fit is read at: a point of the path by name, or a number, which is interpolated
