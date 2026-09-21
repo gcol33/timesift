@@ -512,9 +512,12 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
         // A reweighted least squares is settled when a step of it moves nothing, and what that is
         // read on is the step's own move: the coefficients it started from against the ones it
         // reached, over the columns that have left zero and over the intercept, on the same scale
-        // the descent inside it stops at. Reading it instead on what a further step finds to do
-        // costs a whole step -- a reweighting, a curvature and a sweep over every column offered
-        // -- at every penalty, to learn that there was nothing.
+        // the descent inside it stops at. That is glmnet's own test, and it ends the step on the
+        // reweighting the next one would have opened with, so the loop leaves `r` where the
+        // optimality test below reads it and needs none of its own afterwards. It takes the same
+        // number of steps as reading the move off the first sweep of a further step does --
+        // measured, the same to two decimals on every shape tried -- and saves the reweighting
+        // that reading needed after the loop, which is two of them at every penalty.
         for (int it = 0;; ++it) {
           const double started_at = fit.a0;
           for (std::size_t k2 = 0; k2 < fit.active.size(); ++k2) {
