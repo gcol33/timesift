@@ -1,5 +1,34 @@
 # Changelog
 
+## timesift 0.3.1
+
+### Changed
+
+- The penalised core’s binomial fit is at glmnet’s speed on one thread,
+  at the shipped `thresh = 1e-8`, one notch tighter than glmnet’s
+  default. The path reads the columns once per penalty rather than
+  twice, a binomial fit ends each penalty on the one reweighting the
+  next penalty opens with, and a reweighted least squares step is judged
+  on its own move, which is glmnet’s test
+  ([\#77](https://github.com/gcol33/timesift/issues/77)). A Gaussian fit
+  folds the root of each case weight into the design, so a coordinate’s
+  step reads two streams where it read three.
+- The descent’s inner cycle is Anderson-extrapolated every five passes
+  (Bertrand and Massias, 2021), and the extrapolated point is taken only
+  where it lowers the penalised objective. That is what an
+  ill-conditioned design needed: a tighter threshold there multiplied
+  the passes, and now costs 2.8 to 6.9 times fewer of them. Every fit
+  sits as close to the optimum as before or closer.
+- Timings, one cross-validated path, installed builds, against
+  `cv.glmnet` at its default on the same run: 0.47 s against 0.47 to
+  0.51 s for a binomial fit on the Schrankogel shape (894 units, 942
+  columns, five inner folds), 264 ms against 228 ms for a Gaussian one
+  there (190 ms at glmnet’s own threshold of `1e-7`), and 0.12 s against
+  0.25 s for the four-response learner on a small ill-conditioned design
+  (60 units, 18 columns). Binomial fits on a well-conditioned design
+  move in the fourth decimal of a coefficient at most, and choose the
+  same penalty.
+
 ## timesift 0.3.0
 
 ### Changed

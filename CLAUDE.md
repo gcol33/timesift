@@ -214,7 +214,7 @@ to do with neural networks.
 
 ## Status
 
-Version 0.3.0. Not on CRAN or PyPI yet. The version went down at the rename: 0.1.0 was a first
+Version 0.3.1. Not on CRAN or PyPI yet. The version went down at the rename: 0.1.0 was a first
 release under a new name and a general contract, not a fourth release of `climgrain`. `DESCRIPTION`
 is where the string is written and `pyproject.toml` reads it from there, so a bump is one edit.
 

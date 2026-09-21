@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,15 @@
       <small>Source: <a href="https://github.com/gcol33/timesift/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.3.1" id="timesift-031">timesift 0.3.1<a class="anchor" aria-label="anchor" href="#timesift-031"></a></h2>
+<div class="section level3">
+<h3 id="changed-0-3-1">Changed<a class="anchor" aria-label="anchor" href="#changed-0-3-1"></a></h3>
+<ul><li>The penalised core’s binomial fit is at glmnet’s speed on one thread, at the shipped <code>thresh = 1e-8</code>, one notch tighter than glmnet’s default. The path reads the columns once per penalty rather than twice, a binomial fit ends each penalty on the one reweighting the next penalty opens with, and a reweighted least squares step is judged on its own move, which is glmnet’s test (<a href="https://github.com/gcol33/timesift/issues/77" class="external-link">#77</a>). A Gaussian fit folds the root of each case weight into the design, so a coordinate’s step reads two streams where it read three.</li>
+<li>The descent’s inner cycle is Anderson-extrapolated every five passes (Bertrand and Massias, 2021), and the extrapolated point is taken only where it lowers the penalised objective. That is what an ill-conditioned design needed: a tighter threshold there multiplied the passes, and now costs 2.8 to 6.9 times fewer of them. Every fit sits as close to the optimum as before or closer.</li>
+<li>Timings, one cross-validated path, installed builds, against <code>cv.glmnet</code> at its default on the same run: 0.47 s against 0.47 to 0.51 s for a binomial fit on the Schrankogel shape (894 units, 942 columns, five inner folds), 264 ms against 228 ms for a Gaussian one there (190 ms at glmnet’s own threshold of <code>1e-7</code>), and 0.12 s against 0.25 s for the four-response learner on a small ill-conditioned design (60 units, 18 columns). Binomial fits on a well-conditioned design move in the fourth decimal of a coefficient at most, and choose the same penalty.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.3.0" id="timesift-030">timesift 0.3.0<a class="anchor" aria-label="anchor" href="#timesift-030"></a></h2>
 <div class="section level3">
