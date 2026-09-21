@@ -343,14 +343,14 @@ def _seconds(x):
 @pytest.mark.parametrize(
     "row", read_channels(),
     ids=lambda r: (f"{r['series']}-{r['grain']}-{r['tz'].replace('/', '_')}"
-                   f"-{r['year_start']}-{r['partial']}-{r['kind']}"))
+                   f"-{r['year_start']}-{r['partial']}-{r['kind']}-{r['cycle']}"))
 def test_the_calendar_channels_match_the_fraction_the_r_side_reads(series, row):
     x = grain_matrix(series[row["series"]], "id", "time", "value",
                       grain=binning(row["series"], row["grain"]),
                       stats=row["stat"].split("+"), year_start=row["year_start"],
                       partial=row["partial"], tz=row["tz"])
-    got = bind_channels(x, calendar_channels(x)) if row["kind"] == "bound" \
-        else calendar_channels(x)
+    cc = calendar_channels(x, cycles=(row["cycle"],))
+    got = bind_channels(x, cc) if row["kind"] == "bound" else cc
 
     assert got.values.shape[0] == int(row["n_unit"])
     assert got.values.shape[1] == int(row["n_bin"])
@@ -358,18 +358,19 @@ def test_the_calendar_channels_match_the_fraction_the_r_side_reads(series, row):
     assert got.bins[0] == row["first_bin"]
     assert got.bins[-1] == row["last_bin"]
 
-    from oracle import oracle_year_fraction
+    from oracle import oracle_cycle_fraction
 
-    frac = _core.year_fraction(_seconds(got.bin_start), _seconds(got.bin_end))
+    cycle = row["cycle"]
+    frac = _core.cycle_fraction(_seconds(got.bin_start), _seconds(got.bin_end), cycle)
     assert digest_array(frac) == row["digest"]
-    assert np.array_equal(frac, oracle_year_fraction(got.bin_start, got.bin_end))
+    assert np.array_equal(frac, oracle_cycle_fraction(cycle, got.bin_start, got.bin_end))
 
     tolerance = float(row["tolerance"])
-    assert np.max(np.abs(got.channel("year_sin")[0] - np.sin(2 * np.pi * frac))) < tolerance
-    assert np.max(np.abs(got.channel("year_cos")[0] - np.cos(2 * np.pi * frac))) < tolerance
+    assert np.max(np.abs(got.channel(f"{cycle}_sin")[0] - np.sin(2 * np.pi * frac))) < tolerance
+    assert np.max(np.abs(got.channel(f"{cycle}_cos")[0] - np.cos(2 * np.pi * frac))) < tolerance
     # The calendar is where a bin sits, not something a unit has, so every unit reads the same two
     # channels; a bound array carries its readings unchanged beside them.
-    for name in ("year_sin", "year_cos"):
+    for name in (f"{cycle}_sin", f"{cycle}_cos"):
         assert np.array_equal(got.channel(name), np.tile(got.channel(name)[0],
                                                          (got.values.shape[0], 1)))
     if row["kind"] == "bound":
@@ -395,6 +396,8 @@ def test_what_the_two_channel_functions_refuse_is_what_the_r_side_refuses(series
         "one_argument": lambda: bind_channels(x),
         "duplicate": lambda: bind_channels(x, x),
         "different_bins": lambda: bind_channels(x, other),
+        "day_coarse": lambda: calendar_channels(x, cycles=("day",)),
+        "unknown_cycle": lambda: calendar_channels(x, cycles=("month",)),
     }[row["case"]]
     with pytest.raises(ValueError) as raised:
         case()

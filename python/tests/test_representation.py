@@ -202,6 +202,26 @@ def test_the_calendar_channels_are_the_position_of_a_bin_in_the_year():
     assert np.allclose(cc.values[0, :, 0] ** 2 + cc.values[0, :, 1] ** 2, 1)
 
 
+def test_the_day_cycle_is_the_position_of_a_reading_in_the_utc_day():
+    d = hourly(hours=24 * 3)
+    x = grain_matrix(d, "id", "time", "value", grain="native")
+    cc = calendar_channels(x, cycles=("year", "day"))
+    assert cc.stats == ("year_sin", "year_cos", "day_sin", "day_cos")
+    assert np.array_equal(cc.values[:, :, :2], calendar_channels(x).values)
+    hour = (x.bin_start.astype("datetime64[h]").astype(np.int64) % 24).astype(float)
+    assert np.allclose(cc.channel("day_sin")[0], np.sin(2 * np.pi * hour / 24))
+    assert np.allclose(cc.channel("day_cos")[0], np.cos(2 * np.pi * hour / 24))
+    assert calendar_channels(x, cycles=("day", "year")).stats == \
+        ("day_sin", "day_cos", "year_sin", "year_cos")
+    daily = grain_matrix(d, "id", "time", "value", grain="day")
+    with pytest.raises(ValueError, match="a day or more apart"):
+        calendar_channels(daily, cycles=("day",))
+    with pytest.raises(ValueError, match="unknown cycle: month"):
+        calendar_channels(x, cycles=("month",))
+    with pytest.raises(ValueError, match="each cycle once"):
+        calendar_channels(x, cycles=("day", "day"))
+
+
 def test_channels_are_joined_in_the_order_they_are_given():
     d = hourly(hours=24 * 60)
     x = grain_matrix(d, "id", "time", "value", grain="week", stats=["cold_day", "mean"])

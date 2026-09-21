@@ -20,12 +20,12 @@ ts_bin_nexts_ <- function(bins, grain, year_month, year_day) {
   .Call(`_timesift_ts_bin_nexts_`, bins, grain, year_month, year_day)
 }
 
-ts_year_fraction_ <- function(bin_start, bin_end) {
-  .Call(`_timesift_ts_year_fraction_`, bin_start, bin_end)
+ts_cycle_fraction_ <- function(bin_start, bin_end, cycle) {
+  .Call(`_timesift_ts_cycle_fraction_`, bin_start, bin_end, cycle)
 }
 
-ts_year_phase_ <- function(bin_start, bin_end) {
-  .Call(`_timesift_ts_year_phase_`, bin_start, bin_end)
+ts_cycle_phase_ <- function(bin_start, bin_end, cycle) {
+  .Call(`_timesift_ts_cycle_phase_`, bin_start, bin_end, cycle)
 }
 
 ts_penalised_path_ <- function(x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, max_pass) {

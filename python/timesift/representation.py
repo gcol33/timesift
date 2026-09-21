@@ -421,11 +421,13 @@ def _format_duration(x: int) -> str:
             return f"{n} {name}" + ("" if abs(n) == 1 else "s")
 
 
-def calendar_channels(x: TimesiftMatrix) -> TimesiftMatrix:
-    """Where in the year each bin sits, as the sine and cosine of its fractional position.
+def calendar_channels(x: TimesiftMatrix, cycles=("year",)) -> TimesiftMatrix:
+    """Where in the year, or the day, each bin sits, as the sine and cosine of its fractional
+    position in each cycle named, in the order given.
 
-    The position is read at the midpoint of the record each bin holds, on the Gregorian calendar
-    in UTC. ``inst/spec/representation.md`` is the normative description.
+    The position is read at the midpoint of the record each bin holds, in UTC. The day cycle reads
+    bins that sit less than a day apart and is refused otherwise. ``inst/spec/representation.md``
+    is the normative description.
     """
     if not isinstance(x, TimesiftMatrix):
         raise ValueError(f"expected a grain_matrix() result, got {type(x).__name__}.")
@@ -433,15 +435,21 @@ def calendar_channels(x: TimesiftMatrix) -> TimesiftMatrix:
         raise ValueError("a lookback's bins are placed relative to a target rather than on the "
                          "calendar, so they have no position in the year. calendar_channels() "
                          "reads a grain_matrix().")
-    year_sin, year_cos = _core.year_phase(
-        np.ascontiguousarray(x.bin_start.astype("datetime64[s]").astype(np.int64)),
-        np.ascontiguousarray(x.bin_end.astype("datetime64[s]").astype(np.int64)))
+    if isinstance(cycles, str):
+        cycles = (cycles,)
+    cycles = tuple(cycles)
+    if not cycles or not all(isinstance(c, str) for c in cycles) or len(set(cycles)) < len(cycles):
+        raise ValueError(f"cycles names each cycle once, from 'year' and 'day', got {cycles!r}.")
+    start = np.ascontiguousarray(x.bin_start.astype("datetime64[s]").astype(np.int64))
+    end = np.ascontiguousarray(x.bin_end.astype("datetime64[s]").astype(np.int64))
 
     n_u = x.values.shape[0]
-    out = np.empty((n_u, len(year_sin), 2), dtype=np.float64)
-    out[:, :, 0] = year_sin
-    out[:, :, 1] = year_cos
-    return replace(x, values=out, stats=("year_sin", "year_cos"))
+    out = np.empty((n_u, len(start), 2 * len(cycles)), dtype=np.float64)
+    names = []
+    for k, cycle in enumerate(cycles):
+        out[:, :, 2 * k], out[:, :, 2 * k + 1] = _core.cycle_phase(start, end, cycle)
+        names += [f"{cycle}_sin", f"{cycle}_cos"]
+    return replace(x, values=out, stats=tuple(names))
 
 
 def bind_channels(*parts: TimesiftMatrix) -> TimesiftMatrix:

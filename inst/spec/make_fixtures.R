@@ -414,18 +414,20 @@ cat("wrote", length(COVERAGE_CASES), "coverage cases\n")
 # states, which is what the fraction is pinned here for.
 channel_rows <- list()
 channel_row <- function(name, w, stats = "mean", kind = "calendar", year_start = "09-01",
-                        partial = "keep", tz = "UTC") {
+                        partial = "keep", tz = "UTC", cycle = "year") {
   series <- SERIES[[name]]
   attr(series$time, "tzone") <- tz
   binning <- if (w == "astronomical") astronomical(name) else w
   x <- grain_matrix(series, id, time, value, grain = binning, stats = stats,
                      year_start = year_start, partial = partial)
-  got <- if (kind == "bound") bind_channels(x, calendar_channels(x)) else calendar_channels(x)
+  cc <- calendar_channels(x, cycles = cycle)
+  got <- if (kind == "bound") bind_channels(x, cc) else cc
   start <- attr(got, "bin_start")
-  frac <- ts_year_fraction_(as.numeric(attr(got, "bin_start")),
-                            as.numeric(attr(got, "bin_end")))
+  frac <- ts_cycle_fraction_(as.numeric(attr(got, "bin_start")),
+                             as.numeric(attr(got, "bin_end")), cycle)
   data.frame(series = name, grain = w, tz = tz, year_start = year_start, partial = partial,
-             stat = paste(stats, collapse = "+"), kind = kind, n_unit = dim(got)[1],
+             stat = paste(stats, collapse = "+"), kind = kind, cycle = cycle,
+             n_unit = dim(got)[1],
              n_bin = dim(got)[2],
              channels = paste(dimnames(got)[[3L]], collapse = "+"),
              first_bin = format(start[1], "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
@@ -460,6 +462,12 @@ for (w in c("native", "halfday", "day")) {
 add_channels("aligned", "week", stats = c("cold_day", "mean", "warm_day"), kind = "bound")
 add_channels("offset", "week", stats = c("min", "mean", "max"), kind = "bound")
 add_channels("zoned", "day", kind = "bound", tz = "America/Sao_Paulo")
+# The place in the day, on the two grains finer than a day. The zone row is what says the phase is
+# read on the instants rather than on the clock the bins were placed on.
+for (w in c("native", "halfday")) {
+  add_channels("zoned", w, tz = "America/Sao_Paulo", cycle = "day")
+}
+add_channels("zoned", "native", kind = "bound", tz = "America/Sao_Paulo", cycle = "day")
 
 write_fixture(do.call(rbind, channel_rows), "channels_digests.csv")
 cat("wrote", length(channel_rows), "channel digests\n")
@@ -472,7 +480,9 @@ CHANNEL_GUARDS <- list(
   list(case = "not_a_representation", message = "not a representation"),
   list(case = "one_argument", message = "at least two representations"),
   list(case = "duplicate", message = "carry a channel of the same name: mean"),
-  list(case = "different_bins", message = "argument 2 covers different units or bins")
+  list(case = "different_bins", message = "argument 2 covers different units or bins"),
+  list(case = "day_coarse", message = "sit a day or more apart"),
+  list(case = "unknown_cycle", message = "unknown cycle: month")
 )
 channel_guard <- function(case) {
   series <- SERIES$aligned
@@ -486,6 +496,8 @@ channel_guard <- function(case) {
     one_argument = bind_channels(x),
     duplicate = bind_channels(x, x),
     different_bins = bind_channels(x, grain_matrix(series, id, time, value, grain = "month")),
+    day_coarse = calendar_channels(x, cycles = "day"),
+    unknown_cycle = calendar_channels(x, cycles = "month"),
     stop("no channel guard called ", case))
 }
 for (guard in CHANNEL_GUARDS) {

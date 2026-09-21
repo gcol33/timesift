@@ -231,31 +231,32 @@ cpp11::doubles ts_bin_nexts_(cpp11::doubles bins, std::string grain, int year_mo
   return result;
 }
 
-// The calendar position of each bin, from the instants the representation carries. The fraction
+// The position of each bin in a cycle, from the instants the representation carries. The fraction
 // is reachable on its own because it is the part of the position the contract pins exactly.
 [[cpp11::register]]
-cpp11::doubles ts_year_fraction_(cpp11::doubles bin_start, cpp11::doubles bin_end) {
+cpp11::doubles ts_cycle_fraction_(cpp11::doubles bin_start, cpp11::doubles bin_end,
+                                  std::string cycle) {
   const std::vector<timesift::seconds> opens = as_seconds(bin_start);
   const std::vector<timesift::seconds> closes = as_seconds(bin_end);
   std::vector<double> frac(opens.size());
-  timesift::year_fraction(opens.data(), closes.data(), opens.size(), frac.data());
+  timesift::cycle_fraction(cycle, opens.data(), closes.data(), opens.size(), frac.data());
   cpp11::writable::doubles out(static_cast<R_xlen_t>(frac.size()));
   for (std::size_t i = 0; i < frac.size(); ++i) out[static_cast<R_xlen_t>(i)] = frac[i];
   return out;
 }
 
-
 [[cpp11::register]]
-cpp11::doubles ts_year_phase_(cpp11::doubles bin_start, cpp11::doubles bin_end) {
+cpp11::doubles ts_cycle_phase_(cpp11::doubles bin_start, cpp11::doubles bin_end,
+                               std::string cycle) {
   const std::vector<timesift::seconds> opens = as_seconds(bin_start);
   const std::vector<timesift::seconds> closes = as_seconds(bin_end);
   const std::size_t n = opens.size();
-  std::vector<double> year_sin(n), year_cos(n);
-  timesift::year_phase(opens.data(), closes.data(), n, year_sin.data(), year_cos.data());
+  std::vector<double> out_sin(n), out_cos(n);
+  timesift::cycle_phase(cycle, opens.data(), closes.data(), n, out_sin.data(), out_cos.data());
   cpp11::writable::doubles out(static_cast<R_xlen_t>(2 * n));
   for (std::size_t i = 0; i < n; ++i) {
-    out[static_cast<R_xlen_t>(i)] = year_sin[i];
-    out[static_cast<R_xlen_t>(n + i)] = year_cos[i];
+    out[static_cast<R_xlen_t>(i)] = out_sin[i];
+    out[static_cast<R_xlen_t>(n + i)] = out_cos[i];
   }
   return out;
 }

@@ -280,7 +280,8 @@ test_that("the calendar channels match the fraction the Python side reads", {
                        grain = fixture_binning(dir, row$series, row$grain),
                        stats = strsplit(row$stat, "+", fixed = TRUE)[[1L]],
                        year_start = row$year_start, partial = row$partial)
-    got <- if (row$kind == "bound") bind_channels(x, calendar_channels(x)) else calendar_channels(x)
+    cc <- calendar_channels(x, cycles = row$cycle)
+    got <- if (row$kind == "bound") bind_channels(x, cc) else cc
 
     start <- attr(got, "bin_start")
     expect_equal(dim(got)[1], row$n_unit, info = label)
@@ -290,17 +291,20 @@ test_that("the calendar channels match the fraction the Python side reads", {
     expect_equal(format(start[length(start)], "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
                  row$last_bin, info = label)
 
-    frac <- ts_year_fraction_(as.numeric(start), as.numeric(attr(got, "bin_end")))
+    frac <- ts_cycle_fraction_(as.numeric(start), as.numeric(attr(got, "bin_end")), row$cycle)
     expect_identical(digest_array(frac), row$digest, info = label)
-    expect_equal(frac, oracle_year_fraction(start, attr(got, "bin_end")), info = label)
+    expect_equal(frac, oracle_cycle_fraction(row$cycle, start, attr(got, "bin_end")),
+                 info = label)
 
-    expect_lt(max(abs(as.numeric(got[1, , "year_sin"]) - sin(2 * pi * frac))), row$tolerance)
-    expect_lt(max(abs(as.numeric(got[1, , "year_cos"]) - cos(2 * pi * frac))), row$tolerance)
+    sin_name <- paste0(row$cycle, "_sin")
+    cos_name <- paste0(row$cycle, "_cos")
+    expect_lt(max(abs(as.numeric(got[1, , sin_name]) - sin(2 * pi * frac))), row$tolerance)
+    expect_lt(max(abs(as.numeric(got[1, , cos_name]) - cos(2 * pi * frac))), row$tolerance)
     # The calendar is where a bin sits, not something a unit has, so every unit reads the same two
     # channels; a bound array carries its readings unchanged beside them.
     for (u in seq_len(dim(got)[1])) {
-      expect_identical(got[u, , "year_sin"], got[1L, , "year_sin"], info = label)
-      expect_identical(got[u, , "year_cos"], got[1L, , "year_cos"], info = label)
+      expect_identical(got[u, , sin_name], got[1L, , sin_name], info = label)
+      expect_identical(got[u, , cos_name], got[1L, , cos_name], info = label)
     }
     if (row$kind == "bound") {
       expect_identical(as.numeric(got[, , dimnames(x)[[3L]]]), as.numeric(x), info = label)
@@ -330,9 +334,11 @@ test_that("what the two channel functions refuse is what the Python side refuses
       one_argument = function() bind_channels(x),
       duplicate = function() bind_channels(x, x),
       different_bins = function() bind_channels(x, other),
+      day_coarse = function() calendar_channels(x, cycles = "day"),
+      unknown_cycle = function() calendar_channels(x, cycles = "month"),
       stop("no channel guard called ", row$case))
     expect_error(raised(), row$message, fixed = TRUE, info = row$case)
   }
   expect_setequal(expected$case, c("lookback", "not_a_representation", "one_argument",
-                                   "duplicate", "different_bins"))
+                                   "duplicate", "different_bins", "day_coarse", "unknown_cycle"))
 })

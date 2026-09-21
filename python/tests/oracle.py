@@ -304,3 +304,17 @@ def oracle_year_fraction(bin_start: np.ndarray, bin_end: np.ndarray) -> np.ndarr
     first = year.astype("datetime64[s]").astype(np.int64)
     length = (year + 1).astype("datetime64[s]").astype(np.int64) - first
     return (mid - first) / length
+
+
+def oracle_day_fraction(bin_start: np.ndarray, bin_end: np.ndarray) -> np.ndarray:
+    """Where in the day a bin sits: the same midpoint, over the UTC day it falls in. It reads the
+    day by truncating a datetime64, where the core takes the remainder of a division."""
+    opens = bin_start.astype("datetime64[s]").astype(np.int64)
+    closes = bin_end.astype("datetime64[s]").astype(np.int64)
+    mid = (opens + (closes - opens) // 2).astype("datetime64[s]")
+    into = (mid - mid.astype("datetime64[D]").astype("datetime64[s]")).astype(np.int64)
+    return into / 86400
+
+
+def oracle_cycle_fraction(cycle: str, bin_start: np.ndarray, bin_end: np.ndarray) -> np.ndarray:
+    return {"year": oracle_year_fraction, "day": oracle_day_fraction}[cycle](bin_start, bin_end)

@@ -316,6 +316,23 @@ test_that("the calendar channels are the position of a bin in the year", {
   expect_equal(cc[1, repeated[1], 1], cc[1, repeated[2], 1], tolerance = 0.02)
 })
 
+test_that("the day cycle is the position of a reading in the UTC day", {
+  d <- hourly_series(units = c("a", "b"), hours = 24 * 3)
+  x <- grain_matrix(d, plot, t, temp, grain = "native")
+  cc <- calendar_channels(x, cycles = c("year", "day"))
+  expect_equal(dimnames(cc)[[3]], c("year_sin", "year_cos", "day_sin", "day_cos"))
+  expect_equal(cc[, , 1:2], calendar_channels(x)[, , 1:2])
+  hour <- as.numeric(format(attr(x, "bin_start"), "%H", tz = "UTC"))
+  expect_equal(as.numeric(cc[1, , "day_sin"]), sin(2 * pi * hour / 24))
+  expect_equal(as.numeric(cc[1, , "day_cos"]), cos(2 * pi * hour / 24))
+  expect_equal(dimnames(calendar_channels(x, cycles = c("day", "year")))[[3]],
+               c("day_sin", "day_cos", "year_sin", "year_cos"))
+  daily <- grain_matrix(d, plot, t, temp, grain = "day")
+  expect_error(calendar_channels(daily, cycles = "day"), "a day or more apart")
+  expect_error(calendar_channels(x, cycles = "month"), "unknown cycle: month")
+  expect_error(calendar_channels(x, cycles = c("day", "day")), "each cycle once")
+})
+
 test_that("channels are joined in the order they are given", {
   d <- hourly_series(units = c("a", "b"), hours = 24 * 60)
   x <- grain_matrix(d, plot, t, temp, grain = "week", stats = c("cold_day", "mean"))

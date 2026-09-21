@@ -313,3 +313,21 @@ oracle_year_fraction <- function(bin_start, bin_end) {
   length <- as.numeric(as.POSIXct(paste0(year + 1L, "-01-01"), tz = "UTC")) - first
   (mid - first) / length
 }
+
+# Where in the day a bin sits: the same midpoint, over the UTC day it falls in. It reads the clock
+# time by writing it and parsing it back, where the core takes the remainder of a division.
+oracle_day_fraction <- function(bin_start, bin_end) {
+  opens <- as.numeric(bin_start)
+  mid <- .POSIXct(opens + floor((as.numeric(bin_end) - opens) / 2), tz = "UTC")
+  vapply(format(mid, "%H:%M:%S", tz = "UTC"), function(hms) {
+    part <- as.integer(strsplit(hms, ":", fixed = TRUE)[[1L]])
+    (part[1L] * 3600 + part[2L] * 60 + part[3L]) / 86400
+  }, numeric(1L), USE.NAMES = FALSE)
+}
+
+oracle_cycle_fraction <- function(cycle, bin_start, bin_end) {
+  switch(cycle,
+         year = oracle_year_fraction(bin_start, bin_end),
+         day = oracle_day_fraction(bin_start, bin_end),
+         stop("no oracle for the ", cycle, " cycle"))
+}

@@ -200,20 +200,26 @@ void bin_nexts(const seconds* bin_start, std::size_t n, Grain w, YearStart ys, s
   }
 }
 
-// Where in the year a bin sits. The midpoint of the record the bin holds is read on the Gregorian
-// calendar in UTC, and its position in the year that midpoint falls in becomes an angle: a bin is
-// a span of the calendar, and the turn of the year is where the fraction itself jumps and the sine
-// and the cosine do not.
+// Where in a cycle a bin sits. The midpoint of the record the bin holds is read in UTC, and its
+// position in the year or the day that midpoint falls in becomes an angle: the turn of the cycle
+// is where the fraction itself jumps and the sine and the cosine do not.
 //
-// The instants are read in UTC rather than on the clock the bins were placed on, because the phase
-// is a place on the orbit rather than a reading of a clock, and a zone moves it by its offset:
-// under a day on a cycle of a year, the same shift for every bin of the record.
+// The instants are read in UTC rather than on the clock the bins were placed on, because a phase
+// is a place on the orbit or the rotation rather than a reading of a clock. A zone moves it by its
+// offset, the same shift for every bin of the record; on the day cycle that is also what a site's
+// longitude does to the solar day, and a clock's summer time would move it by an hour twice a year.
+namespace {
+
+// A bin spanning an odd number of seconds has its midpoint on a half second, and the second it
+// began is the one it is read at. Every calendar grain spans whole hours; a supplied calendar need
+// not.
+seconds bin_midpoint(seconds bin_start, seconds bin_end) noexcept {
+  return bin_start + floor_div(bin_end - bin_start, 2);
+}
+
 void year_fraction(const seconds* bin_start, const seconds* bin_end, std::size_t n, double* out) {
   for (std::size_t i = 0; i < n; ++i) {
-    // A bin spanning an odd number of seconds has its midpoint on a half second, and the second it
-    // began is the one it is read at. Every calendar grain spans whole hours; a supplied calendar
-    // need not.
-    const seconds mid = bin_start[i] + floor_div(bin_end[i] - bin_start[i], 2);
+    const seconds mid = bin_midpoint(bin_start[i], bin_end[i]);
     std::int64_t y;
     unsigned m, d;
     civil_from_days(floor_div(mid, kDay), y, m, d);
@@ -223,14 +229,51 @@ void year_fraction(const seconds* bin_start, const seconds* bin_end, std::size_t
   }
 }
 
-void year_phase(const seconds* bin_start, const seconds* bin_end, std::size_t n, double* year_sin,
-                double* year_cos) {
+// The UTC day has no leap second in these instants, so its length is a constant and the fraction
+// is the midpoint's second of the day over it.
+void day_fraction(const seconds* bin_start, const seconds* bin_end, std::size_t n, double* out) {
+  seconds closest = kDay;
+  for (std::size_t i = 1; i < n; ++i) {
+    closest = std::min(closest, bin_start[i] - bin_start[i - 1]);
+  }
+  if (n < 2 || closest >= kDay) {
+    throw Error("the day cycle places a bin in the day, and these bins sit a day or more apart, "
+                "so every one would sit at the same place. It reads a grain finer than a day.");
+  }
+  for (std::size_t i = 0; i < n; ++i) {
+    const seconds mid = bin_midpoint(bin_start[i], bin_end[i]);
+    out[i] = static_cast<double>(floor_mod(mid, kDay)) / static_cast<double>(kDay);
+  }
+}
+
+struct CycleMap {
+  const char* name;
+  void (*fraction)(const seconds*, const seconds*, std::size_t, double*);
+};
+
+const CycleMap kCycles[] = {{"year", year_fraction}, {"day", day_fraction}};
+
+}  // namespace
+
+void cycle_fraction(const std::string& cycle, const seconds* bin_start, const seconds* bin_end,
+                    std::size_t n, double* out) {
+  for (const CycleMap& c : kCycles) {
+    if (cycle == c.name) {
+      c.fraction(bin_start, bin_end, n, out);
+      return;
+    }
+  }
+  throw Error("unknown cycle: " + cycle + ". The cycles are year and day.");
+}
+
+void cycle_phase(const std::string& cycle, const seconds* bin_start, const seconds* bin_end,
+                 std::size_t n, double* out_sin, double* out_cos) {
   constexpr double kTwoPi = 6.283185307179586476925286766559;
   std::vector<double> frac(n);
-  year_fraction(bin_start, bin_end, n, frac.data());
+  cycle_fraction(cycle, bin_start, bin_end, n, frac.data());
   for (std::size_t i = 0; i < n; ++i) {
-    year_sin[i] = std::sin(kTwoPi * frac[i]);
-    year_cos[i] = std::cos(kTwoPi * frac[i]);
+    out_sin[i] = std::sin(kTwoPi * frac[i]);
+    out_cos[i] = std::cos(kTwoPi * frac[i]);
   }
 }
 

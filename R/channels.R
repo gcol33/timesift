@@ -1,22 +1,30 @@
-#' Where in the year each bin sits
+#' Where in the year, or the day, each bin sits
 #'
 #' An encoder that ends in global pooling discards when a thermal event happened, so the position
-#' of a bin in the year has to be given to it as input if it is to be used at all. These two
-#' channels carry that position as the sine and cosine of the bin's fractional place in the year,
-#' which is continuous across the turn of the year where the fraction itself is not.
+#' of a bin in the year has to be given to it as input if it is to be used at all. These channels
+#' carry that position as the sine and cosine of the bin's fractional place in the year, which is
+#' continuous across the turn of the year where the fraction itself is not. On a record read finer
+#' than a day, the same pair for the place in the day carries where a reading sits in the daily
+#' cycle.
 #'
 #' They are the time index of each bin, not a summary of the readings, so adding them introduces no
 #' hand-built thermal feature: whatever a model does with them it could have done with a calendar.
 #'
-#' The position is read at the midpoint of the record each bin holds, on the Gregorian calendar in
-#' UTC, so a bin the record only partly covers sits at the phase it was actually measured over.
-#' `inst/spec/representation.md` is the normative description.
+#' The position is read at the midpoint of the record each bin holds, in UTC, so a bin the record
+#' only partly covers sits at the phase it was actually measured over. A site's longitude and a
+#' zone's offset move the day's phase by the same amount for every bin, which a model absorbs, where
+#' a local clock's summer time would move it twice a year. `inst/spec/representation.md` is the
+#' normative description.
 #'
 #' @param x A [grain_matrix()] result. A [lookback_matrix()] result has no place in the calendar
 #'   and is refused.
+#' @param cycles Which cycles to place each bin in, `"year"`, `"day"` or both, in the order given.
+#'   The day cycle reads bins that sit less than a day apart; at a day or coarser every bin would
+#'   sit at the same place in the day, and it is refused.
 #'
-#' @return An array of the same units and bins with two channels, `year_sin` and `year_cos`,
-#'   identical across units. Combine it with the readings using [bind_channels()].
+#' @return An array of the same units and bins with two channels per cycle, `year_sin` and
+#'   `year_cos`, `day_sin` and `day_cos`, identical across units. Combine it with the readings
+#'   using [bind_channels()].
 #'
 #' @examples
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 400)
@@ -24,19 +32,33 @@
 #' x <- grain_matrix(d, plot, t, temp, grain = "month")
 #' round(calendar_channels(x)[1, 1:4, ], 3)
 #'
+#' hourly <- grain_matrix(d, plot, t, temp, grain = "native")
+#' round(calendar_channels(hourly, cycles = c("year", "day"))[1, 1:4, ], 3)
+#'
 #' @export
-calendar_channels <- function(x) {
+calendar_channels <- function(x, cycles = "year") {
   .check_matrix(x)
   if (is.null(attr(x, "bin_start"))) {
     stop("a lookback's bins are placed relative to a target rather than on the calendar, so they ",
          "have no position in the year. `calendar_channels()` reads a grain_matrix().",
          call. = FALSE)
   }
-  phase <- ts_year_phase_(as.numeric(attr(x, "bin_start")), as.numeric(attr(x, "bin_end")))
-
-  out <- array(rep(phase, each = dim(x)[1L]), dim = c(dim(x)[1L], dim(x)[2L], 2L),
-               dimnames = list(dimnames(x)[[1L]], dimnames(x)[[2L]], c("year_sin", "year_cos")))
-  .carry_attrs(out, x, stats = c("year_sin", "year_cos"))
+  if (!is.character(cycles) || !length(cycles) || anyNA(cycles) || anyDuplicated(cycles)) {
+    stop("`cycles` names each cycle once, from \"year\" and \"day\", got ", .describe(cycles), ".",
+         call. = FALSE)
+  }
+  n_u <- dim(x)[1L]
+  n_b <- dim(x)[2L]
+  names <- as.vector(t(outer(cycles, c("sin", "cos"), paste, sep = "_")))
+  out <- array(0, dim = c(n_u, n_b, length(names)),
+               dimnames = list(dimnames(x)[[1L]], dimnames(x)[[2L]], names))
+  for (k in seq_along(cycles)) {
+    phase <- ts_cycle_phase_(as.numeric(attr(x, "bin_start")), as.numeric(attr(x, "bin_end")),
+                             cycles[k])
+    out[, , 2L * k - 1L] <- rep(phase[seq_len(n_b)], each = n_u)
+    out[, , 2L * k] <- rep(phase[n_b + seq_len(n_b)], each = n_u)
+  }
+  .carry_attrs(out, x, stats = names)
 }
 
 #' Put channels side by side

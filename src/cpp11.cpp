@@ -41,17 +41,17 @@ extern "C" SEXP _timesift_ts_bin_nexts_(SEXP bins, SEXP grain, SEXP year_month, 
   END_CPP11
 }
 // ts_r.cpp
-cpp11::doubles ts_year_fraction_(cpp11::doubles bin_start, cpp11::doubles bin_end);
-extern "C" SEXP _timesift_ts_year_fraction_(SEXP bin_start, SEXP bin_end) {
+cpp11::doubles ts_cycle_fraction_(cpp11::doubles bin_start, cpp11::doubles bin_end, std::string cycle);
+extern "C" SEXP _timesift_ts_cycle_fraction_(SEXP bin_start, SEXP bin_end, SEXP cycle) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_year_fraction_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_start), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_end)));
+    return cpp11::as_sexp(ts_cycle_fraction_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_start), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_end), cpp11::as_cpp<cpp11::decay_t<std::string>>(cycle)));
   END_CPP11
 }
 // ts_r.cpp
-cpp11::doubles ts_year_phase_(cpp11::doubles bin_start, cpp11::doubles bin_end);
-extern "C" SEXP _timesift_ts_year_phase_(SEXP bin_start, SEXP bin_end) {
+cpp11::doubles ts_cycle_phase_(cpp11::doubles bin_start, cpp11::doubles bin_end, std::string cycle);
+extern "C" SEXP _timesift_ts_cycle_phase_(SEXP bin_start, SEXP bin_end, SEXP cycle) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_year_phase_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_start), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_end)));
+    return cpp11::as_sexp(ts_cycle_phase_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_start), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(bin_end), cpp11::as_cpp<cpp11::decay_t<std::string>>(cycle)));
   END_CPP11
 }
 // ts_r.cpp
@@ -88,14 +88,14 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_bin_nexts_",         (DL_FUNC) &_timesift_ts_bin_nexts_,          4},
     {"_timesift_ts_bin_starts_",        (DL_FUNC) &_timesift_ts_bin_starts_,         4},
     {"_timesift_ts_coverage_",          (DL_FUNC) &_timesift_ts_coverage_,           8},
+    {"_timesift_ts_cycle_fraction_",    (DL_FUNC) &_timesift_ts_cycle_fraction_,     3},
+    {"_timesift_ts_cycle_phase_",       (DL_FUNC) &_timesift_ts_cycle_phase_,        3},
     {"_timesift_ts_penalised_coef_",    (DL_FUNC) &_timesift_ts_penalised_coef_,     5},
     {"_timesift_ts_penalised_cv_",      (DL_FUNC) &_timesift_ts_penalised_cv_,      17},
     {"_timesift_ts_penalised_path_",    (DL_FUNC) &_timesift_ts_penalised_path_,    14},
     {"_timesift_ts_penalised_predict_", (DL_FUNC) &_timesift_ts_penalised_predict_,  7},
     {"_timesift_ts_reduce_",            (DL_FUNC) &_timesift_ts_reduce_,            11},
     {"_timesift_ts_reduce_lookbacks_",  (DL_FUNC) &_timesift_ts_reduce_lookbacks_,  12},
-    {"_timesift_ts_year_fraction_",     (DL_FUNC) &_timesift_ts_year_fraction_,      2},
-    {"_timesift_ts_year_phase_",        (DL_FUNC) &_timesift_ts_year_phase_,         2},
     {NULL, NULL, 0}
 };
 }
