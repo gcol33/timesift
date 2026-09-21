@@ -1268,8 +1268,19 @@ fifth point, and neither applies to a path of supplied penalties.</li>
 <li>The fit is iteratively reweighted least squares with a cyclic
 coordinate descent inside it, warm-started along the path, restricted by
 Tibshirani’s sequential strong rule and checked against the optimality
-condition on every column the rule discarded. A reweighting is judged on
-the first sweep after it: one that moves nothing is a fixed point.</li>
+condition on every column the rule discarded. A reweighted least squares
+step is judged on its own move, the coefficients it started from against
+the ones it reached, over the columns that have left zero and over the
+intercept, which is glmnet’s test.</li>
+<li>The cycle over the columns that have left zero is
+Anderson-extrapolated every five passes (Bertrand and Massias, 2021):
+the affine combination of the last six iterates whose successive moves
+come closest to cancelling is taken where the penalised quadratic is
+lower there than at the cycle’s own iterate. The objective only falls,
+and the descent still stops only on a pass that moved nothing.</li>
+<li>A Gaussian fit folds the root of each case weight into the
+standardised columns and into the intercept’s column, so its quadratic
+has unit weight.</li>
 <li>A cross-validated penalty fits each fold along a path of its own and
 reads it at the whole-unit path’s penalties, interpolating between the
 two points around each, which is what <code>cv.glmnet</code> aligns on.

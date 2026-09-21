@@ -528,7 +528,7 @@ in <code>fit$fold_weights</code>.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/ensemble_weights.html">ensemble_weights</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   elasticnet / day  elasticnet / week elasticnet / month </span></span>
-<span><span class="co">#&gt;         0.01545023         0.30136974         0.68318003</span></span></code></pre></div>
+<span><span class="co">#&gt;         0.01546323         0.30141036         0.68312641</span></span></code></pre></div>
 <p>The weights say how much of the combination each candidate carries,
 and a weight at zero is one the combination reached past. Where the
 ensemble line of the plot above sits over every curve the candidates are
@@ -658,7 +658,7 @@ fall in score as that bin’s weight. Nothing is refitted.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span><span class="va">weight</span> <span class="op">~</span> <span class="va">part</span>, <span class="va">weight</span>, <span class="va">mean</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                   part     weight</span></span>
 <span><span class="co">#&gt; 1 2021-09-01T00:00:00Z 0.09523258</span></span>
-<span><span class="co">#&gt; 2 2021-10-01T00:00:00Z 0.11467438</span></span>
+<span><span class="co">#&gt; 2 2021-10-01T00:00:00Z 0.11486486</span></span>
 <span><span class="co">#&gt; 3 2021-11-01T00:00:00Z 0.07128131</span></span>
 <span><span class="co">#&gt; 4 2021-12-01T00:00:00Z 0.05093959</span></span></code></pre></div>
 <p>Holding a channel back instead asks what each statistic of a grain

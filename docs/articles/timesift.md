@@ -386,7 +386,7 @@ it would be scored against; each outer fold’s weights are in
 
 ensemble_weights(fit)
 #>   elasticnet / day  elasticnet / week elasticnet / month 
-#>         0.01545023         0.30136974         0.68318003
+#>         0.01546323         0.30141036         0.68312641
 ```
 
 The weights say how much of the combination each candidate carries, and
@@ -544,7 +544,7 @@ weight <- occlusion(kept, "elasticnet / month", permutations = 5)
 head(aggregate(weight ~ part, weight, mean), 4)
 #>                   part     weight
 #> 1 2021-09-01T00:00:00Z 0.09523258
-#> 2 2021-10-01T00:00:00Z 0.11467438
+#> 2 2021-10-01T00:00:00Z 0.11486486
 #> 3 2021-11-01T00:00:00Z 0.07128131
 #> 4 2021-12-01T00:00:00Z 0.05093959
 ```

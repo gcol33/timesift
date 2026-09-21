@@ -216,6 +216,126 @@ struct Coefs {
   }
 };
 
+// Anderson extrapolation of the cycle over the columns that have left zero (Bertrand and Massias,
+// 2021). A cyclic descent over correlated columns converges along a few slow directions, and the
+// last few iterates of the cycle say what they are: the affine combination of those iterates whose
+// successive moves come closest to cancelling is where the cycle is heading. It is taken only where
+// the penalised quadratic is lower than at the cycle's own iterate, so the objective still only
+// falls, and the descent still stops only on a cycle that moved nothing.
+struct Extrapolation {
+  static constexpr std::size_t depth = 5;
+  std::size_t m = 0;       // the intercept, then the columns that have left zero
+  std::size_t filled = 0;  // iterates held
+  std::vector<double> iterates;  // [depth + 1, m]
+  std::vector<double> target;    // the extrapolated iterate
+  std::vector<double> move;      // the move to it, on the cases
+
+  void reset(std::size_t size) {
+    m = size;
+    filled = 0;
+    iterates.resize((depth + 1) * m);
+  }
+
+  void record(const Coefs& fit) {
+    double* at = iterates.data() + filled * m;
+    at[0] = fit.a0;
+    for (std::size_t k = 0; k < fit.active.size(); ++k) at[k + 1] = fit.b[fit.active[k]];
+    ++filled;
+  }
+};
+
+// The extrapolated point from the iterates held, and whether it was taken.
+bool extrapolate(const Design& d, double lambda, double alpha, bool intercept,
+                 const std::vector<double>& v, std::vector<double>& r, Coefs& fit,
+                 Extrapolation& ex) {
+  constexpr std::size_t K = Extrapolation::depth;
+  const std::size_t m = ex.m;
+  const std::size_t n = d.n;
+  auto iterate = [&](std::size_t i) { return ex.iterates.data() + i * m; };
+
+  // The weights of the combination are the ones minimising the length of the combined move under
+  // weights summing to one: the Gram matrix of the moves against a vector of ones, normalised.
+  double gram[K][K];
+  for (std::size_t a = 0; a < K; ++a) {
+    for (std::size_t b = 0; b <= a; ++b) {
+      double s = 0.0;
+      const double* a0 = iterate(a);
+      const double* a1 = iterate(a + 1);
+      const double* b0 = iterate(b);
+      const double* b1 = iterate(b + 1);
+      for (std::size_t k = 0; k < m; ++k) s += (a1[k] - a0[k]) * (b1[k] - b0[k]);
+      gram[a][b] = s;
+      gram[b][a] = s;
+    }
+  }
+  double chol[K][K] = {};
+  for (std::size_t a = 0; a < K; ++a) {
+    for (std::size_t b = 0; b <= a; ++b) {
+      double s = gram[a][b];
+      for (std::size_t k = 0; k < b; ++k) s -= chol[a][k] * chol[b][k];
+      if (a == b) {
+        if (!(s > 0.0) || !std::isfinite(s)) return false;
+        chol[a][a] = std::sqrt(s);
+      } else {
+        chol[a][b] = s / chol[b][b];
+      }
+    }
+  }
+  double z[K];
+  for (std::size_t a = 0; a < K; ++a) {
+    double s = 1.0;
+    for (std::size_t k = 0; k < a; ++k) s -= chol[a][k] * z[k];
+    z[a] = s / chol[a][a];
+  }
+  for (std::size_t a = K; a-- > 0;) {
+    double s = z[a];
+    for (std::size_t k = a + 1; k < K; ++k) s -= chol[k][a] * z[k];
+    z[a] = s / chol[a][a];
+  }
+  double sum = 0.0;
+  for (std::size_t a = 0; a < K; ++a) sum += z[a];
+  if (!(std::fabs(sum) > 0.0) || !std::isfinite(sum)) return false;
+
+  // The move from the cycle's own iterate to the extrapolated one, on the cases, and what it does to
+  // the penalised quadratic: the smooth part falls by the residual's reading of the move less half
+  // its curvature, and the penalty is read off the coefficients directly.
+  const double* current = iterate(K);
+  std::vector<double>& q = ex.move;
+  q.assign(n, 0.0);
+  double penalty = 0.0;
+  std::vector<double>& target = ex.target;
+  target.resize(m);
+  for (std::size_t k = 0; k < m; ++k) {
+    double s = 0.0;
+    for (std::size_t a = 0; a < K; ++a) s += z[a] * iterate(a + 1)[k];
+    target[k] = s / sum;
+  }
+  const double shift = intercept ? target[0] - current[0] : 0.0;
+  if (shift != 0.0) add_scaled(q.data(), d.lead.data(), shift, n);
+  for (std::size_t k = 0; k + 1 < m; ++k) {
+    const std::size_t j = fit.active[k];
+    const double from = current[k + 1];
+    const double to = target[k + 1];
+    if (to == from) continue;
+    add_scaled(q.data(), d.column(j), to - from, n);
+    const double pen = lambda * d.vp[j];
+    penalty += pen * (alpha * (std::fabs(to) - std::fabs(from)) +
+                      0.5 * (1.0 - alpha) * (to * to - from * from));
+  }
+  const double curve = d.folded ? dot(q.data(), q.data(), n) : dot3(v.data(), q.data(), q.data(), n);
+  const double change = -dot(q.data(), r.data(), n) + 0.5 * curve + penalty;
+  if (!(change < 0.0)) return false;
+
+  if (intercept) fit.a0 = target[0];
+  for (std::size_t k = 0; k + 1 < m; ++k) fit.b[fit.active[k]] = target[k + 1];
+  if (d.folded) {
+    add_scaled(r.data(), q.data(), -1.0, n);
+  } else {
+    add_scaled3(r.data(), v.data(), q.data(), -1.0, n);
+  }
+  return true;
+}
+
 // One weighted least squares elastic net over the columns the caller has offered, by cyclic
 // coordinate descent. `v` is the weight of the quadratic and `r` its residual already multiplied
 // by that weight, so a case the family has pinned carries a gradient and no curvature, which is
@@ -223,7 +343,7 @@ struct Coefs {
 // its columns, and `v` is not read.
 void quadratic_solve(const Design& d, double lambda, double alpha, bool intercept, double thresh,
                      int& budget, const std::vector<double>& v, const std::vector<double>& xv,
-                     std::vector<double>& r, Coefs& fit) {
+                     std::vector<double>& r, Coefs& fit, Extrapolation& ex) {
   const std::size_t n = d.n;
   const double* lead = d.lead.data();
   const double* lead_v = d.folded ? lead : v.data();
@@ -271,12 +391,21 @@ void quadratic_solve(const Design& d, double lambda, double alpha, bool intercep
     if (dlx < thresh) break;
     // The columns that have left zero are then cycled on their own until they settle, and the
     // offered set is swept again only to see whether a column outside them has started to move.
+    // The set is fixed inside this cycle, so the iterates the extrapolation reads are over one set.
+    ex.reset(fit.active.size() + 1);
+    ex.record(fit);
     for (;;) {
       double inner = 0.0;
       for (std::size_t k = 0; k < fit.active.size(); ++k) step(fit.active[k], inner);
       shift(inner);
       if (--budget < 0) throw Error("a penalised fit did not settle inside its pass budget.");
       if (inner < thresh) break;
+      ex.record(fit);
+      if (ex.filled == Extrapolation::depth + 1) {
+        extrapolate(d, lambda, alpha, intercept && sv > 0.0, v, r, fit, ex);
+        ex.reset(ex.m);
+        ex.record(fit);
+      }
     }
   }
 }
@@ -397,6 +526,7 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
   // leaves zero inside a step is read against the zero it started at.
   std::vector<double> started(p, 0.0);
   Coefs fit;
+  Extrapolation ex;
   fit.b.assign(p, 0.0);
   fit.ever.assign(p, 0);
   fit.offered.assign(p, 0);
@@ -528,7 +658,7 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
 
     for (;;) {
       if (family == Family::gaussian) {
-        quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r, fit);
+        quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r, fit, ex);
       } else {
         // A reweighted least squares is settled when a step of it moves nothing, and what that is
         // read on is the step's own move: the coefficients it started from against the ones it
@@ -545,7 +675,7 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
             started[fit.active[k2]] = fit.b[fit.active[k2]];
           }
           curvature();
-          quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r, fit);
+          quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r, fit, ex);
           reweight();
           const double shift = fit.a0 - started_at;
           double moved = total(v.data(), n) * shift * shift;
