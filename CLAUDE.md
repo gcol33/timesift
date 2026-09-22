@@ -216,7 +216,7 @@ to do with neural networks.
 
 ## Status
 
-Version 0.3.0. On PyPI since 2026-09-21, not on CRAN yet. Publishing a GitHub release uploads the
+Version 0.3.1 on master; 0.3.0 on PyPI since 2026-09-21, not on CRAN yet. Publishing a GitHub release uploads the
 sdist and wheels through `python-dist.yaml`, which PyPI trusts as the project's publisher. The version went down at the rename: 0.1.0 was a first
 release under a new name and a general contract, not a fourth release of `climgrain`. `DESCRIPTION`
 is where the string is written and `pyproject.toml` reads it from there, so a bump is one edit.
@@ -246,15 +246,22 @@ every step. Verified against the deposit on 2026-09-02, matching the paper exact
 | numbers per plot, daily three-channel | 3288 | same |
 | inflation at truth 0.60, 0.70, 0.90 | +0.110, +0.095, +0.051 | same |
 | elastic net on the 188 aggregates | 0.687 | 0.686 |
+| stepwise on the 188 aggregates, TSS and AUC | 0.662, 0.844 | 0.662, 0.844 |
 
 The elastic net sits 0.001 low because the two runs seed the inner cross-validation's random fold
 draw differently; nothing else in the table carries randomness. That row was first read when
 `elasticnet()` called glmnet, and has since been read again under the shared core: 0.68605 against
 the published 0.687, the same 0.686 as before and inside the 0.002 the driver compares at, and
 0.68606 once the inner cycle was Anderson-extrapolated (`197fd5a`, 21 minutes on six threads
-where it had taken 94). The
-stepwise arm and the network grid have not been rerun here: forward selection over 188 columns is
-many hours single-threaded, and the encoders want the graphics processor they had in the study.
+where it had taken 94).
+
+The stepwise arm and the network grid were run on 2026-09-22 on LiSC at `780a91d` (#80), the
+networks on L40S cards, and are in `inst/reproduce/README.md`. The stepwise arm is fitted
+unweighted, as the study's was, and reproduces to the rounding. Of the 42 grid levels, 40 are
+inside the spread of one refit against another; the two outside are the fully connected network at
+the hourly rung, 0.047 TSS below the study's own four-seed mean over four seeds of its own, which is
+open as #81. The weekly coldest-day network, the eleven-member ensemble and 17 of the 18 window
+contrasts are inside, and the convolutional network peaks at weekly as the paper's did.
 
 ## Related
 

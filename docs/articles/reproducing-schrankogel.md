@@ -464,23 +464,30 @@ script produces them:
 | inflation of a level whose truth is 0.60 | +0.110 | +0.110 |
 | elastic net on the 188 aggregates | 0.687 | 0.686 |
 | the weekly series elastic net, TSS and AUC | 0.696, 0.868 | 0.697, 0.868 |
-| the selected procedure, AUC and TSS | 0.877, 0.710 | 0.870, 0.701 |
-| outer folds selecting a weekly candidate | 10 of 10 | 9 of 10 |
-| the procedure over the series elastic net, AUC | +0.009 | +0.002 |
-| stepwise AIC on the 188 aggregates | 0.662 | not rerun |
-| the same network on the full hourly record | 0.658 | not rerun |
+| the selected procedure, AUC and TSS | 0.877, 0.710 | 0.872, 0.702 |
+| outer folds selecting a weekly candidate | 10 of 10 | 10 of 10 |
+| the procedure over the series elastic net, AUC | +0.009 | +0.003 |
+| stepwise AIC on the 188 aggregates, TSS and AUC | 0.662, 0.844 | 0.662, 0.844 |
+| the convolutional network on the full hourly record, TSS | 0.658 | 0.660 |
+| the weekly coldest-day network, AUC and TSS | 0.878, 0.712 | 0.875, 0.706 |
+| the eleven-member ensemble, AUC and TSS | 0.887, 0.727 | 0.879, 0.714 |
+| network grid cells inside their tolerance | 42 | 40 of 42 |
 
-The selection stage ran once, on one NVIDIA L40S under torch 0.17.0 and
-libtorch 2.8.0, with the study’s fold map and inner partition. A model
-fitted twice does not give the same weights, so an encoder’s level is
-compared at three times sqrt(2) times the spread of that level over the
-pipeline’s eleven runs of its fixed weekly encoder, 0.0087 AUC and
-0.0145 TSS, and each of the 101 species at its own spread; the
-procedure’s level sits 0.0065 AUC below the pipeline’s single run,
-inside that tolerance, with 100 species inside their bands. Its margin
-over the series elastic net is inside the tolerance and does not
-separate from zero across species, where the pipeline’s did. The
-representation, the fold map, the mask and the elastic-net arms carry no
-such spread and reproduce to the third decimal. The run’s environment is
-in its `run.meta`, and the comparison, its tolerances and their
-derivation are in `inst/reproduce/README.md`.
+The selection stage and the grid ran on NVIDIA L40S cards under torch
+0.17.0 and libtorch 2.8.0, with the study’s fold map and inner
+partition. A model fitted twice does not give the same weights, so an
+encoder’s level is compared at three times sqrt(2) times the spread of
+that level over the pipeline’s eleven runs of its fixed weekly encoder,
+0.0087 AUC and 0.0145 TSS, and each of the 101 species at its own
+spread; the procedure’s level sits 0.005 AUC below the pipeline’s single
+run, inside that tolerance, with all 101 species inside their bands. Its
+margin over the series elastic net is inside the tolerance and does not
+separate from zero across species, where the pipeline’s did. The two
+grid cells outside are the fully connected network at the hourly rung,
+in AUC and in TSS, which sits 0.047 TSS below the study’s own four-seed
+mean; the representation there reproduces under the two convolutional
+networks, and the cause is open. The representation, the fold map, the
+mask and the elastic-net arms carry no such spread and reproduce to the
+third decimal. The run’s environment is in its `run.meta`, and the
+comparison, its tolerances and their derivation are in
+`inst/reproduce/README.md`.

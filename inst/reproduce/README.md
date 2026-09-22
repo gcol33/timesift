@@ -189,9 +189,44 @@ shared penalised core, on the same deposit and the same fold map, and gives 0.68
 figure, 0.00095 from the published one and inside the 0.002 the script compares at. On
 2026-09-21, at `197fd5a`, with the inner cycle Anderson-extrapolated, it gives 0.68606.
 
-The stepwise arm and the network grid have not been rerun here. Forward selection over 188 columns
-is many hours single-threaded, and the encoders want the graphics processor they had in the
-study.
+## The stepwise arm and the network grid
+
+Run on 2026-09-22 on LiSC, the stepwise arm on one processor node and each architecture of the
+grid on one NVIDIA L40S (R 4.5.2, torch 0.17.0, CUDA 12.8), package commit `780a91d`, the study's
+fold map, 60 epochs and the study's stopping rule; the contrasts across them were read at
+`2900261`, whose only change is to `grain_contrasts()`.
+
+| quantity | paper | this run | tolerance | inside |
+|---|---|---|---|---|
+| stepwise on the 188 aggregates, TSS | 0.662 | 0.6619 | 0.001 | yes |
+| stepwise on the 188 aggregates, AUC | 0.844 | 0.8437 | 0.001 | yes |
+| elastic net on the 188 aggregates, TSS | 0.687 | 0.6861 | 0.002 | yes |
+| grid levels, convolutional network, seven windows | table S12 | -0.004 to +0.009 | 0.0087 AUC, 0.0145 TSS | 14 of 14 |
+| grid levels, residual network, seven windows | table S12 | -0.012 to +0.003 | same | 14 of 14 |
+| grid levels, fully connected network, six coarse windows | table S12 | -0.006 to 0 | same | 12 of 12 |
+| fully connected network, hourly, AUC and TSS | 0.789, 0.600 | 0.741, 0.535 | same | no |
+| weekly coldest-day network, AUC and TSS | 0.878, 0.712 | 0.875, 0.706 | same | yes |
+| eleven-member ensemble, window mean, TSS | 0.720 | 0.707 | 0.0145 | yes |
+| eleven-member ensemble, coldest-day reading, AUC and TSS | 0.887, 0.727 | 0.879, 0.714 | 0.0087, 0.0145 | yes |
+| each window against its architecture's best, AUC | table S12 | 17 of 18 inside | 0.0124 | the hourly fully connected one outside |
+| the convolutional network's best window | weekly | weekly | exact | yes |
+
+The stepwise arm draws nothing at random and reproduces to the rounding of the published figures.
+Every network cell but one is inside the spread of one refit against another. The ensemble sits
+below the paper by 0.013 TSS on both readings, inside the tolerance and in the same direction on
+both; its tolerance is the single encoder's, and an average of eleven fits spreads less, so that
+is a looser comparison than the others. The fully connected network and the residual network take
+their best window at half-daily and weekly here, where the paper's single seed took daily and
+half-daily; the paper's own four seeds move both within the sub-monthly plateau (S5), and each
+window's distance from the paper's reference window is inside the tolerance at every one of them.
+
+The one cell outside is the fully connected network at the hourly rung, 131,520 inputs. Refitted
+under four seeds it reads 0.538 TSS (standard deviation 0.023) against the study's own four-seed
+0.585 (0.011), so the gap is not a seed draw. The convolutional and residual networks read the
+same five channels at the same rung inside 0.002 AUC, so the representation is not the cause, and
+the network's architecture and training settings are the study's. Its per-fold level is bimodal,
+some folds near the study's level and some well below, which points at where early stopping ends
+a fit that size. The cause is open, as #81.
 
 ## The selection stage against the analysis pipeline
 
