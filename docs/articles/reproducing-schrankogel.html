@@ -320,10 +320,13 @@ shipped one in that alone:</p>
 <span>  folds <span class="op">=</span> <span class="va">folds</span>, metric <span class="op">=</span> <span class="st">"tss"</span>, response <span class="op">=</span> <span class="st">"presence_absence_unweighted"</span><span class="op">)</span></span></code></pre></div>
 <p>Both redo their predictor selection inside every fold, on the
 training plots only, which is the footing the encoders are fitted on.
-The encoders are the three the paper reports, at the settings it reports
-them at, which are the constructors’ defaults here:</p>
+The encoders are the three the paper reports, at the settings the study
+fitted them at. Those are the constructors’ defaults except the residual
+network’s dropout, which was 0.2 there, and the batch, 64 plots for the
+fully connected network and 32 for the two convolutional ones:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">encoders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mlp <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">mlp</a></span><span class="op">(</span><span class="op">)</span>, cnn <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">cnn</a></span><span class="op">(</span><span class="op">)</span>, rescnn <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">rescnn</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">encoders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mlp <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">mlp</a></span><span class="op">(</span>batch_size <span class="op">=</span> <span class="fl">64</span><span class="op">)</span>, cnn <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">cnn</a></span><span class="op">(</span>batch_size <span class="op">=</span> <span class="fl">32</span><span class="op">)</span>,</span>
+<span>                 rescnn <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">rescnn</a></span><span class="op">(</span>dropout <span class="op">=</span> <span class="fl">0.2</span>, batch_size <span class="op">=</span> <span class="fl">32</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="../reference/torch_learners.html">cnn()</a></code> is four blocks of a one-dimensional convolution of
 kernel width 7, batch normalisation, a rectified linear activation and
 max pooling by two, at 16, 32, 64 and 128 channels, then global average
@@ -339,9 +342,8 @@ capped at 50. The study also stopped early, after ten epochs without an
 improvement on an inner validation split of 15 percent of the fitting
 plots, under which the validation loss is read as the fitting loss is.
 The package default holds no split back and keeps the last epoch, so the
-study’s rule is a control of its own, which every call below is handed.
-The encoders of the study read batches of 32 plots, which the grid asks
-for; the default is 64.</p>
+study’s rule is a control of its own, which every call below is
+handed.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">study</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/train_control.html">train_control</a></span><span class="op">(</span>val_frac <span class="op">=</span> <span class="fl">0.15</span>, early_stopping <span class="op">=</span> <span class="fl">10L</span><span class="op">)</span></span></code></pre></div>
 <p>The eleven members of the paper’s ensemble are seven convolutional

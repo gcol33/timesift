@@ -32,6 +32,10 @@
 #               the selection stage chooses a candidate on; `build` deals five inner folds per
 #               outer training set with fold_map() instead.
 #   --epochs    epoch budget per network fit. Default 60, the budget the study used.
+#   --seed      the training seed of the grid's encoders and of the selection's network. Default
+#               1. The study refitted every cell of its grid under four seeds; a run per seed here
+#               is how the package's own spread at a cell is read beside it. The ensemble's members
+#               keep the seeds the paper's table gives them.
 #   --threads   how many fits of one species' inner cross-validation the penalised arms run at
 #               once. Default 1, serial. The path on every fitting plot and the path of each
 #               inner fold are one independent fit each, so `--threads=6` is as many as five
@@ -73,6 +77,7 @@ grid_grains <- split_opt("grains", "day,week,month,season,year")
 grid_learners <- split_opt("learners", "cnn")
 baseline_arms <- split_opt("baseline", "elastic_net")
 epochs <- as.integer(pick("epochs", "60"))
+seed <- as.integer(pick("seed", "1"))
 threads <- as.integer(pick("threads", "1"))
 folds_from <- pick("folds", file.path(here, "folds.csv"))
 inner_from <- pick("inner", file.path(here, "inner_folds.csv"))
@@ -181,6 +186,7 @@ meta("inner ", if (identical(inner_from, "build")) "dealt by fold_map()" else in
 # another, so running them at once returns the same numbers, and the setting says what the run
 # cost rather than what it computed.
 meta("threads ", threads)
+meta("seed ", seed)
 if (!is.null(smoke)) {
   meta("SMOKE RUN ", smoke[1L], " outer folds and ", smoke[2L], " species; not the reproduction")
   say("SMOKE RUN: ", smoke[1L], " outer folds, ", smoke[2L],
@@ -232,7 +238,7 @@ METRIC_NAME <- "tss"
 SELECTION_METRIC <- "roc_auc"
 # The study's encoders early-stopped on an inner validation split of 15 percent of the fitting plots,
 # after ten epochs without an improvement; the package default holds no split back.
-STUDY_CONTROL <- train_control(val_frac = 0.15, early_stopping = 10L)
+STUDY_CONTROL <- train_control(val_frac = 0.15, early_stopping = 10L, seed = seed)
 
 # The study's forward selection fitted every species unweighted (baseline/06_descriptor_reselect.R
 # of the study code), where the shipped head weights each presence by the ratio of absences to
@@ -769,10 +775,16 @@ ensemble_predictions <- function(reading) {
 }
 
 if ("networks" %in% stages) {
-  encoders <- list(mlp = mlp(epochs = epochs),
-                   cnn = cnn(epochs = epochs, batch_size = 32L),
-                   rescnn = rescnn(epochs = epochs, batch_size = 32L))[intersect(grid_learners,
-                                                               c("mlp", "cnn", "rescnn"))]
+  # The study's grid configuration (MODEL_CFG in src/schrankogel/runner.py of the study code),
+  # named in full rather than left to the constructors' defaults: the residual network's dropout
+  # there is 0.2 where rescnn()'s default is 0.3.
+  encoders <- list(
+    mlp = mlp(hidden = c(512L, 256L), dropout = 0.3, epochs = epochs, batch_size = 64L),
+    cnn = cnn(channels = c(16L, 32L, 64L, 128L), kernel = 7L, dropout = 0.3, epochs = epochs,
+              batch_size = 32L),
+    rescnn = rescnn(channels = c(32L, 64L, 128L, 256L), blocks_per_stage = 2L, kernel = 7L,
+                    dropout = 0.2, epochs = epochs, batch_size = 32L)
+  )[intersect(grid_learners, c("mlp", "cnn", "rescnn"))]
   for (reading in names(READINGS)) {
     spec <- READINGS[[reading]]
     grains <- if (reading == "mean") grid_grains else

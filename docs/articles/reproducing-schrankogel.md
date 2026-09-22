@@ -190,12 +190,15 @@ stepwise_arm <- grain_ladder(
 
 Both redo their predictor selection inside every fold, on the training
 plots only, which is the footing the encoders are fitted on. The
-encoders are the three the paper reports, at the settings it reports
-them at, which are the constructors’ defaults here:
+encoders are the three the paper reports, at the settings the study
+fitted them at. Those are the constructors’ defaults except the residual
+network’s dropout, which was 0.2 there, and the batch, 64 plots for the
+fully connected network and 32 for the two convolutional ones:
 
 ``` r
 
-encoders <- list(mlp = mlp(), cnn = cnn(), rescnn = rescnn())
+encoders <- list(mlp = mlp(batch_size = 64), cnn = cnn(batch_size = 32),
+                 rescnn = rescnn(dropout = 0.2, batch_size = 32))
 ```
 
 [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
@@ -219,8 +222,7 @@ without an improvement on an inner validation split of 15 percent of the
 fitting plots, under which the validation loss is read as the fitting
 loss is. The package default holds no split back and keeps the last
 epoch, so the study’s rule is a control of its own, which every call
-below is handed. The encoders of the study read batches of 32 plots,
-which the grid asks for; the default is 64.
+below is handed.
 
 ``` r
 
