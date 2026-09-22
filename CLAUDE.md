@@ -255,13 +255,17 @@ the published 0.687, the same 0.686 as before and inside the 0.002 the driver co
 0.68606 once the inner cycle was Anderson-extrapolated (`197fd5a`, 21 minutes on six threads
 where it had taken 94).
 
-The stepwise arm and the network grid were run on 2026-09-22 on LiSC at `780a91d` (#80), the
+The stepwise arm and the network grid were run on 2026-09-22 on LiSC at `7f03a3e` (#80, #81), the
 networks on L40S cards, and are in `inst/reproduce/README.md`. The stepwise arm is fitted
-unweighted, as the study's was, and reproduces to the rounding. Of the 42 grid levels, 40 are
-inside the spread of one refit against another; the two outside are the fully connected network at
-the hourly rung, 0.047 TSS below the study's own four-seed mean over four seeds of its own, which is
-open as #81. The weekly coldest-day network, the eleven-member ensemble and 17 of the 18 window
-contrasts are inside, and the convolutional network peaks at weekly as the paper's did.
+unweighted, as the study's was, and reproduces to the rounding. Every one of the 42 grid levels in
+TSS and 41 of them in AUC are inside the spread of one refit against another, the weekly
+coldest-day network, the eleven-member ensemble and all 18 window contrasts are inside, and the
+convolutional network peaks at weekly as the paper's did. The one AUC outside is the fully
+connected network at the hourly rung, 0.011 below the study's published seed; over four seeds its
+TSS reads 0.582 against the study's own four-seed 0.585. It sat 0.047 TSS below until the encoders
+stopped standardising the calendar channels (#81): the study feeds them at their own amplitude, and
+being identical across units they reach a network as a bias whose step under AdamW grows with
+their scale.
 
 ## Related
 
