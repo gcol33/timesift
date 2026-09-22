@@ -414,7 +414,8 @@ the cosine of it are the platform's library, accurate to about an ulp and no fur
 contract pins `frac` and states a tolerance of **1e-12** on the two channels. Both suites read the
 fraction back and assert the channels against it.
 
-The result carries every attribute of its input, with `stats` replaced by `year_sin, year_cos`. A
+The result carries every attribute of its input, with `stats` replaced by `year_sin, year_cos`, no
+`static` channel, and `position` naming every channel it holds. A
 lookback is refused: its bins are placed relative to a target rather than on the calendar, so they
 have no position in the year, and it carries no `bin_start` to read one from.
 
@@ -453,7 +454,9 @@ the calendar position of each bin reach a model as one input.
 
 The result carries the **first argument's** attributes, with `stats` the joined channel names.
 Every other argument is read for its channels alone; nothing of its own binning survives, which is
-why the units and the bins have to agree in the first place.
+why the units and the bins have to agree in the first place. The two attributes that name channels
+rather than bins, `static` and `position`, name those of every argument, in the order the channels
+come.
 
 Four inputs are refused, and the three that concern one argument name its position from one:
 
@@ -917,7 +920,8 @@ call site.
   each presence by the ratio of absences to presences among the fitting units, capped at 50, and
   each absence by one; a head without a weights function fits unweighted. On both sides.
 - The encoders standardise every channel by its own centre and sample standard deviation over
-  every unit and bin of the fitting units; the inner validation set is a plain random draw of the
+  every unit and bin of the fitting units, except a channel `position` names, which they read at
+  its own amplitude (centre 0, scale 1); the inner validation set is a plain random draw of the
   fitting units, and the loss read on it, which the early stopping watches, is weighted by the
   head as the fitting loss is, with the fitting units alone in the count the weights are made
   from; the fitting units are cut into as

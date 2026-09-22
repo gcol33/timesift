@@ -24,7 +24,9 @@
 #'
 #' @return An array of the same units and bins with two channels per cycle, `year_sin` and
 #'   `year_cos`, `day_sin` and `day_cos`, identical across units. Combine it with the readings
-#'   using [bind_channels()].
+#'   using [bind_channels()]. The channels are recorded as positions in the `position` attribute,
+#'   and the encoders of [torch_learners] read them at their own amplitude rather than
+#'   standardise them.
 #'
 #' @examples
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 400)
@@ -58,7 +60,9 @@ calendar_channels <- function(x, cycles = "year") {
     out[, , 2L * k - 1L] <- rep(phase[seq_len(n_b)], each = n_u)
     out[, , 2L * k] <- rep(phase[n_b + seq_len(n_b)], each = n_u)
   }
-  .carry_attrs(out, x, stats = names)
+  out <- .carry_attrs(out, x, stats = names)
+  attr(out, "position") <- names
+  out
 }
 
 #' Put channels side by side
@@ -72,7 +76,8 @@ calendar_channels <- function(x, cycles = "year") {
 #'
 #' @return One array carrying every channel, in the order the arguments are given and, inside each
 #'   argument, in its own channel order. The attributes are the first argument's, with `stats` the
-#'   joined names.
+#'   joined names, except `static` and `position`, which name channels and so name those of every
+#'   argument.
 #'
 #' @examples
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 60)
@@ -105,7 +110,14 @@ bind_channels <- function(...) {
   out <- array(unlist(lapply(parts, as.numeric), use.names = FALSE),
                dim = c(dim(first)[1:2], length(names)),
                dimnames = c(dimnames(first)[1:2], list(names)))
-  .carry_attrs(out, first, stats = names)
+  out <- .carry_attrs(out, first, stats = names)
+  for (a in c("static", "position")) {
+    marked <- unlist(lapply(parts, attr, a))
+    if (length(marked)) {
+      attr(out, a) <- marked
+    }
+  }
+  out
 }
 
 .check_matrix <- function(x) {

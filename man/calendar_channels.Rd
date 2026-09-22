@@ -17,7 +17,9 @@ sit at the same place in the day, and it is refused.}
 \value{
 An array of the same units and bins with two channels per cycle, \code{year_sin} and
 \code{year_cos}, \code{day_sin} and \code{day_cos}, identical across units. Combine it with the readings
-using \code{\link[=bind_channels]{bind_channels()}}.
+using \code{\link[=bind_channels]{bind_channels()}}. The channels are recorded as positions in the \code{position} attribute,
+and the encoders of \link{torch_learners} read them at their own amplitude rather than
+standardise them.
 }
 \description{
 An encoder that ends in global pooling discards when a thermal event happened, so the position

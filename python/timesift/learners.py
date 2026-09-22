@@ -391,7 +391,7 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head, group=
     make_loss, activation = _objective(head)
 
     m = np.transpose(x.values, (0, 2, 1))
-    centre, scale = _channel_scaler(m)
+    centre, scale = _channel_scaler(m, [s in x.position for s in x.stats])
     m = (m - centre) / scale
 
     torch.manual_seed(cfg.seed)
@@ -557,14 +557,16 @@ def _batches(idx: np.ndarray, size: int) -> list:
     return np.array_split(idx, max(1, min(-(-n // size), n // 2)))
 
 
-def _channel_scaler(m: np.ndarray):
+def _channel_scaler(m: np.ndarray, position):
     """One centre and one scale per channel of a ``[unit, channel, bin]`` array, over every unit
-    and bin, the sample standard deviation as the R side reads it."""
+    and bin, the sample standard deviation as the R side reads it, and the identity on a channel
+    ``position`` marks."""
     centre = m.mean(axis=(0, 2), keepdims=True)
     with np.errstate(invalid="ignore", divide="ignore"):
         scale = m.std(axis=(0, 2), ddof=1, keepdims=True)
     scale = np.where(np.isfinite(scale) & (scale >= 1e-8), scale, 1.0)
-    return centre, scale
+    position = np.asarray(position, dtype=bool).reshape(1, -1, 1)
+    return np.where(position, 0.0, centre), np.where(position, 1.0, scale)
 
 
 def _torch_predict(model, x: TimesiftMatrix) -> np.ndarray:

@@ -43,6 +43,8 @@ class TimesiftMatrix:
     unit carrying several targets cannot name a row on its own. ``span`` and ``lag`` are set by a
     lookback alone, and are what rebuilding one for new targets reads. ``static`` names the
     channels holding the same number in every bin, which :func:`flatten` reads once each.
+    ``position`` names the channels :func:`calendar_channels` made, which the encoders read at
+    their own amplitude rather than standardise.
 
     ``bin_start``, ``bin_end`` and ``bin_partial`` are the calendar's, and are ``None`` on a
     representation the calendar did not bin.
@@ -61,6 +63,7 @@ class TimesiftMatrix:
     span: int | None = None
     lag: int | None = None
     static: tuple[str, ...] = ()
+    position: tuple[str, ...] = ()
 
     @property
     def shape(self) -> tuple[int, int, int]:
@@ -449,14 +452,15 @@ def calendar_channels(x: TimesiftMatrix, cycles=("year",)) -> TimesiftMatrix:
     for k, cycle in enumerate(cycles):
         out[:, :, 2 * k], out[:, :, 2 * k + 1] = _core.cycle_phase(start, end, cycle)
         names += [f"{cycle}_sin", f"{cycle}_cos"]
-    return replace(x, values=out, stats=tuple(names))
+    return replace(x, values=out, stats=tuple(names), static=(), position=tuple(names))
 
 
 def bind_channels(*parts: TimesiftMatrix) -> TimesiftMatrix:
     """Put the channels of several representations of the same units and bins side by side.
 
     The channels come back in the order the arguments are given and, inside each argument, in its
-    own channel order. Everything else is the first argument's.
+    own channel order. Everything else is the first argument's, except ``static`` and
+    ``position``, which name channels and so name those of every argument.
     """
     if len(parts) < 2:
         raise ValueError("`bind_channels()` needs at least two representations.")
@@ -471,7 +475,9 @@ def bind_channels(*parts: TimesiftMatrix) -> TimesiftMatrix:
         twice = sorted({s for s in names if names.count(s) > 1})
         raise ValueError("two representations carry a channel of the same name: "
                          + ", ".join(twice) + ".")
-    return replace(first, values=np.concatenate([p.values for p in parts], axis=2), stats=names)
+    return replace(first, values=np.concatenate([p.values for p in parts], axis=2), stats=names,
+                   static=tuple(s for p in parts for s in p.static),
+                   position=tuple(s for p in parts for s in p.position))
 
 
 # ---- the zone ---------------------------------------------------------------------------------

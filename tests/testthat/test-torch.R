@@ -59,6 +59,19 @@ test_that("standardisation is per channel and computed on the units the learner 
   expect_false(isTRUE(all.equal(fit$model$scaler$centre[[1L]], mean(f$x[, , 1L]))))
 })
 
+test_that("the calendar channels reach an encoder at their own amplitude", {
+  skip_if_no_torch()
+  f <- torch_fixture(n_unit = 24L, days = 60L)
+  x <- bind_channels(f$x, calendar_channels(f$x))
+  fit <- fit_learner(mlp(epochs = 2L), .subset_units(x, seq_len(12L)), f$y[seq_len(12L), ])
+  readings <- seq_len(dim(f$x)[3L])
+  expect_equal(unname(fit$model$scaler$centre[readings]),
+               vapply(readings, function(k) mean(f$x[1:12, , k]), numeric(1L)))
+  expect_equal(unname(fit$model$scaler$centre[-readings]), c(0, 0))
+  expect_equal(unname(fit$model$scaler$scale[-readings]), c(1, 1))
+  expect_true(all(is.finite(stats::predict(fit, x))))
+})
+
 test_that("a static predictor appended as a channel is put on the readings' footing", {
   skip_if_no_torch()
   f <- torch_fixture(n_unit = 24L, days = 60L)

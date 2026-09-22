@@ -228,6 +228,11 @@ def test_channels_are_joined_in_the_order_they_are_given():
     b = bind_channels(x, calendar_channels(x))
     assert b.stats == ("cold_day", "mean", "year_sin", "year_cos")
     assert np.array_equal(b.channel("mean"), x.channel("mean"))
+    assert x.position == ()
+    assert calendar_channels(x).position == ("year_sin", "year_cos")
+    assert b.position == ("year_sin", "year_cos")
+    assert bind_channels(calendar_channels(x), x).position == ("year_sin", "year_cos")
+    assert b.take_units([1]).position == ("year_sin", "year_cos")
     with pytest.raises(ValueError, match="same name"):
         bind_channels(x, x)
 

@@ -13,7 +13,8 @@ and bins.}
 \value{
 One array carrying every channel, in the order the arguments are given and, inside each
 argument, in its own channel order. The attributes are the first argument's, with \code{stats} the
-joined names.
+joined names, except \code{static} and \code{position}, which name channels and so name those of every
+argument.
 }
 \description{
 Joins representations of the same units and bins into one array, in the order given. It is how

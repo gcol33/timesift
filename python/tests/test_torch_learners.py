@@ -153,6 +153,19 @@ def test_standardisation_is_per_channel_and_computed_on_the_units_handed():
     assert not np.allclose(fit.model["centre"].ravel()[0], x.values[:, :, 0].mean())
 
 
+def test_the_calendar_channels_reach_an_encoder_at_their_own_amplitude():
+    from timesift import bind_channels, calendar_channels
+    x, y, _ = fixture(n_unit=24, days=60)
+    both = bind_channels(x, calendar_channels(x))
+    half = np.arange(12)
+    fit = fit_learner(mlp(epochs=2), both.take_units(half), y.take_units(half))
+    k = x.values.shape[2]
+    assert np.allclose(fit.model["centre"].ravel()[:k], x.values[half].mean(axis=(0, 1)))
+    assert np.array_equal(fit.model["centre"].ravel()[k:], [0.0, 0.0])
+    assert np.array_equal(fit.model["scale"].ravel()[k:], [1.0, 1.0])
+    assert np.isfinite(fit.predict(both)).all()
+
+
 def test_a_static_predictor_appended_as_a_channel_is_put_on_the_readings_footing():
     from dataclasses import replace
     x, y, _ = fixture(n_unit=24, days=60)
