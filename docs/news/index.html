@@ -91,6 +91,8 @@
 <li>The Python <code><a href="../reference/occlusion.html">occlusion()</a></code> scored every cell, including the ones the scorable-cell mask leaves out, so its weights could rest on cells R’s did not. It now reads the mask as every score does (<a href="https://github.com/gcol33/timesift/issues/79" class="external-link">#79</a>).</li>
 <li>
 <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code> read each grain’s name back out of the contrast label emmeans writes, which puts parentheses around a level holding a character it treats as an operator: a grain called <code>month-mean</code> came back as <code>(month-mean)</code>. The name is now taken from the factor’s levels (<a href="https://github.com/gcol33/timesift/issues/79" class="external-link">#79</a>).</li>
+<li>
+<code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code> stopped with “undefined columns selected” on a ladder of more than 3000 scored cells, which the Schrankogel grid is at 7070 per architecture: emmeans stops computing Satterthwaite’s degrees of freedom past that size and names its interval columns differently. The limit is now the ladder’s own size (<a href="https://github.com/gcol33/timesift/issues/79" class="external-link">#79</a>).</li>
 <li>Recovery tests for <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code>: a planted effect per grain is recovered and its intervals cover it at their stated rate over twenty seeds, and with no effect the contrast finds none (<a href="https://github.com/gcol33/timesift/issues/79" class="external-link">#79</a>).</li>
 </ul></div>
 <div class="section level3">

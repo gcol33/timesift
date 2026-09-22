@@ -48,6 +48,13 @@
   an operator: a grain called `month-mean` came back as `(month-mean)`.
   The name is now taken from the factor’s levels
   ([\#79](https://github.com/gcol33/timesift/issues/79)).
+- [`grain_contrasts()`](https://gillescolling.com/timesift/reference/grain_contrasts.md)
+  stopped with “undefined columns selected” on a ladder of more than
+  3000 scored cells, which the Schrankogel grid is at 7070 per
+  architecture: emmeans stops computing Satterthwaite’s degrees of
+  freedom past that size and names its interval columns differently. The
+  limit is now the ladder’s own size
+  ([\#79](https://github.com/gcol33/timesift/issues/79)).
 - Recovery tests for
   [`grain_contrasts()`](https://gillescolling.com/timesift/reference/grain_contrasts.md):
   a planted effect per grain is recovered and its intervals cover it at

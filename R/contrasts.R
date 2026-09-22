@@ -82,7 +82,11 @@ grain_contrasts <- function(ladder, learner = NULL, reference = NULL, adjust = "
   d$variable <- factor(d$variable)
   d$fold <- factor(d$fold)
   fit <- lmerTest::lmer(score ~ grain + (1 | variable) + (1 | fold), data = d, REML = TRUE)
-  means <- emmeans::emmeans(fit, "grain", lmer.df = "satterthwaite")
+  # emmeans computes Satterthwaite's degrees of freedom only up to 3000 observations by default and
+  # falls back to asymptotic intervals above that, under other column names; a ladder of a hundred
+  # variables, ten folds and seven grains is past it. The limit is the ladder's own size, so every
+  # contrast is read the way the documentation says.
+  means <- emmeans::emmeans(fit, "grain", lmer.df = "satterthwaite", lmerTest.limit = nrow(d))
   # trt.vs.ctrl gives every grain minus the reference, so a grain scoring below its learner's
   # best carries a negative difference, which is the direction the comparison is read in.
   comparison <- emmeans::contrast(means, method = "trt.vs.ctrl", ref = 1L, adjust = adjust)

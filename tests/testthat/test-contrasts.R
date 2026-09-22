@@ -78,6 +78,17 @@ test_that("the contrast recovers a planted effect of each grain, at its stated c
   expect_gte(covered, 36L)
 })
 
+test_that("a ladder past emmeans' default limit of 3000 observations is read the same way", {
+  skip_if_no_mixed_model()
+  effect <- c(week = 0, day = -0.02, month = -0.05, season = -0.03)
+  lad <- planted_ladder(effect, n_var = 101L, n_fold = 10L, seed = 5L)
+  expect_gt(nrow(lad), 3000L)
+  out <- grain_contrasts(lad, reference = "week")
+  expect_named(out, c("learner", "grain", "reference", "diff", "lower", "upper", "p_value"))
+  expect_true(all(is.finite(c(out$lower, out$upper))))
+  expect_lt(max(abs(out$diff - effect[out$grain])), 0.01)
+})
+
 test_that("with no effect of the grain the contrast finds none", {
   skip_if_no_mixed_model()
   rejected <- 0L
