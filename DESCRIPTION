@@ -14,10 +14,13 @@ Description: Fits and compares representations of time-varying data against a
     out-of-fold predictions into an ensemble. Calendar-aware binning keeps a bin
     a real week or month rather than a fixed block of hours. Learners, response
     heads and metrics are registered rather than hard-coded, so adding one is a
-    registration and not a fork of the fitting code. The shipped default is
-    presence-absence with a joint multi-label head scored by the true skill
-    statistic, the setting used for species distribution modelling from
-    microclimate loggers.
+    registration and not a fork of the fitting code. The penalised baseline is
+    an elastic net fitted by cyclic coordinate descent along a warm-started
+    path, following Friedman, Hastie and Tibshirani (2010)
+    <doi:10.18637/jss.v033.i01>. The shipped default is presence-absence with a
+    joint multi-label head scored by the true skill statistic of Allouche,
+    Tsoar and Kadmon (2006) <doi:10.1111/j.1365-2664.2006.01214.x>, the setting
+    used for species distribution modelling from microclimate loggers.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Language: en-GB

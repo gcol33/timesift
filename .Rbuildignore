@@ -31,3 +31,6 @@
 ^\.pytest_cache$
 ^\.ruff_cache$
 ^codemeta\.json$
+^src/.*\.o$
+^src/.*\.so$
+^src/.*\.dll$
