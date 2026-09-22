@@ -6,10 +6,16 @@
 
 * This is a new release.
 
+The note also lists seven possibly misspelled words in the Description. Five are the surnames of
+the authors of the two papers cited there: Allouche, Hastie, Kadmon, Tibshirani and Tsoar. The
+other two are spelled as intended: `lookback()` is one of the package's exported functions and the
+name of the representation it builds, and a record the package leaves unreduced is described as
+unreduced.
+
 ## Test environments
 
 * local: Windows 11, R 4.6.1, `--as-cran`
-* win-builder: R-devel, R-release
+* win-builder: R-devel (2026-09-21 r90579) and R-release (4.6.1), both `Status: 1 NOTE`
 * GitHub Actions: ubuntu-latest (R-release, R-devel), windows-latest, macos-latest
 
 ## Notes on two things a search of the sources will find
