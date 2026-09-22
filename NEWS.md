@@ -12,6 +12,15 @@
 
 ## Fixed
 
+* The encoders read the channels of `calendar_channels()` at their own amplitude, where they used
+  to standardise them like a reading. The channels lie on the unit circle already, and being
+  identical across units they reach a network as a bias, whose step under AdamW grows with the
+  scale of the input carrying it; standardising multiplied them by 1.41. At the hourly rung they
+  are four of the fully connected encoder's five channels, and on the Schrankogel record they cost
+  it 0.044 TSS against the study, which fed them unscaled. `calendar_channels()` records its
+  channels in a `position` attribute (a field in Python), and `bind_channels()` carries
+  `position` and `static` from every argument; R's used to drop `static` and Python's to keep the
+  first argument's alone (#81).
 * `plot()` of a `select_grain()` result drew empty axes. The inner scores were matched to their
   candidates on a label joined by a space where the candidates' was joined by a bar, so every
   line and every circle was placed at no position. One helper now writes the label wherever a
