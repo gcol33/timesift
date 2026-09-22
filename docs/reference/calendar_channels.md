@@ -37,6 +37,10 @@ An array of the same units and bins with two channels per cycle,
 `year_sin` and `year_cos`, `day_sin` and `day_cos`, identical across
 units. Combine it with the readings using
 [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md).
+The channels are recorded as positions in the `position` attribute, and
+the encoders of
+[torch_learners](https://gillescolling.com/timesift/reference/torch_learners.md)
+read them at their own amplitude rather than standardise them.
 
 ## Details
 

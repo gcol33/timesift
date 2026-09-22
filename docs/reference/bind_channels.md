@@ -22,7 +22,8 @@ bind_channels(...)
 
 One array carrying every channel, in the order the arguments are given
 and, inside each argument, in its own channel order. The attributes are
-the first argument's, with `stats` the joined names.
+the first argument's, with `stats` the joined names, except `static` and
+`position`, which name channels and so name those of every argument.
 
 ## Examples
 

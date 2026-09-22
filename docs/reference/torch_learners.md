@@ -105,7 +105,15 @@ on a continuous response.
 Every channel is standardised by its own centre and scale, computed over
 every unit and bin of the fitting units, so a static predictor appended
 as a channel sits on the same footing as a reading whatever its units
-are.
+are. The channels of
+[`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
+are the exception and are read at their own amplitude: they lie on the
+unit circle already, and being identical across units they reach a
+network as a bias, whose step under an adaptive optimiser grows with the
+scale of the input carrying it. Standardised, the four calendar channels
+of an hourly record move the fully connected encoder's first layer 1.4
+times as far per step, and on the Schrankogel record that costs it 0.044
+TSS (`inst/reproduce/README.md`).
 
 A fitted encoder holds its weights as plain arrays and rebuilds the
 network when it predicts, so a fit saved with

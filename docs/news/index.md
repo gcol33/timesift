@@ -17,6 +17,23 @@
 
 ### Fixed
 
+- The encoders read the channels of
+  [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
+  at their own amplitude, where they used to standardise them like a
+  reading. The channels lie on the unit circle already, and being
+  identical across units they reach a network as a bias, whose step
+  under AdamW grows with the scale of the input carrying it;
+  standardising multiplied them by 1.41. At the hourly rung they are
+  four of the fully connected encoder’s five channels, and on the
+  Schrankogel record they cost it 0.044 TSS against the study, which fed
+  them unscaled.
+  [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
+  records its channels in a `position` attribute (a field in Python),
+  and
+  [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md)
+  carries `position` and `static` from every argument; R’s used to drop
+  `static` and Python’s to keep the first argument’s alone
+  ([\#81](https://github.com/gcol33/timesift/issues/81)).
 - [`plot()`](https://rdrr.io/r/graphics/plot.default.html) of a
   [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
   result drew empty axes. The inner scores were matched to their

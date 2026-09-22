@@ -384,7 +384,8 @@ normative description.</p>
 bins side by side.</p>
 <p>The channels come back in the order the arguments are given and,
 inside each argument, in its own channel order. Everything else is the
-first argument’s.</p>
+first argument’s, except <code>static</code> and <code>position</code>,
+which name channels and so name those of every argument.</p>
 </div>
 <div class="section level2">
 <h2 id="feature_matrix">
@@ -415,7 +416,8 @@ unit. That is the whole point of comparing against it.</p>
 <span id="cb19-12"><a href="#cb19-12" tabindex="-1"></a>    span,</span>
 <span id="cb19-13"><a href="#cb19-13" tabindex="-1"></a>    lag,</span>
 <span id="cb19-14"><a href="#cb19-14" tabindex="-1"></a>    static,</span>
-<span id="cb19-15"><a href="#cb19-15" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb19-15"><a href="#cb19-15" tabindex="-1"></a>    position,</span>
+<span id="cb19-16"><a href="#cb19-16" tabindex="-1"></a>)</span></code></pre></div>
 <p>A <code>[row, bin, channel]</code> representation and the reduction
 that produced it.</p>
 <p>A row is a unit where the calendar did the binning and a target where
@@ -423,7 +425,9 @@ a lookback did, since a unit carrying several targets cannot name a row
 on its own. <code>span</code> and <code>lag</code> are set by a lookback
 alone, and are what rebuilding one for new targets reads.
 <code>static</code> names the channels holding the same number in every
-bin, which <code>flatten</code> reads once each.</p>
+bin, which <code>flatten</code> reads once each. <code>position</code>
+names the channels <code>calendar_channels</code> made, which the
+encoders read at their own amplitude rather than standardise.</p>
 <p><code>bin_start</code>, <code>bin_end</code> and
 <code>bin_partial</code> are the calendar’s, and are <code>None</code>
 on a representation the calendar did not bin.</p>
@@ -455,6 +459,8 @@ on a representation the calendar did not bin.</p>
 <code>lag</code> - int | None</li>
 <li>
 <code>static</code> - tuple[str, …]</li>
+<li>
+<code>position</code> - tuple[str, …]</li>
 </ul>
 <div class="section level3">
 <h3 id="shape">

@@ -281,7 +281,8 @@ side by side.
 
 The channels come back in the order the arguments are given and, inside
 each argument, in its own channel order. Everything else is the first
-argument’s.
+argument’s, except `static` and `position`, which name channels and so
+name those of every argument.
 
 ## `feature_matrix()`
 
@@ -313,6 +314,7 @@ TimesiftMatrix(
     span,
     lag,
     static,
+    position,
 )
 ```
 
@@ -324,6 +326,8 @@ lookback did, since a unit carrying several targets cannot name a row on
 its own. `span` and `lag` are set by a lookback alone, and are what
 rebuilding one for new targets reads. `static` names the channels
 holding the same number in every bin, which `flatten` reads once each.
+`position` names the channels `calendar_channels` made, which the
+encoders read at their own amplitude rather than standardise.
 
 `bin_start`, `bin_end` and `bin_partial` are the calendar’s, and are
 `None` on a representation the calendar did not bin.
@@ -343,6 +347,7 @@ Attributes:
 - `span` - int \| None
 - `lag` - int \| None
 - `static` - tuple\[str, …\]
+- `position` - tuple\[str, …\]
 
 ### `shape`
 
