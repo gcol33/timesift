@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,14 @@
       <small>Source: <a href="https://github.com/gcol33/timesift/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.3.2" id="timesift-032">timesift 0.3.2<a class="anchor" aria-label="anchor" href="#timesift-032"></a></h2>
+<div class="section level3">
+<h3 id="reproduction-0-3-2">Reproduction<a class="anchor" aria-label="anchor" href="#reproduction-0-3-2"></a></h3>
+<ul><li>
+<code>inst/reproduce/schrankogel.R</code> runs the paper’s headline arm, the eleven-member ensemble with its window chosen inside every outer training set, as the <code>ensemble_selection</code> stage. The eleven members pinned to one window are one learner, whose prediction is their mean probability, and the stage is <code><a href="../reference/select_grain.html">select_grain()</a></code> over the eleven rungs the study chose among: the window mean at all seven windows and the coldest-day, mean and warmest-day reading from the weekly window up, on the study’s five inner folds by AUC. It is compared with the published 0.889 AUC and 0.729 TSS. The ensemble’s members keep the paper’s seeds at <code>--seed=1</code> and move from them by <code>seed - 1</code> at any other, so a run per seed refits the ensemble too. The <code>reproducing-schrankogel</code> vignette carries the same call (<a href="https://github.com/gcol33/timesift/issues/82" class="external-link">#82</a>).</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.3.1" id="timesift-031">timesift 0.3.1<a class="anchor" aria-label="anchor" href="#timesift-031"></a></h2>
 <div class="section level3">

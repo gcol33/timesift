@@ -11,8 +11,8 @@
 #
 # Options, each --name=value:
 #   --stages    which stages to run, comma-separated: contract, representation, baseline,
-#               networks, selection, contrasts, grains, inflation. Default all but networks and
-#               selection, the two that fit encoders.
+#               networks, selection, ensemble_selection, contrasts, grains, inflation. Default all
+#               but networks, selection and ensemble_selection, the three that fit encoders.
 #   --grains    which grains the network grid covers. Default day,week,month,season,year, the
 #               five coarse grains; native and halfday are 26,304 and 2,192 steps per plot and
 #               want a graphics processor, as they had in the study.
@@ -35,7 +35,8 @@
 #   --seed      the training seed of the grid's encoders and of the selection's network. Default
 #               1. The study refitted every cell of its grid under four seeds; a run per seed here
 #               is how the package's own spread at a cell is read beside it. The ensemble's members
-#               keep the seeds the paper's table gives them.
+#               keep the seeds the paper's table gives them at seed 1, and move by `seed - 1` from
+#               them at any other, so a run per seed is a refit of the ensemble too.
 #   --threads   how many fits of one species' inner cross-validation the penalised arms run at
 #               once. Default 1, serial. The path on every fitting plot and the path of each
 #               inner fold are one independent fit each, so `--threads=6` is as many as five
@@ -333,7 +334,11 @@ REFERENCE <- list(
   fixed_weekly_auc = 0.878,
   ensemble_mean_tss = 0.720,
   ensemble_extremeday_tss = 0.727,
-  ensemble_extremeday_auc = 0.887)
+  ensemble_extremeday_auc = 0.887,
+  # The paper's headline: the eleven-member ensemble with its window chosen inside every outer
+  # training set.
+  ensemble_selection_auc = 0.889,
+  ensemble_selection_tss = 0.729)
 
 # The study's network grid on the window mean (S12, the grid table): mean AUC and mean TSS per
 # architecture and window over the 101 species, and each window's AUC against its architecture's
@@ -485,7 +490,8 @@ EXPECTED_BINS <- c(native = 26304L, halfday = 2192L, day = 1096L, week = 157L, m
 
 # The record and its calendar are read only by the stages that bin it, so a run of the contract
 # alone needs neither the 1.2 GB file nor seasons.csv.
-reads_record <- any(c("representation", "networks", "selection") %in% stages) ||
+reads_record <- any(c("representation", "networks", "selection", "ensemble_selection") %in%
+                      stages) ||
   ("baseline" %in% stages && "series" %in% baseline_arms)
 if (!reads_record) {
   readings <- NULL
@@ -748,7 +754,27 @@ network_input <- local({
 ensemble_member <- function(m) {
   arch <- if (m$architecture == "cnn") cnn else rescnn
   arch(channels = m$channels[[1L]], kernel = m$kernel, dropout = m$dropout, epochs = epochs,
-       batch_size = 32L, swa = TRUE, seed = m$seed)
+       batch_size = 32L, swa = TRUE, seed = m$seed + seed - 1L)
+}
+
+# The eleven members as one learner, every member reading the one representation it is handed: the
+# study's `pin_window`, which runs the ensemble with all eleven at a single window. Its prediction
+# is the members' held-out probabilities averaged with equal weight, the ensemble("mean") of the
+# grid's ensemble arm, so the set is one candidate and select_grain() can choose its window as it
+# chooses any learner's.
+pinned_ensemble <- function() {
+  members <- lapply(seq_len(nrow(ENSEMBLE_MEMBERS)),
+                    function(i) ensemble_member(ENSEMBLE_MEMBERS[i, ]))
+  learner(
+    "ensemble", reads = "sequence", multi = "joint", needs = "torch",
+    fit = function(x, y, control, group = NULL) {
+      # The run's control reaches every member, and each member's own settings, its seed and its
+      # weight averaging among them, override it on the settings they name.
+      lapply(members, function(m) fit_learner(m, x, y, control = control, group = group))
+    },
+    predict = function(model, x) {
+      Reduce(`+`, lapply(model, function(fit) predict(fit, x))) / length(model)
+    })
 }
 
 # The study's ensemble at one reading: each member fitted at its own window, and the members'
@@ -843,6 +869,70 @@ if ("networks" %in% stages) {
                      REFERENCE$ensemble_extremeday_tss, TOLERANCE$level_tss)
       }
     }
+  }
+}
+
+# ---- the headline: the ensemble with its window chosen inside every outer fold ----------------
+
+# The study ran its eleven-member ensemble once per rung with every member pinned to that rung's
+# window, and chose among the rungs inside each outer training set: the seven window means and the
+# four coldest-day, mean and warmest-day readings from the weekly window up, eleven rungs. The rung
+# is chosen on the mean inner AUC over the five inner folds, refitted on the whole training set and
+# read once on the outer fold, which is select_grain() over the eleven with the pinned ensemble as
+# its one learner.
+ENSEMBLE_RUNGS <- list(
+  mean       = list(stats = "mean",
+                    grains = c("native", "halfday", "day", "week", "month", "season", "year")),
+  extremeday = list(stats = REPORTED_STATS, grains = c("week", "month", "season", "year")))
+EXPECTED_RUNGS <- 11L
+
+if ("ensemble_selection" %in% stages) {
+  say("building the eleven rungs of the pinned ensemble")
+  rungs <- list()
+  for (reading in names(ENSEMBLE_RUNGS)) {
+    spec <- ENSEMBLE_RUNGS[[reading]]
+    for (w in intersect(spec$grains, grid_grains)) {
+      rungs[[paste(w, reading, sep = ".")]] <- network_input(w, spec$stats)
+    }
+  }
+  if (identical(sort(grid_grains), sort(names(EXPECTED_BINS)))) {
+    assert_equal("ensemble rungs", length(rungs), EXPECTED_RUNGS)
+  } else {
+    say(sprintf("%-38s %d over %s", "ensemble rungs:", length(rungs),
+                paste(grid_grains, collapse = ",")))
+  }
+
+  say("selecting the ensemble's window inside each outer training set: ", length(rungs),
+      " rungs, ", nrow(ENSEMBLE_MEMBERS), " members, ", length(unique(folds)), " outer folds, ",
+      INNER_FOLDS, " inner folds, ", epochs, " epochs")
+  ens_selection <- select_grain(timesift_set(rungs), y, list(ensemble = pinned_ensemble()),
+                                folds = folds, inner = inner_split, metric = SELECTION_METRIC,
+                                control = STUDY_CONTROL,
+                                compare = series_ladder_auc(series_ladder), verbose = TRUE)
+  print(ens_selection)
+  write_out(ens_selection$selected, "ensemble_selection.csv")
+  write_out(ens_selection$inner, "ensemble_selection_inner.csv")
+  write_out(ens_selection$scores, "ensemble_selection_cells_auc.csv")
+  write_out(score_predictions(y, attr(ens_selection, "predictions")[["selected|selected"]], folds,
+                              cells, METRIC_NAME), "ensemble_selection_cells_tss.csv")
+  # Which rung each outer fold chose is reported rather than compared: the paper gives the level of
+  # the procedure and not the rung each fold landed on.
+  say("rungs selected: ", paste(sprintf("fold %s %s", ens_selection$selected$fold,
+                                        ens_selection$selected$grain), collapse = "; "))
+
+  est <- ens_selection$estimate
+  compare_with("the selected ensemble, AUC",
+               est$score[est$metric == SELECTION_METRIC & est$interval == "variables"],
+               REFERENCE$ensemble_selection_auc, TOLERANCE$level_auc)
+  compare_with("the selected ensemble, TSS",
+               est$score[est$metric == METRIC_NAME & est$interval == "variables"],
+               REFERENCE$ensemble_selection_tss, TOLERANCE$level_tss)
+
+  if (!is.null(ens_selection$contrast)) {
+    write_out(ens_selection$contrast, "ensemble_selection_contrast.csv")
+    print(ens_selection$contrast)
+  } else {
+    say("no contrast: the weekly series arm is not in this run. Add --baseline=series.")
   }
 }
 

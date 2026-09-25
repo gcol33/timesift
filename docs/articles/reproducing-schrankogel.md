@@ -382,6 +382,48 @@ series <- grain_ladder(timesift_set(list(series = weekly)), y,
 157 weeks by three channels is 471 numbers per plot, and with their
 squares the penalised fit reads 942 columns.
 
+## The headline: the ensemble with its window chosen
+
+The paper’s headline, 0.889 AUC and 0.729 TSS, is the eleven-member
+ensemble with its window chosen inside every outer training set rather
+than fixed in advance. The study ran the ensemble once per rung with
+every member pinned to that rung’s window, and chose among eleven rungs:
+the window mean at all seven windows, and the coldest-day, mean and
+warmest-day reading at the weekly, monthly, seasonal and yearly windows.
+
+The eleven members pinned to one window are one learner: each fits the
+representation it is handed and the learner predicts the mean of their
+probabilities. That makes the set one candidate, so the selection is the
+same
+[`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+call over the eleven rungs:
+
+``` r
+
+pinned <- learner("ensemble", reads = "sequence", multi = "joint", needs = "torch",
+  fit = function(x, y, control, group = NULL) {
+    lapply(seq_len(nrow(members)), function(i) fit_learner(member(i), x, y, control = control,
+                                                           group = group))
+  },
+  predict = function(model, x) Reduce(`+`, lapply(model, predict, newdata = x)) / length(model))
+
+rungs <- c(unclass(ladder_input),
+           setNames(lapply(c("week", "month", "season", "year"), function(w) {
+             x <- grain_matrix(readings, logger_ID, date, temp, grain = binning[[w]],
+                               stats = c("cold_day", "mean", "warm_day"))
+             bind_channels(x, calendar_channels(x))
+           }), paste0(c("week", "month", "season", "year"), ".extremeday")))
+ensemble_selection <- select_grain(timesift_set(rungs), y, list(ensemble = pinned),
+                                   folds = folds, inner = inner_split, metric = "roc_auc",
+                                   control = study)
+ensemble_selection$estimate
+```
+
+It is ten outer folds by five inner folds by eleven rungs by eleven
+members, plus the chosen rung’s eleven members refitted once per outer
+fold: 6,160 encoder fits. The driver runs it as the `ensemble_selection`
+stage.
+
 ## The environment a fitted encoder carries
 
 A representation is arithmetic on the record and reproduces exactly. A

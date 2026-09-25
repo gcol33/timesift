@@ -1,3 +1,17 @@
+# timesift 0.3.2
+
+## Reproduction
+
+* `inst/reproduce/schrankogel.R` runs the paper's headline arm, the eleven-member ensemble with its
+  window chosen inside every outer training set, as the `ensemble_selection` stage. The eleven
+  members pinned to one window are one learner, whose prediction is their mean probability, and
+  the stage is `select_grain()` over the eleven rungs the study chose among: the window mean at
+  all seven windows and the coldest-day, mean and warmest-day reading from the weekly window up,
+  on the study's five inner folds by AUC. It is compared with the published 0.889 AUC and 0.729
+  TSS. The ensemble's members keep the paper's seeds at `--seed=1` and move from them by
+  `seed - 1` at any other, so a run per seed refits the ensemble too. The `reproducing-schrankogel`
+  vignette carries the same call (#82).
+
 # timesift 0.3.1
 
 ## New

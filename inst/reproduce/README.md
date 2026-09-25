@@ -25,13 +25,15 @@ map every number below was checked against, and the default.
 | `representation` | the record at all seven grains, with every bin count asserted | `representation.csv` |
 | `baseline` | the aggregated-feature arms on the deposit's 188 variables, and the penalised fit on the weekly three-channel series | `baseline.csv`, `baseline_series.csv` |
 | `selection` | the study's own procedure through `select_grain()`: 33 candidates, ten outer folds, the study's five inner folds, the convolutional encoder | `selection.csv`, `selection_inner.csv`, `selection_cells_auc.csv`, `selection_cells_tss.csv`, `selection_contrast.csv` |
+| `ensemble_selection` | the paper's headline: the eleven-member ensemble with every member pinned to one window, its window chosen among eleven rungs inside every outer training set through `select_grain()` | `ensemble_selection.csv`, `ensemble_selection_inner.csv`, `ensemble_selection_cells_auc.csv`, `ensemble_selection_cells_tss.csv`, `ensemble_selection_contrast.csv` |
 | `networks` | the encoders across the ladder, and the study's eleven-member ensemble, each under TSS and AUC | `networks_mean.csv`, `networks_extremeday.csv`, and `_auc` beside each |
 | `contrasts` | every pair of arms, paired inside each cell both scored | `contrasts.csv` |
 | `grains` | each window against the window the study took as its architecture's best, in AUC on the window mean | `grain_contrasts.csv` |
 | `inflation` | what the reported levels are upper bounds on, and the level each reported score implies | `inflation.csv`, `implied_skill.csv` |
 
 The contract stage always runs, since everything downstream reads its response and its folds. The
-default is every stage but `networks` and `selection`, the two that fit encoders.
+default is every stage but `networks`, `selection` and `ensemble_selection`, the three that fit
+encoders.
 
 ## The selection stage
 
@@ -57,6 +59,35 @@ It is 1,660 encoder fits at the full candidate set: ten outer folds by five inne
 candidates, plus one refit per outer fold. The two finest windows are 26,304 and 2,192 steps per
 plot and want a graphics processor. `--grains` narrows the windows, and a narrowed run says how
 many candidates it searched rather than asserting 33.
+
+## The ensemble selection stage
+
+The paper's headline, 0.889 AUC and 0.729 TSS, is not the 33-candidate selection above but the
+eleven-member ensemble with its window chosen inside every outer training set. The study ran the
+ensemble once per rung with every member pinned to that rung's window (`pin_window` in its
+`scripts/run_inner_oof.py`), and chose among eleven rungs: the window mean at all seven windows and
+the coldest-day, mean and warmest-day reading at the weekly, monthly, seasonal and yearly windows.
+Each outer fold takes the rung with the highest mean inner AUC over the five inner folds, refits it
+on the whole training set and reads the outer fold once.
+
+```
+Rscript schrankogel.R <deposit_dir> <out_dir> --stages=contract,baseline,ensemble_selection \
+  --baseline=series --grains=native,halfday,day,week,month,season,year --epochs=60 --seed=1
+```
+
+The eleven members are one learner there: each fits the representation it is handed under its own
+architecture, channels, kernel, dropout and seed, and the learner's prediction is their held-out
+probabilities averaged with equal weight, as the grid's ensemble arm averages them. That makes the
+set one candidate, so the stage is `select_grain()` over the eleven rungs with that learner, on the
+study's inner partition, and every setting the selection stage uses holds here too. At `--seed=1`
+the members keep the paper's seeds, and at any other seed they move from them by `seed - 1`, so a
+run per seed is a refit of the whole ensemble.
+
+It is 6,160 encoder fits at the full rung set: ten outer folds by five inner folds by eleven rungs
+by eleven members, plus the eleven members of the chosen rung refitted once per outer fold. The hourly and half-daily rungs want a
+graphics processor. `--grains` narrows the rungs, and a narrowed run says how many it searched
+rather than asserting eleven. The level is compared at the single encoder's tolerance, which an
+average of eleven fits spreads inside; which rung each fold chose is reported and not compared.
 
 ## Smoke runs
 
