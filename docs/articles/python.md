@@ -59,8 +59,9 @@ difference between the two is a recorded decision.
   comparison](https://gillescolling.com/timesift/articles/python-scoring.md):
 
   The metrics, the paired contrast between two arms on matched cells,
-  the inflation of a score read at its own best threshold, and what a
-  fitted model read.
+  every grain against a learner’s best, the inflation of a score read at
+  its own best threshold, what a fitted model read, and a record with a
+  planted grain to test all of it on.
 
 - [Extending](https://gillescolling.com/timesift/articles/python-extending.md):
 

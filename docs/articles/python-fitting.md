@@ -621,3 +621,30 @@ Attributes:
 - `interval` - str
 - `nested_cv` - list\[dict\] \| None
 - `final` - dict \| None
+
+## `plot()`
+
+``` python
+plot(x, col=None, interval: bool = True, ax=None, **kwargs)
+```
+
+Draw a ladder, a run or a selection, and return the table the drawing
+was made from.
+
+A ladder is drawn as one line per learner across the grains, at the
+across-variable mean of the per-variable score, with a 95 percent
+interval from its standard error across variables on Student’s t with
+one degree of freedom fewer than there are variables; an open circle
+marks each learner’s best grain. A run is drawn the same way across the
+representations, with the stack’s held-out score across them as a dashed
+line: the curves are scored on the folds a choice among them would be
+judged on, so the best of them sits a little high, and the stack’s line
+does not. A selection is drawn as every candidate’s inner score in every
+outer fold, one line per fold, an open circle on the candidate the fold
+chose.
+
+`col` is one colour per line, recycled. `ax` is the matplotlib axes to
+draw on, a new figure’s where it is left unset, and `kwargs` reach
+`ax.set()`, so `title=` or `ylim=` are set as they would be there.
+`interval` draws the interval on a ladder or a run and is ignored on a
+selection, which draws none. Needs matplotlib.

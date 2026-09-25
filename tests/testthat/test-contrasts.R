@@ -108,3 +108,23 @@ test_that("a grain is named as the ladder names it, whatever characters it holds
   got <- out$diff[match(c("month-mean", "a (b)", "day"), out$grain)]
   expect_lt(max(abs(got - c(-0.03, -0.06, -0.01))), 0.02)
 })
+
+test_that("the pinned table is what the scores it was made from give", {
+  skip_if_no_mixed_model()
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures not found")
+  cells <- utils::read.csv(file.path(dir, "grain_contrast_cells.csv"), stringsAsFactors = FALSE)
+  expected <- utils::read.csv(file.path(dir, "grain_contrast.csv"), stringsAsFactors = FALSE)
+  lad <- structure(cbind(learner = "cnn", cells, scorable = !is.na(cells$score),
+                         stringsAsFactors = FALSE),
+                   class = c("timesift_ladder", "data.frame"), metric = "tss")
+  out <- grain_contrasts(lad)
+  # The Python suite reads the same two files at the tolerances the spec gives: the differences to
+  # the optimiser's, the interval and the p-value to the multivariate t integrator's.
+  expect_identical(out$grain, expected$grain)
+  expect_identical(out$reference, expected$reference)
+  expect_equal(out$diff, expected$diff, tolerance = 1e-6)
+  expect_equal(out$lower, expected$lower, tolerance = 2e-4)
+  expect_equal(out$upper, expected$upper, tolerance = 2e-4)
+  expect_equal(out$p_value, expected$p_value, tolerance = 2e-3)
+})

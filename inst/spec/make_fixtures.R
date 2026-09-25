@@ -819,3 +819,56 @@ write_fixture(
              glmnet_stops = stall_stops, stringsAsFactors = FALSE),
   "penalised_stall_cv.csv")
 cat("wrote the captured stall's reference,", stall_stops, "glmnet folds stopping early\n")
+
+# ---- the grain contrast and the simulator's design ------------------------------------------------
+# The mixed model of the grain contrast is fitted by each language's own optimiser and its adjusted
+# p-values and intervals are integrals each language evaluates by quasi-Monte Carlo, so what is
+# pinned here is R's table and the tolerance each column is read at is the spec's: the differences
+# to the optimiser's, the rest to the integrator's. The design is small, twelve variables over
+# four folds, so the degrees of freedom are low enough that reading them as emmeans does moves the
+# critical value, and cells are missing, so the fit is not the balanced one a shortcut would get
+# right by accident.
+set.seed(20260925L)
+gc_vars <- sprintf("s%02d", 1:12)
+gc_cells <- expand.grid(fold = 1:4, variable = gc_vars, grain = c("day", "week", "month"),
+                        KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
+gc_cells$score <- round(0.62 + stats::rnorm(12, sd = 0.08)[match(gc_cells$variable, gc_vars)] +
+                          stats::rnorm(4, sd = 0.015)[gc_cells$fold] +
+                          c(day = 0, week = 0.025, month = 0.012)[gc_cells$grain] +
+                          stats::rnorm(nrow(gc_cells), sd = 0.03), 6)
+gc_cells$score[c(3L, 20L, 41L, 77L, 130L)] <- NA_real_
+gc_cells <- gc_cells[c("grain", "variable", "fold", "score")]
+write_fixture(
+  data.frame(gc_cells[c("grain", "variable", "fold")],
+             score = ifelse(is.na(gc_cells$score), "NA", sprintf("%.12g", gc_cells$score)),
+             stringsAsFactors = FALSE),
+  "grain_contrast_cells.csv")
+gc_ladder <- structure(cbind(learner = "cnn", gc_cells, scorable = !is.na(gc_cells$score),
+                             stringsAsFactors = FALSE),
+                       class = c("timesift_ladder", "data.frame"), metric = "tss")
+gc_out <- grain_contrasts(gc_ladder)
+write_fixture(
+  data.frame(gc_out[c("learner", "grain", "reference")],
+             lapply(gc_out[c("diff", "lower", "upper", "p_value")], sprintf, fmt = "%.12g"),
+             stringsAsFactors = FALSE),
+  "grain_contrast.csv")
+
+# The simulator's design draws nothing, so every number of it is pinned: where each variable's
+# stretch of bins is anchored, the weights it reads the readings by, the population standard
+# deviation of its driver and the link solved for the asked-for prevalence and skill.
+sim_rows <- list()
+for (m in c("event", "season", "lag")) {
+  sim <- simulate_records(n = 2L, mechanism = m, variables = 6L, days = 400L, prevalence = 0.2,
+                          auc = 0.8)
+  when <- sort(unique(sim$readings$time))
+  phi <- exp(-sim$design$step_hours / (24 * sim$design$anomaly_days))
+  d <- .simulate_design(m, 6L, when, "09-01", phi, 0, 1, 0.2, 0.8, 1L)
+  sim_rows[[m]] <- data.frame(mechanism = m, grain = sim$grain, bins = sim$design$bins,
+                              variable = 1:6, anchor = d$anchor,
+                              weight_ss = sprintf("%.12g", colSums(d$weights^2)),
+                              sigma = sprintf("%.12g", d$sigma),
+                              b0 = sprintf("%.12g", d$link$b0), b1 = sprintf("%.12g", d$link$b1),
+                              stringsAsFactors = FALSE)
+}
+write_fixture(do.call(rbind, sim_rows), "simulate_design.csv")
+cat("wrote the grain contrast and the simulator's design\n")

@@ -48,7 +48,7 @@ carries, so a difference between the two is a recorded decision.
 
 [Scoring and comparison](python-scoring.html)
 
-: The metrics, the paired contrast between two arms on matched cells, the inflation of a score read at its own best threshold, and what a fitted model read.
+: The metrics, the paired contrast between two arms on matched cells, every grain against a learner's best, the inflation of a score read at its own best threshold, what a fitted model read, and a record with a planted grain to test all of it on.
 
 [Extending](python-extending.html)
 

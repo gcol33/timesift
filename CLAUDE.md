@@ -224,15 +224,18 @@ is where the string is written and `pyproject.toml` reads it from there, so a bu
 The build order is done on both sides: the representation and the fixtures, the lookback, the fold
 map and the scorable-cell mask, the ladder and its plot, the learner registry, the penalised fit,
 the torch learners, the stack, and above them the paired contrast, the mixed-model grain contrast,
-the occlusion profile and the inflation of a self-selected threshold. The Python side carries the
-same except the mixed model, and reproduces every one of the 257 representation digests, 29 of
-which pin a zone other than UTC, and every one of the 12 penalised cases.
+the occlusion profile and the inflation of a self-selected threshold. The Python side carries all
+of it, the mixed-model grain contrast, the record simulator and the plots included, and reproduces
+every one of the 257 representation digests, 29 of which pin a zone other than UTC, every one of the
+12 penalised cases, R's grain contrast on the pinned scores and the simulator's design.
 
 Both sides run on one C++ core. The implementations that used to be compared are kept as oracles
 the suites check the core against. The last section of `inst/spec/representation.md` says what each
 language carries, so a difference between them is a recorded decision: one name per concept, the
-three registries and the nested selection on both sides, and the mixed-model contrast, the record
-simulator and the plots in R alone.
+three registries, the nested selection, the mixed-model contrast, the record simulator and the
+plots on both sides, and only tidyselect's verbs in R alone, where Python selects a column by name,
+glob or predicate. The Python contrast needs scipy and its plots matplotlib, each an extra of the
+wheel, as R's contrast needs lme4, lmerTest and emmeans.
 
 `inst/reproduce/schrankogel.R` runs the published grid from the deposit and asserts its input at
 every step. Verified against the deposit on 2026-09-02, matching the paper exactly:

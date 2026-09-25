@@ -4,7 +4,7 @@ title: "Python: scoring and comparison"
 
 <!-- Written by tools/python_reference.py from the Python sources. Do not edit. -->
 
-The metrics, the paired contrast between two arms on matched cells, the inflation of a score read at its own best threshold, and what a fitted model read.
+The metrics, the paired contrast between two arms on matched cells, every grain against a learner's best, the inflation of a score read at its own best threshold, what a fitted model read, and a record with a planted grain to test all of it on.
 
 ## `tss()`
 
@@ -113,6 +113,34 @@ risk on a new sample, by the nested cross-validation of Bates, Hastie and Tibshi
 read on the difference of the two arms' cell scores, which needs a ladder fitted with
 `grain_ladder(interval="nested_cv")`.
 
+## `grain_contrasts()`
+
+```python
+grain_contrasts(
+    ladder: Ladder,
+    learner: str | None = None,
+    reference: str | None = None,
+    adjust: str = 'mvt',
+)
+```
+
+Compare every grain against the reference grain of one learner.
+
+A mixed model on the learner's per-cell scores, `score ~ grain + (1 | variable) +
+(1 | fold)`, fitted by restricted maximum likelihood, and every grain compared against
+`reference` by Dunnett's many-to-one procedure. The design is balanced across variables,
+folds and grains, so each grain is compared within a variable and within a fold, and the
+variation between variables cancels from the comparison.
+
+`learner` is the only one in the ladder by default, and `reference` the learner's best
+grain. Taking the best-observed grain as the reference favours it, so read this beside
+`paired_contrast`, which singles out no grain. `adjust` is `"mvt"`, the adjustment
+R's default reads, or `"none"`.
+
+Returns one row per grain other than the reference: `learner`, `grain`, `reference`,
+the difference from the reference `diff`, its interval `lower` and `upper`, and the
+adjusted `p_value`. Needs scipy.
+
 ## `tss_inflation()`
 
 ```python
@@ -165,3 +193,72 @@ What one candidate's score loses when a bin, or a channel, is withheld from it.
 Takes a `timesift.fit.timesift` run or a `timesift.ladder.grain_ladder` result,
 and the profile itself is one implementation either way. The models kept per fold are the ones
 read, so the profile is measured where the score was: on the units each model held out.
+
+## `simulate_records()`
+
+```python
+simulate_records(
+    n: int = 300,
+    mechanism: str = 'none',
+    variables: int = 10,
+    prevalence: float = 0.1,
+    auc: float = 0.75,
+    from_: str = '2021-09-01',
+    days: int = 365,
+    step_hours: float = 3,
+    seasonal: float = 8,
+    offset_sd: float = 1,
+    anomaly_sd: float = 1,
+    anomaly_days: float = 2,
+    offset_effect: float = 0,
+    sensor_sd: float = 0.3,
+    year_start: str = '09-01',
+    seed: int = 1,
+    draw: int = 1,
+)
+```
+
+Draw units carrying a record and a presence-absence response acting at one known grain.
+
+The response is driven by `g_ij = sum_t w_j(t) a_i(t)`, a weighted mean of unit `i`'s
+latent anomaly: the record with the shared seasonal cycle and the unit's own offset taken out.
+The weights are constant within the bins of one grain and zero outside a short stretch of them,
+so the true grain is the coarsest grain at which `g` is still an exact linear functional of
+the representation. `"none"` draws the driver independently of the record; `"event"` reads
+three consecutive days, `"season"` one whole season, and `"lag"` four consecutive weeks
+under a geometric decay.
+
+The driver is standardised by its population mean and standard deviation, computed in closed
+form from the settings, and the response is `Bernoulli(expit(b0 + b1 z))` with `b0` and
+`b1` solved so the marginal prevalence is `prevalence` and the population area under the
+ROC curve of `z` is `auc`. `auc` is a ceiling no fitted model reaches.
+
+`seed` fixes the design and `draw` the units, so two calls with one `seed` and two
+`draw` values are two samples of one population. `from_` is R's `from`, renamed because
+`from` is a Python keyword.
+
+## `Simulation`
+
+```python
+Simulation(readings, y, driver, grain, weights, link, design, grain_stat, anchor)
+```
+
+A simulated record, its response, and everything the draw is reproducible from.
+
+`readings` is the long table `grain_matrix` takes, as a mapping of `unit`, `time`
+and `reading`. `y` is the `[unit, variable]` 0/1 response and `driver` the
+standardised driver `z` behind it. `grain` is the true grain, or `None` where the
+response does not read the record. `weights` is the `[reading, variable]` matrix defining
+the driver, `link` the solved `b0` and `b1`, and `design` the settings of the draw.
+
+Attributes:
+
+- `readings` - dict
+- `y` - Response
+- `driver` - np.ndarray
+- `grain` - str | None
+- `weights` - np.ndarray
+- `link` - dict
+- `design` - dict
+- `grain_stat` - str
+- `anchor` - np.ndarray

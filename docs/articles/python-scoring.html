@@ -113,8 +113,9 @@
     
 <!-- Written by tools/python_reference.py from the Python sources. Do not edit. -->
 <p>The metrics, the paired contrast between two arms on matched cells,
-the inflation of a score read at its own best threshold, and what a
-fitted model read.</p>
+every grain against a learner’s best, the inflation of a score read at
+its own best threshold, what a fitted model read, and a record with a
+planted grain to test all of it on.</p>
 <div class="section level2">
 <h2 id="tss">
 <code>tss()</code><a class="anchor" aria-label="anchor" href="#tss"></a>
@@ -226,16 +227,46 @@ difference of the two arms’ cell scores, which needs a ladder fitted
 with <code>grain_ladder(interval="nested_cv")</code>.</p>
 </div>
 <div class="section level2">
+<h2 id="grain_contrasts">
+<code>grain_contrasts()</code><a class="anchor" aria-label="anchor" href="#grain_contrasts"></a>
+</h2>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>grain_contrasts(</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>    ladder: Ladder,</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>    learner: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    reference: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>,</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    adjust: <span class="bu">str</span> <span class="op">=</span> <span class="st">'mvt'</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>)</span></code></pre></div>
+<p>Compare every grain against the reference grain of one learner.</p>
+<p>A mixed model on the learner’s per-cell scores,
+<code>score ~ grain + (1 | variable) + (1 | fold)</code>, fitted by
+restricted maximum likelihood, and every grain compared against
+<code>reference</code> by Dunnett’s many-to-one procedure. The design is
+balanced across variables, folds and grains, so each grain is compared
+within a variable and within a fold, and the variation between variables
+cancels from the comparison.</p>
+<p><code>learner</code> is the only one in the ladder by default, and
+<code>reference</code> the learner’s best grain. Taking the
+best-observed grain as the reference favours it, so read this beside
+<code>paired_contrast</code>, which singles out no grain.
+<code>adjust</code> is <code>"mvt"</code>, the adjustment R’s default
+reads, or <code>"none"</code>.</p>
+<p>Returns one row per grain other than the reference:
+<code>learner</code>, <code>grain</code>, <code>reference</code>, the
+difference from the reference <code>diff</code>, its interval
+<code>lower</code> and <code>upper</code>, and the adjusted
+<code>p_value</code>. Needs scipy.</p>
+</div>
+<div class="section level2">
 <h2 id="tss_inflation">
 <code>tss_inflation()</code><a class="anchor" aria-label="anchor" href="#tss_inflation"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>tss_inflation(</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>    y: Response,</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>    folds,</span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    skill<span class="op">=</span>(<span class="fl">0.6</span>, <span class="fl">0.7</span>, <span class="fl">0.9</span>),</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    replicates: <span class="bu">int</span> <span class="op">=</span> <span class="dv">200</span>,</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>tss_inflation(</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>    y: Response,</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    folds,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>    skill<span class="op">=</span>(<span class="fl">0.6</span>, <span class="fl">0.7</span>, <span class="fl">0.9</span>),</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    replicates: <span class="bu">int</span> <span class="op">=</span> <span class="dv">200</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>)</span></code></pre></div>
 <p>How much a threshold chosen on the scored units inflates the level it
 reports.</p>
 <p>Predictions are simulated under a normal model whose population skill
@@ -251,14 +282,14 @@ it.</p>
 <h2 id="implied_skill">
 <code>implied_skill()</code><a class="anchor" aria-label="anchor" href="#implied_skill"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>implied_skill(</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>    y: Response,</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    folds,</span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>    observed,</span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    grid<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    replicates: <span class="bu">int</span> <span class="op">=</span> <span class="dv">200</span>,</span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>implied_skill(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>    y: Response,</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>    folds,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>    observed,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>    grid<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>    replicates: <span class="bu">int</span> <span class="op">=</span> <span class="dv">200</span>,</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>)</span></code></pre></div>
 <p>What population skill a level actually read is consistent with.</p>
 <p><code>tss_inflation</code> maps a population skill to the level a
 design reports for it; this inverts that map, under the distribution of
@@ -271,7 +302,7 @@ equal.</p>
 <h2 id="occlusion">
 <code>occlusion()</code><a class="anchor" aria-label="anchor" href="#occlusion"></a>
 </h2>
-<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>occlusion(x, <span class="op">*</span>args, <span class="op">**</span>kwargs)</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>occlusion(x, <span class="op">*</span>args, <span class="op">**</span>kwargs)</span></code></pre></div>
 <p>What one candidate’s score loses when a bin, or a channel, is
 withheld from it.</p>
 <p>Takes a <code>timesift.fit.timesift</code> run or a
@@ -279,6 +310,93 @@ withheld from it.</p>
 is one implementation either way. The models kept per fold are the ones
 read, so the profile is measured where the score was: on the units each
 model held out.</p>
+</div>
+<div class="section level2">
+<h2 id="simulate_records">
+<code>simulate_records()</code><a class="anchor" aria-label="anchor" href="#simulate_records"></a>
+</h2>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>simulate_records(</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>    n: <span class="bu">int</span> <span class="op">=</span> <span class="dv">300</span>,</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>    mechanism: <span class="bu">str</span> <span class="op">=</span> <span class="st">'none'</span>,</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>    variables: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>,</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>    prevalence: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>    auc: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.75</span>,</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>    from_: <span class="bu">str</span> <span class="op">=</span> <span class="st">'2021-09-01'</span>,</span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>    days: <span class="bu">int</span> <span class="op">=</span> <span class="dv">365</span>,</span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>    step_hours: <span class="bu">float</span> <span class="op">=</span> <span class="dv">3</span>,</span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>    seasonal: <span class="bu">float</span> <span class="op">=</span> <span class="dv">8</span>,</span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a>    offset_sd: <span class="bu">float</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a>    anomaly_sd: <span class="bu">float</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a>    anomaly_days: <span class="bu">float</span> <span class="op">=</span> <span class="dv">2</span>,</span>
+<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a>    offset_effect: <span class="bu">float</span> <span class="op">=</span> <span class="dv">0</span>,</span>
+<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a>    sensor_sd: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.3</span>,</span>
+<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a>    year_start: <span class="bu">str</span> <span class="op">=</span> <span class="st">'09-01'</span>,</span>
+<span id="cb14-17"><a href="#cb14-17" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb14-18"><a href="#cb14-18" tabindex="-1"></a>    draw: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb14-19"><a href="#cb14-19" tabindex="-1"></a>)</span></code></pre></div>
+<p>Draw units carrying a record and a presence-absence response acting
+at one known grain.</p>
+<p>The response is driven by <code>g_ij = sum_t w_j(t) a_i(t)</code>, a
+weighted mean of unit <code>i</code>’s latent anomaly: the record with
+the shared seasonal cycle and the unit’s own offset taken out. The
+weights are constant within the bins of one grain and zero outside a
+short stretch of them, so the true grain is the coarsest grain at which
+<code>g</code> is still an exact linear functional of the
+representation. <code>"none"</code> draws the driver independently of
+the record; <code>"event"</code> reads three consecutive days,
+<code>"season"</code> one whole season, and <code>"lag"</code> four
+consecutive weeks under a geometric decay.</p>
+<p>The driver is standardised by its population mean and standard
+deviation, computed in closed form from the settings, and the response
+is <code>Bernoulli(expit(b0 + b1 z))</code> with <code>b0</code> and
+<code>b1</code> solved so the marginal prevalence is
+<code>prevalence</code> and the population area under the ROC curve of
+<code>z</code> is <code>auc</code>. <code>auc</code> is a ceiling no
+fitted model reaches.</p>
+<p><code>seed</code> fixes the design and <code>draw</code> the units,
+so two calls with one <code>seed</code> and two <code>draw</code> values
+are two samples of one population. <code>from_</code> is R’s
+<code>from</code>, renamed because <code>from</code> is a Python
+keyword.</p>
+</div>
+<div class="section level2">
+<h2 id="simulation">
+<code>Simulation</code><a class="anchor" aria-label="anchor" href="#simulation"></a>
+</h2>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>Simulation(readings, y, driver, grain, weights, link, design, grain_stat, anchor)</span></code></pre></div>
+<p>A simulated record, its response, and everything the draw is
+reproducible from.</p>
+<p><code>readings</code> is the long table <code>grain_matrix</code>
+takes, as a mapping of <code>unit</code>, <code>time</code> and
+<code>reading</code>. <code>y</code> is the
+<code>[unit, variable]</code> 0/1 response and <code>driver</code> the
+standardised driver <code>z</code> behind it. <code>grain</code> is the
+true grain, or <code>None</code> where the response does not read the
+record. <code>weights</code> is the <code>[reading, variable]</code>
+matrix defining the driver, <code>link</code> the solved <code>b0</code>
+and <code>b1</code>, and <code>design</code> the settings of the
+draw.</p>
+<p>Attributes:</p>
+<ul>
+<li>
+<code>readings</code> - dict</li>
+<li>
+<code>y</code> - Response</li>
+<li>
+<code>driver</code> - np.ndarray</li>
+<li>
+<code>grain</code> - str | None</li>
+<li>
+<code>weights</code> - np.ndarray</li>
+<li>
+<code>link</code> - dict</li>
+<li>
+<code>design</code> - dict</li>
+<li>
+<code>grain_stat</code> - str</li>
+<li>
+<code>anchor</code> - np.ndarray</li>
+</ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

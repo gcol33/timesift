@@ -15,6 +15,7 @@ from importlib.metadata import version as _installed_version
 
 from .artifacts import (read_cells, read_folds, read_response, write_cells,
                         write_folds, write_response)
+from .contrasts import grain_contrasts
 from .control import TrainControl, train_control
 from .digest import digest_array
 from .fit import Timesift, timesift
@@ -34,8 +35,10 @@ from .representation import (DAY_LEVEL_STATS, GRAINS, STATS, Coverage, TimesiftM
                              grain_matrix, lookback_matrix, timesift_set)
 from .response import (PRESENCE_ABSENCE, Cells, Folds, Response, align_folds, as_response,
                        fold_map, positive_weights, scorable_cells)
+from .plot import plot
 from .select import column_names, select_columns
 from .selection import Selection, select_grain
+from .simulate import Simulation, simulate_records
 from .specs import (Representation, Resampling, Sift, TimesiftSpec, as_resampling, as_sift,
                     auto_grains, build_representation, cv, expand_sift, grain, grains,
                     grouped_cv, lookback, lookbacks, multigrain, n_targets, native,
@@ -68,7 +71,7 @@ __all__ = [
     "Cells", "Coverage", "DAY_LEVEL_STATS", "EnsembleSpec", "Fit", "Folds",
     "GRAINS",
     "Ladder", "Learner", "PRESENCE_ABSENCE", "Representation", "Resampling", "Response", "STATS",
-    "Selection", "Sift", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",
+    "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
     "average_precision",
     "bind_channels", "build_representation", "calendar_channels", "candidate_table", "cnn",
@@ -76,15 +79,15 @@ __all__ = [
     "elasticnet",
     "ensemble", "ensemble_combine", "ensemble_fit", "ensemble_weights",
     "expand_sift", "feature_matrix", "fit_learner", "flatten", "fold_map", "forest",
-    "get_learner", "grain",
+    "get_learner", "grain", "grain_contrasts",
     "grain_ladder", "grain_matrix", "grains", "grouped_cv", "implied_skill", "kappa_score",
     "learners", "lookback", "lookback_matrix", "lookbacks", "metrics", "mlp", "model_agreement",
-    "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "positive_weights",
+    "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "plot", "positive_weights",
     "procedure_table",
     "read_cells",
     "read_folds", "read_response", "register_learner", "register_metric", "register_response",
     "rescnn", "resolve_folds", "resolve_metric", "responses", "roc_auc", "scorable_cells",
     "score_predictions", "select_columns",
-    "select_grain", "stepwise", "summary", "target_labels", "timesift", "timesift_set",
+    "select_grain", "simulate_records", "stepwise", "summary", "target_labels", "timesift", "timesift_set",
     "train_control", "tss", "tss_inflation", "write_cells", "write_folds", "write_response",
 ]

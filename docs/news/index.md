@@ -1,5 +1,28 @@
 # Changelog
 
+## timesift (development version)
+
+### New
+
+- The Python side carries everything the R side does.
+  [`grain_contrasts()`](https://gillescolling.com/timesift/reference/grain_contrasts.md)
+  fits `score ~ grain + (1 | variable) + (1 | fold)` by restricted
+  maximum likelihood, reads each contrast’s degrees of freedom as
+  lmerTest does and adjusts by the multivariate t as emmeans’ `"mvt"`
+  does, written out in numpy with scipy’s integrator and optimiser
+  beside it; on the pinned scores it returns R’s differences to 1e-6 and
+  R’s intervals and p-values to the integrator’s error.
+  [`simulate_records()`](https://gillescolling.com/timesift/reference/simulate_records.md)
+  builds the same design as R’s, anchors, weights, driver scale and
+  link, and draws the units from numpy’s stream.
+  [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws a
+  ladder, a run or a selection on matplotlib in R’s colours and returns
+  the table it drew from. scipy and matplotlib are the `contrasts` and
+  `plot` extras of the wheel, and the numpy-only install is unchanged.
+- `grain_contrast_cells.csv`, `grain_contrast.csv` and
+  `simulate_design.csv` join the contract’s fixtures, and both suites
+  assert them.
+
 ## timesift 0.3.2
 
 ### Reproduction

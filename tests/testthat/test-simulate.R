@@ -132,3 +132,24 @@ test_that("the generator refuses a design it cannot place", {
   expect_error(simulate_records(n = 10L, step_hours = 5), "must divide 24")
   expect_error(simulate_records(n = 1L), "at least 2")
 })
+
+test_that("the design is the one the contract pins", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures not found")
+  pinned <- utils::read.csv(file.path(dir, "simulate_design.csv"), stringsAsFactors = FALSE)
+  for (m in unique(pinned$mechanism)) {
+    rows <- pinned[pinned$mechanism == m, , drop = FALSE]
+    sim <- simulate_records(n = 2L, mechanism = m, variables = 6L, days = 400L,
+                            prevalence = 0.2, auc = 0.8)
+    when <- sort(unique(sim$readings$time))
+    phi <- exp(-sim$design$step_hours / (24 * sim$design$anomaly_days))
+    d <- timesift:::.simulate_design(m, 6L, when, "09-01", phi, 0, 1, 0.2, 0.8, 1L)
+    expect_identical(sim$grain, rows$grain[1L])
+    expect_identical(sim$design$bins, rows$bins[1L])
+    expect_identical(as.integer(d$anchor), rows$anchor)
+    expect_equal(colSums(d$weights^2), rows$weight_ss, tolerance = 1e-10)
+    expect_equal(d$sigma, rows$sigma, tolerance = 1e-10)
+    expect_equal(d$link$b0, rows$b0[1L], tolerance = 1e-10)
+    expect_equal(d$link$b1, rows$b1[1L], tolerance = 1e-10)
+  }
+})

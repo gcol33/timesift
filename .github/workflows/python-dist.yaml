@@ -46,7 +46,7 @@ jobs:
           python -m venv "$RUNNER_TEMP/venv"
           . "$RUNNER_TEMP/venv/bin/activate"
           python -m pip install --upgrade pip
-          python -m pip install "${tarball}[test,sklearn]"
+          python -m pip install "${tarball}[test,sklearn,contrasts,plot]"
           mkdir "$RUNNER_TEMP/unpacked"
           tar -xzf "$tarball" -C "$RUNNER_TEMP/unpacked"
           cd "$RUNNER_TEMP"/unpacked/timesift-*

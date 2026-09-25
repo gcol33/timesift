@@ -20,6 +20,11 @@ dependencies = ["numpy>=1.24", "tzdata; platform_system == 'Windows'"]
 torch = ["torch>=2.0"]
 # The trees `forest()` grows, and nothing else: the penalised fit is the shared core.
 sklearn = ["scikit-learn>=1.0"]
+# The multivariate t `grain_contrasts()` reads Dunnett's comparisons against, and the optimiser
+# its restricted fit is found by; the mixed model itself is written out in numpy.
+contrasts = ["scipy>=1.15"]
+# What `plot()` draws with.
+plot = ["matplotlib>=3.5"]
 # pandas is what a user's table is, so the suite reads one through `timesift()`; the package
 # itself never imports it.
 test = ["pytest>=8.0", "pandas>=2.0"]

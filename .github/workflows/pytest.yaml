@@ -34,7 +34,7 @@ jobs:
       - name: Install the package and its test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ".[test,sklearn]"
+          python -m pip install ".[test,sklearn,contrasts,plot]"
 
       # The default index serves the CUDA build on Linux, which is gigabytes for a runner that has
       # no device. The encoder tests skip themselves everywhere this step does not run.

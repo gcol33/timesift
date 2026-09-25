@@ -76,6 +76,15 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="development version" id="timesift-development-version">timesift (development version)<a class="anchor" aria-label="anchor" href="#timesift-development-version"></a></h2>
+<div class="section level3">
+<h3 id="new-development-version">New<a class="anchor" aria-label="anchor" href="#new-development-version"></a></h3>
+<ul><li>The Python side carries everything the R side does. <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code> fits <code>score ~ grain + (1 | variable) + (1 | fold)</code> by restricted maximum likelihood, reads each contrast’s degrees of freedom as lmerTest does and adjusts by the multivariate t as emmeans’ <code>"mvt"</code> does, written out in numpy with scipy’s integrator and optimiser beside it; on the pinned scores it returns R’s differences to 1e-6 and R’s intervals and p-values to the integrator’s error. <code><a href="../reference/simulate_records.html">simulate_records()</a></code> builds the same design as R’s, anchors, weights, driver scale and link, and draws the units from numpy’s stream. <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> draws a ladder, a run or a selection on matplotlib in R’s colours and returns the table it drew from. scipy and matplotlib are the <code>contrasts</code> and <code>plot</code> extras of the wheel, and the numpy-only install is unchanged.</li>
+<li>
+<code>grain_contrast_cells.csv</code>, <code>grain_contrast.csv</code> and <code>simulate_design.csv</code> join the contract’s fixtures, and both suites assert them.</li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.3.2" id="timesift-032">timesift 0.3.2<a class="anchor" aria-label="anchor" href="#timesift-032"></a></h2>
 <div class="section level3">
 <h3 id="reproduction-0-3-2">Reproduction<a class="anchor" aria-label="anchor" href="#reproduction-0-3-2"></a></h3>

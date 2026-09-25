@@ -57,7 +57,7 @@ SECTIONS = (
                "target_labels", "select_columns", "column_names", "summary", "candidate_table",
                "procedure_table", "ensemble", "ensemble_fit", "ensemble_combine",
                "ensemble_weights", "EnsembleSpec", "Stack", "grain_ladder", "fit_learner",
-               "select_grain", "Ladder", "Fit", "Selection"),
+               "select_grain", "Ladder", "Fit", "Selection", "plot"),
     ),
     dict(
         slug="python-learners",
@@ -70,11 +70,12 @@ SECTIONS = (
     dict(
         slug="python-scoring",
         title="Python: scoring and comparison",
-        desc="The metrics, the paired contrast between two arms on matched cells, the inflation "
-             "of a score read at its own best threshold, and what a fitted model read.",
+        desc="The metrics, the paired contrast between two arms on matched cells, every grain "
+             "against a learner's best, the inflation of a score read at its own best threshold, "
+             "what a fitted model read, and a record with a planted grain to test all of it on.",
         names=("tss", "roc_auc", "average_precision", "kappa_score", "cohen_kappa", "decision_threshold",
-               "model_agreement", "score_predictions", "paired_contrast", "tss_inflation",
-               "implied_skill", "occlusion"),
+               "model_agreement", "score_predictions", "paired_contrast", "grain_contrasts",
+               "tss_inflation", "implied_skill", "occlusion", "simulate_records", "Simulation"),
     ),
     dict(
         slug="python-extending",
