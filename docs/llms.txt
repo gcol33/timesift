@@ -51,7 +51,9 @@ fit
 `predict(fit, new_plots, new_logger)` rebuilds every member’s
 representation for the new rows and predicts through the ensemble fitted
 on every target; `candidate = "selected"` predicts with the chosen
-candidate.
+candidate. `type = "binary"` cuts each species into presence and absence
+at a threshold learned from the fit’s own out-of-fold predictions, so a
+binary map is one prediction per map cell.
 
 ## Four things, and one contract
 
@@ -372,6 +374,8 @@ without the fitting layer.
   : Put channels side by side
 - [`feature_matrix()`](https://gillescolling.com/timesift/reference/feature_matrix.md)
   : Bring an already-reduced feature table into a ladder
+- [`as.matrix(`*`<timesift_matrix>`*`)`](https://gillescolling.com/timesift/reference/as.matrix.timesift_matrix.md)
+  : A representation as a block of predictors
 
 ## One grain at a time
 

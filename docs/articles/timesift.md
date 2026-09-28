@@ -160,6 +160,31 @@ round(p[1:3, 1:4], 3)
 #> p003 0.040 0.924 0.185 0.949
 ```
 
+`type = "binary"` cuts each response into presence and absence. The cut
+is learned from the same candidate’s out-of-fold predictions of the
+fit’s own targets, so it comes from predictions of plots the model had
+not been fitted on.
+[`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+on the fit returns the cuts themselves, and `rule` picks how they are
+learned: `"youden"` maximises sensitivity plus specificity, `"kappa"`
+maximises Cohen’s kappa, and `"prevalence"` predicts as many presences
+as were observed.
+
+``` r
+
+decision_threshold(fit, rule = "prevalence")
+#>       sp1       sp2       sp3       sp4       sp5       sp6 
+#> 0.5643002 0.4907909 0.5252335 0.5131875 0.6334832 0.5234282
+predict(fit, targets, series, type = "binary", rule = "prevalence")[1:3, 1:4]
+#>      sp1 sp2 sp3 sp4
+#> p001   0   1   0   1
+#> p002   1   1   1   1
+#> p003   0   1   0   1
+```
+
+A binary map is this prediction with one target per map cell, each
+carrying a series of its own at the grain the fit reads.
+
 ## Representations
 
 A representation carries the settings and nothing else, so the same
@@ -332,41 +357,61 @@ cnn(channels = c(16L, 32L), epochs = 300L)
 
 A learner of your own is a fit and a predict pair, and it goes through
 the same folds, the same cells and the same scoring as the ones that
-ship.
+ship. [`as.matrix()`](https://rdrr.io/r/base/matrix.html) lays a
+representation out as the block of predictors the tabular learners read,
+one column per bin of each channel. A fit that declares a `weights`
+argument is handed the case weights every shipped learner fits under,
+which weight a presence by how rare it is.
 
 ``` r
 
-flat <- function(x) matrix(as.numeric(x), nrow = dim(x)[1])
-
 nearest_neighbour <- learner(
   "1nn",
-  fit = function(x, y, ...) list(x = flat(x), y = y),
+  fit = function(x, y, ...) list(x = as.matrix(x), y = y),
   predict = function(model, x) {
-    d <- as.matrix(dist(rbind(flat(x), model$x)))[seq_len(dim(x)[1]), -seq_len(dim(x)[1])]
+    m <- as.matrix(x)
+    d <- as.matrix(dist(rbind(m, model$x)))[seq_len(nrow(m)), -seq_len(nrow(m))]
     model$y[apply(d, 1, which.min), , drop = FALSE]
   }
 )
 
+weighted_glm <- learner(
+  "weighted_glm",
+  fit = function(x, y, weights, ...) {
+    f <- as.data.frame(as.matrix(x))
+    lapply(seq_len(ncol(y)), function(j) {
+      glm(y[, j] ~ ., data = f, weights = weights[, j], family = quasibinomial(),
+          control = glm.control(maxit = 100))
+    })
+  },
+  predict = function(model, x) {
+    f <- as.data.frame(as.matrix(x))
+    vapply(model, function(m) predict(m, f, type = "response"), numeric(nrow(f)))
+  },
+  data = grain("month")
+)
+
 both <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
-                 models = c(elasticnet(), nearest_neighbour),
+                 models = c(elasticnet(), nearest_neighbour, weighted_glm),
                  sift = grains("week", "month"), resampling = cv(v = 5), verbose = FALSE)
 summary(both)
 #> timesift  60 targets, 6 responses, 5-fold random CV, roc_auc
 #> 
 #> candidates, scored on the outer folds
-#> candidate                    mean    won  responses
-#> 1nn / week                  0.720      0  separate
-#> 1nn / month                 0.772      0  separate
-#> elasticnet / week           0.895      3  separate
-#> elasticnet / month          0.907      3  separate
+#> candidate                      mean    won  responses
+#> 1nn / week                    0.720      0  separate
+#> 1nn / month                   0.772      0  separate
+#> elasticnet / week             0.895      2  separate
+#> weighted_glm / month          0.904      2  separate
+#> elasticnet / month            0.907      2  separate
 #> 
 #> procedure, chosen and weighted inside each outer training fold
-#> selected                    0.907  se 0.019
-#> ensemble                    0.910  se 0.016
+#> selected                      0.907  se 0.019
+#> ensemble                      0.910  se 0.016
 #> selected elasticnet / month in 5 of 5 folds
 #> 
 #> choice on every target  elasticnet / month
-#> weights on every target  elasticnet / month 0.63   elasticnet / week 0.32   1nn / month 0.05
+#> weights on every target  elasticnet / week 0.35   elasticnet / month 0.34   weighted_glm / month 0.28   1nn / month 0.03
 ```
 
 ## The combination

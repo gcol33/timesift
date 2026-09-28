@@ -41,7 +41,10 @@ learner(
   response of their own. One that declares a `group` argument is handed
   the grouping the outer fold map keeps whole, one value per unit of `x`
   or `NULL`, so a split it draws inside the fit keeps the same groups
-  whole.
+  whole. One that declares a `weights` argument is handed the head's
+  case weights, a matrix of the response's shape, which is what a rare
+  response weighs in every learner that ships; a fit that declares none
+  fits unweighted.
 
 - predict:
 
@@ -102,16 +105,18 @@ runs across every representation of the run.
 ## Examples
 
 ``` r
-# The bin means of a unit, fed to one logistic regression per variable.
+# Every bin of every channel as a predictor, one weighted logistic regression per variable.
 flat_glm <- learner(
   "flat_glm",
-  fit = function(x, y, ...) {
-    f <- as.data.frame(apply(x, c(1, 3), mean))
-    lapply(seq_len(ncol(y)), function(j)
-      stats::glm(y[, j] ~ ., data = f, family = stats::binomial()))
+  fit = function(x, y, weights, ...) {
+    f <- as.data.frame(as.matrix(x))
+    lapply(seq_len(ncol(y)), function(j) {
+      stats::glm(y[, j] ~ ., data = f, weights = weights[, j],
+                 family = stats::quasibinomial())
+    })
   },
   predict = function(model, x) {
-    f <- as.data.frame(apply(x, c(1, 3), mean))
+    f <- as.data.frame(as.matrix(x))
     vapply(model, function(m) stats::predict(m, f, type = "response"), numeric(nrow(f)))
   }
 )

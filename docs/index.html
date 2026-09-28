@@ -43,7 +43,7 @@
 
     <a class="navbar-brand me-2" href="index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -169,7 +169,7 @@
 <span><span class="co">#&gt;</span></span>
 <span><span class="co">#&gt; choice on every target  elasticnet / month</span></span>
 <span><span class="co">#&gt; weights on every target  elasticnet / month 0.98   forest / month 0.02</span></span></code></pre></div>
-<p><code>predict(fit, new_plots, new_logger)</code> rebuilds every member’s representation for the new rows and predicts through the ensemble fitted on every target; <code>candidate = "selected"</code> predicts with the chosen candidate.</p>
+<p><code>predict(fit, new_plots, new_logger)</code> rebuilds every member’s representation for the new rows and predicts through the ensemble fitted on every target; <code>candidate = "selected"</code> predicts with the chosen candidate. <code>type = "binary"</code> cuts each species into presence and absence at a threshold learned from the fit’s own out-of-fold predictions, so a binary map is one prediction per map cell.</p>
 </div>
 <div class="section level2">
 <h2 id="four-things-and-one-contract">Four things, and one contract<a class="anchor" aria-label="anchor" href="#four-things-and-one-contract"></a>

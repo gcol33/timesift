@@ -1058,6 +1058,7 @@ the difference is recorded here rather than found at a call site.
 | the combiner | [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md), [`ensemble_fit()`](https://gillescolling.com/timesift/reference/ensemble_fit.md), [`ensemble_combine()`](https://gillescolling.com/timesift/reference/ensemble_combine.md) and [`ensemble_weights()`](https://gillescolling.com/timesift/reference/ensemble_weights.md) |
 | scoring held-out predictions | [`score_predictions()`](https://gillescolling.com/timesift/reference/score_predictions.md), on the cells the mask allows |
 | the metrics | [`tss()`](https://gillescolling.com/timesift/reference/tss.md), [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md), [`average_precision()`](https://gillescolling.com/timesift/reference/average_precision.md) and [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md), with [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md) and [`model_agreement()`](https://gillescolling.com/timesift/reference/kappa_score.md) beside them |
+| the cut a fit applies | [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md) given a fit in place of the response, one cut per response learned from a candidate’s out-of-fold predictions |
 | two arms on matched cells | [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md) |
 | every grain against a learner’s best | [`grain_contrasts()`](https://gillescolling.com/timesift/reference/grain_contrasts.md), the mixed model of the per-cell scores and Dunnett’s many-to-one comparisons off it |
 | a record with a planted grain | [`simulate_records()`](https://gillescolling.com/timesift/reference/simulate_records.md), the vignette’s and the recovery tests’ generator |
@@ -1197,7 +1198,9 @@ the difference is recorded here rather than found at a call site.
   model per response take the family the loss names, logistic under
   `binary_cross_entropy` and Gaussian under `squared_error`. A fit that
   declares a `head` argument is handed the head, as one that declares
-  `control` is handed the control.
+  `control` is handed the control, and one that declares `weights` is
+  handed the head’s case weights, the matrix of the response’s shape the
+  learners that ship fit under; a fit declaring none fits unweighted.
 - A fitted encoder holds its weights as arrays and the device *setting*
   rather than the device it resolved to, and rebuilds the network when
   it predicts, so a fit written with
@@ -1261,6 +1264,18 @@ the difference is recorded here rather than found at a call site.
   `(r, a, b, c)`, the repetition and the folds it leaves out, zero where
   it leaves out fewer than three. Two tables whose contrast is read must
   carry the same response, maps, `repeats` and `seed`.
+- A binary prediction, `type = "binary"`, cuts each response at the
+  threshold
+  [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+  learns under `rule` from the same candidate’s out-of-fold predictions
+  of the fit’s own targets: the member’s own for one candidate, and the
+  members’ combined under the refitted stack’s weights for the ensemble.
+  Presence is `p >= threshold`. A response whose held-out predictions
+  give no cut predicts `NA` in R and NaN in Python, and a fit whose
+  response is not 0/1 refuses the cut before anything is built. `rule`
+  is `"youden"` by default, as it is for
+  [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+  itself.
 - `models` takes one learner, a set or list of them, or the name of a
   registered one, and `learners` on a ladder takes the same three forms.
 - Predicting rebuilds each member’s representation for the new targets
@@ -1347,6 +1362,9 @@ the difference is recorded here rather than found at a call site.
 | the occlusion profile | [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md), an S3 generic with methods on a run and on a ladder | [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md), one function taking either |
 | the report on a run | [`summary()`](https://rdrr.io/r/base/summary.html), a method on the base generic, printing the candidates and the procedure | [`summary()`](https://rdrr.io/r/base/summary.html), one function returning the text, with `candidate_table()` and `procedure_table()` for the two tables it prints |
 | predicting new targets | [`predict()`](https://rdrr.io/r/stats/predict.html), a method on the base generic | `.predict()`, a method on the fit |
+| a binary prediction | an integer matrix of 0 and 1, `NA` where no cut is learned | a float array of 0.0 and 1.0, NaN where no cut is learned |
+| the cuts of a fit | [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md), an S3 generic with a method on a fit, returning a named vector | [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md), one function taking a fit or a response, returning a dict |
+| a representation as a block of predictors | [`as.matrix()`](https://rdrr.io/r/base/matrix.html), a method on the base generic | `flatten()` |
 | a set of learners, or of representations | [`c()`](https://rdrr.io/r/base/c.html), an S3 method on each spec class | a `list`, and `+` between two of them |
 | drawing a ladder, a run or a selection | [`plot()`](https://rdrr.io/r/graphics/plot.default.html), a method on the base generic for each, on base graphics | [`plot()`](https://rdrr.io/r/graphics/plot.default.html), one function taking any of the three, on matplotlib |
 | a simulated record | a `timesift_simulation` list whose `readings` is a data frame | the `Simulation` dataclass, whose `readings` is a mapping of column to array; the first reading instant is `from_`, since `from` is a keyword |
@@ -1372,7 +1390,7 @@ it has none.
 
 | in Python only | what it is |
 |----|----|
-| `flatten`, `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.flatten()`, `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
+| `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
 | `Representation`, `Sift`, `Resampling`, `TimesiftSpec`, `Learner`, `TrainControl`, `TimesiftMatrix`, `TimesiftSet`, `Coverage`, `Response`, `Folds`, `Cells`, `Fit`, `Ladder`, `Selection`, `Timesift`, `Stack`, `EnsembleSpec`, `Simulation` | the types. R attaches a class attribute to a list or an array and the constructor is the only door to it; a Python dataclass is the type itself, and a user annotating a function or building one by hand reaches it by name. |
 | `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `PRESENCE_ABSENCE` | the grain and statistic vocabularies as tuples, and the shipped head as the mapping [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through [`responses()`](https://gillescolling.com/timesift/reference/register_response.md) on both sides. |
 

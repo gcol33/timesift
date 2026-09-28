@@ -131,6 +131,8 @@ without the fitting layer.
   : Put channels side by side
 - [`feature_matrix()`](https://gillescolling.com/timesift/reference/feature_matrix.md)
   : Bring an already-reduced feature table into a ladder
+- [`as.matrix(`*`<timesift_matrix>`*`)`](https://gillescolling.com/timesift/reference/as.matrix.timesift_matrix.md)
+  : A representation as a block of predictors
 
 ## One grain at a time
 

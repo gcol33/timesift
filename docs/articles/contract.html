@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -1580,38 +1580,45 @@ nested selection</td>
 beside them</td>
 </tr>
 <tr class="even">
+<td>the cut a fit applies</td>
+<td>
+<code><a href="../reference/kappa_score.html">decision_threshold()</a></code> given a fit in place of the
+response, one cut per response learned from a candidate’s out-of-fold
+predictions</td>
+</tr>
+<tr class="odd">
 <td>two arms on matched cells</td>
 <td><code><a href="../reference/paired_contrast.html">paired_contrast()</a></code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>every grain against a learner’s best</td>
 <td>
 <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code>, the mixed model of the per-cell
 scores and Dunnett’s many-to-one comparisons off it</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>a record with a planted grain</td>
 <td>
 <code><a href="../reference/simulate_records.html">simulate_records()</a></code>, the vignette’s and the recovery
 tests’ generator</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the inflation of a self-selected threshold</td>
 <td>
 <code><a href="../reference/tss_inflation.html">tss_inflation()</a></code>, and <code><a href="../reference/implied_skill.html">implied_skill()</a></code> for
 the level it implies</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>a set of representations</td>
 <td>
 <code><a href="../reference/timesift_set.html">timesift_set()</a></code>, which reads as a mapping of grain name
 to representation</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>folds of the inner cross-validation</td>
 <td><code>n_inner</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the three artifacts</td>
 <td>
 <code><a href="../reference/artifacts.html">write_folds()</a></code> and <code><a href="../reference/artifacts.html">read_folds()</a></code>,
@@ -1619,12 +1626,12 @@ to representation</td>
 <code><a href="../reference/artifacts.html">write_cells()</a></code> and <code><a href="../reference/artifacts.html">read_cells()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the digest</td>
 <td>
 <code><a href="../reference/digest_array.html">digest_array()</a></code>, exported</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the three registries</td>
 <td>
 <code><a href="../reference/register_learner.html">register_learner()</a></code> and <code><a href="../reference/register_learner.html">learners()</a></code>,
@@ -1632,7 +1639,7 @@ to representation</td>
 <code><a href="../reference/register_response.html">register_response()</a></code> and <code><a href="../reference/register_response.html">responses()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>what a rare response weighs</td>
 <td>
 <code><a href="../reference/positive_weights.html">positive_weights()</a></code>, the case weights the shipped
@@ -1775,7 +1782,10 @@ the three learners fitting one model per response take the family the
 loss names, logistic under <code>binary_cross_entropy</code> and
 Gaussian under <code>squared_error</code>. A fit that declares a
 <code>head</code> argument is handed the head, as one that declares
-<code>control</code> is handed the control.</li>
+<code>control</code> is handed the control, and one that declares
+<code>weights</code> is handed the head’s case weights, the matrix of
+the response’s shape the learners that ship fit under; a fit declaring
+none fits unweighted.</li>
 <li>A fitted encoder holds its weights as arrays and the device
 <em>setting</em> rather than the device it resolved to, and rebuilds the
 network when it predicts, so a fit written with <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code>
@@ -1840,6 +1850,16 @@ nested cross-validation draws its seed as
 zero where it leaves out fewer than three. Two tables whose contrast is
 read must carry the same response, maps, <code>repeats</code> and
 <code>seed</code>.</li>
+<li>A binary prediction, <code>type = "binary"</code>, cuts each
+response at the threshold <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> learns under
+<code>rule</code> from the same candidate’s out-of-fold predictions of
+the fit’s own targets: the member’s own for one candidate, and the
+members’ combined under the refitted stack’s weights for the ensemble.
+Presence is <code>p &gt;= threshold</code>. A response whose held-out
+predictions give no cut predicts <code>NA</code> in R and NaN in Python,
+and a fit whose response is not 0/1 refuses the cut before anything is
+built. <code>rule</code> is <code>"youden"</code> by default, as it is
+for <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> itself.</li>
 <li>
 <code>models</code> takes one learner, a set or list of them, or the
 name of a registered one, and <code>learners</code> on a ladder takes
@@ -1979,12 +1999,33 @@ the two tables it prints</td>
 <code>.predict()</code>, a method on the fit</td>
 </tr>
 <tr class="even">
+<td>a binary prediction</td>
+<td>an integer matrix of 0 and 1, <code>NA</code> where no cut is
+learned</td>
+<td>a float array of 0.0 and 1.0, NaN where no cut is learned</td>
+</tr>
+<tr class="odd">
+<td>the cuts of a fit</td>
+<td>
+<code><a href="../reference/kappa_score.html">decision_threshold()</a></code>, an S3 generic with a method on a
+fit, returning a named vector</td>
+<td>
+<code><a href="../reference/kappa_score.html">decision_threshold()</a></code>, one function taking a fit or a
+response, returning a dict</td>
+</tr>
+<tr class="even">
+<td>a representation as a block of predictors</td>
+<td>
+<code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix()</a></code>, a method on the base generic</td>
+<td><code>flatten()</code></td>
+</tr>
+<tr class="odd">
 <td>a set of learners, or of representations</td>
 <td>
 <code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code>, an S3 method on each spec class</td>
 <td>a <code>list</code>, and <code>+</code> between two of them</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>drawing a ladder, a run or a selection</td>
 <td>
 <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code>, a method on the base generic for each, on base
@@ -1993,7 +2034,7 @@ graphics</td>
 <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code>, one function taking any of the three, on
 matplotlib</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>a simulated record</td>
 <td>a <code>timesift_simulation</code> list whose <code>readings</code>
 is a data frame</td>
@@ -2051,23 +2092,22 @@ predicate on the name, resolved by <code>select_columns()</code>.</td>
 <tbody>
 <tr class="odd">
 <td>
-<code>flatten</code>, <code>align_folds</code>,
-<code>as_response</code>, <code>as_resampling</code>,
-<code>get_learner</code>, <code>resolve_metric</code>,
-<code>cohen_kappa</code>, <code>auto_grains</code>,
-<code>expand_sift</code>, <code>resolve_folds</code>,
-<code>n_targets</code>, <code>target_labels</code>,
-<code>select_columns</code>, <code>column_names</code>
+<code>align_folds</code>, <code>as_response</code>,
+<code>as_resampling</code>, <code>get_learner</code>,
+<code>resolve_metric</code>, <code>cohen_kappa</code>,
+<code>auto_grains</code>, <code>expand_sift</code>,
+<code>resolve_folds</code>, <code>n_targets</code>,
+<code>target_labels</code>, <code>select_columns</code>,
+<code>column_names</code>
 </td>
-<td>the helpers R keeps unexported: <code>.flatten()</code>,
-<code>.as_folds()</code>, <code>.as_response()</code>,
-<code>.as_learner()</code>, <code>.as_metric()</code>,
-<code>.kappa_table()</code>, <code>.auto_grains()</code> and
-<code>.select_columns()</code> do the same work by the same name, and
-<code>.as_fold_map()</code>, <code>.sift_specs()</code> and
-<code>.target_frame()</code> do what the last five do. A Python module
-namespace is flat, and anyone writing a learner or reading an artifact
-against this side reaches them.</td>
+<td>the helpers R keeps unexported: <code>.as_folds()</code>,
+<code>.as_response()</code>, <code>.as_learner()</code>,
+<code>.as_metric()</code>, <code>.kappa_table()</code>,
+<code>.auto_grains()</code> and <code>.select_columns()</code> do the
+same work by the same name, and <code>.as_fold_map()</code>,
+<code>.sift_specs()</code> and <code>.target_frame()</code> do what the
+last five do. A Python module namespace is flat, and anyone writing a
+learner or reading an artifact against this side reaches them.</td>
 </tr>
 <tr class="even">
 <td>

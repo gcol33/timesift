@@ -51,7 +51,9 @@ fit
 `predict(fit, new_plots, new_logger)` rebuilds every member’s
 representation for the new rows and predicts through the ensemble fitted
 on every target; `candidate = "selected"` predicts with the chosen
-candidate.
+candidate. `type = "binary"` cuts each species into presence and absence
+at a threshold learned from the fit’s own out-of-fold predictions, so a
+binary map is one prediction per map cell.
 
 ## Four things, and one contract
 

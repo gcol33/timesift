@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -76,10 +76,17 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="development version" id="timesift-development-version">timesift (development version)<a class="anchor" aria-label="anchor" href="#timesift-development-version"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.4.0" id="timesift-040">timesift 0.4.0<a class="anchor" aria-label="anchor" href="#timesift-040"></a></h2>
 <div class="section level3">
-<h3 id="new-development-version">New<a class="anchor" aria-label="anchor" href="#new-development-version"></a></h3>
-<ul><li>The Python side carries everything the R side does. <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code> fits <code>score ~ grain + (1 | variable) + (1 | fold)</code> by restricted maximum likelihood, reads each contrast’s degrees of freedom as lmerTest does and adjusts by the multivariate t as emmeans’ <code>"mvt"</code> does, written out in numpy with scipy’s integrator and optimiser beside it; on the pinned scores it returns R’s differences to 1e-6 and R’s intervals and p-values to the integrator’s error. <code><a href="../reference/simulate_records.html">simulate_records()</a></code> builds the same design as R’s, anchors, weights, driver scale and link, and draws the units from numpy’s stream. <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> draws a ladder, a run or a selection on matplotlib in R’s colours and returns the table it drew from. scipy and matplotlib are the <code>contrasts</code> and <code>plot</code> extras of the wheel, and the numpy-only install is unchanged.</li>
+<h3 id="new-0-4-0">New<a class="anchor" aria-label="anchor" href="#new-0-4-0"></a></h3>
+<ul><li>
+<code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> on a fit takes <code>type = "binary"</code>, cutting each response into presence and absence at the threshold learned under <code>rule</code> (<code>"youden"</code>, <code>"kappa"</code> or <code>"prevalence"</code>) from the same candidate’s out-of-fold predictions of the fit’s own targets. For the ensemble those are the members’ combined under the refitted stack’s weights. A binary map is this prediction on one target per map cell. Both languages.</li>
+<li>
+<code><a href="../reference/kappa_score.html">decision_threshold()</a></code> takes a fit in place of the response and returns one cut per response, the cut <code>type = "binary"</code> applies. In R it is an S3 generic with a method on a fit.</li>
+<li>A learner’s fit that declares a <code>weights</code> argument is handed the response head’s case weights, a matrix of the response’s shape, as one declaring <code>head</code>, <code>control</code> or <code>group</code> is handed those. A learner of one’s own now fits a rare response under the weight every shipped learner fits it under. Both languages.</li>
+<li>
+<code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix()</a></code> on a representation lays it out as the block of predictors the tabular learners read, one column per bin of each channel, named <code>channel@bin</code>, and one column per static predictor. It is Python’s <code>flatten()</code>, which was already exported there. The example in <code><a href="../reference/learner.html">?learner</a></code> used to average the bins away and now reads this block.</li>
+<li>The Python side carries everything the R side does. <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code> fits <code>score ~ grain + (1 | variable) + (1 | fold)</code> by restricted maximum likelihood, reads each contrast’s degrees of freedom as lmerTest does and adjusts by the multivariate t as emmeans’ <code>"mvt"</code> does, written out in numpy with scipy’s integrator and optimiser beside it; on the pinned scores it returns R’s differences to 1e-6 and R’s intervals and p-values to the integrator’s error. <code><a href="../reference/simulate_records.html">simulate_records()</a></code> builds the same design as R’s, anchors, weights, driver scale and link, and draws the units from numpy’s stream. <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> draws a ladder, a run or a selection on matplotlib in R’s colours and returns the table it drew from. scipy and matplotlib are the <code>contrasts</code> and <code>plot</code> extras of the wheel, and the numpy-only install is unchanged.</li>
 <li>
 <code>grain_contrast_cells.csv</code>, <code>grain_contrast.csv</code> and <code>simulate_design.csv</code> join the contract’s fixtures, and both suites assert them.</li>
 </ul></div>

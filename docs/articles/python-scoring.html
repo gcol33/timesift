@@ -41,7 +41,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -168,9 +168,14 @@ either order.</p>
 <h2 id="decision_threshold">
 <code>decision_threshold()</code><a class="anchor" aria-label="anchor" href="#decision_threshold"></a>
 </h2>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>decision_threshold(y, p, rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>decision_threshold(y, p<span class="op">=</span><span class="va">None</span>, rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>, candidate: <span class="bu">str</span> <span class="op">=</span> <span class="st">'ensemble'</span>)</span></code></pre></div>
 <p>The probability cut a rule selects. Presence is predicted at
 <code>p &gt;= threshold</code>.</p>
+<p>Given a <code><a href="../reference/timesift.html">timesift()</a></code> fit in place of <code>y</code> and no
+<code>p</code>, one cut per response, learned from
+<code>candidate</code>’s out-of-fold predictions of the fit’s own
+targets, as a dict keyed by the response; that is the cut
+<code>predict(type="binary")</code> applies to new targets.</p>
 </div>
 <div class="section level2">
 <h2 id="model_agreement">

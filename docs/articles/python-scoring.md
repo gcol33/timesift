@@ -61,11 +61,18 @@ either order.
 ## `decision_threshold()`
 
 ``` python
-decision_threshold(y, p, rule: str = 'youden')
+decision_threshold(y, p=None, rule: str = 'youden', candidate: str = 'ensemble')
 ```
 
 The probability cut a rule selects. Presence is predicted at
 `p >= threshold`.
+
+Given a
+[`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+fit in place of `y` and no `p`, one cut per response, learned from
+`candidate`’s out-of-fold predictions of the fit’s own targets, as a
+dict keyed by the response; that is the cut `predict(type="binary")`
+applies to new targets.
 
 ## `model_agreement()`
 

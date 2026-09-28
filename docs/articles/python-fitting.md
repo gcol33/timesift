@@ -139,7 +139,14 @@ Which representation a candidate reads.
 ### `predict()`
 
 ``` python
-predict(self, targets, series=None, candidate: str = 'ensemble')
+predict(
+    self,
+    targets,
+    series=None,
+    candidate: str = 'ensemble',
+    type: str = 'response',
+    rule: str = 'youden',
+)
 ```
 
 Predict new targets, rebuilding each member’s representation from the
@@ -150,6 +157,14 @@ what predicts here is one model per candidate rather than a fold’s worth
 of them. `"ensemble"` combines them under the weights fitted on every
 target, `"selected"` predicts with the candidate the rule chose on every
 target (`choice`), and any other value names one candidate.
+
+`type="binary"` cuts each response into presence and absence at the
+threshold
+[`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+learns by `rule` from the same candidate’s out-of-fold predictions of
+the fit’s own targets, and returns 0.0 and 1.0, NaN for a response whose
+held-out predictions give no cut. A binary map of a species is this
+prediction on one target per map cell.
 
 ## `TimesiftSpec`
 
@@ -401,7 +416,10 @@ A `fit` that declares a `head` argument is handed the registered head,
 whose `loss` and `activation` say what it is fitting toward; the
 learners that ship read both from there and hold no response of their
 own. A `fit` that declares a `control` is handed the run’s training
-settings the same way.
+settings the same way, and one that declares `weights` the head’s case
+weights, an array of the response’s shape, which is what a rare response
+weighs in every learner that ships; a fit that declares none fits
+unweighted.
 
 ## `select_grain()`
 
