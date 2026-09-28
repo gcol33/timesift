@@ -110,6 +110,21 @@ p <- predict(fit, targets, series)
 round(p[1:3, 1:4], 3)
 ```
 
+`type = "binary"` cuts each response into presence and absence. The cut is learned from the same
+candidate's out-of-fold predictions of the fit's own targets, so it comes from predictions of
+plots the model had not been fitted on. `decision_threshold()` on the fit returns the cuts
+themselves, and `rule` picks how they are learned: `"youden"` maximises sensitivity plus
+specificity, `"kappa"` maximises Cohen's kappa, and `"prevalence"` predicts as many presences as
+were observed.
+
+```{r binary}
+decision_threshold(fit, rule = "prevalence")
+predict(fit, targets, series, type = "binary", rule = "prevalence")[1:3, 1:4]
+```
+
+A binary map is this prediction with one target per map cell, each carrying a series of its own
+at the grain the fit reads.
+
 ## Representations
 
 A representation carries the settings and nothing else, so the same object describes an arm before
@@ -195,22 +210,40 @@ cnn(channels = c(16L, 32L), epochs = 300L)
 ```
 
 A learner of your own is a fit and a predict pair, and it goes through the same folds, the same
-cells and the same scoring as the ones that ship.
+cells and the same scoring as the ones that ship. `as.matrix()` lays a representation out as the
+block of predictors the tabular learners read, one column per bin of each channel. A fit that
+declares a `weights` argument is handed the case weights every shipped learner fits under, which
+weight a presence by how rare it is.
 
 ```{r custom}
-flat <- function(x) matrix(as.numeric(x), nrow = dim(x)[1])
-
 nearest_neighbour <- learner(
   "1nn",
-  fit = function(x, y, ...) list(x = flat(x), y = y),
+  fit = function(x, y, ...) list(x = as.matrix(x), y = y),
   predict = function(model, x) {
-    d <- as.matrix(dist(rbind(flat(x), model$x)))[seq_len(dim(x)[1]), -seq_len(dim(x)[1])]
+    m <- as.matrix(x)
+    d <- as.matrix(dist(rbind(m, model$x)))[seq_len(nrow(m)), -seq_len(nrow(m))]
     model$y[apply(d, 1, which.min), , drop = FALSE]
   }
 )
 
+weighted_glm <- learner(
+  "weighted_glm",
+  fit = function(x, y, weights, ...) {
+    f <- as.data.frame(as.matrix(x))
+    lapply(seq_len(ncol(y)), function(j) {
+      glm(y[, j] ~ ., data = f, weights = weights[, j], family = quasibinomial(),
+          control = glm.control(maxit = 100))
+    })
+  },
+  predict = function(model, x) {
+    f <- as.data.frame(as.matrix(x))
+    vapply(model, function(m) predict(m, f, type = "response"), numeric(nrow(f)))
+  },
+  data = grain("month")
+)
+
 both <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
-                 models = c(elasticnet(), nearest_neighbour),
+                 models = c(elasticnet(), nearest_neighbour, weighted_glm),
                  sift = grains("week", "month"), resampling = cv(v = 5), verbose = FALSE)
 summary(both)
 ```

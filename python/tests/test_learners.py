@@ -390,6 +390,33 @@ def test_a_learners_fit_is_handed_the_head_only_where_it_declares_one():
     assert fit.model == "binary_cross_entropy"
 
 
+def test_a_learners_fit_is_handed_the_heads_case_weights_only_where_it_declares_them(
+        temporary_response):
+    from timesift.registry import RESPONSES
+    from timesift.response import positive_weights
+    x, y = planted(n_unit=12, days=14, seed=95)
+    seen = {}
+
+    def plain(x, y, **params):
+        seen.update(params)
+        return 1
+
+    def aware(x, y, weights, **params):
+        return weights
+
+    constant = lambda model, x: np.full((x.values.shape[0], 1), 0.5)  # noqa: E731
+    fit_learner(Learner("plain", fit=plain, predict=constant), x, y.take_variables([0]))
+    assert "weights" not in seen
+    one = y.take_variables([0])
+    fit = fit_learner(Learner("aware", fit=aware, predict=constant), x, one)
+    np.testing.assert_array_equal(fit.model, positive_weights(one.align(x.units).values))
+    head = RESPONSES.get("presence_absence")
+    temporary_response("unweighted_declared", {k: v for k, v in head.items() if k != "weights"})
+    fit = fit_learner(Learner("aware", fit=aware, predict=constant), x, one,
+                      response="unweighted_declared")
+    np.testing.assert_array_equal(fit.model, np.ones((12, 1)))
+
+
 def test_a_learners_fit_is_handed_the_control_only_where_it_declares_one():
     x, y = planted(n_unit=10, days=14, seed=94)
     one = y.take_variables([0])

@@ -95,10 +95,28 @@ def roc_auc(y, p) -> float:
     return float((ranks[y == 1].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
 
 
-def decision_threshold(y, p, rule: str = "youden") -> float:
-    """The probability cut a rule selects. Presence is predicted at ``p >= threshold``."""
+def decision_threshold(y, p=None, rule: str = "youden", candidate: str = "ensemble"):
+    """The probability cut a rule selects. Presence is predicted at ``p >= threshold``.
+
+    Given a ``timesift()`` fit in place of ``y`` and no ``p``, one cut per response, learned from
+    ``candidate``'s out-of-fold predictions of the fit's own targets, as a dict keyed by the
+    response; that is the cut ``predict(type="binary")`` applies to new targets.
+    """
     if rule not in THRESHOLD_RULES:
         raise ValueError(f"rule must be one of {THRESHOLD_RULES}, got {rule!r}")
+    from .fit import Timesift
+    if isinstance(y, Timesift):
+        if p is not None:
+            raise TypeError("a fit carries its own held-out predictions; `p` is not given with one")
+        observed = np.asarray(y.y.values, dtype=np.float64)
+        if not np.isin(observed, (0.0, 1.0)).all():
+            raise ValueError("a cut is learned on a presence-absence response, and this fit was "
+                             f'made under the "{y.response}" head.')
+        held = np.asarray(y._held_out(candidate), dtype=np.float64)
+        return {v: decision_threshold(observed[:, j], held[:, j], rule)
+                for j, v in enumerate(y.y.variables)}
+    if p is None:
+        raise TypeError("`p` is the predictions for the units of `y`")
     s = _sweep(y, p)
     if s is None:
         return float("nan")

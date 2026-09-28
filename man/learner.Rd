@@ -26,7 +26,9 @@ argument is handed the registered response head, whose \code{loss} and \code{act
 is fitting toward. The learners that ship read both from there and hold no response of their
 own. One that declares a \code{group} argument is handed the grouping the outer fold map keeps
 whole, one value per unit of \code{x} or \code{NULL}, so a split it draws inside the fit keeps the
-same groups whole.}
+same groups whole. One that declares a \code{weights} argument is handed the head's case weights,
+a matrix of the response's shape, which is what a rare response weighs in every learner that
+ships; a fit that declares none fits unweighted.}
 
 \item{predict}{A function of \verb{(model, x)} returning a \verb{[unit, variable]} matrix of predictions
 for the units of \code{x}, in that order.}
@@ -70,16 +72,18 @@ every response of it.
 representation of the run.
 }
 \examples{
-# The bin means of a unit, fed to one logistic regression per variable.
+# Every bin of every channel as a predictor, one weighted logistic regression per variable.
 flat_glm <- learner(
   "flat_glm",
-  fit = function(x, y, ...) {
-    f <- as.data.frame(apply(x, c(1, 3), mean))
-    lapply(seq_len(ncol(y)), function(j)
-      stats::glm(y[, j] ~ ., data = f, family = stats::binomial()))
+  fit = function(x, y, weights, ...) {
+    f <- as.data.frame(as.matrix(x))
+    lapply(seq_len(ncol(y)), function(j) {
+      stats::glm(y[, j] ~ ., data = f, weights = weights[, j],
+                 family = stats::quasibinomial())
+    })
   },
   predict = function(model, x) {
-    f <- as.data.frame(apply(x, c(1, 3), mean))
+    f <- as.data.frame(as.matrix(x))
     vapply(model, function(m) stats::predict(m, f, type = "response"), numeric(nrow(f)))
   }
 )

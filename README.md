@@ -101,7 +101,8 @@ fit
 
 `predict(fit, new_plots, new_logger)` rebuilds every member's representation for the new rows and
 predicts through the ensemble fitted on every target; `candidate = "selected"` predicts with the
-chosen candidate.
+chosen candidate. `type = "binary"` cuts each species into presence and absence at a threshold
+learned from the fit's own out-of-fold predictions, so a binary map is one prediction per map cell.
 
 ## Four things, and one contract
 
@@ -146,8 +147,8 @@ apart on one sensor read two different stretches of the same series, anchored by
 
 `elasticnet()` and `stepwise()` read a block of features, `forest()` grows a probability forest over
 one, and the `torch` encoders `mlp()`, `cnn()` and `rescnn()` read a sequence with a joint
-multi-label head. `learner()` takes a fit and a predict pair of your own, which then goes through
-the same folds, the same cells and the same scoring.
+multi-label head. `learner()` takes a fit and a predict pair of your own, which then
+goes through the same folds, the same cells and the same scoring.
 
 Architecture belongs to the constructor and training belongs to `train_control()`, so
 `train_control(epochs = 200, device = "cuda")` reaches every neural learner of a run at once and a

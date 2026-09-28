@@ -140,6 +140,7 @@ reference:
   - calendar_channels
   - bind_channels
   - feature_matrix
+  - as.matrix.timesift_matrix
 - title: One grain at a time
   desc: |
     Fitting across a set of grains on its own split, and reading the grain a ladder saturates at.

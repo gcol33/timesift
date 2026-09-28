@@ -24,7 +24,9 @@
 #'   is fitting toward. The learners that ship read both from there and hold no response of their
 #'   own. One that declares a `group` argument is handed the grouping the outer fold map keeps
 #'   whole, one value per unit of `x` or `NULL`, so a split it draws inside the fit keeps the
-#'   same groups whole.
+#'   same groups whole. One that declares a `weights` argument is handed the head's case weights,
+#'   a matrix of the response's shape, which is what a rare response weighs in every learner that
+#'   ships; a fit that declares none fits unweighted.
 #' @param predict A function of `(model, x)` returning a `[unit, variable]` matrix of predictions
 #'   for the units of `x`, in that order.
 #' @param data A representation the learner is pinned to, or `NULL` to run across every
@@ -42,16 +44,18 @@
 #' @return A `timesift_learner`.
 #'
 #' @examples
-#' # The bin means of a unit, fed to one logistic regression per variable.
+#' # Every bin of every channel as a predictor, one weighted logistic regression per variable.
 #' flat_glm <- learner(
 #'   "flat_glm",
-#'   fit = function(x, y, ...) {
-#'     f <- as.data.frame(apply(x, c(1, 3), mean))
-#'     lapply(seq_len(ncol(y)), function(j)
-#'       stats::glm(y[, j] ~ ., data = f, family = stats::binomial()))
+#'   fit = function(x, y, weights, ...) {
+#'     f <- as.data.frame(as.matrix(x))
+#'     lapply(seq_len(ncol(y)), function(j) {
+#'       stats::glm(y[, j] ~ ., data = f, weights = weights[, j],
+#'                  family = stats::quasibinomial())
+#'     })
 #'   },
 #'   predict = function(model, x) {
-#'     f <- as.data.frame(apply(x, c(1, 3), mean))
+#'     f <- as.data.frame(as.matrix(x))
 #'     vapply(model, function(m) stats::predict(m, f, type = "response"), numeric(nrow(f)))
 #'   }
 #' )
@@ -192,6 +196,9 @@ fit_learner <- function(learner, x, y, response = "presence_absence", control = 
   }
   if ("head" %in% declared) {
     args$head <- spec
+  }
+  if ("weights" %in% declared) {
+    args$weights <- .head_weights(spec, y)
   }
   if ("group" %in% declared) {
     if (!is.null(group) && length(group) != dim(x)[1L]) {
@@ -413,6 +420,35 @@ print.timesift_models <- function(x, ...) {
          " in the representation but not the response, first: ", missing[1L], ".", call. = FALSE)
   }
   y[units, , drop = FALSE]
+}
+
+#' A representation as a block of predictors
+#'
+#' Lays a `[unit, bin, channel]` array out as one row per unit and one column per bin of each
+#' channel, which is what a model reading a table of predictors takes. It is what the learners
+#' that read a tabular block fit on, so a learner of your own that calls it reads the same
+#' columns they do.
+#'
+#' Columns are named `channel@bin`, channel by channel and bin by bin within each. A channel that
+#' holds the same number in every bin, as a `static` predictor does, is one column named by the
+#' channel alone.
+#'
+#' @param x A [grain_matrix()], [lookback_matrix()], [feature_matrix()] or
+#'   [build_representation()] result.
+#' @param ... Ignored.
+#'
+#' @return A numeric `[unit, predictor]` matrix, the units as row names.
+#'
+#' @examples
+#' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 60)
+#' d <- data.frame(plot = rep(c("a", "b"), each = length(t)), t = rep(t, 2),
+#'                 temp = sin(seq_len(2 * length(t)) / 24))
+#' x <- grain_matrix(d, plot, t, temp, grain = "month", stats = c("min", "max"))
+#' as.matrix(x)
+#'
+#' @export
+as.matrix.timesift_matrix <- function(x, ...) {
+  .flatten(x)
 }
 
 # Flatten [unit, bin, channel] to [unit, bin * channel] in the array's own order, so the column

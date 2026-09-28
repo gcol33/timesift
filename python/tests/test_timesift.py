@@ -338,6 +338,43 @@ def test_the_ensemble_is_fitted_on_the_out_of_fold_predictions_and_predicts_thro
     assert fit.predict(later, series(plots=PLOTS[:4])).shape == (4, 3)
 
 
+def test_a_binary_prediction_cuts_each_response_where_its_held_out_predictions_put_the_cut():
+    from timesift.metrics import decision_threshold
+    from timesift.stack import ensemble_combine
+    fit = fitted(models=[learner("a"), learner("b", multi="joint")], ensemble=True)
+    y = fit.y.values
+    held = {"ensemble": ensemble_combine(fit.stack, {m: fit.oof[m] for m in fit.stack.members}),
+            "selected": fit.oof[fit.choice],
+            f"a{SEPARATOR}week": fit.oof[f"a{SEPARATOR}week"]}
+    for candidate, oof in held.items():
+        for rule in ("youden", "prevalence"):
+            cut = decision_threshold(fit, candidate=candidate, rule=rule)
+            assert list(cut) == list(fit.y.variables)
+            for j, v in enumerate(fit.y.variables):
+                expected = decision_threshold(y[:, j], oof[:, j], rule)
+                assert cut[v] == expected or (np.isnan(cut[v]) and np.isnan(expected))
+            p = fit.predict(targets(), series(), candidate=candidate)
+            b = fit.predict(targets(), series(), candidate=candidate, type="binary", rule=rule)
+            cuts = np.array([cut[v] for v in fit.y.variables])
+            finite = np.isfinite(cuts)
+            np.testing.assert_array_equal(b[:, finite] == 1, p[:, finite] >= cuts[finite])
+            assert np.isnan(b[:, ~finite]).all()
+    with pytest.raises(ValueError, match="`type` is one of"):
+        fit.predict(targets(), series(), type="class")
+    with pytest.raises(TypeError, match="carries its own held-out predictions"):
+        decision_threshold(fit, y)
+
+
+def test_a_cut_is_refused_on_a_response_that_is_not_presence_absence():
+    from timesift.metrics import decision_threshold
+    fit = fitted()
+    fit.y.values[0, 0] = 0.5
+    with pytest.raises(ValueError, match="learned on a presence-absence response"):
+        decision_threshold(fit, candidate=f"stub{SEPARATOR}week")
+    with pytest.raises(ValueError, match="learned on a presence-absence response"):
+        fit.predict(targets(), series(), candidate=f"stub{SEPARATOR}week", type="binary")
+
+
 def test_a_learner_that_declares_no_control_is_not_handed_the_runs():
     from timesift.control import train_control
 

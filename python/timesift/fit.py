@@ -42,6 +42,8 @@ UNREDUCED = "native"
 
 SCORE_COLUMNS = ("candidate", "variable", "fold", "score", "scorable")
 
+PREDICTION_TYPES = ("response", "binary")
+
 
 @dataclass
 class Timesift:
@@ -84,29 +86,67 @@ class Timesift:
         raise KeyError(f'no candidate called "{candidate}" in this fit. The candidates are '
                        f'{", ".join(self.candidates["candidate"])}.')
 
-    def predict(self, targets, series=None, candidate: str = "ensemble") -> np.ndarray:
+    def predict(self, targets, series=None, candidate: str = "ensemble", type: str = "response",
+                rule: str = "youden") -> np.ndarray:
         """Predict new targets, rebuilding each member's representation from the stored settings.
 
         Every candidate is refitted on all the targets at the end of a fit, so what predicts here
         is one model per candidate rather than a fold's worth of them. ``"ensemble"`` combines them
         under the weights fitted on every target, ``"selected"`` predicts with the candidate the
         rule chose on every target (``choice``), and any other value names one candidate.
+
+        ``type="binary"`` cuts each response into presence and absence at the threshold
+        ``decision_threshold()`` learns by ``rule`` from the same candidate's out-of-fold
+        predictions of the fit's own targets, and returns 0.0 and 1.0, NaN for a response whose
+        held-out predictions give no cut. A binary map of a species is this prediction on one
+        target per map cell.
         """
-        if candidate == "selected":
-            candidate = self.choice
+        if type not in PREDICTION_TYPES:
+            raise ValueError(f"`type` is one of {', '.join(PREDICTION_TYPES)}, got {type!r}")
+        members = self._members(candidate)
+        # The cut is learned before anything is built, so a response it cannot be learned on is
+        # refused before the new targets' representations are.
+        cut = None
+        if type == "binary":
+            from .metrics import decision_threshold
+            cut = decision_threshold(self, candidate=candidate, rule=rule)
+        built = self._rebuild(members, targets, series)
+        preds = {name: self.models[name].predict(built[name]) for name in members}
+        if candidate == "ensemble":
+            from .stack import ensemble_combine
+            p = ensemble_combine(self.stack, preds)
+        else:
+            p = preds[members[0]]
+        if cut is None:
+            return p
+        cuts = np.array([cut[v] for v in self.y.variables], dtype=np.float64)
+        out = (p >= cuts).astype(np.float64)
+        out[:, ~np.isfinite(cuts)] = np.nan
+        return out
+
+    def _members(self, candidate: str) -> tuple:
+        """The members a candidate name predicts through: the stack's for ``"ensemble"``, the
+        rule's choice for ``"selected"``, and the one named otherwise."""
         if candidate == "ensemble":
             if self.stack is None:
                 raise ValueError("this fit has no ensemble. Name a candidate: "
                                  f"{', '.join(self.models)}.")
-            from .stack import ensemble_combine
-            built = self._rebuild(self.stack.members, targets, series)
-            return ensemble_combine(self.stack, {name: self.models[name].predict(built[name])
-                                                 for name in self.stack.members})
-        if candidate not in self.models:
-            raise KeyError(f'no candidate called "{candidate}" was fitted. '
+            return tuple(self.stack.members)
+        name = self.choice if candidate == "selected" else candidate
+        if name not in self.models:
+            raise KeyError(f'no candidate called "{name}" was fitted. '
                            f"Fitted: {', '.join(self.models)}.")
-        built = self._rebuild([candidate], targets, series)
-        return self.models[candidate].predict(built[candidate])
+        return (name,)
+
+    def _held_out(self, candidate: str) -> np.ndarray:
+        """What a candidate predicted for the fit's own targets from the outer folds that held
+        them out, in the response's row order. The ensemble's is its members' combined under the
+        weights the refitted stack carries, which is the combination a prediction goes through."""
+        members = self._members(candidate)
+        if candidate == "ensemble":
+            from .stack import ensemble_combine
+            return ensemble_combine(self.stack, {name: self.oof[name] for name in members})
+        return self.oof[members[0]]
 
     def _rebuild(self, names, targets, series) -> dict:
         """One build per representation, however many candidates read it."""

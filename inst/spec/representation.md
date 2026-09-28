@@ -861,6 +861,7 @@ call site.
 | the combiner | `ensemble()`, `ensemble_fit()`, `ensemble_combine()` and `ensemble_weights()` |
 | scoring held-out predictions | `score_predictions()`, on the cells the mask allows |
 | the metrics | `tss()`, `roc_auc()`, `average_precision()` and `kappa_score()`, with `decision_threshold()` and `model_agreement()` beside them |
+| the cut a fit applies | `decision_threshold()` given a fit in place of the response, one cut per response learned from a candidate's out-of-fold predictions |
 | two arms on matched cells | `paired_contrast()` |
 | every grain against a learner's best | `grain_contrasts()`, the mixed model of the per-cell scores and Dunnett's many-to-one comparisons off it |
 | a record with a planted grain | `simulate_records()`, the vignette's and the recovery tests' generator |
@@ -961,7 +962,9 @@ call site.
   encoders train under the head's `loss` and predict through its `activation`, and the three
   learners fitting one model per response take the family the loss names, logistic under
   `binary_cross_entropy` and Gaussian under `squared_error`. A fit that declares a `head` argument
-  is handed the head, as one that declares `control` is handed the control.
+  is handed the head, as one that declares `control` is handed the control, and one that
+  declares `weights` is handed the head's case weights, the matrix of the response's shape the
+  learners that ship fit under; a fit declaring none fits unweighted.
 - A fitted encoder holds its weights as arrays and the device *setting* rather than the device it
   resolved to, and rebuilds the network when it predicts, so a fit written with `saveRDS()` or
   `pickle` predicts in a fresh session and on another machine.
@@ -1004,6 +1007,13 @@ call site.
   `seed + 10007 r + 101 a + b + 3001 c` from its tag `(r, a, b, c)`, the repetition and the folds
   it leaves out, zero where it leaves out fewer than three. Two
   tables whose contrast is read must carry the same response, maps, `repeats` and `seed`.
+- A binary prediction, `type = "binary"`, cuts each response at the threshold
+  `decision_threshold()` learns under `rule` from the same candidate's out-of-fold predictions of
+  the fit's own targets: the member's own for one candidate, and the members' combined under the
+  refitted stack's weights for the ensemble. Presence is `p >= threshold`. A response whose
+  held-out predictions give no cut predicts `NA` in R and NaN in Python, and a fit whose response
+  is not 0/1 refuses the cut before anything is built. `rule` is `"youden"` by default, as it is
+  for `decision_threshold()` itself.
 - `models` takes one learner, a set or list of them, or the name of a registered one, and
   `learners` on a ladder takes the same three forms.
 - Predicting rebuilds each member's representation for the new targets from the settings its own
@@ -1065,6 +1075,9 @@ call site.
 | the occlusion profile | `occlusion()`, an S3 generic with methods on a run and on a ladder | `occlusion()`, one function taking either |
 | the report on a run | `summary()`, a method on the base generic, printing the candidates and the procedure | `summary()`, one function returning the text, with `candidate_table()` and `procedure_table()` for the two tables it prints |
 | predicting new targets | `predict()`, a method on the base generic | `.predict()`, a method on the fit |
+| a binary prediction | an integer matrix of 0 and 1, `NA` where no cut is learned | a float array of 0.0 and 1.0, NaN where no cut is learned |
+| the cuts of a fit | `decision_threshold()`, an S3 generic with a method on a fit, returning a named vector | `decision_threshold()`, one function taking a fit or a response, returning a dict |
+| a representation as a block of predictors | `as.matrix()`, a method on the base generic | `flatten()` |
 | a set of learners, or of representations | `c()`, an S3 method on each spec class | a `list`, and `+` between two of them |
 | drawing a ladder, a run or a selection | `plot()`, a method on the base generic for each, on base graphics | `plot()`, one function taking any of the three, on matplotlib |
 | a simulated record | a `timesift_simulation` list whose `readings` is a data frame | the `Simulation` dataclass, whose `readings` is a mapping of column to array; the first reading instant is `from_`, since `from` is a keyword |
@@ -1084,7 +1097,7 @@ is a function because it has none.
 
 | in Python only | what it is |
 |---|---|
-| `flatten`, `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.flatten()`, `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
+| `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
 | `Representation`, `Sift`, `Resampling`, `TimesiftSpec`, `Learner`, `TrainControl`, `TimesiftMatrix`, `TimesiftSet`, `Coverage`, `Response`, `Folds`, `Cells`, `Fit`, `Ladder`, `Selection`, `Timesift`, `Stack`, `EnsembleSpec`, `Simulation` | the types. R attaches a class attribute to a list or an array and the constructor is the only door to it; a Python dataclass is the type itself, and a user annotating a function or building one by hand reaches it by name. |
 | `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `PRESENCE_ABSENCE` | the grain and statistic vocabularies as tuples, and the shipped head as the mapping `register_response()` takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through `responses()` on both sides. |
 

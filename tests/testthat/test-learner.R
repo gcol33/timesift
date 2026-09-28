@@ -63,6 +63,18 @@ test_that("flattening names every predictor by its bin and its channel", {
   expect_true(all(grepl("^mean@|^max@", colnames(m))))
 })
 
+test_that("as.matrix() lays a representation out as the block the tabular learners read", {
+  sim <- sim_series(n_unit = 5L, days = 20L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week", stats = c("mean", "max"))
+  m <- as.matrix(x)
+  expect_identical(m, .flatten(x))
+  expect_identical(rownames(m), dimnames(x)[[1L]])
+  bin <- dimnames(x)[[2L]][2L]
+  expect_identical(m[, paste0("max@", bin)], x[, bin, "max"])
+  f <- as.data.frame(m)
+  expect_identical(names(f), colnames(m))
+})
+
 test_that("a scaler is computed on what it is given and applied to something else", {
   m <- matrix(c(1, 2, 3, 10, 20, 30), ncol = 2)
   s <- .scaler(m)
@@ -314,6 +326,24 @@ test_that("a learner's fit is handed the head only where it declares one", {
   aware <- learner("aware", fit = function(x, y, head, ...) head$loss,
                    predict = function(model, x) matrix(0.5, nrow = dim(x)[1L], ncol = 1L))
   expect_equal(fit_learner(aware, x, y)$model, "binary_cross_entropy")
+})
+
+test_that("a learner's fit is handed the head's case weights only where it declares them", {
+  seen <- NULL
+  plain <- learner("plain", fit = function(x, y, ...) { seen <<- names(list(...)); 1 },
+                   predict = function(model, x) matrix(0.5, nrow = dim(x)[1L], ncol = 1L))
+  sim <- sim_series(n_unit = 12L, days = 20L, seed = 94L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
+  y <- sim_response(sim, n_var = 2L, seed = 95L)
+  fit_learner(plain, x, y)
+  expect_false("weights" %in% seen)
+  aware <- learner("aware", fit = function(x, y, weights, ...) weights,
+                   predict = function(model, x) matrix(0.5, nrow = dim(x)[1L], ncol = 2L))
+  expect_equal(fit_learner(aware, x, y)$model, positive_weights(y[dimnames(x)[[1L]], ]))
+  head <- .responses_reg$get("presence_absence")
+  local_response("unweighted_declared", head[setdiff(names(head), "weights")])
+  expect_equal(unname(fit_learner(aware, x, y, response = "unweighted_declared")$model),
+               matrix(1, 12L, 2L))
 })
 
 # ---- what a fit carries of the learner that made it -------------------------------------------

@@ -1,7 +1,22 @@
-# timesift (development version)
+# timesift 0.4.0
 
 ## New
 
+* `predict()` on a fit takes `type = "binary"`, cutting each response into presence and absence
+  at the threshold learned under `rule` (`"youden"`, `"kappa"` or `"prevalence"`) from the same
+  candidate's out-of-fold predictions of the fit's own targets. For the ensemble those are the
+  members' combined under the refitted stack's weights. A binary map is this prediction on one
+  target per map cell. Both languages.
+* `decision_threshold()` takes a fit in place of the response and returns one cut per response,
+  the cut `type = "binary"` applies. In R it is an S3 generic with a method on a fit.
+* A learner's fit that declares a `weights` argument is handed the response head's case weights,
+  a matrix of the response's shape, as one declaring `head`, `control` or `group` is handed those.
+  A learner of one's own now fits a rare response under the weight every shipped learner fits it
+  under. Both languages.
+* `as.matrix()` on a representation lays it out as the block of predictors the tabular learners
+  read, one column per bin of each channel, named `channel@bin`, and one column per static
+  predictor. It is Python's `flatten()`, which was already exported there. The example in
+  `?learner` used to average the bins away and now reads this block.
 * The Python side carries everything the R side does. `grain_contrasts()` fits
   `score ~ grain + (1 | variable) + (1 | fold)` by restricted maximum likelihood, reads each
   contrast's degrees of freedom as lmerTest does and adjusts by the multivariate t as emmeans'

@@ -4,7 +4,15 @@
 \alias{predict.timesift}
 \title{Predict from a fitted timesift}
 \usage{
-\method{predict}{timesift}(object, targets, series = NULL, candidate = "ensemble", ...)
+\method{predict}{timesift}(
+  object,
+  targets,
+  series = NULL,
+  candidate = "ensemble",
+  type = c("response", "binary"),
+  rule = c("youden", "kappa", "prevalence"),
+  ...
+)
 }
 \arguments{
 \item{object}{A \code{\link[=timesift]{timesift()}} fit.}
@@ -17,15 +25,31 @@ columns the fit was given.}
 \item{candidate}{\code{"ensemble"}, the stack refitted on every target; \code{"selected"}, the candidate
 the rule chose on every target (\code{object$choice}); or the name of one candidate.}
 
+\item{type}{\code{"response"} for the prediction on the scale of the response head, a probability
+of presence under the shipped one, or \code{"binary"} for presence and absence.}
+
+\item{rule}{With \code{type = "binary"}, the rule of \code{\link[=decision_threshold]{decision_threshold()}} the cut is learned by.}
+
 \item{...}{Ignored.}
 }
 \value{
 A \verb{[target, response]} matrix of predictions, named by target and in the order the fit
 carries its own targets: sorted by identifier, or the targets' own order where \code{target_time}
-anchors them.
+anchors them. Under \code{type = "binary"} an integer matrix of 0 and 1, \code{NA} for a response
+whose held-out predictions give no cut.
 }
 \description{
 Rebuilds every member's representation for the new targets from the settings its own arm was
 built with, predicts with the model refitted on all targets, and combines them where the
 ensemble is asked for.
+}
+\details{
+With \code{type = "binary"} each response is cut into presence and absence at the threshold
+\code{\link[=decision_threshold]{decision_threshold()}} learns from the same candidate's out-of-fold predictions of the fit's
+own targets: never from predictions of units the model was fitted on, and never from the new
+targets, which carry no response. \code{rule} is the rule that picks it. A binary map of a species
+is this prediction on one target per map cell.
+}
+\seealso{
+\code{\link[=decision_threshold]{decision_threshold()}} for the cuts themselves.
 }

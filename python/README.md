@@ -32,7 +32,8 @@ weights  elasticnet / week 0.37   elasticnet / day 0.22   forest / month 0.17   
 `targets` and `series` are mappings of column name to array, which a data frame satisfies. `y`, `x`
 and `static` are selections over their own table: a column name, a list of names, a glob such as
 `"sp_*"`, or a function of a name. `fit.predict(targets, series)` rebuilds each member's
-representation for the new rows and combines them.
+representation for the new rows and combines them, and `type="binary"` cuts each response at a
+threshold learned from the fit's own out-of-fold predictions.
 
 ## What is here
 

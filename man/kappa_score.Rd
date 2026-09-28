@@ -3,29 +3,47 @@
 \name{kappa_score}
 \alias{kappa_score}
 \alias{decision_threshold}
+\alias{decision_threshold.default}
+\alias{decision_threshold.timesift}
 \alias{model_agreement}
 \title{Cohen's kappa, and where two models disagree}
 \usage{
 kappa_score(y, p, rule = c("youden", "kappa", "prevalence"))
 
-decision_threshold(y, p, rule = c("youden", "kappa", "prevalence"))
+decision_threshold(y, ...)
+
+\method{decision_threshold}{default}(y, p, rule = c("youden", "kappa", "prevalence"), ...)
+
+\method{decision_threshold}{timesift}(
+  y,
+  candidate = "ensemble",
+  rule = c("youden", "kappa", "prevalence"),
+  ...
+)
 
 model_agreement(y, p_a, p_b, rule = c("youden", "kappa", "prevalence"))
 }
 \arguments{
-\item{y}{Observed presence-absence, \code{0}/\code{1} or logical.}
+\item{y}{Observed presence-absence, \code{0}/\code{1} or logical; for \code{decision_threshold()}, also a
+\code{\link[=timesift]{timesift()}} fit, which carries its own response and held-out predictions.}
 
 \item{p}{Predicted scores for the same units, in the same order. Higher means presence.}
 
 \item{rule}{Threshold rule: \code{"youden"}, \code{"kappa"} or \code{"prevalence"}.}
 
+\item{...}{Ignored.}
+
+\item{candidate}{For a \code{\link[=timesift]{timesift()}} fit, the candidate whose cut is learned: \code{"ensemble"},
+\code{"selected"} or the name of one, as \code{\link[=predict]{predict()}} takes it.}
+
 \item{p_a, p_b}{Two models' predictions for the same units.}
 }
 \value{
 For \code{kappa_score()}, one number. For \code{decision_threshold()}, the cut itself, applied as
-\code{p >= threshold}. For \code{model_agreement()}, a one-row data frame carrying the agreement kappa
-between two models cut by the same rule, the share of units they decide differently, and how
-often each is the one that is right there.
+\code{p >= threshold}, and on a fit one cut per response, named by it, \code{NA} where the response's
+held-out predictions give none. For \code{model_agreement()}, a one-row data frame carrying the
+agreement kappa between two models cut by the same rule, the share of units they decide
+differently, and how often each is the one that is right there.
 }
 \description{
 A chance-corrected agreement rate on a two-by-two table. Read against the observed response it
@@ -38,6 +56,10 @@ threshold is part of the statistic. \code{"youden"} is the operating point \code
 inherits its selection bias; \code{"kappa"} maximises kappa itself and inherits the analogous bias;
 \code{"prevalence"} cuts at the observed presence rate, which selects nothing from the labels and is
 the rule to read an absolute level at.
+
+Given a \code{\link[=timesift]{timesift()}} fit, \code{decision_threshold()} learns one cut per response from a candidate's
+out-of-fold predictions of the fit's own targets, which is the cut \code{predict(type = "binary")}
+applies to new targets.
 }
 \examples{
 y <- c(0, 0, 0, 1, 1, 1)

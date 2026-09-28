@@ -433,6 +433,40 @@ test_that("a fit predicts units it was never fitted on", {
   expect_equal(dim(one), dim(p))
 })
 
+test_that("a binary prediction cuts each response where its held-out predictions put the cut", {
+  case <- toy_case(n_unit = 30L, days = 60L)
+  fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+                  models = list(a = toy(), b = toy("b")), sift = grains("week"),
+                  resampling = cv(v = 3L), control = NULL, verbose = FALSE)
+  held <- list(ensemble = ensemble_combine(fit$stack, fit$oof[names(fit$stack$weights)]),
+               selected = fit$oof[[fit$choice]], `a / week` = fit$oof[["a / week"]])
+  for (candidate in names(held)) {
+    for (rule in c("youden", "prevalence")) {
+      cut <- decision_threshold(fit, candidate = candidate, rule = rule)
+      expect_named(cut, colnames(fit$y))
+      for (v in colnames(fit$y)) {
+        expect_identical(cut[[v]], decision_threshold(fit$y[, v], held[[candidate]][, v], rule))
+      }
+      p <- predict(fit, case$targets, case$series, candidate = candidate)
+      b <- predict(fit, case$targets, case$series, candidate = candidate, type = "binary",
+                   rule = rule)
+      expect_identical(storage.mode(b), "integer")
+      expect_identical(dimnames(b), dimnames(p))
+      expect_identical(b[] == 1L, p >= matrix(cut[colnames(p)], nrow(p), ncol(p), byrow = TRUE))
+    }
+  }
+})
+
+test_that("a cut is refused on a response that is not presence-absence", {
+  fit <- run_toy(toy_case())
+  fit$y[1L, 1L] <- 0.5
+  expect_error(decision_threshold(fit, candidate = "toy / week"),
+               "learned on a presence-absence response")
+  expect_error(predict(fit, toy_case()$targets, toy_case()$series, candidate = "toy / week",
+                       type = "binary"),
+               "learned on a presence-absence response")
+})
+
 test_that("predicting needs no response column, because a new target has none", {
   case <- toy_case(n_unit = 24L, days = 60L)
   fit <- run_toy(case)

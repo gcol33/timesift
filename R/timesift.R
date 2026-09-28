@@ -667,21 +667,68 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 #' built with, predicts with the model refitted on all targets, and combines them where the
 #' ensemble is asked for.
 #'
+#' With `type = "binary"` each response is cut into presence and absence at the threshold
+#' [decision_threshold()] learns from the same candidate's out-of-fold predictions of the fit's
+#' own targets: never from predictions of units the model was fitted on, and never from the new
+#' targets, which carry no response. `rule` is the rule that picks it. A binary map of a species
+#' is this prediction on one target per map cell.
+#'
 #' @param object A [timesift()] fit.
 #' @param targets A data frame of targets, carrying the identifier, the anchor and the static
 #'   columns the fit was given.
 #' @param series The long table of readings for those targets, or `NULL` for a targets-only fit.
 #' @param candidate `"ensemble"`, the stack refitted on every target; `"selected"`, the candidate
 #'   the rule chose on every target (`object$choice`); or the name of one candidate.
+#' @param type `"response"` for the prediction on the scale of the response head, a probability
+#'   of presence under the shipped one, or `"binary"` for presence and absence.
+#' @param rule With `type = "binary"`, the rule of [decision_threshold()] the cut is learned by.
 #' @param ... Ignored.
 #'
 #' @return A `[target, response]` matrix of predictions, named by target and in the order the fit
 #'   carries its own targets: sorted by identifier, or the targets' own order where `target_time`
-#'   anchors them.
+#'   anchors them. Under `type = "binary"` an integer matrix of 0 and 1, `NA` for a response
+#'   whose held-out predictions give no cut.
+#'
+#' @seealso [decision_threshold()] for the cuts themselves.
 #'
 #' @export
-predict.timesift <- function(object, targets, series = NULL, candidate = "ensemble", ...) {
+predict.timesift <- function(object, targets, series = NULL, candidate = "ensemble",
+                             type = c("response", "binary"),
+                             rule = c("youden", "kappa", "prevalence"), ...) {
+  type <- match.arg(type)
+  rule <- match.arg(rule)
   spec <- object$spec
+  members <- .run_members(object, candidate)
+  # The cut is learned before anything is built, so a response it cannot be learned on is refused
+  # before the new targets' representations are.
+  cut <- if (type == "binary") decision_threshold(object, candidate = candidate, rule = rule)
+  # The new targets are held to what the fit's own were held to: one row per identifier unless
+  # `target_time` places the rows in time. Two rows for one plot would predict twice, silently.
+  .check_targets_unique(.target_frame(targets, spec), spec)
+  labels <- object$candidates$representation[match(members, object$candidates$candidate)]
+  built <- lapply(stats::setNames(unique(labels), unique(labels)), function(label) {
+    build_representation(spec$sift[[label]], series, targets, spec)
+  })
+  preds <- stats::setNames(lapply(seq_along(members), function(i) {
+    stats::predict(object$models[[members[i]]], built[[labels[i]]])
+  }), members)
+  p <- if (identical(candidate, "ensemble")) {
+    ensemble_combine(object$stack, preds)
+  } else {
+    preds[[1L]]
+  }
+  if (is.null(cut)) {
+    return(p)
+  }
+  out <- p
+  storage.mode(out) <- "integer"
+  out[] <- as.integer(sweep(p, 2L, cut[colnames(p)], `>=`))
+  out
+}
+
+# The members a candidate name predicts through: the stack's for `"ensemble"`, the rule's choice
+# for `"selected"`, and the one named otherwise.
+.run_members <- function(object, candidate) {
   if (identical(candidate, "ensemble")) {
     if (is.null(object$stack)) {
       stop("this fit carries no ensemble; name a candidate or \"selected\": ",
@@ -698,19 +745,17 @@ predict.timesift <- function(object, targets, series = NULL, candidate = "ensemb
     stop("unknown candidate: ", .listing(unknown), ". This fit carries ",
          .listing(names(object$models)), ".", call. = FALSE)
   }
-  # The new targets are held to what the fit's own were held to: one row per identifier unless
-  # `target_time` places the rows in time. Two rows for one plot would predict twice, silently.
-  .check_targets_unique(.target_frame(targets, spec), spec)
-  labels <- object$candidates$representation[match(members, object$candidates$candidate)]
-  built <- lapply(stats::setNames(unique(labels), unique(labels)), function(label) {
-    build_representation(spec$sift[[label]], series, targets, spec)
-  })
-  preds <- stats::setNames(lapply(seq_along(members), function(i) {
-    stats::predict(object$models[[members[i]]], built[[labels[i]]])
-  }), members)
+  members
+}
+
+# What a candidate predicted for the fit's own targets from the outer folds that held them out.
+# The ensemble's is its members' combined under the weights the refitted stack carries, which is
+# the combination a prediction goes through.
+.run_held_out <- function(object, candidate) {
+  members <- .run_members(object, candidate)
   if (identical(candidate, "ensemble")) {
-    ensemble_combine(object$stack, preds)
+    ensemble_combine(object$stack, object$oof[members])
   } else {
-    preds[[1L]]
+    object$oof[[members]]
   }
 }

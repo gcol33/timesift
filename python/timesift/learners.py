@@ -122,7 +122,9 @@ def fit_learner(learner, x: TimesiftMatrix, y, response: str = "presence_absence
     A ``fit`` that declares a ``head`` argument is handed the registered head, whose ``loss`` and
     ``activation`` say what it is fitting toward; the learners that ship read both from there and
     hold no response of their own. A ``fit`` that declares a ``control`` is handed the run's
-    training settings the same way.
+    training settings the same way, and one that declares ``weights`` the head's case weights, an
+    array of the response's shape, which is what a rare response weighs in every learner that
+    ships; a fit that declares none fits unweighted.
     """
     from .registry import RESPONSES
     from .response import as_response
@@ -135,7 +137,9 @@ def fit_learner(learner, x: TimesiftMatrix, y, response: str = "presence_absence
                          f"{x.values.shape[0]}")
     given = _declared(learner.fit, head=head, control=control, variables=y.variables,
                       group=None if group is None else tuple(str(g) for g in group))
-    model = learner.fit(x, y.values, **{**learner.params, **kwargs, **given})
+    if "weights" in inspect.signature(learner.fit).parameters:
+        given["weights"] = _head_weights(head, y.values)
+    model =learner.fit(x, y.values, **{**learner.params, **kwargs, **given})
     return Fit(learner=learner, model=model, variables=y.variables, response=response,
                bins=tuple(x.bins), channels=tuple(x.stats))
 

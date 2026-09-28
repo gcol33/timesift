@@ -112,13 +112,21 @@ average_precision <- function(y, p) {
 #' `"prevalence"` cuts at the observed presence rate, which selects nothing from the labels and is
 #' the rule to read an absolute level at.
 #'
+#' Given a [timesift()] fit, `decision_threshold()` learns one cut per response from a candidate's
+#' out-of-fold predictions of the fit's own targets, which is the cut `predict(type = "binary")`
+#' applies to new targets.
+#'
 #' @inheritParams tss
+#' @param y Observed presence-absence, `0`/`1` or logical; for `decision_threshold()`, also a
+#'   [timesift()] fit, which carries its own response and held-out predictions.
 #' @param rule Threshold rule: `"youden"`, `"kappa"` or `"prevalence"`.
+#' @param ... Ignored.
 #'
 #' @return For `kappa_score()`, one number. For `decision_threshold()`, the cut itself, applied as
-#'   `p >= threshold`. For `model_agreement()`, a one-row data frame carrying the agreement kappa
-#'   between two models cut by the same rule, the share of units they decide differently, and how
-#'   often each is the one that is right there.
+#'   `p >= threshold`, and on a fit one cut per response, named by it, `NA` where the response's
+#'   held-out predictions give none. For `model_agreement()`, a one-row data frame carrying the
+#'   agreement kappa between two models cut by the same rule, the share of units they decide
+#'   differently, and how often each is the one that is right there.
 #'
 #' @examples
 #' y <- c(0, 0, 0, 1, 1, 1)
@@ -136,7 +144,13 @@ kappa_score <- function(y, p, rule = c("youden", "kappa", "prevalence")) {
 
 #' @rdname kappa_score
 #' @export
-decision_threshold <- function(y, p, rule = c("youden", "kappa", "prevalence")) {
+decision_threshold <- function(y, ...) {
+  UseMethod("decision_threshold")
+}
+
+#' @rdname kappa_score
+#' @export
+decision_threshold.default <- function(y, p, rule = c("youden", "kappa", "prevalence"), ...) {
   rule <- match.arg(rule)
   s <- .sweep(y, p)
   if (is.null(s)) {
@@ -155,6 +169,24 @@ decision_threshold <- function(y, p, rule = c("youden", "kappa", "prevalence")) 
   pe <- ((s$tp + s$fp) * s$n_pos + (fn + tn) * s$n_neg) / n^2
   k <- ifelse(pe >= 1, -Inf, (po - pe) / (1 - pe))
   s$thr[which.max(k)]
+}
+
+#' @rdname kappa_score
+#' @param candidate For a [timesift()] fit, the candidate whose cut is learned: `"ensemble"`,
+#'   `"selected"` or the name of one, as [predict()] takes it.
+#' @export
+decision_threshold.timesift <- function(y, candidate = "ensemble",
+                                        rule = c("youden", "kappa", "prevalence"), ...) {
+  rule <- match.arg(rule)
+  observed <- y$y
+  if (!all(observed %in% c(0, 1))) {
+    stop("a cut is learned on a presence-absence response, and this fit was made under the \"",
+         y$response, "\" head.", call. = FALSE)
+  }
+  p <- .run_held_out(y, candidate)[rownames(observed), colnames(observed), drop = FALSE]
+  variables <- stats::setNames(colnames(observed), colnames(observed))
+  vapply(variables, function(v) decision_threshold.default(observed[, v], p[, v], rule),
+         numeric(1L))
 }
 
 #' @rdname kappa_score
