@@ -1,0 +1,108 @@
+# Classification and regression tree on the flattened representation
+
+One tree per response, over every bin-by-channel column of the
+representation, grown under rpart's rules: the Gini index under a
+presence-absence head and the sum of squares under a head with a
+squared-error loss, a split only between two distinct values of a
+column, and the cost-complexity bookkeeping that keeps a split only
+where it lowers the risk by at least `cp` of the root's. On the same
+columns, weights and folds the tree is the one rpart grows, split for
+split, and its complexity table the one rpart reports; the tree is grown
+by the core the Python package calls, so the two languages grow it
+identically.
+
+## Usage
+
+``` r
+tree(
+  data = NULL,
+  min_split = NULL,
+  min_leaf = NULL,
+  cp = NULL,
+  max_depth = NULL,
+  prune = c("se_sum", "one_se", "min", "none"),
+  n_inner = NULL,
+  preset = c("package", "bigboss"),
+  seed = 1L
+)
+```
+
+## Arguments
+
+- data:
+
+  A representation the learner is pinned to, or `NULL` to run across
+  every representation of the run.
+
+- min_split:
+
+  Observations a node needs before a split of it is tried.
+
+- min_leaf:
+
+  Observations each child of a split keeps.
+
+- cp:
+
+  The share of the root's risk a split has to remove to be kept.
+
+- max_depth:
+
+  Depth of the deepest node, the root at depth 0; 30 at most.
+
+- prune:
+
+  How the grown tree is pruned: `"se_sum"`, `"one_se"`, `"min"` or
+  `"none"`.
+
+- n_inner:
+
+  Folds of the inner cross-validation the pruning reads.
+
+- preset:
+
+  Whose defaults the settings left `NULL` take: `"package"` or
+  `"bigboss"`.
+
+- seed:
+
+  Seed for the inner cross-validation's fold draw.
+
+## Value
+
+A
+[`learner()`](https://gillescolling.com/timesift/reference/learner.md).
+
+## Details
+
+The grown tree is pruned back by an inner cross-validation. Its folds
+are dealt for each response and stratified on it, as the elastic net's
+are, and `prune` names the rule that reads the complexity table:
+`"se_sum"` takes the row of least cross-validated error plus its
+standard error among the rows that keep a split, the last of them where
+several tie, which is how biomod2 prunes its classification tree;
+`"one_se"` takes the smallest tree within one standard error of the
+least cross-validated error; `"min"` the first row reaching the least
+error; and `"none"` keeps the tree as grown.
+
+`preset` says whose defaults the settings left `NULL` take. `"package"`
+is rpart's own, which is what biomod2's default option set fits:
+`min_split = 20`, `min_leaf = round(min_split / 3)` (or
+`min_split = 3 * min_leaf` where only `min_leaf` is given), `cp = 0.01`,
+`max_depth = 30` and ten inner folds. `"bigboss"` is biomod2's tuned
+option set: `min_split = 5`, `min_leaf = 5`, `cp = 0.001`,
+`max_depth = 10` and five inner folds. A setting given explicitly beats
+either.
+
+The case weights are the response head's,
+[`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
+under presence-absence. They weigh every class count and sum of squares
+the tree is grown on; `min_split` and `min_leaf` count observations, as
+rpart's do.
+
+## Examples
+
+``` r
+tree()
+tree(preset = "bigboss", prune = "one_se")
+```

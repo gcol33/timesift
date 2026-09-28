@@ -76,6 +76,14 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="development version" id="timesift-development-version">timesift (development version)<a class="anchor" aria-label="anchor" href="#timesift-development-version"></a></h2>
+<div class="section level3">
+<h3 id="new-development-version">New<a class="anchor" aria-label="anchor" href="#new-development-version"></a></h3>
+<ul><li>
+<code><a href="../reference/tree.html">tree()</a></code> grows one classification or regression tree per response under rpart’s rules: the Gini index under a presence-absence head and the sum of squares under a squared-error one, <code>min_split</code>, <code>min_leaf</code>, <code>cp</code> and <code>max_depth</code> as <code>rpart.control()</code> has them, and the cost-complexity table with its cross-validated error. The tree is pruned back by an inner cross-validation read by <code>prune</code>: <code>"se_sum"</code>, the rule biomod2 prunes its classification tree by, <code>"one_se"</code>, <code>"min"</code> or <code>"none"</code>. <code>preset = "bigboss"</code> takes biomod2’s tuned option set for every setting left open. It runs on a new core, <code>src/ts_tree.cpp</code>, compiled into both languages, so the two grow the same tree; on the contract’s twelve cases it reproduces rpart’s node table, complexity table, cross-validated error and pruned predictions to <code>1.1e-16</code>. Both languages.</li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.4.0" id="timesift-040">timesift 0.4.0<a class="anchor" aria-label="anchor" href="#timesift-040"></a></h2>
 <div class="section level3">
 <h3 id="new-0-4-0">New<a class="anchor" aria-label="anchor" href="#new-0-4-0"></a></h3>

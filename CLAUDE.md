@@ -57,6 +57,7 @@ timesift/
   src/                the shared core, compiled into both languages
     ts_core.h ts_calendar.cpp ts_core.cpp
     ts_penalised.h ts_penalised.cpp
+    ts_tree.h ts_tree.cpp
     ts_r.cpp          the cpp11 wrapper; cpp11.cpp is generated
   R/                  R package source
   tests/testthat/     including helper-oracle.R, the pure-R implementation
@@ -170,8 +171,8 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   and predict through the activation, the per-response learners take the family the loss names,
   and the combiner minimises the loss. A fit that declares a `head` argument is handed the head,
   as one that declares `control` is handed the control; no learner holds a response of its own.
-  Same for learners: `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `stepwise()`, `forest()` and
-  any user-supplied fit/predict pair go through one interface.
+  Same for learners: `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `stepwise()`, `forest()`,
+  `tree()` and any user-supplied fit/predict pair go through one interface.
 - **A fitted encoder is a plain object.** Its weights are arrays and its device is the setting,
   not the resolved device; the network is rebuilt at prediction. `saveRDS()` and `pickle` round
   trip a fit, and a fit made on one machine predicts on another.
@@ -189,6 +190,11 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   started path, under glmnet's conventions. It is the arm the networks are measured against, so a
   baseline that moved between the languages would make the tool the confound in the other
   direction. The folds are dealt above it and handed over; nothing inside it draws.
+- **So is the tree.** `src/ts_tree.cpp` is rpart's recursive partitioning, ported: its sort, its
+  split search, its cost-complexity bookkeeping and its cross-validated table, so `tree()` is the
+  classification tree a biomod2 user already fits. It is pinned against rpart's own output in the
+  fixtures, and differs from rpart only where rpart's class priors, computed with R's
+  extended-precision sums, break an exact tie at `cp` under fractional weights.
 - **The pure-R and pure-NumPy implementations are kept as test oracles**, never reachable at
   runtime. The NumPy one was written from the spec rather than from the R source, so it is the
   evidence that the spec is complete; one shared binary would otherwise make the agreement between

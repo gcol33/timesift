@@ -111,6 +111,8 @@ series, anchored by `target_time`.
 and
 [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
 read a block of features,
+[`tree()`](https://gillescolling.com/timesift/reference/tree.md) grows
+rpart’s tree over one,
 [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
 grows a probability forest over one, and the `torch` encoders
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md),

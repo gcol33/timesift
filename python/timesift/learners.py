@@ -24,7 +24,7 @@ from .representation import TimesiftMatrix
 from .response import fitting_rows
 
 __all__ = ["Fit", "Learner", "READS", "MULTI", "cnn", "elasticnet", "fit_learner", "flatten",
-           "mlp", "rescnn", "forest", "stepwise"]
+           "mlp", "rescnn", "forest", "stepwise", "tree"]
 
 READS = ("tabular", "sequence")
 MULTI = ("joint", "separate")
@@ -843,6 +843,94 @@ class _WeightedForest:
 
 def _rf_predict(model, x):
     return _predict_columns(model["models"], flatten(x), model["n_col"], model["family"])
+
+
+def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prune="se_sum",
+         n_inner=None, preset="package", seed=1) -> Learner:
+    """One classification or regression tree per variable, over every bin-by-channel column,
+    grown under rpart's rules: the Gini index under a presence-absence head and the sum of squares
+    under a head with a squared-error loss, a split only between two distinct values of a column,
+    and the cost-complexity bookkeeping that keeps a split only where it lowers the risk by at
+    least ``cp`` of the root's. On the same columns, weights and folds the tree is the one rpart
+    grows, split for split, and its complexity table the one rpart reports; the tree is grown by
+    the core the R package calls, so the two languages grow it identically.
+
+    The grown tree is pruned back by an inner cross-validation. Its folds are dealt for each
+    response and stratified on it, as the elastic net's are, and ``prune`` names the rule that
+    reads the complexity table: ``"se_sum"`` takes the row of least cross-validated error plus its
+    standard error among the rows that keep a split, the last of them where several tie, which is
+    how biomod2 prunes its classification tree; ``"one_se"`` takes the smallest tree within one
+    standard error of the least cross-validated error; ``"min"`` the first row reaching the least
+    error; and ``"none"`` keeps the tree as grown.
+
+    ``preset`` says whose defaults the settings left ``None`` take. ``"package"`` is rpart's own,
+    which is what biomod2's default option set fits: ``min_split=20``,
+    ``min_leaf=round(min_split / 3)`` (or ``min_split=3 * min_leaf`` where only ``min_leaf`` is
+    given), ``cp=0.01``, ``max_depth=30`` and ten inner folds. ``"bigboss"`` is biomod2's tuned
+    option set: ``min_split=5``, ``min_leaf=5``, ``cp=0.001``, ``max_depth=10`` and five inner
+    folds. A setting given explicitly beats either.
+
+    The case weights are the response head's, :func:`~timesift.response.positive_weights` under
+    presence-absence. They weigh every class count and sum of squares the tree is grown on;
+    ``min_split`` and ``min_leaf`` count observations, as rpart's do.
+    """
+    from .tree import PRUNE_RULES
+    if prune not in PRUNE_RULES:
+        raise ValueError(f"`prune` is one of {', '.join(PRUNE_RULES)}, got {prune!r}.")
+    settings = _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner)
+    return Learner(name="tree", fit=_tree_fit, predict=_tree_predict, data=data,
+                   reads="tabular", multi="separate",
+                   params=dict(settings, prune=prune, seed=int(seed)))
+
+
+def _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner) -> dict:
+    """The settings a tree is grown under: those given, and the preset's for the rest. Under
+    rpart's own defaults a ``min_leaf`` left open follows ``min_split`` and a ``min_split`` left
+    open follows a given ``min_leaf``, as ``rpart.control()`` has them."""
+    if preset == "bigboss":
+        base = dict(min_split=5, min_leaf=5, cp=0.001, max_depth=10, n_inner=5)
+    elif preset == "package":
+        split = min_split if min_split is not None else (
+            20 if min_leaf is None else 3 * int(min_leaf))
+        base = dict(min_split=split, min_leaf=round(split / 3), cp=0.01, max_depth=30,
+                    n_inner=10)
+    else:
+        raise ValueError(f'`preset` is "package" or "bigboss", got {preset!r}.')
+    given = dict(min_split=min_split, min_leaf=min_leaf, cp=cp, max_depth=max_depth,
+                 n_inner=n_inner)
+    out = {k: base[k] if v is None else v for k, v in given.items()}
+    for k in ("min_split", "min_leaf", "max_depth", "n_inner"):
+        out[k] = int(out[k])
+    out["cp"] = float(out["cp"])
+    return out
+
+
+def _tree_fit(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, seed, head, variables,
+              group=None, **_):
+    from .tree import tree_fit, tree_prune, tree_prune_cp
+    family = _family(head)
+    m = flatten(x)
+
+    def make(design, yj, seed_j, w):
+        fold, n_fold = None, 0
+        if prune != "none":
+            fold = _inner_folds(yj, n_inner, seed_j, group)
+            n_fold = int(fold.max()) + 1
+        grown = tree_fit(design, yj, w, family, min_split, min_leaf, cp, max_depth, fold, n_fold)
+        at = tree_prune_cp(grown, prune)
+        return grown if at is None else tree_prune(grown, at)
+
+    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables),
+                                    _head_weights(head, y)),
+                n_col=m.shape[1], family=family)
+
+
+def _tree_predict(model, x):
+    from .tree import tree_predict
+    m = flatten(x)
+    return np.column_stack([
+        np.full(m.shape[0], f) if isinstance(f, float) else tree_predict(f, m)
+        for f in model["models"]])
 
 
 def stepwise(data=None, max_terms=3, degree=2) -> Learner:

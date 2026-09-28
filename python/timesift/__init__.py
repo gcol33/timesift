@@ -22,7 +22,7 @@ from .fit import Timesift, timesift
 from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
 from .learners import (Fit, Learner, cnn, elasticnet, fit_learner, flatten, forest, mlp,
-                       rescnn, stepwise)
+                       rescnn, stepwise, tree)
 from .metrics import (average_precision, cohen_kappa, decision_threshold, kappa_score,
                       model_agreement, roc_auc, tss)
 from .occlusion import feature_matrix
@@ -63,6 +63,7 @@ register_response("presence_absence", PRESENCE_ABSENCE)
 register_learner("elasticnet", elasticnet)
 register_learner("stepwise", stepwise)
 register_learner("forest", forest)
+register_learner("tree", tree)
 register_learner("mlp", mlp)
 register_learner("cnn", cnn)
 register_learner("rescnn", rescnn)
@@ -89,5 +90,5 @@ __all__ = [
     "rescnn", "resolve_folds", "resolve_metric", "responses", "roc_auc", "scorable_cells",
     "score_predictions", "select_columns",
     "select_grain", "simulate_records", "stepwise", "summary", "target_labels", "timesift", "timesift_set",
-    "train_control", "tss", "tss_inflation", "write_cells", "write_folds", "write_response",
+    "train_control", "tree", "tss", "tss_inflation", "write_cells", "write_folds", "write_response",
 ]

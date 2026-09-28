@@ -1,0 +1,109 @@
+#' Classification and regression tree on the flattened representation
+#'
+#' One tree per response, over every bin-by-channel column of the representation, grown under
+#' rpart's rules: the Gini index under a presence-absence head and the sum of squares under a head
+#' with a squared-error loss, a split only between two distinct values of a column, and the
+#' cost-complexity bookkeeping that keeps a split only where it lowers the risk by at least `cp` of
+#' the root's. On the same columns, weights and folds the tree is the one rpart grows, split for
+#' split, and its complexity table the one rpart reports; the tree is grown by the core the Python
+#' package calls, so the two languages grow it identically.
+#'
+#' The grown tree is pruned back by an inner cross-validation. Its folds are dealt for each
+#' response and stratified on it, as the elastic net's are, and `prune` names the rule that reads
+#' the complexity table: `"se_sum"` takes the row of least cross-validated error plus its standard
+#' error among the rows that keep a split, the last of them where several tie, which is how
+#' biomod2 prunes its classification tree; `"one_se"` takes the smallest tree within one standard
+#' error of the least cross-validated error; `"min"` the first row reaching the least error; and
+#' `"none"` keeps the tree as grown.
+#'
+#' `preset` says whose defaults the settings left `NULL` take. `"package"` is rpart's own, which is
+#' what biomod2's default option set fits: `min_split = 20`, `min_leaf = round(min_split / 3)`
+#' (or `min_split = 3 * min_leaf` where only `min_leaf` is given), `cp = 0.01`, `max_depth = 30`
+#' and ten inner folds. `"bigboss"` is biomod2's tuned option set: `min_split = 5`, `min_leaf = 5`,
+#' `cp = 0.001`, `max_depth = 10` and five inner folds. A setting given explicitly beats either.
+#'
+#' The case weights are the response head's, [positive_weights()] under presence-absence. They
+#' weigh every class count and sum of squares the tree is grown on; `min_split` and `min_leaf`
+#' count observations, as rpart's do.
+#'
+#' @inheritParams elasticnet
+#' @param min_split Observations a node needs before a split of it is tried.
+#' @param min_leaf Observations each child of a split keeps.
+#' @param cp The share of the root's risk a split has to remove to be kept.
+#' @param max_depth Depth of the deepest node, the root at depth 0; 30 at most.
+#' @param prune How the grown tree is pruned: `"se_sum"`, `"one_se"`, `"min"` or `"none"`.
+#' @param n_inner Folds of the inner cross-validation the pruning reads.
+#' @param preset Whose defaults the settings left `NULL` take: `"package"` or `"bigboss"`.
+#' @param seed Seed for the inner cross-validation's fold draw.
+#'
+#' @return A [learner()].
+#'
+#' @examples
+#' tree()
+#' tree(preset = "bigboss", prune = "one_se")
+#'
+#' @export
+tree <- function(data = NULL, min_split = NULL, min_leaf = NULL, cp = NULL, max_depth = NULL,
+                 prune = c("se_sum", "one_se", "min", "none"), n_inner = NULL,
+                 preset = c("package", "bigboss"), seed = 1L) {
+  prune <- match.arg(prune)
+  preset <- match.arg(preset)
+  settings <- .tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner)
+  learner(
+    name = "tree",
+    data = data, reads = "tabular", multi = "separate",
+    params = c(settings, list(prune = prune, seed = as.integer(seed))),
+    fit = function(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, seed, head,
+                   weights, group = NULL, ...) {
+      family <- .head_family(head)
+      m <- .flatten(x)
+      seeds <- .variable_seeds(seed, y)
+      models <- lapply(seq_len(ncol(y)), function(j) {
+        yj <- y[, j]
+        if (length(unique(yj)) < 2L) {
+          return(mean(yj))
+        }
+        fold <- NULL
+        n_fold <- 0L
+        if (!identical(prune, "none")) {
+          inner <- .inner_folds(yj, n_inner, seeds[j], group)
+          labels <- sort(unique(inner))
+          fold <- match(inner, labels) - 1L
+          n_fold <- length(labels)
+        }
+        grown <- .tree_fit(m, yj, weights[, j], family, min_split, min_leaf, cp, max_depth,
+                           fold, n_fold)
+        at <- .tree_prune_cp(grown, prune)
+        if (is.null(at)) grown else .tree_prune(grown, at)
+      })
+      list(models = models, columns = colnames(m), family = family)
+    },
+    predict = function(model, x) {
+      m <- .flatten(x)
+      .as_predictions(vapply(model$models, function(f) {
+        if (is.numeric(f)) rep(f, nrow(m)) else .tree_predict(f, m)
+      }, numeric(nrow(m))), nrow(m))
+    }
+  )
+}
+
+# The settings a tree is grown under: those given, and the preset's for the rest. Under rpart's
+# own defaults a `min_leaf` left open follows `min_split` and a `min_split` left open follows a
+# given `min_leaf`, as `rpart.control()` has them.
+.tree_settings <- function(preset, min_split, min_leaf, cp, max_depth, n_inner) {
+  if (identical(preset, "bigboss")) {
+    base <- list(min_split = 5L, min_leaf = 5L, cp = 0.001, max_depth = 10L, n_inner = 5L)
+  } else {
+    split <- min_split %||% if (is.null(min_leaf)) 20L else 3L * as.integer(min_leaf)
+    base <- list(min_split = split, min_leaf = round(split / 3), cp = 0.01, max_depth = 30L,
+                 n_inner = 10L)
+  }
+  out <- list(min_split = min_split %||% base$min_split, min_leaf = min_leaf %||% base$min_leaf,
+              cp = cp %||% base$cp, max_depth = max_depth %||% base$max_depth,
+              n_inner = n_inner %||% base$n_inner)
+  out$min_split <- as.integer(out$min_split)
+  out$min_leaf <- as.integer(out$min_leaf)
+  out$max_depth <- as.integer(out$max_depth)
+  out$n_inner <- as.integer(out$n_inner)
+  out
+}

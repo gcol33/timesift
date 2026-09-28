@@ -82,6 +82,56 @@ selector rather than of the features. The family is the response head’s:
 logistic under a binary cross-entropy loss, Gaussian under a
 squared-error one.
 
+## `tree()`
+
+``` python
+tree(
+    data=None,
+    min_split=None,
+    min_leaf=None,
+    cp=None,
+    max_depth=None,
+    prune='se_sum',
+    n_inner=None,
+    preset='package',
+    seed=1,
+)
+```
+
+One classification or regression tree per variable, over every
+bin-by-channel column, grown under rpart’s rules: the Gini index under a
+presence-absence head and the sum of squares under a head with a
+squared-error loss, a split only between two distinct values of a
+column, and the cost-complexity bookkeeping that keeps a split only
+where it lowers the risk by at least `cp` of the root’s. On the same
+columns, weights and folds the tree is the one rpart grows, split for
+split, and its complexity table the one rpart reports; the tree is grown
+by the core the R package calls, so the two languages grow it
+identically.
+
+The grown tree is pruned back by an inner cross-validation. Its folds
+are dealt for each response and stratified on it, as the elastic net’s
+are, and `prune` names the rule that reads the complexity table:
+`"se_sum"` takes the row of least cross-validated error plus its
+standard error among the rows that keep a split, the last of them where
+several tie, which is how biomod2 prunes its classification tree;
+`"one_se"` takes the smallest tree within one standard error of the
+least cross-validated error; `"min"` the first row reaching the least
+error; and `"none"` keeps the tree as grown.
+
+`preset` says whose defaults the settings left `None` take. `"package"`
+is rpart’s own, which is what biomod2’s default option set fits:
+`min_split=20`, `min_leaf=round(min_split / 3)` (or
+`min_split=3 * min_leaf` where only `min_leaf` is given), `cp=0.01`,
+`max_depth=30` and ten inner folds. `"bigboss"` is biomod2’s tuned
+option set: `min_split=5`, `min_leaf=5`, `cp=0.001`, `max_depth=10` and
+five inner folds. A setting given explicitly beats either.
+
+The case weights are the response head’s,
+`timesift.response.positive_weights` under presence-absence. They weigh
+every class count and sum of squares the tree is grown on; `min_split`
+and `min_leaf` count observations, as rpart’s do.
+
 ## `forest()`
 
 ``` python

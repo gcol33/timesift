@@ -1,3 +1,18 @@
+# timesift (development version)
+
+## New
+
+* `tree()` grows one classification or regression tree per response under rpart's rules: the
+  Gini index under a presence-absence head and the sum of squares under a squared-error one,
+  `min_split`, `min_leaf`, `cp` and `max_depth` as `rpart.control()` has them, and the
+  cost-complexity table with its cross-validated error. The tree is pruned back by an inner
+  cross-validation read by `prune`: `"se_sum"`, the rule biomod2 prunes its classification tree
+  by, `"one_se"`, `"min"` or `"none"`. `preset = "bigboss"` takes biomod2's tuned option set for
+  every setting left open. It runs on a new core, `src/ts_tree.cpp`, compiled into both
+  languages, so the two grow the same tree; on the contract's twelve cases it reproduces rpart's
+  node table, complexity table, cross-validated error and pruned predictions to `1.1e-16`. Both
+  languages.
+
 # timesift 0.4.0
 
 ## New

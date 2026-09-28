@@ -6,6 +6,7 @@
 
 #include "ts_core.h"
 #include "ts_penalised.h"
+#include "ts_tree.h"
 
 namespace {
 
@@ -381,4 +382,112 @@ cpp11::doubles ts_penalised_coef_(cpp11::doubles lambda, cpp11::doubles a0, cpp1
   std::vector<double> coef(path.n_column + 1, 0.0);
   timesift::penalised_coef(path, at, coef.data(), coef.data() + 1);
   return give(coef);
+}
+
+// The tree, from the same core the Python side calls. A fitted tree crosses into R as a list of
+// plain vectors, one per field of the node table and the complexity table, and comes back the
+// same way to be pruned or to predict.
+namespace {
+
+cpp11::writable::integers give(const std::vector<std::int8_t>& from) {
+  cpp11::writable::integers out(static_cast<R_xlen_t>(from.size()));
+  for (std::size_t i = 0; i < from.size(); ++i) out[static_cast<R_xlen_t>(i)] = from[i];
+  return out;
+}
+
+cpp11::writable::list give(const timesift::Tree& tree) {
+  using namespace cpp11::literals;
+  return cpp11::writable::list({
+    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(tree.family))),
+    "number"_nm = give(tree.number),
+    "column"_nm = give(tree.column),
+    "threshold"_nm = give(tree.threshold),
+    "less_left"_nm = give(tree.less_left),
+    "left"_nm = give(tree.left),
+    "right"_nm = give(tree.right),
+    "n"_nm = give(tree.n),
+    "weight"_nm = give(tree.weight),
+    "risk"_nm = give(tree.risk),
+    "complexity"_nm = give(tree.complexity),
+    "value"_nm = give(tree.value),
+    "root_risk"_nm = cpp11::as_sexp(tree.root_risk),
+    "cp"_nm = give(tree.cp),
+    "nsplit"_nm = give(tree.nsplit),
+    "rel_error"_nm = give(tree.rel_error),
+    "xerror"_nm = give(tree.xerror),
+    "xstd"_nm = give(tree.xstd)
+  });
+}
+
+template <typename T>
+std::vector<T> take_field(const cpp11::list& tree, const char* name) {
+  cpp11::sexp field = tree[name];
+  std::vector<T> out;
+  if (TYPEOF(field) == INTSXP) {
+    cpp11::integers v(field);
+    for (R_xlen_t i = 0; i < v.size(); ++i) out.push_back(static_cast<T>(v[i]));
+  } else {
+    cpp11::doubles v(field);
+    for (R_xlen_t i = 0; i < v.size(); ++i) out.push_back(static_cast<T>(v[i]));
+  }
+  return out;
+}
+
+timesift::Tree take_tree(const cpp11::list& tree) {
+  timesift::Tree out;
+  out.family = timesift::family_from_name(cpp11::as_cpp<std::string>(tree["family"]));
+  out.number = take_field<std::int32_t>(tree, "number");
+  out.column = take_field<std::int32_t>(tree, "column");
+  out.threshold = take_field<double>(tree, "threshold");
+  out.less_left = take_field<std::int8_t>(tree, "less_left");
+  out.left = take_field<std::int32_t>(tree, "left");
+  out.right = take_field<std::int32_t>(tree, "right");
+  out.n = take_field<std::int32_t>(tree, "n");
+  out.weight = take_field<double>(tree, "weight");
+  out.risk = take_field<double>(tree, "risk");
+  out.complexity = take_field<double>(tree, "complexity");
+  out.value = take_field<double>(tree, "value");
+  out.root_risk = cpp11::as_cpp<double>(tree["root_risk"]);
+  out.cp = take_field<double>(tree, "cp");
+  out.nsplit = take_field<std::int32_t>(tree, "nsplit");
+  out.rel_error = take_field<double>(tree, "rel_error");
+  out.xerror = take_field<double>(tree, "xerror");
+  out.xstd = take_field<double>(tree, "xstd");
+  return out;
+}
+
+}  // namespace
+
+[[cpp11::register]]
+cpp11::list ts_tree_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                         std::string family, int min_split, int min_leaf, double cp,
+                         int max_depth, cpp11::sexp fold, int n_fold) {
+  timesift::TreeSpec spec;
+  spec.min_split = min_split;
+  spec.min_leaf = min_leaf;
+  spec.cp = cp;
+  spec.max_depth = max_depth;
+  std::vector<std::int32_t> which;
+  if (fold != R_NilValue) {
+    cpp11::integers given(fold);
+    for (R_xlen_t i = 0; i < given.size(); ++i) which.push_back(given[i]);
+  }
+  const timesift::Tree tree = timesift::tree_fit(
+      REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
+      static_cast<std::size_t>(p), timesift::family_from_name(family), spec,
+      which.empty() ? nullptr : which.data(), which.empty() ? 0 : n_fold);
+  return give(tree);
+}
+
+[[cpp11::register]]
+cpp11::list ts_tree_prune_(cpp11::list tree, double cp) {
+  return give(timesift::tree_prune(take_tree(tree), cp));
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_tree_predict_(cpp11::list tree, cpp11::doubles newx, int n, int p) {
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::tree_predict(take_tree(tree), REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                         static_cast<std::size_t>(p), out.data());
+  return give(out);
 }

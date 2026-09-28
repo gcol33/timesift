@@ -49,6 +49,8 @@ your own goes through.
   : Forward selection by AIC on the flattened representation
 - [`forest()`](https://gillescolling.com/timesift/reference/forest.md) :
   Random forest on the flattened representation
+- [`tree()`](https://gillescolling.com/timesift/reference/tree.md) :
+  Classification and regression tree on the flattened representation
 - [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)

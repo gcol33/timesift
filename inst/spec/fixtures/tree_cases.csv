@@ -1,0 +1,13 @@
+case,family,weights,min_split,min_leaf,cp,max_depth
+binomial_flat_package,binomial,flat,20,7,0.01,30
+binomial_flat_bigboss,binomial,flat,5,5,0.001,10
+binomial_flat_deep,binomial,flat,4,2,0,4
+binomial_counts_package,binomial,counts,20,7,0.01,30
+binomial_counts_bigboss,binomial,counts,5,5,0.001,10
+binomial_counts_deep,binomial,counts,4,2,0,4
+gaussian_flat_package,gaussian,flat,20,7,0.01,30
+gaussian_flat_bigboss,gaussian,flat,5,5,0.001,10
+gaussian_flat_deep,gaussian,flat,4,2,0,4
+gaussian_counts_package,gaussian,counts,20,7,0.01,30
+gaussian_counts_bigboss,gaussian,counts,5,5,0.001,10
+gaussian_counts_deep,gaussian,counts,4,2,0,4

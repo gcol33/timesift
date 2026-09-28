@@ -12,6 +12,7 @@
 
 #include "ts_core.h"
 #include "ts_penalised.h"
+#include "ts_tree.h"
 
 namespace nb = nanobind;
 
@@ -111,11 +112,66 @@ timesift::PenaltyPath take(ConstF64 lambda, ConstF64 a0, ConstF64 beta,
   return path;
 }
 
+// A fitted tree crosses into Python as a dict of arrays, one per field of the node table and the
+// complexity table, and comes back the same way to be pruned or to predict.
+nb::dict give(const timesift::Tree& tree) {
+  nb::dict out;
+  out["family"] = std::string(timesift::family_name(tree.family));
+  out["number"] = give(std::vector<std::int32_t>(tree.number));
+  out["column"] = give(std::vector<std::int32_t>(tree.column));
+  out["threshold"] = give(std::vector<double>(tree.threshold));
+  out["less_left"] = give(std::vector<std::int8_t>(tree.less_left));
+  out["left"] = give(std::vector<std::int32_t>(tree.left));
+  out["right"] = give(std::vector<std::int32_t>(tree.right));
+  out["n"] = give(std::vector<std::int32_t>(tree.n));
+  out["weight"] = give(std::vector<double>(tree.weight));
+  out["risk"] = give(std::vector<double>(tree.risk));
+  out["complexity"] = give(std::vector<double>(tree.complexity));
+  out["value"] = give(std::vector<double>(tree.value));
+  out["root_risk"] = tree.root_risk;
+  out["cp"] = give(std::vector<double>(tree.cp));
+  out["nsplit"] = give(std::vector<std::int32_t>(tree.nsplit));
+  out["rel_error"] = give(std::vector<double>(tree.rel_error));
+  out["xerror"] = give(std::vector<double>(tree.xerror));
+  out["xstd"] = give(std::vector<double>(tree.xstd));
+  return out;
+}
+
+template <typename T>
+std::vector<T> take_field(const nb::dict& tree, const char* name) {
+  const auto a = nb::cast<nb::ndarray<const T, nb::ndim<1>, nb::c_contig, nb::device::cpu>>(
+      tree[name]);
+  return std::vector<T>(a.data(), a.data() + a.size());
+}
+
+timesift::Tree take_tree(const nb::dict& tree) {
+  timesift::Tree out;
+  out.family = timesift::family_from_name(nb::cast<std::string>(tree["family"]));
+  out.number = take_field<std::int32_t>(tree, "number");
+  out.column = take_field<std::int32_t>(tree, "column");
+  out.threshold = take_field<double>(tree, "threshold");
+  out.less_left = take_field<std::int8_t>(tree, "less_left");
+  out.left = take_field<std::int32_t>(tree, "left");
+  out.right = take_field<std::int32_t>(tree, "right");
+  out.n = take_field<std::int32_t>(tree, "n");
+  out.weight = take_field<double>(tree, "weight");
+  out.risk = take_field<double>(tree, "risk");
+  out.complexity = take_field<double>(tree, "complexity");
+  out.value = take_field<double>(tree, "value");
+  out.root_risk = nb::cast<double>(tree["root_risk"]);
+  out.cp = take_field<double>(tree, "cp");
+  out.nsplit = take_field<std::int32_t>(tree, "nsplit");
+  out.rel_error = take_field<double>(tree, "rel_error");
+  out.xerror = take_field<double>(tree, "xerror");
+  out.xstd = take_field<double>(tree, "xstd");
+  return out;
+}
+
 }  // namespace
 
 NB_MODULE(_core, m) {
-  m.doc() = "The binning, the reduction and the penalised fit, shared with the R package as "
-            "src/ts_core.cpp and src/ts_penalised.cpp.";
+  m.doc() = "The binning, the reduction, the penalised fit and the tree, shared with the R "
+            "package as src/ts_core.cpp, src/ts_penalised.cpp and src/ts_tree.cpp.";
 
   nb::register_exception_translator(
       [](const std::exception_ptr& p, void*) {
@@ -289,4 +345,36 @@ NB_MODULE(_core, m) {
           return give(std::move(coef));
         },
         nb::arg("lambda"), nb::arg("a0"), nb::arg("beta"), nb::arg("family"), nb::arg("at"));
+
+  m.def("tree_fit",
+        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int min_split,
+           int min_leaf, double cp, int max_depth, std::optional<ConstI32> fold, int n_fold) {
+          timesift::TreeSpec spec;
+          spec.min_split = min_split;
+          spec.min_leaf = min_leaf;
+          spec.cp = cp;
+          spec.max_depth = max_depth;
+          return give(timesift::tree_fit(
+              x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
+              timesift::family_from_name(family), spec,
+              fold.has_value() ? fold->data() : nullptr, fold.has_value() ? n_fold : 0));
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("min_split"),
+        nb::arg("min_leaf"), nb::arg("cp"), nb::arg("max_depth"), nb::arg("fold") = nb::none(),
+        nb::arg("n_fold") = 0);
+
+  m.def("tree_prune",
+        [](const nb::dict& tree, double cp) {
+          return give(timesift::tree_prune(take_tree(tree), cp));
+        },
+        nb::arg("tree"), nb::arg("cp"));
+
+  m.def("tree_predict",
+        [](const nb::dict& tree, ConstMat newx) {
+          std::vector<double> out(newx.shape(0));
+          timesift::tree_predict(take_tree(tree), newx.data(), newx.shape(0), newx.shape(1),
+                                 out.data());
+          return give(std::move(out));
+        },
+        nb::arg("tree"), nb::arg("newx"));
 }

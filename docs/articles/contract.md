@@ -572,10 +572,11 @@ and `src/ts_calendar.cpp`, compiled into the R package by R itself and
 into the Python extension by CMake. So is the penalised fit,
 `src/ts_penalised.cpp`, for the same reason: it is the arm the networks
 are measured against, and a baseline that moved between the languages
-would make the tool the confound. What each language holds above them is
-the boundary, which resolves the columns, resolves the zone, deals the
-folds and wraps the result. The two agree by construction rather than by
-two implementations being checked against each other after the fact.
+would make the tool the confound. So is the tree, `src/ts_tree.cpp`.
+What each language holds above them is the boundary, which resolves the
+columns, resolves the zone, deals the folds and wraps the result. The
+two agree by construction rather than by two implementations being
+checked against each other after the fact.
 
 The digests did not stop meaning anything when that happened. The
 implementations they used to compare are kept as test oracles,
@@ -598,10 +599,11 @@ possible**, and both sides carry the reader and the writer for all
 three.
 
 A model fitted in one language and a model fitted in the other cannot be
-byte-identical and are not required to be. The penalised fit is the one
-model that is: it goes through the shared core, so the two sides return
-the same coefficients from the same design, and what is stated below is
-how far either sits from glmnet rather than from the other.
+byte-identical and are not required to be. The penalised fit and the
+tree are the models that are: each goes through the shared core, so the
+two sides return the same coefficients, and grow the same tree, from the
+same design, and what is stated below is how far either sits from glmnet
+and from rpart rather than from the other.
 
 ## The file format of the three artifacts
 
@@ -1027,6 +1029,94 @@ truncates the path and returns the penalties it did reach; the generator
 refuses any reference glmnet warned about, so a fixture can never encode
 a failure both implementations would have to reproduce to match.
 
+## The tree
+
+[`tree()`](https://gillescolling.com/timesift/reference/tree.md) is one
+classification or regression tree per response, over `src/ts_tree.cpp`,
+which both languages compile. Its rules are rpart’s, because a biomod2
+user’s classification tree is rpart’s and the tree here has to be the
+one they already fit.
+
+- The design is column-major and every value finite; a non-finite value
+  is an error rather than a surrogate split. A binomial response is 0 or
+  1, and case weights are zero or more and sum to more than zero.
+- A binomial family splits on the Gini index of the weighted class
+  counts, a Gaussian one on the weighted sum of squares. A node’s risk
+  is the weight it misclassifies under its majority class, the first
+  class winning a tie, or its weighted sum of squares about its weighted
+  mean. Its value is the weighted share of ones, or that mean.
+- A column’s observations are sorted once, by rpart’s own quicksort, and
+  every node reads them in that order. The order matters beyond the
+  sort: a node’s sums are taken in it, and two sums of the same numbers
+  in two orders can differ in the last place and turn a tie between two
+  columns the other way.
+- A split is tried only between two distinct values of a column, at
+  their midpoint, with at least `min_leaf` observations on each side. A
+  column’s best split is the first position reaching the largest
+  improvement, and a node’s is the first column reaching the largest
+  improvement across columns. An improvement at or below `1e-10` of the
+  largest the fit has seen is read as none. Observations of zero weight
+  are not offered to the split search.
+- A node of fewer than `min_split` observations, or `max_depth` levels
+  below the root, is not split. The complexity bookkeeping is rpart’s
+  `partition()`: a split is kept where the risk its subtree removes, per
+  split, is more than `cp` times the root’s risk, and a node whose
+  subtree fails that is collapsed after its children were grown. The
+  direction of a continuous split sends the side of lower mean, or of
+  fewer ones, left.
+- The complexity table is rpart’s: one row per distinct complexity,
+  largest first, each on the scale of the root’s risk, with the number
+  of splits and the relative risk of the tree pruned there. Where folds
+  are given, each fold’s complement grows a tree under the complexity
+  rescaled by its share of the weight, and every held-out observation is
+  run down it at the geometric mean of each pair of adjacent rows;
+  `xerror` is the weighted loss summed over the held-out observations
+  and `xstd` its spread, both on the root’s scale.
+- `prune` reads that table. `"se_sum"` is the row of least
+  `xerror + xstd` among the rows that keep a split, the last of them
+  where several tie, which is how biomod2 prunes its classification
+  tree; `"one_se"` the first row within one `xstd` of the least
+  `xerror`; `"min"` the first row of least `xerror`; `"none"` no
+  pruning. Pruning at a complexity collapses every split whose own
+  complexity is at or below it and keeps the table whole.
+- The folds are dealt by the caller and handed over as one 0-based index
+  per unit. Nothing inside the core draws.
+- Every operation rounds on its own: the core is compiled with
+  floating-point contraction off, so no multiply and add fuse into one
+  rounding. A fused operation moves a sum by a unit in the last place,
+  which is enough to turn a tie between two splits the other way, and
+  compilers fuse by default on some machines and not on others.
+- rpart’s class priors are the data’s class shares, divided back out by
+  shares it computes again in C; the core takes every prior as exactly
+  one. The two are the same numbers wherever the weighted class counts
+  are exact, which integer weights make them. Under fractional weights
+  rpart’s priors sit a unit in the last place from one, computed with
+  R’s extended-precision sums, whose width depends on the machine, and a
+  split whose complexity ties `cp` exactly can then fall the other way.
+  The core falls the same way on every machine.
+
+### The fixtures
+
+`tree_cases.csv` names twelve cases: each family, with every weight one
+and with the integer counts `tree_weights.csv` holds, under rpart’s own
+defaults, biomod2’s tuned option set, and a shallow tree grown with no
+complexity threshold at all. Each is grown on the design
+`penalised_input.csv` carries, with its five-fold map as the
+cross-validation’s folds. `tree_nodes.csv` holds rpart’s node table,
+`tree_cptable.csv` its complexity table with the cross-validated error,
+and `tree_predict.csv` the predictions of the tree rpart’s `prune()`
+leaves at the row biomod2’s rule picks.
+
+### How exactly
+
+The node numbers, the split columns, the split directions, the node
+counts and the number of splits in each row of the table are asserted
+exactly. Every number of the node table and the complexity table, the
+thresholds, weights, risks, complexities, values, cross-validated errors
+and their spreads, and every prediction of the pruned tree, is asserted
+to `1e-12` relative. On the twelve cases the largest difference from
+rpart is `1.1e-16`.
+
 ## What each language carries
 
 The representation and the three artifacts are the contract. Everything
@@ -1049,6 +1139,7 @@ the difference is recorded here rather than found at a call site.
 | the penalised learner | [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md) |
 | the forward selector | [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md) |
 | the forest | [`forest()`](https://gillescolling.com/timesift/reference/forest.md) |
+| the classification and regression tree | [`tree()`](https://gillescolling.com/timesift/reference/tree.md) |
 | the encoders | [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md) |
 | how an encoder is trained | [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md) |
 | fitting one learner on one representation | [`fit_learner()`](https://gillescolling.com/timesift/reference/fit_learner.md) |

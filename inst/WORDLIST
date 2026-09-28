@@ -8,6 +8,7 @@ CMake
 CUDA
 Chytrý
 Dunnett's
+Gini
 Hastie
 Hochberg
 IANA
@@ -29,6 +30,7 @@ Zenodo
 artifact
 artifacts
 binormal
+biomod
 climgrain
 contrast's
 dict
@@ -62,6 +64,8 @@ rescores
 rescoring
 rescorings
 reweighting
+rpart
+rpart's
 run's
 scikit
 scipy

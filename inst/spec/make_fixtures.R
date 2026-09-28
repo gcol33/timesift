@@ -872,3 +872,92 @@ for (m in c("event", "season", "lag")) {
 }
 write_fixture(do.call(rbind, sim_rows), "simulate_design.csv")
 cat("wrote the grain contrast and the simulator's design\n")
+
+# The tree.
+#
+# The reference is rpart's, grown on the design the penalised fixtures carry, read back from its
+# own file so both sides and rpart see the same doubles. rpart's class priors are the data's class
+# shares, which it computes with R's extended-precision sums; the core takes them as exactly those
+# shares. Under integer weights the two are the same numbers and the tree is rpart's to the last
+# bit, so the weights here are counts. Under fractional weights a split whose complexity ties the
+# threshold exactly can fall the other way, and on which side depends on the width of R's long
+# double on the machine rpart runs on.
+tree_x <- as.matrix(utils::read.csv(file.path(out_dir, "penalised_input.csv"),
+                                    check.names = FALSE)[, colnames(pen_x)])
+set.seed(20260928L)
+tree_count <- sample(1:4, PEN_N, replace = TRUE)
+write_fixture(data.frame(unit = pen_units, count = tree_count, stringsAsFactors = FALSE),
+              "tree_weights.csv")
+
+TREE_CASES <- do.call(rbind, lapply(c("binomial", "gaussian"), function(family) {
+  do.call(rbind, lapply(c("flat", "counts"), function(weights) {
+    rbind(
+      data.frame(case = sprintf("%s_%s_package", family, weights), family = family,
+                 weights = weights, min_split = 20L, min_leaf = 7L, cp = 0.01, max_depth = 30L,
+                 stringsAsFactors = FALSE),
+      data.frame(case = sprintf("%s_%s_bigboss", family, weights), family = family,
+                 weights = weights, min_split = 5L, min_leaf = 5L, cp = 0.001, max_depth = 10L,
+                 stringsAsFactors = FALSE),
+      data.frame(case = sprintf("%s_%s_deep", family, weights), family = family,
+                 weights = weights, min_split = 4L, min_leaf = 2L, cp = 0, max_depth = 4L,
+                 stringsAsFactors = FALSE))
+  }))
+}))
+write_fixture(TREE_CASES, "tree_cases.csv")
+
+tree_nodes <- list()
+tree_tables <- list()
+tree_predictions <- list()
+for (i in seq_len(nrow(TREE_CASES))) {
+  row <- TREE_CASES[i, ]
+  y <- if (row$family == "binomial") pen_y_binomial else pen_y_gaussian
+  w <- if (row$weights == "counts") tree_count else rep(1, PEN_N)
+  d <- data.frame(y = if (row$family == "binomial") factor(y, levels = c(0, 1)) else y,
+                  tree_x, check.names = TRUE)
+  fit <- rpart::rpart(y ~ ., data = d, weights = w,
+                      method = if (row$family == "binomial") "class" else "anova",
+                      control = rpart::rpart.control(minsplit = row$min_split,
+                                                     minbucket = row$min_leaf, cp = row$cp,
+                                                     maxdepth = row$max_depth, maxcompete = 0L,
+                                                     maxsurrogate = 0L, xval = pen_fold + 1L))
+  f <- fit$frame
+  inner <- f$var != "<leaf>"
+  column <- rep(-1L, nrow(f))
+  column[inner] <- match(as.character(f$var[inner]), make.names(colnames(tree_x))) - 1L
+  threshold <- rep(0, nrow(f))
+  less_left <- rep(0L, nrow(f))
+  if (any(inner)) {
+    threshold[inner] <- fit$splits[, "index"]
+    less_left[inner] <- as.integer(fit$splits[, "ncat"] == -1)
+  }
+  value <- if (row$family == "binomial") f$yval2[, 5L] else f$yval
+  tree_nodes[[i]] <- data.frame(case = row$case, number = as.integer(rownames(f)),
+                                column = column, threshold = sprintf("%.17g", threshold),
+                                less_left = less_left, n = f$n,
+                                weight = sprintf("%.17g", f$wt), risk = sprintf("%.17g", f$dev),
+                                complexity = sprintf("%.17g", f$complexity),
+                                value = sprintf("%.17g", value), stringsAsFactors = FALSE)
+  cpt <- fit$cptable
+  tree_tables[[i]] <- data.frame(case = row$case, row = seq_len(nrow(cpt)),
+                                 cp = sprintf("%.17g", cpt[, "CP"]),
+                                 nsplit = as.integer(cpt[, "nsplit"]),
+                                 rel_error = sprintf("%.17g", cpt[, "rel error"]),
+                                 xerror = sprintf("%.17g", cpt[, "xerror"]),
+                                 xstd = sprintf("%.17g", cpt[, "xstd"]),
+                                 stringsAsFactors = FALSE)
+  # biomod2's pruning: the least cross-validated error plus its standard error among the rows
+  # that keep a split, the last of them where several tie.
+  kept <- as.data.frame(cpt)
+  kept$xsum <- kept$xerror + kept$xstd
+  kept <- kept[kept$nsplit > 0, ]
+  pruned <- if (nrow(kept)) rpart::prune(fit, cp = kept$CP[max(which(kept$xsum == min(kept$xsum)))])
+            else fit
+  p <- stats::predict(pruned, d)
+  p <- if (row$family == "binomial") p[, "1"] else as.numeric(p)
+  tree_predictions[[i]] <- data.frame(case = row$case, unit = pen_units,
+                                      se_sum = sprintf("%.17g", p), stringsAsFactors = FALSE)
+}
+write_fixture(do.call(rbind, tree_nodes), "tree_nodes.csv")
+write_fixture(do.call(rbind, tree_tables), "tree_cptable.csv")
+write_fixture(do.call(rbind, tree_predictions), "tree_predict.csv")
+cat("wrote the tree reference\n")

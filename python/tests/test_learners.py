@@ -9,7 +9,7 @@ import pytest
 from dataclasses import replace
 
 from timesift.control import train_control
-from timesift.learners import (Learner, elasticnet, fit_learner, flatten, forest, stepwise,
+from timesift.learners import (Learner, elasticnet, fit_learner, flatten, forest, stepwise, tree,
                                _apply_basis, _design, _logistic, _poly_basis)
 from timesift.metrics import roc_auc
 from timesift.representation import grain_matrix
@@ -200,8 +200,8 @@ def test_the_settings_a_learner_carries_are_the_ones_it_reports():
 
 def test_every_learner_declares_what_it_reads_and_how_it_covers_the_responses():
     declared = {"elasticnet": ("tabular", "separate"), "stepwise": ("tabular", "separate"),
-                "forest": ("tabular", "separate")}
-    for build in (elasticnet, stepwise, forest):
+                "forest": ("tabular", "separate"), "tree": ("tabular", "separate")}
+    for build in (elasticnet, stepwise, forest, tree):
         learner = build()
         assert (learner.reads, learner.multi) == declared[learner.name]
         assert learner.data is None
