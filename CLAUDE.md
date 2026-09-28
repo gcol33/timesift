@@ -233,7 +233,7 @@ Both sides run on one C++ core. The implementations that used to be compared are
 the suites check the core against. The last section of `inst/spec/representation.md` says what each
 language carries, so a difference between them is a recorded decision: one name per concept, the
 three registries, the nested selection, the mixed-model contrast, the record simulator and the
-plots on both sides, and only tidyselect's verbs in R alone, where Python selects a column by name,
+plots on both sides, and in R alone only tidyselect's verbs, where Python selects a column by name,
 glob or predicate. The Python contrast needs scipy and its plots matplotlib, each an extra of the
 wheel, as R's contrast needs lme4, lmerTest and emmeans.
 

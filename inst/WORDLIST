@@ -30,6 +30,7 @@ artifact
 artifacts
 binormal
 climgrain
+contrast's
 dict
 docstring
 doi
@@ -45,9 +46,11 @@ int
 jss
 learn's
 libtorch
+lmerTest
 lookback
 lookback's
 lookbacks
+matplotlib
 nanobind
 ndarray
 np
@@ -61,6 +64,8 @@ rescorings
 reweighting
 run's
 scikit
+scipy
+scipy's
 scorable
 sift's
 str
