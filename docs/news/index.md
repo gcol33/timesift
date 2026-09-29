@@ -4,6 +4,23 @@
 
 ### New
 
+- [`mars()`](https://gillescolling.com/timesift/reference/mars.md) fits
+  one multivariate adaptive regression spline per response, as the earth
+  package fits it and biomod2 fits `MARS`: earth’s forward pass of hinge
+  pairs with Fast MARS, leaps’ backward pruning by generalised
+  cross-validation, and the kept terms refitted as a logistic model
+  under a presence-absence head (earth’s
+  `glm = list(family = binomial)`) or by least squares under a
+  squared-error one. `degree`, `penalty`, `nk`, `thresh`, `minspan`,
+  `endspan`, `fast_k`, `fast_beta`, `prune` and `nprune` are earth’s
+  settings under earth’s defaults, which biomod2 uses under both of its
+  option sets. It runs on a new core, `src/ts_mars.cpp`, compiled into
+  both languages; on the contract’s ten cases, weighted ones included,
+  it keeps earth’s terms exactly and its coefficients and predictions
+  agree with earth’s to `8e-14`. A weighted fit reaches the residual
+  sums earth refits by QR at every candidate knot with Friedman’s
+  running updates: on 715 units and 471 columns under presence weights
+  it takes 0.1 s against earth’s 17 s. Both languages.
 - [`tree()`](https://gillescolling.com/timesift/reference/tree.md) grows
   one classification or regression tree per response under rpart’s
   rules: the Gini index under a presence-absence head and the sum of
@@ -74,8 +91,47 @@
   disagree: their weighted mean, standard deviation, coefficient of
   variation and t interval at `alpha`, biomod2’s `EMcv` and `EMci`. On
   one target per map cell it is an uncertainty map. Both languages.
+- [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
+  draws biomod2’s surface range envelope, `SRE`, around each response’s
+  presences: every column’s `quantile` and `1 - quantile` quantiles over
+  the presences, R’s type 7 as `bm_SRE()` reads them, and a prediction
+  of one where every column lies inside its band. On the contract’s six
+  cases its bounds and projections are `bm_SRE()`’s to the last bit. The
+  core is `src/ts_envelope.cpp`. Both languages.
+- [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
+  takes `direction = c("forward", "both", "backward", "none")` and
+  `terms = c("column", "power")`. `"both"` and `"backward"` are MASS’s
+  `stepAIC()` step for step, and `terms = "power"` makes each power of a
+  column a term of its own, as biomod2’s quadratic formula writes them;
+  `direction = "none"` with it is the model biomod2 fits as `GLM`,
+  `x + I(x^2)` over every column. `max_terms = Inf` lifts the budget,
+  and `threads` runs one step’s candidate fits at once. On the
+  contract’s thirteen cases the core chooses MASS’s,
+  [`glm()`](https://rdrr.io/r/stats/glm.html)’s and the R oracle’s
+  terms, in the same order, with the deviance to about `1e-14`. The
+  defaults are the forward search over column terms it always ran. Both
+  languages.
 
 ### Changed
+
+- [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
+  runs on a new core, `src/ts_stepwise.cpp`, compiled into both
+  languages: R’s `glm.fit` iteration over LINPACK’s `dqrdc2`, which sets
+  the rank R reports, and MASS’s step rules. It replaces
+  [`stats::glm()`](https://rdrr.io/r/stats/glm.html) in R and a separate
+  NumPy fitter in Python, which differed on what they refused: R took
+  any fit that settled within 25 iterations, while Python also refused
+  one whose fitted probabilities came within `1e-8` of zero or one. Both
+  now refuse only a fit that has not settled, as R did. On the fixture’s
+  design and on simulated records the core chooses the columns R’s
+  [`glm()`](https://rdrr.io/r/stats/glm.html) search chose, with
+  predictions equal to about `1e-15`. A fit saved from an earlier
+  version does not predict under this one; refit it.
+
+- A
+  [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
+  fit names every response whose final model did not settle in
+  `stopped`.
 
 - A `"weighted"` ensemble in Python gives every member the same weight
   where none scores above zero, as R’s always did, where it used to

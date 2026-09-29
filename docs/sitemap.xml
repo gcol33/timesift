@@ -1,5 +1,6 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://gillescolling.com/timesift/404.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/LICENSE-text.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/articles/contract.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/articles/index.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/articles/python-artifacts.html</loc></url>
@@ -14,7 +15,6 @@
 <url><loc>https://gillescolling.com/timesift/articles/timesift.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/authors.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/index.html</loc></url>
-<url><loc>https://gillescolling.com/timesift/LICENSE-text.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/news/index.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/artifacts.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/as.matrix.timesift_matrix.html</loc></url>
@@ -33,19 +33,21 @@
 <url><loc>https://gillescolling.com/timesift/reference/ensemble_fit.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/ensemble_spread.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/ensemble_weights.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/envelope.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/feature_matrix.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/fit_learner.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/fold_map.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/forest.html</loc></url>
-<url><loc>https://gillescolling.com/timesift/reference/grains.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/grain_contrasts.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/grain_ladder.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/grain_matrix.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/grains.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/implied_skill.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/index.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/kappa_score.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/learner.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/lookback_matrix.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/mars.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/maxnet.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/native.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/occlusion.html</loc></url>

@@ -1792,10 +1792,14 @@ generator’s arithmetic in doubles where every step is exact.
 family, flat weights and the tree’s counts, a balanced forest, one
 trying every column, and a seed of 2^32 - 1.
 <code>forest_nodes.csv</code> holds each tree’s node table and
-<code>forest_predict.csv</code> the forest’s prediction for every unit.
-<code>forest_stream.csv</code> holds the generator’s first eight outputs
-for five seed and tree pairs, which the Python suite also checks against
-a reimplementation of the generator of its own.</p>
+<code>forest_predict.csv</code> the forest’s prediction for every unit,
+the thresholds, the values and the predictions as hexadecimal floats: R
+reads a seventeen-digit decimal exactly only where it has extended
+precision, and on arm64 macOS it reads 5/6 a unit in the last place off,
+where a hexadecimal float reads exactly on every platform and in both
+languages. <code>forest_stream.csv</code> holds the generator’s first
+eight outputs for five seed and tree pairs, which the Python suite also
+checks against a reimplementation of the generator of its own.</p>
 </div>
 <div class="section level3">
 <h3 id="how-exactly-4">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-4"></a>
@@ -1957,6 +1961,406 @@ gradients in single precision.</p>
 </div>
 </div>
 <div class="section level2">
+<h2 id="the-envelope">The envelope<a class="anchor" aria-label="anchor" href="#the-envelope"></a>
+</h2>
+<p><code><a href="../reference/envelope.html">envelope()</a></code> is one surface range envelope per response,
+biomod2’s <code>SRE</code>, over <code>src/ts_envelope.cpp</code>, which
+both languages compile.</p>
+<ul>
+<li>Over the rows whose response is one, each column’s <code>q</code>
+and <code>1 - q</code> quantiles, <code>q</code> the
+<code>quantile</code> setting in <code>[0, 0.5]</code>. The upper
+probability is formed as <code>1 - q</code> before it is used, as R
+forms it.</li>
+<li>The quantile is R’s type 7, the default of <code><a href="https://rdrr.io/r/stats/quantile.html" class="external-link">quantile()</a></code>
+and the one <code>bm_SRE()</code> reads: over the <code>m</code> sorted
+values, the position <code>h = 1 + (m - 1) * prob</code>, the value at
+<code>floor(h)</code>, and where <code>h</code> lies above it and the
+value at <code>ceiling(h)</code> differs,
+<code>(1 - f) * lo + f * hi</code> with
+<code>f = h - floor(h)</code>.</li>
+<li>A row is predicted one where every column lies inside its band, both
+ends included, and zero elsewhere.</li>
+<li>The absences and the case weights are not read. A response with no
+presence, or with nothing else, is predicted its mean above the core, as
+every per-response learner predicts one.</li>
+</ul>
+<div class="section level3">
+<h3 id="the-fixtures-5">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-5"></a>
+</h3>
+<p><code>envelope_cases.csv</code> names six cases on the weekly columns
+maxnet’s fixtures read, over the three responses those carry: quantiles
+of <code>0</code>, <code>0.025</code> at each presence count,
+<code>0.1</code> and <code>0.5</code>. <code>envelope_bounds.csv</code>
+holds each column’s two bounds from
+<code>bm_SRE(do.extrem = TRUE)</code>, and
+<code>envelope_predict.csv</code> its projection onto the fixture’s rows
+and onto every reading scaled by <code>1.02</code>. At a quantile of
+zero a presence sits on each bound, which is where an exclusive
+comparison would differ.</p>
+</div>
+<div class="section level3">
+<h3 id="how-exactly-6">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-6"></a>
+</h3>
+<ul>
+<li>
+<strong>The bounds are arithmetic on the readings</strong> and are
+asserted to <code>1e-12</code> relative; the core and biomod2 agree to
+the last bit.</li>
+<li><strong>The projections are asserted exactly.</strong></li>
+</ul>
+</div>
+</div>
+<div class="section level2">
+<h2 id="the-stepwise-model">The stepwise model<a class="anchor" aria-label="anchor" href="#the-stepwise-model"></a>
+</h2>
+<p><code><a href="../reference/stepwise.html">stepwise()</a></code> is one generalised linear model per response,
+its terms chosen by Akaike’s criterion, over
+<code>src/ts_stepwise.cpp</code>, which both languages compile. Each fit
+is R’s <code>glm.fit</code> and the search is MASS’s
+<code>stepAIC()</code>, because the forward search over column terms is
+the arm the published comparison ran and the rest is what a biomod2
+user’s <code>GLM</code> is.</p>
+<ul>
+<li>
+<strong>The terms.</strong> A column holding one value over the rows
+fitted is not a term. Under <code>"column"</code> a term is the column’s
+orthogonal polynomial of degree
+<code>min(degree, distinct values - 1)</code>; under
+<code>"power"</code> each power <code>1</code> to <code>degree</code> of
+the column is a term of its own, the square taken as a product and any
+higher power through <code>pow</code>, as R’s <code>^</code> takes them.
+Terms are catalogued column by column, each column’s powers in
+order.</li>
+<li>
+<strong>The orthogonal polynomial</strong> is the three-term
+recurrence of R’s <code><a href="https://rdrr.io/r/stats/poly.html" class="external-link">poly()</a></code>: <code>P_0 = 1</code>,
+<code>norm2_0 = n</code>, and for <code>k = 1..d</code>,
+<code>alpha_k = sum(v P_{k-1}^2) / norm2_{k-1}</code>,
+<code>P_k = (v - alpha_k) P_{k-1} - (norm2_{k-1} / norm2_{k-2}) P_{k-2}</code>
+(the last term absent at <code>k = 1</code>) and
+<code>norm2_k = sum(P_k^2)</code>; the columns are
+<code>P_k / sqrt(norm2_k)</code>. The alphas and norms are kept with the
+fit and new rows are mapped through them, never through a basis
+re-derived from themselves.</li>
+<li>
+<strong>The design</strong> is the intercept followed by the columns
+of each term the model holds, in the order it holds them.</li>
+<li>
+<strong>Each fit</strong> is iteratively reweighted least squares as
+<code>glm.fit</code>: starting means <code>(w y + 0.5) / (w + 1)</code>
+under the binomial family and <code>y</code> under the Gaussian one; at
+each iteration the working response <code>eta + (y - mu) / mu_eta</code>
+and working weights <code>sqrt(w mu_eta^2 / V(mu))</code>, solved by
+LINPACK’s <code>dqrdc2</code> Householder decomposition with its limited
+pivoting at a tolerance of <code>min(1e-7, epsilon / 1000)</code>, a
+column falling below that share of its original norm moved to the end
+and given a coefficient of zero; and the stopping rule
+<code>|dev - dev_old| / (|dev| + 0.1) &lt; epsilon</code>,
+<code>epsilon = 1e-8</code>, within 25 iterations. The logit link holds
+the linear predictor at 30 either side as R’s does: below
+<code>-30</code> the mean is <code>eps / (1 + eps)</code> and above
+<code>30</code> it is <code>1 / (1 + eps)</code> with <code>eps</code>
+the machine epsilon, and the derivative is <code>eps</code> outside that
+range. The rank is the decomposition’s at the last iteration.</li>
+<li>
+<strong>The criterion</strong> is <code>deviance + 2 rank</code>
+under the binomial family and, under the Gaussian one,
+<code>n (log(2 pi deviance / n) + 1) + 2 - sum(log w) + 2 rank</code>,
+the deviance weighted by the case weights in both.</li>
+<li>
+<strong>The search.</strong> <code>"forward"</code> and
+<code>"both"</code> start from the intercept, <code>"backward"</code>
+and <code>"none"</code> from every term. <code>"none"</code> stops
+there. Otherwise each step fits the model with each held term dropped,
+where the search drops (<code>"both"</code>, <code>"backward"</code>),
+and with each term it lacks added, where it adds
+(<code>"forward"</code>, <code>"both"</code>) and holds fewer than
+<code>max_terms</code>. A move whose fit did not settle is not a
+candidate. If any drop leaves the rank where it was, the last such term
+is dropped and the step ends. Otherwise the moves that change the rank
+are compared in order, drops in the model’s order and then additions in
+catalogue order, and the first to reach the lowest criterion is taken if
+that is strictly below the model’s own; if none is, the search stops. A
+taken addition goes to the end of the model.</li>
+<li>
+<strong>What a fit keeps</strong>: each term’s column, power and
+degree, the recurrences, the coefficients, the rank, the deviance, the
+criterion, whether the last fit settled, and the number of steps. A
+model holding no term predicts the mean of the response over the rows
+fitted, unweighted. Otherwise the prediction is the linear predictor
+through the link.</li>
+<li>The candidate fits of one step are independent, and
+<code>threads</code> runs them at once without changing what comes
+back.</li>
+</ul>
+<div class="section level3">
+<h3 id="the-fixtures-6">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-6"></a>
+</h3>
+<p><code>stepwise_cases.csv</code> names thirteen cases on the weekly
+columns maxnet’s fixtures read. Seven are MASS’s <code>stepAIC()</code>
+over biomod2’s formula <code>x + I(x^2)</code> (<code>I(x^3)</code>
+beside them in one) from the intercept or from every term, in every
+direction: two of them carry the first column twice, so a term is
+aliased and the backward search drops it before anything else. MASS’s
+binomial family rounds a fractional weight into a count, so its binomial
+cases are unweighted; its Gaussian criterion differs from the core’s by
+a constant, and one Gaussian case is weighted. Two are
+<code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> on every term, and four are the forward search over
+column terms written in R alone,
+<code>tests/testthat/helper-oracle-stepwise.R</code>, under fractional
+case weights. Each case carries the terms chosen as
+<code>column:power</code> in the order the model holds them,
+<code>0</code> for a polynomial, with the rank, the deviance, whether
+the fit settled and the number of steps.
+<code>stepwise_predict.csv</code> holds the fitted means on the
+fixture’s rows and on every reading scaled by <code>1.01</code>.</p>
+</div>
+<div class="section level3">
+<h3 id="how-exactly-7">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-7"></a>
+</h3>
+<ul>
+<li><strong>The terms, the rank, the steps and whether the fit settled
+are asserted exactly.</strong></li>
+<li>
+<strong>The deviance is asserted to <code>1e-9</code> relative and
+the predictions to <code>1e-8</code>.</strong> The iteration is
+<code>glm.fit</code>’s own and the two settle on the same iterate;
+across the thirteen cases they agree to about <code>1e-14</code>.</li>
+</ul>
+</div>
+</div>
+<div class="section level2">
+<h2 id="mars">MARS<a class="anchor" aria-label="anchor" href="#mars"></a>
+</h2>
+<p><code><a href="../reference/mars.html">mars()</a></code> is one multivariate adaptive regression spline
+per response, over <code>src/ts_mars.cpp</code>, which both languages
+compile. The forward pass is earth’s (5.3.6) <code>ForwardPass</code>,
+the pruning pass leaps’ backward elimination as earth calls it, and the
+refit earth’s, because a biomod2 user’s <code>MARS</code> is
+<code>earth(y ~ ., glm = list(family = binomial))</code>. The least
+squares and the logistic refit are R’s <code>dqrdc2</code> and
+<code>glm.fit</code>, from <code>src/ts_glm.cpp</code>, which the
+stepwise model shares.</p>
+<ul>
+<li>
+<strong>The weights.</strong> Weights that differ from the first by
+no more than <code>1e-8</code> are no weights: every weight is one
+below. Otherwise a weight below the mean over <code>1e8</code> is raised
+to it. The basis is weighted throughout the two passes: the intercept is
+<code>sqrt(w)</code> and every term is its parent times a hinge, so
+every term carries the root weight once.</li>
+<li>
+<strong>The scaled response.</strong> The forward pass reads
+<code>ys = (y - mean(y)) / sd(y)</code>, <code>sd</code> over
+<code>n - 1</code>, and a weighted fit also
+<code>yw = sqrt(w) y / sd(y)</code>. The null residual sum of squares is
+<code>sum(w (ys - wm)^2)</code>, <code>wm</code> the weighted mean, held
+at <code>1e-8 n</code> from below.</li>
+<li>
+<strong>The settings.</strong> <code>nk</code>, the most terms,
+defaults to <code>min(200, max(20, 2 p)) + 1</code>;
+<code>penalty</code> to 2 at degree one and 3 above. The end span of a
+term of degree <code>d</code> is <code>endspan</code>, or where that is
+0 <code>floor(7.32193 + log(p) / 0.69315)</code>, widened at
+<code>d &gt;= 2</code> by <code>floor(adjust * span + 0.5)</code>,
+<code>adjust = 2</code>, and held to <code>[1, floor(n / 2) - 1]</code>.
+The min span is <code>minspan</code>, or where that is 0
+<code>floor((2.9702 + log(p m)) / 1.7329)</code> with <code>m</code> the
+units where the parent is positive, at least
+<ol style="list-style-type: decimal">
+<li>The first knot counted from the top sits
+<code>max(1, endspan + s)</code> units in, <code>s</code> the remainder
+<code>a - floor(a / minspan) minspan</code> halved over the
+<code>a = max(0, n - 2 endspan)</code> units available (half the min
+span where it divides exactly, half of <code>a</code> where
+<code>a</code> is at most the min span). A negative <code>minspan</code>
+asks for <code>-minspan</code> knots: the min span is
+<code>ceiling(n / (1 - minspan))</code> and the first knot the smallest
+multiple of it at or past the end span, less one.</li>
+</ol>
+</li>
+<li>
+<strong>The order of a column</strong> is its units sorted by value,
+ties in unit order.</li>
+<li>
+<strong>The basis the search reads</strong> is earth’s: an
+orthonormal basis of the terms held, built by modified Gram-Schmidt in
+the order they entered, the intercept <code>1 / sqrt(n)</code> and the
+first term centred on its mean, a term whose residual has a sum of
+squares of zero held as zero. A weighted fit keeps beside it the
+orthonormal basis of every column of the weighted basis so far, the
+unusable upper hinges included, each one whose residual norm is below
+<code>1e-8</code> of its own dropped, which is the basis earth’s QR
+regresses on.</li>
+<li>
+<strong>A step.</strong> For each of the first <code>fast_k</code>
+parents of the queue whose degree is below <code>degree</code>, and each
+column the parent does not already use, the step searches the column
+linearly and then its knots, and takes the candidate of greatest
+reduction in the residual sum of squares, the first in parent order and
+column order where two tie. A candidate is <em>of a new form</em> unless
+some term held uses the column and uses the same other columns as the
+parent; only then is the linear term a candidate and the pair’s upper
+hinge usable.</li>
+<li>
+<strong>The linear candidate</strong> is the parent times the
+column. Unweighted, it is orthogonalised against the basis, and where
+its residual’s sum of squares is at most <code>0.01</code> it is zero
+and the form is no longer new; its reduction is
+<code>(sum(ys q))^2</code>. Weighted, it is orthogonalised against the
+weighted basis, dropped where its residual norm is below
+<code>1e-8</code> of its own, and its reduction is the one the exact
+residuals give.</li>
+<li>
+<strong>The knot search</strong> scans the column’s order from its
+second largest value down to the end span. With <code>b</code> the
+parent and <code>h(t) = b max(0, x - t)</code>, it carries, as each unit
+enters above the knot, the running sums of <code>b</code>,
+<code>b^2</code>, <code>b x</code> and <code>b^2 x</code>, each centred
+column’s covariance with <code>b</code>, and the centred response’s
+covariance with <code>b</code>, and from them the centred covariance of
+<code>h(t)</code> with each basis column (<code>c_k</code>), with itself
+(<code>c</code>), and with the centred response (<code>g</code>):
+<code>c += dx (2 S(b^2 x) - S(b^2) (x0 + x1)) + (u^2 - v^2) / n</code>,
+<code>v = S(b x) - S(b) x0</code> and <code>u</code> its last value. A
+weighted fit centres on <code>sqrt(w) / |sqrt(w)|</code> instead of the
+constant, with the sums of <code>b</code> and <code>b x</code> weighted
+by it and no division by <code>n</code>. At a unit whose parent is
+positive, and unweighted whose <code>c</code> is positive, a counter
+from the first knot’s position runs down, and where it reaches zero it
+is reset to the min span and the knot evaluated:
+<code>r = g - sum(g_k c_k)</code> over the basis and the linear
+candidate, and <code>q = c - sum(c_k^2)</code>.
+<ul>
+<li>Unweighted, where <code>q / c</code> exceeds <code>0.01</code>
+(below the 15th column) or <code>1e-5</code>, the knot reduces the
+residuals by the linear candidate’s reduction plus <code>r^2 / q</code>,
+and it is kept where that beats the column’s best so far and is below
+<code>min(1.01 R, 10 D)</code>, <code>R</code> the residual sum of
+squares and <code>D</code> the last step’s reduction.</li>
+<li>Weighted, where <code>q</code> exceeds <code>1e-10 c</code> the
+knot’s residual sum of squares is the base’s less <code>r^2 / q</code>,
+and it is kept where that is below the best so far by more than
+<code>1e-10</code>; the linear candidate is best where no knot is below
+it. earth fits the whole weighted basis by QR at every knot; this is the
+same residual sum of squares, and a hinge within <code>1e-10</code> of
+the basis is the column earth’s QR would drop.</li>
+</ul>
+</li>
+<li>
+<strong>A step’s term.</strong> The parent’s factors and a new one
+on the column: at the knot’s value, the lower term
+<code>max(0, x - t)</code> over the units above the knot in the order
+and the upper term <code>max(0, t - x)</code> over the rest, or, for the
+linear candidate, the column itself at the column’s least value, with no
+upper term. The upper term is used only where the candidate was of a new
+form and, weighted, its residual on earth’s basis has a sum of squares
+above <code>0.01</code>; an unusable one keeps its place in the basis’s
+numbering but is never a parent.</li>
+<li>
+<strong>Fast MARS.</strong> A queue entry per term position in the
+order they entered, starting from the intercept at the null residual sum
+of squares. After each step a parent tried is given its best reduction
+and the count of term positions then, and the new terms enter at
+infinity. The queue is sorted by reduction, larger first and then the
+lower position, and ranked; then, where <code>fast_beta</code> is above
+zero, by
+<code>rank + fast_beta (positions now - positions at its reduction)</code>,
+the lower first, then the reduction and then the position. A parent
+whose degree is too high keeps its entry unchanged.</li>
+<li>
+<strong>Stopping.</strong> After each step the residual sum of
+squares is the last less the step’s reduction, within <code>1e-10</code>
+of zero taken as zero, and <code>R^2 = 1 - R / R_null</code>. The pass
+stops without the step where no candidate was found and, at a
+<code>thresh</code> above zero, where <code>R^2</code> rose by less than
+it (a rise within <code>1e-10</code> of zero taken as zero) or the
+generalised R-squared fell below <code>-10</code>; with it, where
+<code>R^2</code> reached <code>1 - thresh</code> or the term positions
+reached <code>nk - 1</code>. The termination code is earth’s: 1 at
+<code>nk</code> below 3, 2 or 3 at a generalised R-squared below
+<code>-10</code>, 4 at a small rise, 5 at the largest <code>R^2</code>,
+6 where nothing was found, and 7 at <code>nk</code>.</li>
+<li>
+<strong>After the pass</strong>, the usable terms are decomposed by
+<code>dqrdc2</code> at <code>1e-8</code> and a term it moves past the
+rank is dropped.</li>
+<li>
+<strong>The pruning pass</strong> is leaps over the weighted basis
+and the weighted, unscaled response (<code>sqrt(w) y</code>): Miller’s
+orthogonal reduction (AS 274) row by row, the tolerances at
+<code>5e-10</code> of each column’s scaled row sums, the dependent
+columns dropped and the reduction rebuilt without them. Each subset size
+first records the prefix of the terms in their order. Backward
+elimination then runs from the last position down to the third, the
+intercept held in: the position whose drop raises the residuals least
+(the lowest where two tie, one below its tolerance at once) is moved to
+the end, and every prefix it moved past is recorded where its residual
+sum of squares beats the one held for its size and it is not the same
+subset. The generalised cross-validation of a size <code>k</code> is
+<code>RSS_k / (n (1 - C / n)^2)</code>, `C = k + penalty (k
+<ul>
+<li><ol style="list-style-type: decimal">
+<li>/ 2<code>(0 at</code>penalty = -1<code>) and infinite from</code>C
+&gt;=
+n<code>; the first size of least value up to</code>nprune<code>is kept. Unpruned, the first</code>nprune`
+terms are.</li>
+</ol></li>
+</ul>
+</li>
+<li>
+<strong>The refit</strong> is over the kept terms unweighted, the
+weighted basis divided by <code>sqrt(w)</code>: under the binomial
+family <code>glm.fit</code> from <code>src/ts_glm.cpp</code> with the
+head’s weights, under the Gaussian one <code>dqrls</code> at
+<code>1e-7</code> over the terms and the response each times
+<code>sqrt(w)</code>. A dependent kept term is an error.</li>
+<li>
+<strong>What a fit keeps</strong>: every term of the forward pass as
+its factors (column, direction and cut), the kept terms in their order,
+their coefficients, the termination code, the kept size’s generalised
+cross-validation and whether the refit settled. The prediction is each
+kept term as the product of its factors, <code>max(0, x - t)</code>,
+<code>max(0, t - x)</code> or <code>x</code>, then the linear predictor,
+through the logit link under the binomial family.</li>
+<li>The columns of one parent are independent searches, and
+<code>threads</code> runs them at once; their results are taken in
+column order afterwards, so what comes back does not depend on it.</li>
+</ul>
+<div class="section level3">
+<h3 id="the-fixtures-7">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-7"></a>
+</h3>
+<p><code>mars_cases.csv</code> names ten cases on the weekly columns
+maxnet’s fixtures read: earth’s own fits over the binomial and the
+Gaussian response, at degrees one and two, unweighted and under the
+fractional weights, unpruned, with <code>nprune = 5</code>, and with
+<code>minspan = 3</code>, <code>endspan = 5</code> and every term a
+parent. Each case carries every forward term as
+<code>column:direction:cut</code> factors, the kept terms, the
+termination code and the kept size’s generalised cross-validation.
+<code>mars_coef.csv</code> holds the kept terms’ coefficients, the
+logistic refit’s under the binomial response, and
+<code>mars_predict.csv</code> the predictions on every reading scaled by
+<code>1.01</code>. The weighted cases are earth’s QR at every knot.</p>
+</div>
+<div class="section level3">
+<h3 id="how-exactly-8">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-8"></a>
+</h3>
+<ul>
+<li>
+<strong>The forward terms, the kept terms and the termination code
+are asserted exactly</strong>, the cuts to <code>1e-12</code> relative:
+a cut is a reading.</li>
+<li>
+<strong>The coefficients and the generalised cross-validation are
+asserted to <code>1e-8</code> relative and the predictions to
+<code>1e-9</code>.</strong> Across the ten cases the core and earth
+agree to <code>8e-14</code> or better, weighted cases included.</li>
+</ul>
+</div>
+</div>
+<div class="section level2">
 <h2 id="the-combiner">The combiner<a class="anchor" aria-label="anchor" href="#the-combiner"></a>
 </h2>
 <p><code><a href="../reference/ensemble_fit.html">ensemble_fit()</a></code> is handed each candidate’s out-of-fold
@@ -2052,7 +2456,7 @@ fewer than two members carry weight. The array is
 both sides.</p>
 </div>
 <div class="section level3">
-<h3 id="the-fixtures-5">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-5"></a>
+<h3 id="the-fixtures-8">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-8"></a>
 </h3>
 <p><code>ensemble_oof.csv</code> holds five candidates’ out-of-fold
 predictions of the response fixture, rounded to six decimals, two of
@@ -2069,7 +2473,7 @@ each case’s combination and spread at <code>alpha = 0.1</code> for every
 unit and variable.</p>
 </div>
 <div class="section level3">
-<h3 id="how-exactly-6">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-6"></a>
+<h3 id="how-exactly-9">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-9"></a>
 </h3>
 <p>Everything is asserted to <code>1e-10</code> relative. The file holds
 twelve significant digits, and the largest difference either side reads
@@ -2156,8 +2560,10 @@ them</td>
 <td><code><a href="../reference/elasticnet.html">elasticnet()</a></code></td>
 </tr>
 <tr class="odd">
-<td>the forward selector</td>
-<td><code><a href="../reference/stepwise.html">stepwise()</a></code></td>
+<td>the stepwise selector</td>
+<td>
+<code><a href="../reference/stepwise.html">stepwise()</a></code>, forward, two-way, backward or
+unselected</td>
 </tr>
 <tr class="even">
 <td>the forest</td>
@@ -2174,6 +2580,14 @@ them</td>
 <tr class="odd">
 <td>maxnet’s MaxEnt</td>
 <td><code><a href="../reference/maxnet.html">maxnet()</a></code></td>
+</tr>
+<tr class="even">
+<td>the surface range envelope</td>
+<td><code><a href="../reference/envelope.html">envelope()</a></code></td>
+</tr>
+<tr class="odd">
+<td>multivariate adaptive regression splines</td>
+<td><code><a href="../reference/mars.html">mars()</a></code></td>
 </tr>
 <tr class="even">
 <td>the encoders</td>
@@ -2395,17 +2809,17 @@ under 1 on both.</li>
 <li>What a rare response weighs is the response head’s and not a
 training setting. The head’s weights function returns one case weight
 per cell of the response, and the encoders, the penalised fit, the
-forest and the forward search all fit under it: the encoders as an
-elementwise weight on the loss, the penalised fit and the forward search
-as case weights, and the forest as the probability a unit is drawn into
-a tree’s bootstrap, since a tree grown to pure leaves is the same tree
-under any weight on its observations. The weights function takes the
-response and a mask of the rows the model is fitted on, reads whatever
-it reads off those rows alone, and weights every row. The shipped
-presence-absence head weights each presence by the ratio of absences to
-presences among the fitting units, capped at 50, and each absence by
-one; a head without a weights function fits unweighted. On both
-sides.</li>
+forest and the stepwise search all fit under it: the encoders as an
+elementwise weight on the loss, the penalised fit and the stepwise
+search as case weights, and the forest as the probability a unit is
+drawn into a tree’s bootstrap, since a tree grown to pure leaves is the
+same tree under any weight on its observations. The weights function
+takes the response and a mask of the rows the model is fitted on, reads
+whatever it reads off those rows alone, and weights every row. The
+shipped presence-absence head weights each presence by the ratio of
+absences to presences among the fitting units, capped at 50, and each
+absence by one; a head without a weights function fits unweighted. On
+both sides.</li>
 <li>The encoders standardise every channel by its own centre and sample
 standard deviation over every unit and bin of the fitting units, except
 a channel <code>position</code> names, which they read at its own

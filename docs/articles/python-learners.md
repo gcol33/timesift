@@ -65,22 +65,48 @@ without being asked. What comes back does not depend on it.
 ## `stepwise()`
 
 ``` python
-stepwise(data=None, max_terms=3, degree=2)
+stepwise(
+    data=None,
+    max_terms=3,
+    degree=2,
+    direction='forward',
+    terms='column',
+    threads=1,
+)
 ```
 
-One generalised linear model per variable, its predictors chosen by
-forward selection over every bin-by-channel column, admitting a column
-while it lowers Akaike’s criterion and stopping at a fixed budget.
+One generalised linear model per variable, its terms chosen by Akaike’s
+criterion over every bin-by-channel column. The family is the response
+head’s: logistic under a binary cross-entropy loss, Gaussian under a
+squared-error one, and so are the case weights.
 
-Each candidate enters as an orthogonal polynomial, so a term can be
-non-monotone in the reading the way a niche optimum is. Selection
-happens inside whichever units the learner is handed, so under
-`grain_ladder` it is redone in every fold. Reported beside a penalised
-fit it also prices discrete selection: choosing a handful of columns out
-of hundreds is high variance, and that variance is a cost of the
-selector rather than of the features. The family is the response head’s:
-logistic under a binary cross-entropy loss, Gaussian under a
-squared-error one.
+`terms` says what one term is. Under `"column"` it is a column’s
+orthogonal polynomial of degree `degree`, so a column enters with its
+curvature at once and can be non-monotone in the reading the way a niche
+optimum is. Under `"power"` each power of a column is a term of its own,
+which is how biomod2 writes a quadratic formula and how
+[`MASS::stepAIC()`](https://rdrr.io/pkg/MASS/man/stepAIC.html) walks it.
+A column holding one value over the fitting units is not a term.
+
+`direction` is the search. `"forward"` starts from the intercept and
+admits the term that lowers the criterion most, while one does and the
+model holds fewer than `max_terms`. `"both"` also weighs dropping each
+term it holds at every step, and `"backward"` starts from every term and
+drops alone. `"none"` fits every term and selects nothing: with
+`terms="power"` and `degree=2` that is the model biomod2’s GLM fits. The
+two-way and backward searches are MASS’s `stepAIC()`, step for step.
+`max_terms` bounds what a forward or two-way search adds; `float("inf")`
+for no bound.
+
+Each fit is R’s `glm.fit`: iteratively reweighted least squares, the
+rank read off the same pivoted decomposition, and the same stopping
+rule. A move whose fit does not settle within its 25 iterations is
+refused rather than taken, and the fit names every response whose final
+model did not settle in `stopped`. A model with nothing but the
+intercept predicts the response’s share among the fitting units. The
+search runs on the core the R package calls, so the two select the same
+terms and return the same coefficients; `threads` runs one step’s
+candidate fits at once and does not change what comes back.
 
 ## `tree()`
 
@@ -315,6 +341,81 @@ is predicted its share among the fitting units, and the fit names it in
 read at its last settled point; the fit names every such response in
 `stopped`. The learner needs a presence-absence response, under a head
 whose loss is the binary cross-entropy.
+
+## `envelope()`
+
+``` python
+envelope(data=None, quantile=0.025)
+```
+
+biomod2’s surface range envelope, one per variable, over every
+bin-by-channel column: for each column the `quantile` and `1 - quantile`
+quantiles of its readings over the units present, and a unit predicted
+present where every column lies between its two, the ends included. With
+the same quantile it draws the envelope `bm_SRE()` draws; the quantile
+is R’s default, type 7.
+
+The prediction is zero or one, and enters an ensemble as that. The
+envelope reads the presences and nothing else: neither the absences nor
+the head’s case weights move it. Every column has to agree for a unit to
+be inside, so the more columns a representation has the fewer units any
+envelope holds, and a coarse grain, `data=grain("season")`, is what it
+is meant for.
+
+A response with no presence, or with nothing else, is predicted its
+share among the fitting units and named in `unfitted`. The learner needs
+a presence-absence response, under a head whose loss is the binary
+cross-entropy.
+
+## `mars()`
+
+``` python
+mars(
+    data=None,
+    degree=1,
+    penalty=None,
+    nk=None,
+    thresh=0.001,
+    minspan=0,
+    endspan=0,
+    fast_k=20,
+    fast_beta=1.0,
+    prune=True,
+    nprune=None,
+    threads=1,
+)
+```
+
+One MARS model per variable over every bin-by-channel column, fitted as
+the earth package fits it and as biomod2 fits `MARS`. The forward pass
+starts from the intercept and at each step multiplies a term already in
+the model by a pair of hinges on one column, `max(0, x - t)` and
+`max(0, t - x)`, taking the parent, the column and the knot `t` that
+most reduce the residual sum of squares of a least-squares fit to the
+response; a knot at a column’s least value enters the column linearly.
+`degree` bounds how many hinges a term multiplies. The pass stops at
+`nk` terms, when a step raises the R-squared by less than `thresh`, or
+when no term reduces the residuals.
+
+The pruning pass removes terms one at a time, each time the one whose
+loss raises the residuals least, and keeps the subset of least
+generalised cross-validation, which charges `penalty` per knot. Under a
+binary cross-entropy head the kept terms are refitted as a logistic
+model, as earth’s `glm = list(family = binomial)` refits them, and the
+prediction is its probability; under a squared-error head they are
+refitted by least squares.
+
+The defaults are earth’s, which biomod2 uses under its default and
+`"bigboss"` option sets alike: degree one, `penalty` 2 (3 above degree
+one), `thresh=0.001`, `nk = min(200, max(20, 2 p)) + 1` for `p` columns,
+Friedman’s spans between knots (`minspan=0`, `endspan=0`) and Fast MARS
+over the `fast_k=20` best parents. `prune=False` keeps every forward
+term; `nprune` caps the terms kept. The case weights are the head’s and
+weigh both passes and the refit. The passes run on the core the R
+package calls, so the two keep the same terms and return the same
+coefficients; `threads` searches that many columns at once and does not
+change what comes back. A variable holding one value is predicted its
+mean.
 
 ## `mlp()`
 

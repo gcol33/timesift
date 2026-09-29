@@ -46,7 +46,7 @@ your own goes through.
 - [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
   : Penalised regression on the flattened representation
 - [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
-  : Forward selection by AIC on the flattened representation
+  : Stepwise selection by AIC on the flattened representation
 - [`forest()`](https://gillescolling.com/timesift/reference/forest.md) :
   Random forest on the flattened representation
 - [`tree()`](https://gillescolling.com/timesift/reference/tree.md) :
@@ -55,6 +55,11 @@ your own goes through.
   : Gradient boosted trees on the flattened representation
 - [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md) :
   maxnet's MaxEnt on the flattened representation
+- [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
+  : biomod2's surface range envelope on the flattened representation
+- [`mars()`](https://gillescolling.com/timesift/reference/mars.md) :
+  Multivariate adaptive regression splines on the flattened
+  representation
 - [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
