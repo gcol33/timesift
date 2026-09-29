@@ -1517,3 +1517,76 @@ write_fixture(cbind(do.call(rbind, sw_rows), deviance_tolerance = 1e-9,
                     prediction_tolerance = 1e-8), "stepwise_cases.csv")
 write_fixture(do.call(rbind, sw_pred), "stepwise_predict.csv")
 cat("wrote", nrow(SW_CASES), "stepwise cases\n")
+
+# MARS.
+#
+# earth's own fits, which is the reference biomod2's `MARS` calls: every term of the forward pass
+# as its factors, the terms the pruning pass keeps, their coefficients (the logistic refit's under
+# the binomial response, as `glm = list(family = binomial)` gives them, the least-squares ones
+# under the Gaussian), and the predictions on the design scaled by 1.01. The weighted cases are
+# earth's QR at every knot, which the core reaches by running updates instead, so they pin that the
+# two choose the same knots. A term is its factors in column order, each `column:direction:cut`
+# with the column one-based, and the intercept is `1`.
+if (!requireNamespace("earth", quietly = TRUE)) {
+  stop("the MARS fixtures are the fits the earth package gives, so it has to be installed to ",
+       "regenerate them.", call. = FALSE)
+}
+mars_case <- function(case, response, weighted = FALSE, degree = 1L, prune = TRUE,
+                      nprune = NA_integer_, minspan = 0L, endspan = 0L, fast_k = 20L) {
+  data.frame(case = case, response = response, weighted = weighted, degree = degree,
+             prune = prune, nprune = nprune, minspan = minspan, endspan = endspan,
+             fast_k = fast_k, stringsAsFactors = FALSE)
+}
+MARS_CASES <- rbind(
+  mars_case("binomial", "y_binomial"),
+  mars_case("binomial_weighted", "y_binomial", weighted = TRUE),
+  mars_case("binomial_degree2", "y_binomial", degree = 2L),
+  mars_case("binomial_unpruned", "y_binomial", prune = FALSE),
+  mars_case("gaussian", "y_gaussian"),
+  mars_case("gaussian_weighted", "y_gaussian", weighted = TRUE),
+  mars_case("gaussian_degree2", "y_gaussian", degree = 2L),
+  mars_case("gaussian_weighted_degree2", "y_gaussian", weighted = TRUE, degree = 2L),
+  mars_case("gaussian_nprune", "y_gaussian", nprune = 5L),
+  mars_case("gaussian_spans", "y_gaussian", minspan = 3L, endspan = 5L, fast_k = 0L))
+mars_y <- list(y_binomial = pen_y_binomial, y_gaussian = pen_y_gaussian)
+mars_term_key <- function(dirs, cuts) {
+  k <- which(dirs != 0)
+  if (!length(k)) return("1")
+  paste(sprintf("%d:%d:%.15g", k, dirs[k], cuts[k]), collapse = "*")
+}
+mars_rows <- list()
+mars_coef <- list()
+mars_pred <- list()
+for (i in seq_len(nrow(MARS_CASES))) {
+  row <- MARS_CASES[i, ]
+  y <- mars_y[[row$response]]
+  binomial <- row$response == "y_binomial"
+  df <- mx_frame(mx_x)
+  df$y <- y
+  args <- list(formula = y ~ ., data = df, degree = row$degree, minspan = row$minspan,
+               endspan = row$endspan, fast.k = row$fast_k,
+               pmethod = if (row$prune) "backward" else "none")
+  if (!is.na(row$nprune)) args$nprune <- row$nprune
+  if (row$weighted) args$weights <- pen_w
+  if (binomial) args$glm <- list(family = stats::binomial)
+  e <- suppressWarnings(do.call(earth::earth, args))
+  forward <- vapply(seq_len(nrow(e$dirs)), function(t) mars_term_key(e$dirs[t, ], e$cuts[t, ]),
+                    character(1L))
+  coef <- if (binomial) e$glm.coefficients[, 1L] else e$coefficients[, 1L]
+  fitted_out <- as.numeric(stats::predict(e, newdata = mx_frame(mx_x * 1.01),
+                                          type = if (binomial) "response" else "link"))
+  mars_rows[[i]] <- data.frame(row, n_forward = length(forward), termcond = e$termcond,
+                               forward = paste(forward, collapse = " "),
+                               selected = paste(sort(e$selected.terms), collapse = " "),
+                               gcv = sprintf("%.15g", e$gcv), stringsAsFactors = FALSE)
+  mars_coef[[i]] <- data.frame(case = row$case, term = e$selected.terms,
+                               coefficient = sprintf("%.15g", coef), stringsAsFactors = FALSE)
+  mars_pred[[i]] <- data.frame(case = row$case, row = seq_len(nrow(mx_x)),
+                               fitted_out = sprintf("%.15g", fitted_out),
+                               stringsAsFactors = FALSE)
+}
+write_fixture(cbind(do.call(rbind, mars_rows), cut_tolerance = 1e-12, coef_tolerance = 1e-8,
+                    prediction_tolerance = 1e-9), "mars_cases.csv")
+write_fixture(do.call(rbind, mars_coef), "mars_coef.csv")
+write_fixture(do.call(rbind, mars_pred), "mars_predict.csv")
+cat("wrote", nrow(MARS_CASES), "MARS cases\n")

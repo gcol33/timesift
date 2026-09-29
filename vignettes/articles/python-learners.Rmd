@@ -320,6 +320,50 @@ A response with no presence, or with nothing else, is predicted its share among 
 units and named in `unfitted`. The learner needs a presence-absence response, under a head
 whose loss is the binary cross-entropy.
 
+## `mars()`
+
+```python
+mars(
+    data=None,
+    degree=1,
+    penalty=None,
+    nk=None,
+    thresh=0.001,
+    minspan=0,
+    endspan=0,
+    fast_k=20,
+    fast_beta=1.0,
+    prune=True,
+    nprune=None,
+    threads=1,
+)
+```
+
+One MARS model per variable over every bin-by-channel column, fitted as the earth package
+fits it and as biomod2 fits `MARS`. The forward pass starts from the intercept and at each
+step multiplies a term already in the model by a pair of hinges on one column,
+`max(0, x - t)` and `max(0, t - x)`, taking the parent, the column and the knot `t` that
+most reduce the residual sum of squares of a least-squares fit to the response; a knot at a
+column's least value enters the column linearly. `degree` bounds how many hinges a term
+multiplies. The pass stops at `nk` terms, when a step raises the R-squared by less than
+`thresh`, or when no term reduces the residuals.
+
+The pruning pass removes terms one at a time, each time the one whose loss raises the residuals
+least, and keeps the subset of least generalised cross-validation, which charges `penalty`
+per knot. Under a binary cross-entropy head the kept terms are refitted as a logistic model, as
+earth's `glm = list(family = binomial)` refits them, and the prediction is its probability;
+under a squared-error head they are refitted by least squares.
+
+The defaults are earth's, which biomod2 uses under its default and `"bigboss"` option sets
+alike: degree one, `penalty` 2 (3 above degree one), `thresh=0.001`,
+`nk = min(200, max(20, 2 p)) + 1` for `p` columns, Friedman's spans between knots
+(`minspan=0`, `endspan=0`) and Fast MARS over the `fast_k=20` best parents.
+`prune=False` keeps every forward term; `nprune` caps the terms kept. The case weights are the head's and
+weigh both passes and the refit. The passes run on the core the R package calls, so the two
+keep the same terms and return the same coefficients; `threads` searches that many columns
+at once and does not change what comes back. A variable holding one value is predicted its
+mean.
+
 ## `mlp()`
 
 ```python

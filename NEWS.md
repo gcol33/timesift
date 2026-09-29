@@ -2,6 +2,18 @@
 
 ## New
 
+* `mars()` fits one multivariate adaptive regression spline per response, as the earth package
+  fits it and biomod2 fits `MARS`: earth's forward pass of hinge pairs with Fast MARS, leaps'
+  backward pruning by generalised cross-validation, and the kept terms refitted as a logistic model
+  under a presence-absence head (earth's `glm = list(family = binomial)`) or by least squares
+  under a squared-error one. `degree`, `penalty`, `nk`, `thresh`, `minspan`, `endspan`, `fast_k`,
+  `fast_beta`, `prune` and `nprune` are earth's settings under earth's defaults, which biomod2
+  uses under both of its option sets. It runs on a new core, `src/ts_mars.cpp`, compiled into both
+  languages; on the contract's ten cases, weighted ones included, it keeps earth's terms exactly and
+  its coefficients and predictions agree with earth's to `8e-14`. A weighted fit reaches the
+  residual sums earth refits by QR at every candidate knot with Friedman's running updates: on 715
+  units and 471 columns under presence weights it takes 0.1 s against earth's 17 s. Both
+  languages.
 * `tree()` grows one classification or regression tree per response under rpart's rules: the
   Gini index under a presence-absence head and the sum of squares under a squared-error one,
   `min_split`, `min_leaf`, `cp` and `max_depth` as `rpart.control()` has them, and the

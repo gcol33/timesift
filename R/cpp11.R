@@ -103,3 +103,11 @@ ts_stepwise_fit_ <- function(x, y, w, n, p, family, max_terms, degree, direction
 ts_stepwise_predict_ <- function(fit, newx, n, p) {
   .Call(`_timesift_ts_stepwise_predict_`, fit, newx, n, p)
 }
+
+ts_mars_fit_ <- function(x, y, w, n, p, family, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_beta, prune, nprune, threads) {
+  .Call(`_timesift_ts_mars_fit_`, x, y, w, n, p, family, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_beta, prune, nprune, threads)
+}
+
+ts_mars_predict_ <- function(fit, newx, n, p) {
+  .Call(`_timesift_ts_mars_predict_`, fit, newx, n, p)
+}

@@ -12,6 +12,7 @@
 
 #include "ts_core.h"
 #include "ts_envelope.h"
+#include "ts_mars.h"
 #include "ts_maxnet.h"
 #include "ts_penalised.h"
 #include "ts_stepwise.h"
@@ -226,9 +227,10 @@ timesift::TreeTable take_table(const nb::dict& from) {
 
 NB_MODULE(_core, m) {
   m.doc() = "The binning, the reduction, the penalised fit, maxnet, the tree, the forest, the "
-            "boosted trees, the envelope and the stepwise model, shared with the R package as "
-            "src/ts_core.cpp, src/ts_penalised.cpp, src/ts_maxnet.cpp, src/ts_tree.cpp, "
-            "src/ts_boost.cpp, src/ts_envelope.cpp and src/ts_stepwise.cpp.";
+            "boosted trees, the envelope, the stepwise model and MARS, shared with the R package "
+            "as src/ts_core.cpp, src/ts_penalised.cpp, src/ts_maxnet.cpp, src/ts_tree.cpp, "
+            "src/ts_boost.cpp, src/ts_envelope.cpp, src/ts_stepwise.cpp, src/ts_glm.cpp and "
+            "src/ts_mars.cpp.";
 
   nb::register_exception_translator(
       [](const std::exception_ptr& p, void*) {
@@ -693,6 +695,64 @@ NB_MODULE(_core, m) {
           s.beta = take_field<double>(fit, "beta");
           std::vector<double> out(newx.shape(0));
           timesift::stepwise_predict(s, newx.data(), newx.shape(0), newx.shape(1), out.data());
+          return give(std::move(out));
+        },
+        nb::arg("fit"), nb::arg("newx"));
+
+  m.def("mars_fit",
+        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int degree,
+           double penalty, int nk, double thresh, int minspan, int endspan, int fast_k,
+           double fast_beta, bool prune, int nprune, int threads) {
+          timesift::MarsSpec spec;
+          spec.family = timesift::family_from_name(family);
+          spec.degree = degree;
+          spec.penalty = penalty;
+          spec.nk = nk;
+          spec.thresh = thresh;
+          spec.minspan = minspan;
+          spec.endspan = endspan;
+          spec.fast_k = fast_k;
+          spec.fast_beta = fast_beta;
+          spec.prune = prune;
+          spec.nprune = nprune;
+          spec.threads = threads;
+          timesift::Mars fit;
+          {
+            nb::gil_scoped_release release;
+            fit = timesift::mars_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1), spec);
+          }
+          nb::dict out;
+          out["family"] = std::string(timesift::family_name(fit.family));
+          out["n_column"] = fit.n_column;
+          out["factor_start"] = give(std::move(fit.factor_start));
+          out["factor_column"] = give(std::move(fit.factor_column));
+          out["factor_dir"] = give(std::move(fit.factor_dir));
+          out["factor_cut"] = give(std::move(fit.factor_cut));
+          out["selected"] = give(std::move(fit.selected));
+          out["beta"] = give(std::move(fit.beta));
+          out["termcond"] = fit.termcond;
+          out["gcv"] = fit.gcv;
+          out["converged"] = fit.converged;
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("degree"),
+        nb::arg("penalty"), nb::arg("nk"), nb::arg("thresh"), nb::arg("minspan"),
+        nb::arg("endspan"), nb::arg("fast_k"), nb::arg("fast_beta"), nb::arg("prune"),
+        nb::arg("nprune"), nb::arg("threads") = 1);
+
+  m.def("mars_predict",
+        [](const nb::dict& fit, ConstMat newx) {
+          timesift::Mars s;
+          s.family = timesift::family_from_name(nb::cast<std::string>(fit["family"]));
+          s.n_column = nb::cast<std::int32_t>(fit["n_column"]);
+          s.factor_start = take_field<std::int32_t>(fit, "factor_start");
+          s.factor_column = take_field<std::int32_t>(fit, "factor_column");
+          s.factor_dir = take_field<std::int32_t>(fit, "factor_dir");
+          s.factor_cut = take_field<double>(fit, "factor_cut");
+          s.selected = take_field<std::int32_t>(fit, "selected");
+          s.beta = take_field<double>(fit, "beta");
+          std::vector<double> out(newx.shape(0));
+          timesift::mars_predict(s, newx.data(), newx.shape(0), newx.shape(1), out.data());
           return give(std::move(out));
         },
         nb::arg("fit"), nb::arg("newx"));

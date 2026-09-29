@@ -1262,6 +1262,133 @@ the fitted means on the fixture's rows and on every reading scaled by `1.01`.
   `glm.fit`'s own and the two settle on the same iterate; across the thirteen cases they agree to
   about `1e-14`.
 
+## MARS
+
+`mars()` is one multivariate adaptive regression spline per response, over `src/ts_mars.cpp`,
+which both languages compile. The forward pass is earth's (5.3.6) `ForwardPass`, the pruning pass
+leaps' backward elimination as earth calls it, and the refit earth's, because a biomod2 user's
+`MARS` is `earth(y ~ ., glm = list(family = binomial))`. The least squares and the logistic refit
+are R's `dqrdc2` and `glm.fit`, from `src/ts_glm.cpp`, which the stepwise model shares.
+
+- **The weights.** Weights that differ from the first by no more than `1e-8` are no weights: every
+  weight is one below. Otherwise a weight below the mean over `1e8` is raised to it. The basis is
+  weighted throughout the two passes: the intercept is `sqrt(w)` and every term is its parent times
+  a hinge, so every term carries the root weight once.
+- **The scaled response.** The forward pass reads `ys = (y - mean(y)) / sd(y)`, `sd` over `n - 1`,
+  and a weighted fit also `yw = sqrt(w) y / sd(y)`. The null residual sum of squares is
+  `sum(w (ys - wm)^2)`, `wm` the weighted mean, held at `1e-8 n` from below.
+- **The settings.** `nk`, the most terms, defaults to `min(200, max(20, 2 p)) + 1`; `penalty` to 2
+  at degree one and 3 above. The end span of a term of degree `d` is `endspan`, or where that is 0
+  `floor(7.32193 + log(p) / 0.69315)`, widened at `d >= 2` by `floor(adjust * span + 0.5)`,
+  `adjust = 2`, and held to `[1, floor(n / 2) - 1]`. The min span is `minspan`, or where that is 0
+  `floor((2.9702 + log(p m)) / 1.7329)` with `m` the units where the parent is positive, at least
+  1. The first knot counted from the top sits `max(1, endspan + s)` units in, `s` the remainder
+  `a - floor(a / minspan) minspan` halved over the `a = max(0, n - 2 endspan)` units available (half
+  the min span where it divides exactly, half of `a` where `a` is at most the min span). A negative
+  `minspan` asks for `-minspan` knots: the min span is `ceiling(n / (1 - minspan))` and the first
+  knot the smallest multiple of it at or past the end span, less one.
+- **The order of a column** is its units sorted by value, ties in unit order.
+- **The basis the search reads** is earth's: an orthonormal basis of the terms held, built by
+  modified Gram-Schmidt in the order they entered, the intercept `1 / sqrt(n)` and the first term
+  centred on its mean, a term whose residual has a sum of squares of zero held as zero. A weighted
+  fit keeps beside it the orthonormal basis of every column of the weighted basis so far, the
+  unusable upper hinges included, each one whose residual norm is below `1e-8` of its own dropped,
+  which is the basis earth's QR regresses on.
+- **A step.** For each of the first `fast_k` parents of the queue whose degree is below `degree`,
+  and each column the parent does not already use, the step searches the column linearly and then
+  its knots, and takes the candidate of greatest reduction in the residual sum of squares, the
+  first in parent order and column order where two tie. A candidate is *of a new form* unless some
+  term held uses the column and uses the same other columns as the parent; only then is the linear
+  term a candidate and the pair's upper hinge usable.
+- **The linear candidate** is the parent times the column. Unweighted, it is orthogonalised against
+  the basis, and where its residual's sum of squares is at most `0.01` it is zero and the form is
+  no longer new; its reduction is `(sum(ys q))^2`. Weighted, it is orthogonalised against the
+  weighted basis, dropped where its residual norm is below `1e-8` of its own, and its reduction is
+  the one the exact residuals give.
+- **The knot search** scans the column's order from its second largest value down to the end span.
+  With `b` the parent and `h(t) = b max(0, x - t)`, it carries, as each unit enters above the
+  knot, the running sums of `b`, `b^2`, `b x` and `b^2 x`, each centred column's covariance with
+  `b`, and the centred response's covariance with `b`, and from them the centred covariance of
+  `h(t)` with each basis column (`c_k`), with itself (`c`), and with the centred response (`g`):
+  `c += dx (2 S(b^2 x) - S(b^2) (x0 + x1)) + (u^2 - v^2) / n`, `v = S(b x) - S(b) x0` and `u` its
+  last value. A weighted fit centres on `sqrt(w) / |sqrt(w)|` instead of the constant, with the
+  sums of `b` and `b x` weighted by it and no division by `n`. At a unit whose parent is positive,
+  and unweighted whose `c` is positive, a counter from the first knot's position runs down, and
+  where it reaches zero it is reset to the min span and the knot evaluated:
+  `r = g - sum(g_k c_k)` over the basis and the linear candidate, and `q = c - sum(c_k^2)`.
+  - Unweighted, where `q / c` exceeds `0.01` (below the 15th column) or `1e-5`, the knot reduces
+    the residuals by the linear candidate's reduction plus `r^2 / q`, and it is kept where that
+    beats the column's best so far and is below `min(1.01 R, 10 D)`, `R` the residual sum of
+    squares and `D` the last step's reduction.
+  - Weighted, where `q` exceeds `1e-10 c` the knot's residual sum of squares is the base's less
+    `r^2 / q`, and it is kept where that is below the best so far by more than `1e-10`; the linear
+    candidate is best where no knot is below it. earth fits the whole weighted basis by QR at every
+    knot; this is the same residual sum of squares, and a hinge within `1e-10` of the basis is the
+    column earth's QR would drop.
+- **A step's term.** The parent's factors and a new one on the column: at the knot's value, the
+  lower term `max(0, x - t)` over the units above the knot in the order and the upper term
+  `max(0, t - x)` over the rest, or, for the linear candidate, the column itself at the column's
+  least value, with no upper term. The upper term is used only where the candidate was of a new
+  form and, weighted, its residual on earth's basis has a sum of squares above `0.01`; an unusable
+  one keeps its place in the basis's numbering but is never a parent.
+- **Fast MARS.** A queue entry per term position in the order they entered, starting from the
+  intercept at the null residual sum of squares. After each step a parent tried is given its best
+  reduction and the count of term positions then, and the new terms enter at infinity. The queue
+  is sorted by reduction, larger first and then the lower position, and ranked; then, where
+  `fast_beta` is above zero, by `rank + fast_beta (positions now - positions at its reduction)`,
+  the lower first, then the reduction and then the position. A parent whose degree is too high
+  keeps its entry unchanged.
+- **Stopping.** After each step the residual sum of squares is the last less the step's reduction,
+  within `1e-10` of zero taken as zero, and `R^2 = 1 - R / R_null`. The pass stops without the step
+  where no candidate was found and, at a `thresh` above zero, where `R^2` rose by less than it (a
+  rise within `1e-10` of zero taken as zero) or the generalised R-squared fell below `-10`; with
+  it, where `R^2` reached `1 - thresh` or the term positions reached `nk - 1`. The termination code is earth's: 1 at `nk`
+  below 3, 2 or 3 at a generalised R-squared below `-10`, 4 at a small rise, 5 at the largest
+  `R^2`, 6 where nothing was found, and 7 at `nk`.
+- **After the pass**, the usable terms are decomposed by `dqrdc2` at `1e-8` and a term it moves past
+  the rank is dropped.
+- **The pruning pass** is leaps over the weighted basis and the weighted, unscaled response
+  (`sqrt(w) y`): Miller's orthogonal reduction (AS 274) row by row, the tolerances at `5e-10` of
+  each column's scaled row sums, the dependent columns dropped and the reduction rebuilt without
+  them. Each subset size first records the prefix of the terms in their order. Backward
+  elimination then runs from the last position down to the third, the intercept held in: the
+  position whose drop raises the residuals least (the lowest where two tie, one below its
+  tolerance at once) is moved to the end, and every prefix it moved past is recorded where its
+  residual sum of squares beats the one held for its size and it is not the same subset. The
+  generalised cross-validation of a size `k` is `RSS_k / (n (1 - C / n)^2)`, `C = k + penalty (k
+  - 1) / 2` (0 at `penalty = -1`) and infinite from `C >= n`; the first size of least value up to
+  `nprune` is kept. Unpruned, the first `nprune` terms are.
+- **The refit** is over the kept terms unweighted, the weighted basis divided by `sqrt(w)`: under the
+  binomial family `glm.fit` from `src/ts_glm.cpp` with the head's weights, under the Gaussian one
+  `dqrls` at `1e-7` over the terms and the response each times `sqrt(w)`. A dependent kept term is
+  an error.
+- **What a fit keeps**: every term of the forward pass as its factors (column, direction and cut),
+  the kept terms in their order, their coefficients, the termination code, the kept size's
+  generalised cross-validation and whether the refit settled. The prediction is each kept term as
+  the product of its factors, `max(0, x - t)`, `max(0, t - x)` or `x`, then the linear predictor,
+  through the logit link under the binomial family.
+- The columns of one parent are independent searches, and `threads` runs them at once; their
+  results are taken in column order afterwards, so what comes back does not depend on it.
+
+### The fixtures
+
+`mars_cases.csv` names ten cases on the weekly columns maxnet's fixtures read: earth's own fits
+over the binomial and the Gaussian response, at degrees one and two, unweighted and under the
+fractional weights, unpruned, with `nprune = 5`, and with `minspan = 3`, `endspan = 5` and every
+term a parent. Each case carries every forward term as `column:direction:cut` factors, the kept
+terms, the termination code and the kept size's generalised cross-validation. `mars_coef.csv`
+holds the kept terms' coefficients, the logistic refit's under the binomial response, and
+`mars_predict.csv` the predictions on every reading scaled by `1.01`. The weighted cases are
+earth's QR at every knot.
+
+### How exactly
+
+- **The forward terms, the kept terms and the termination code are asserted exactly**, the cuts to
+  `1e-12` relative: a cut is a reading.
+- **The coefficients and the generalised cross-validation are asserted to `1e-8` relative and the
+  predictions to `1e-9`.** Across the ten cases the core and earth agree to `8e-14` or better,
+  weighted cases included.
+
 ## The combiner
 
 `ensemble_fit()` is handed each candidate's out-of-fold predictions, the response, the mask and the
@@ -1365,6 +1492,7 @@ call site.
 | gradient boosted trees | `boosting()` |
 | maxnet's MaxEnt | `maxnet()` |
 | the surface range envelope | `envelope()` |
+| multivariate adaptive regression splines | `mars()` |
 | the encoders | `mlp()`, `cnn()`, `rescnn()` |
 | how an encoder is trained | `train_control()` |
 | fitting one learner on one representation | `fit_learner()` |

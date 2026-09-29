@@ -150,7 +150,8 @@ apart on one sensor read two different stretches of the same series, anchored by
 `elasticnet()` and `stepwise()` read a block of features, `tree()` grows rpart's tree over one,
 `forest()` grows a probability forest over one, `boosting()` fits gbm's or xgboost's boosted trees
 over one, `maxnet()` fits maxnet's MaxEnt over one, `envelope()` draws biomod2's surface range
-envelope around the presences in one, and the `torch` encoders `mlp()`, `cnn()` and
+envelope around the presences in one, `mars()` fits earth's multivariate adaptive regression
+splines over one, and the `torch` encoders `mlp()`, `cnn()` and
 `rescnn()` read a sequence with a joint multi-label head. `learner()` takes a fit and a predict pair of your own, which then
 goes through the same folds, the same cells and the same scoring.
 

@@ -64,7 +64,7 @@ SECTIONS = (
         title="Python: learners",
         desc="The arms that ship, how they are trained, and the interface a learner of your own "
              "goes through.",
-        names=("elasticnet", "stepwise", "tree", "forest", "boosting", "maxnet", "envelope",
+        names=("elasticnet", "stepwise", "tree", "forest", "boosting", "maxnet", "envelope", "mars",
                "mlp", "cnn", "rescnn", "Learner", "train_control", "TrainControl", "flatten"),
     ),
     dict(

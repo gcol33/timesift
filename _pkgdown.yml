@@ -102,6 +102,7 @@ reference:
   - boosting
   - maxnet
   - envelope
+  - mars
   - torch_learners
   - train_control
   - learner

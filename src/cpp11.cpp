@@ -187,6 +187,20 @@ extern "C" SEXP _timesift_ts_stepwise_predict_(SEXP fit, SEXP newx, SEXP n, SEXP
     return cpp11::as_sexp(ts_stepwise_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p)));
   END_CPP11
 }
+// ts_r.cpp
+cpp11::list ts_mars_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, int degree, double penalty, int nk, double thresh, int minspan, int endspan, int fast_k, double fast_beta, bool prune, int nprune, int threads);
+extern "C" SEXP _timesift_ts_mars_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP degree, SEXP penalty, SEXP nk, SEXP thresh, SEXP minspan, SEXP endspan, SEXP fast_k, SEXP fast_beta, SEXP prune, SEXP nprune, SEXP threads) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_mars_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(degree), cpp11::as_cpp<cpp11::decay_t<double>>(penalty), cpp11::as_cpp<cpp11::decay_t<int>>(nk), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<int>>(minspan), cpp11::as_cpp<cpp11::decay_t<int>>(endspan), cpp11::as_cpp<cpp11::decay_t<int>>(fast_k), cpp11::as_cpp<cpp11::decay_t<double>>(fast_beta), cpp11::as_cpp<cpp11::decay_t<bool>>(prune), cpp11::as_cpp<cpp11::decay_t<int>>(nprune), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::doubles ts_mars_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p);
+extern "C" SEXP _timesift_ts_mars_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_mars_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p)));
+  END_CPP11
+}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
@@ -202,6 +216,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_forest_fit_",        (DL_FUNC) &_timesift_ts_forest_fit_,        12},
     {"_timesift_ts_forest_predict_",    (DL_FUNC) &_timesift_ts_forest_predict_,     4},
     {"_timesift_ts_forest_stream_",     (DL_FUNC) &_timesift_ts_forest_stream_,      3},
+    {"_timesift_ts_mars_fit_",          (DL_FUNC) &_timesift_ts_mars_fit_,          17},
+    {"_timesift_ts_mars_predict_",      (DL_FUNC) &_timesift_ts_mars_predict_,       4},
     {"_timesift_ts_maxnet_design_",     (DL_FUNC) &_timesift_ts_maxnet_design_,     10},
     {"_timesift_ts_maxnet_fit_",        (DL_FUNC) &_timesift_ts_maxnet_fit_,        18},
     {"_timesift_ts_maxnet_predict_",    (DL_FUNC) &_timesift_ts_maxnet_predict_,     6},

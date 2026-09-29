@@ -6,15 +6,12 @@
 #include <string>
 #include <vector>
 
+#include "ts_glm.h"
 #include "ts_penalised.h"
 
 // The stepwise generalised linear model, once, for both languages.
 //
-// Each fit is R's `glm.fit`: iteratively reweighted least squares from the family's starting
-// means, each step a least-squares solve by LINPACK's `dqrdc2` Householder decomposition with its
-// limited pivoting, which is what sets the rank R reports, and the deviance's relative change
-// against `epsilon` as the stopping rule. The binomial family is the logit link with R's clamp of
-// the linear predictor at 30 either side.
+// Each fit is R's `glm.fit`, from `ts_glm.h`.
 //
 // The search is MASS's `stepAIC`. A term is a column's orthogonal polynomial, or one power of a
 // column; a step compares the model as it stands, each term it holds dropped and each term it lacks
@@ -31,17 +28,6 @@ StepDirection step_direction_from_name(const std::string& name);
 const char* step_direction_name(StepDirection d);
 StepTerms step_terms_from_name(const std::string& name);
 const char* step_terms_name(StepTerms t);
-
-struct Glm {
-  std::vector<double> beta;   // one per column of the design; an aliased column's is zero
-  std::int32_t rank = 0;
-  double deviance = 0.0;
-  bool converged = false;
-};
-
-// `x` [n, q] column-major, the intercept's column included; `w` the prior weights.
-Glm glm_fit(const double* x, std::size_t n, std::size_t q, const double* y, const double* w,
-            Family family, double epsilon, int max_iter);
 
 struct StepwiseSpec {
   Family family = Family::binomial;

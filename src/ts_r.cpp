@@ -6,6 +6,7 @@
 
 #include "ts_core.h"
 #include "ts_envelope.h"
+#include "ts_mars.h"
 #include "ts_maxnet.h"
 #include "ts_penalised.h"
 #include "ts_stepwise.h"
@@ -827,5 +828,61 @@ cpp11::doubles ts_stepwise_predict_(cpp11::list fit, cpp11::doubles newx, int n,
   std::vector<double> out(static_cast<std::size_t>(n));
   timesift::stepwise_predict(s, REAL_RO(newx.data()), static_cast<std::size_t>(n),
                              static_cast<std::size_t>(p), out.data());
+  return give(out);
+}
+
+// MARS, from the same core the Python side calls. A fit crosses into R as a list of plain vectors:
+// every term of the forward pass as its factors, the terms kept, and their coefficients.
+[[cpp11::register]]
+cpp11::list ts_mars_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                         std::string family, int degree, double penalty, int nk, double thresh,
+                         int minspan, int endspan, int fast_k, double fast_beta, bool prune,
+                         int nprune, int threads) {
+  timesift::MarsSpec spec;
+  spec.family = timesift::family_from_name(family);
+  spec.degree = degree;
+  spec.penalty = std::isnan(penalty) ? std::numeric_limits<double>::quiet_NaN() : penalty;
+  spec.nk = nk;
+  spec.thresh = thresh;
+  spec.minspan = minspan;
+  spec.endspan = endspan;
+  spec.fast_k = fast_k;
+  spec.fast_beta = fast_beta;
+  spec.prune = prune;
+  spec.nprune = nprune;
+  spec.threads = threads;
+  const timesift::Mars fit =
+      timesift::mars_fit(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()),
+                         static_cast<std::size_t>(n), static_cast<std::size_t>(p), spec);
+  using namespace cpp11::literals;
+  return cpp11::writable::list({
+    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
+    "n_column"_nm = cpp11::as_sexp(fit.n_column),
+    "factor_start"_nm = give(fit.factor_start),
+    "factor_column"_nm = give(fit.factor_column),
+    "factor_dir"_nm = give(fit.factor_dir),
+    "factor_cut"_nm = give(fit.factor_cut),
+    "selected"_nm = give(fit.selected),
+    "beta"_nm = give(fit.beta),
+    "termcond"_nm = cpp11::as_sexp(fit.termcond),
+    "gcv"_nm = cpp11::as_sexp(fit.gcv),
+    "converged"_nm = cpp11::as_sexp(fit.converged)
+  });
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_mars_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p) {
+  timesift::Mars m;
+  m.family = timesift::family_from_name(cpp11::as_cpp<std::string>(fit["family"]));
+  m.n_column = cpp11::as_cpp<int>(fit["n_column"]);
+  m.factor_start = take_field<std::int32_t>(fit, "factor_start");
+  m.factor_column = take_field<std::int32_t>(fit, "factor_column");
+  m.factor_dir = take_field<std::int32_t>(fit, "factor_dir");
+  m.factor_cut = take_field<double>(fit, "factor_cut");
+  m.selected = take_field<std::int32_t>(fit, "selected");
+  m.beta = take_field<double>(fit, "beta");
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::mars_predict(m, REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                         static_cast<std::size_t>(p), out.data());
   return give(out);
 }

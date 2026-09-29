@@ -24,7 +24,7 @@ from .representation import TimesiftMatrix
 from .response import fitting_rows
 
 __all__ = ["Fit", "Learner", "READS", "MULTI", "boosting", "cnn", "elasticnet", "fit_learner",
-           "envelope", "flatten", "mlp", "rescnn", "forest", "stepwise", "tree"]
+           "envelope", "flatten", "mars", "mlp", "rescnn", "forest", "stepwise", "tree"]
 
 READS = ("tabular", "sequence")
 MULTI = ("joint", "separate")
@@ -1236,3 +1236,86 @@ def _envelope_fit(x, y, quantile, head, variables, **_):
 def _envelope_predict(model, x):
     from ._envelope import envelope_predict
     return _predict_columns(model["models"], flatten(x), envelope_predict)
+
+
+def _whole(v, name, least):
+    if isinstance(v, bool) or not isinstance(v, (int, float, np.integer, np.floating)) \
+            or not float(v).is_integer() or v < least:
+        raise ValueError(f"`{name}` is one whole number of {least} or more, got {v!r}.")
+
+
+def mars(data=None, degree=1, penalty=None, nk=None, thresh=0.001, minspan=0, endspan=0,
+         fast_k=20, fast_beta=1.0, prune=True, nprune=None, threads=1) -> Learner:
+    """One MARS model per variable over every bin-by-channel column, fitted as the earth package
+    fits it and as biomod2 fits ``MARS``. The forward pass starts from the intercept and at each
+    step multiplies a term already in the model by a pair of hinges on one column,
+    ``max(0, x - t)`` and ``max(0, t - x)``, taking the parent, the column and the knot ``t`` that
+    most reduce the residual sum of squares of a least-squares fit to the response; a knot at a
+    column's least value enters the column linearly. ``degree`` bounds how many hinges a term
+    multiplies. The pass stops at ``nk`` terms, when a step raises the R-squared by less than
+    ``thresh``, or when no term reduces the residuals.
+
+    The pruning pass removes terms one at a time, each time the one whose loss raises the residuals
+    least, and keeps the subset of least generalised cross-validation, which charges ``penalty``
+    per knot. Under a binary cross-entropy head the kept terms are refitted as a logistic model, as
+    earth's ``glm = list(family = binomial)`` refits them, and the prediction is its probability;
+    under a squared-error head they are refitted by least squares.
+
+    The defaults are earth's, which biomod2 uses under its default and ``"bigboss"`` option sets
+    alike: degree one, ``penalty`` 2 (3 above degree one), ``thresh=0.001``,
+    ``nk = min(200, max(20, 2 p)) + 1`` for ``p`` columns, Friedman's spans between knots
+    (``minspan=0``, ``endspan=0``) and Fast MARS over the ``fast_k=20`` best parents.
+    ``prune=False`` keeps every forward term; ``nprune`` caps the terms kept. The case weights are the head's and
+    weigh both passes and the refit. The passes run on the core the R package calls, so the two
+    keep the same terms and return the same coefficients; ``threads`` searches that many columns
+    at once and does not change what comes back. A variable holding one value is predicted its
+    mean.
+    """
+    _whole(degree, "degree", 1)
+    if nk is not None:
+        _whole(nk, "nk", 1)
+    if nprune is not None:
+        _whole(nprune, "nprune", 1)
+    _whole(endspan, "endspan", 0)
+    _whole(fast_k, "fast_k", 0)
+    if isinstance(minspan, bool) or not float(minspan).is_integer():
+        raise ValueError(f"`minspan` is one whole number, got {minspan!r}.")
+    if penalty is not None and (isinstance(penalty, bool) or np.isnan(penalty)
+                                or (penalty < 0 and penalty != -1)):
+        raise ValueError(f"`penalty` is one number of zero or more, or -1, got {penalty!r}.")
+    if isinstance(thresh, bool) or not 0.0 <= thresh < 1.0:
+        raise ValueError(f"`thresh` is one number in [0, 1), got {thresh!r}.")
+    if isinstance(fast_beta, bool) or not fast_beta >= 0.0:
+        raise ValueError(f"`fast_beta` is one number of zero or more, got {fast_beta!r}.")
+    if not isinstance(prune, (bool, np.bool_)):
+        raise ValueError(f"`prune` is True or False, got {prune!r}.")
+    return Learner(name="mars", fit=_mars_fit, predict=_mars_predict, data=data, reads="tabular",
+                   multi="separate",
+                   params=dict(degree=int(degree), penalty=penalty,
+                               nk=None if nk is None else int(nk), thresh=float(thresh),
+                               minspan=int(minspan), endspan=int(endspan), fast_k=int(fast_k),
+                               fast_beta=float(fast_beta), prune=bool(prune),
+                               nprune=None if nprune is None else int(nprune),
+                               threads=int(threads)))
+
+
+def _mars_fit(x, y, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_beta, prune,
+              nprune, threads, head, variables, **_):
+    from ._mars import mars_fit
+    family = _family(head)
+    m = flatten(x)
+
+    def make(design, yj, seed_j, w):
+        return mars_fit(design, yj, w, family, degree=degree, penalty=penalty, nk=nk,
+                        thresh=thresh, minspan=minspan, endspan=endspan, fast_k=fast_k,
+                        fast_beta=fast_beta, prune=prune, nprune=nprune, threads=threads)
+
+    models = _fit_columns(m, y, make, [0] * y.shape[1], _head_weights(head, y))
+    return dict(models=models, n_col=m.shape[1], family=family,
+                stopped=[str(v) for v, f in zip(variables, models)
+                         if isinstance(f, dict) and not f["converged"]])
+
+
+def _mars_predict(model, x):
+    from ._mars import mars_predict
+    return _predict_columns(model["models"], flatten(x), mars_predict)

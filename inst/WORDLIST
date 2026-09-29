@@ -8,12 +8,15 @@ CMake
 CUDA
 Chytrý
 Dunnett's
+Friedman
+Friedman's
 Gini
 Hastie
 Hochberg
 IANA
 Kadmon
 LF
+MARS
 Massias
 MaxEnt
 MASS's
@@ -52,6 +55,7 @@ glmnet's
 halfday
 int
 jss
+leaps
 learn's
 libtorch
 lmerTest
