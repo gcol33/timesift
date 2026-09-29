@@ -172,7 +172,8 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   and the combiner minimises the loss. A fit that declares a `head` argument is handed the head,
   as one that declares `control` is handed the control; no learner holds a response of its own.
   Same for learners: `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `stepwise()`, `forest()`,
-  `tree()`, `boosting()` and any user-supplied fit/predict pair go through one interface.
+  `tree()`, `boosting()`, `maxnet()` and any user-supplied fit/predict pair go through one
+  interface.
 - **A fitted encoder is a plain object.** Its weights are arrays and its device is the setting,
   not the resolved device; the network is rebuilt at prediction. `saveRDS()` and `pickle` round
   trip a fit, and a fit made on one machine predicts on another.

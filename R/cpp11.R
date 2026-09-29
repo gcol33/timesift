@@ -75,3 +75,15 @@ ts_boost_predict_ <- function(fit, newx, n, p) {
 ts_forest_stream_ <- function(seed, tree, n) {
   .Call(`_timesift_ts_forest_stream_`, seed, tree, n)
 }
+
+ts_maxnet_design_ <- function(x, y, n, p, classes, knots, regmult, formulation, add_samples, max_design) {
+  .Call(`_timesift_ts_maxnet_design_`, x, y, n, p, classes, knots, regmult, formulation, add_samples, max_design)
+}
+
+ts_maxnet_fit_ <- function(x, y, w, n, p, classes, knots, regmult, formulation, add_samples, thresh, max_pass, n_lambda, one_se, fold, n_fold, threads, max_design) {
+  .Call(`_timesift_ts_maxnet_fit_`, x, y, w, n, p, classes, knots, regmult, formulation, add_samples, thresh, max_pass, n_lambda, one_se, fold, n_fold, threads, max_design)
+}
+
+ts_maxnet_predict_ <- function(fit, newx, n, p, clamp, type) {
+  .Call(`_timesift_ts_maxnet_predict_`, fit, newx, n, p, clamp, type)
+}

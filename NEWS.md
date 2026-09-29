@@ -23,6 +23,18 @@
   columns, one thread, biomod2's tuned gbm fit (2500 trees of seven splits) takes 56 s against
   gbm's 68 s, and xgboost's defaults 1.2 s against xgboost's exact method's 2.6 s. Both
   languages.
+* `maxnet()` fits one maxnet model per response, which is what biomod2 fits as `MAXNET`:
+  maxnet's linear, quadratic, product, hinge and threshold features, chosen by the presence count
+  as `maxnet.formula()` chooses them or named in `classes`, its regularisation of each feature
+  times `regmult`, and a lasso over them on the penalised core `elasticnet()` runs on, so the two
+  languages fit the same model. `formulation = "background"` is maxnet's presence-background
+  model and predicts its cloglog output; `formulation = "absence"` reads the absences as absences,
+  a logistic lasso over the same features under the head's case weights with the penalty chosen
+  by an inner cross-validation. On the contract's twelve cases the features and penalty factors
+  are maxnet's to `7.4e-16` and the objective glmnet's to `5.5e-14`. The core is
+  `src/ts_maxnet.cpp`. On 900 units a weekly three-channel representation, 47,100 features under
+  maxnet's `"lqh"`, fits in 8 s; a design above `max_design` gigabytes is refused with its size.
+  Both languages.
 * `forest(balance = TRUE)` is the down-sampled forest biomod2 fits as `RFd`: each tree draws as
   many units from each class as the smaller class holds. `forest()` also takes `preset`
   (`"package"`, randomForest's defaults, or `"bigboss"`, biomod2's tuned set) and `threads`. Both

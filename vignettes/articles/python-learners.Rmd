@@ -217,6 +217,67 @@ response head's, `timesift.response.positive_weights` under presence-absence, an
 the gradient and every sum a tree is grown on; `min_leaf` counts units under gbm, as
 `n.minobsinnode` does.
 
+## `maxnet()`
+
+```python
+maxnet(
+    data=None,
+    classes=None,
+    regmult=1.0,
+    formulation='background',
+    type=None,
+    knots=50,
+    add_samples=True,
+    clamp=True,
+    n_inner=5,
+    s='lambda.min',
+    thresh=1e-08,
+    max_design=2.0,
+    threads=1,
+    seed=1,
+)
+```
+
+One maxnet model per variable, over every bin-by-channel column: maxnet's feature classes,
+its regularisation of each feature, and a lasso over them, fitted by the penalised core
+`elasticnet` runs on, which the R package calls too. With the maxnet package's own
+settings the features and the penalty factors are maxnet's to rounding, and the fit settles at
+the objective glmnet reaches for maxnet.
+
+The feature classes are the letters of `classes`: `l` the column itself, `q` its square,
+`p` the product of each pair of columns, `h` forward and reverse hinges at the interior of
+`knots` equally spaced points of each column's range, and `t` thresholds at 49 interior
+points of it. Left `None`, they follow the response's presence count as `maxnet.formula()`
+has them: `"l"` under 10 presences, `"lq"` under 15, `"lqh"` under 80, and `"lqph"`
+from 80 on. A column holding one value over the units fitted takes no feature.
+
+`formulation` says what the absences are. `"background"` is maxnet's own and what biomod2
+fits as `MAXNET`: every unit is background, each presence joins the background again unless
+an absence carries the same readings (`add_samples`), the background is weighted 100 against
+a presence's 1, and the model is read at the last of maxnet's 200 penalties, which scale with
+`regmult`. Its output is maxnet's `type`, `"cloglog"` by default as biomod2 predicts it.
+`"absence"` reads the absences as absences: a logistic lasso over the same features and
+penalty factors under the response head's case weights,
+`timesift.response.positive_weights` under presence-absence, with the penalty chosen by
+an inner cross-validation dealt as the elastic net's is (`n_inner` folds, read at `s`), and
+a probability as output.
+
+The background formulation takes no case weights, as maxnet takes none and biomod2 passes none:
+the background weight is what sets a presence's weight there. Either formulation holds each
+column inside the range it was fitted on, and each feature inside its own, before predicting,
+as maxnet's `predict(clamp=TRUE)` does; `clamp=False` reads them as they are.
+
+A hinge per column per knot makes the design large: a weekly three-channel representation,
+471 columns, is 47,100 features under `"lqh"`, and its products under `"lqph"` 110,685
+more. The design is held in memory with a centred copy beside it, and a fit whose design would
+take more than `max_design` gigabytes is refused with the size it would have taken.
+
+A response with fewer than two presences, or one whose inner training sets cannot each hold two
+of each outcome under the absence formulation, is predicted its share among the fitting units,
+and the fit names it in `unfitted`. A path that does not settle at a penalty ends there and is
+read at its last settled point; the fit names every such response in `stopped`. The learner
+needs a presence-absence response, under a head whose loss is the binary cross-entropy.
+
 ## `mlp()`
 
 ```python

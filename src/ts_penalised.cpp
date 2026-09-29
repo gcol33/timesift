@@ -12,10 +12,9 @@ namespace timesift {
 namespace {
 
 // glmnet's own control constants, which are part of what is being matched rather than settings of
-// ours: the probability a fitted case is pinned at, the linear predictor's clamp, the floor under
-// the mixing when the largest penalty is derived, and the probability the held-out deviance is
-// read at.
-constexpr double kProbFloor = 1e-9;
+// ours: the linear predictor's clamp, the floor under the mixing when the largest penalty is
+// derived, and the probability the held-out deviance is read at. The probability a fitted case is
+// pinned at is glmnet's too, and is the spec's, because maxnet moves it.
 constexpr double kEtaClamp = 250.0;
 constexpr double kAlphaFloor = 1e-3;
 constexpr double kCVProbFloor = 1e-5;
@@ -622,10 +621,10 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
       const double e = std::min(std::max(eta[i], -kEtaClamp), kEtaClamp);
       double prob = 1.0 / (1.0 + std::exp(-e));
       double curve = prob * (1.0 - prob);
-      if (prob < kProbFloor) {
+      if (prob < spec.prob_floor) {
         prob = 0.0;
         curve = 0.0;
-      } else if (prob > 1.0 - kProbFloor) {
+      } else if (prob > 1.0 - spec.prob_floor) {
         prob = 1.0;
         curve = 0.0;
       }

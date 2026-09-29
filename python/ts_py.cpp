@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "ts_core.h"
+#include "ts_maxnet.h"
 #include "ts_penalised.h"
 #include "ts_tree.h"
 
@@ -112,6 +113,35 @@ timesift::PenaltyPath take(ConstF64 lambda, ConstF64 a0, ConstF64 beta,
   return path;
 }
 
+// maxnet's settings, and a fit as a dict of arrays, the features it gave a coefficient one field
+// each.
+timesift::MaxnetSpec maxnet_spec(const std::string& classes, int knots, double regmult,
+                                 const std::string& formulation, bool add_samples, double thresh,
+                                 double max_pass, int n_lambda, bool one_se, int threads,
+                                 double max_design) {
+  timesift::MaxnetSpec spec;
+  spec.classes = classes;
+  spec.knots = knots;
+  spec.regmult = regmult;
+  spec.formulation = timesift::maxnet_formulation_from_name(formulation);
+  spec.add_samples = add_samples;
+  spec.thresh = thresh;
+  spec.max_pass = static_cast<int>(max_pass);
+  spec.n_lambda = n_lambda;
+  spec.one_se = one_se;
+  spec.threads = threads;
+  spec.max_design = max_design;
+  return spec;
+}
+
+void give_features(nb::dict& out, const timesift::MaxnetFeatures& f) {
+  out["kind"] = give(std::vector<std::int8_t>(f.kind));
+  out["a"] = give(std::vector<std::int32_t>(f.a));
+  out["b"] = give(std::vector<std::int32_t>(f.b));
+  out["lo"] = give(std::vector<double>(f.lo));
+  out["hi"] = give(std::vector<double>(f.hi));
+}
+
 // A fitted tree crosses into Python as a dict of arrays, one per field of the node table and the
 // complexity table, and comes back the same way to be pruned or to predict.
 nb::dict give(const timesift::Tree& tree) {
@@ -193,9 +223,9 @@ timesift::TreeTable take_table(const nb::dict& from) {
 }  // namespace
 
 NB_MODULE(_core, m) {
-  m.doc() = "The binning, the reduction, the penalised fit, the tree, the forest and the boosted "
-            "trees, shared with the R package as src/ts_core.cpp, src/ts_penalised.cpp, "
-            "src/ts_tree.cpp and src/ts_boost.cpp.";
+  m.doc() = "The binning, the reduction, the penalised fit, maxnet, the tree, the forest and the "
+            "boosted trees, shared with the R package as src/ts_core.cpp, "
+            "src/ts_penalised.cpp, src/ts_maxnet.cpp, src/ts_tree.cpp and src/ts_boost.cpp.";
 
   nb::register_exception_translator(
       [](const std::exception_ptr& p, void*) {
@@ -499,4 +529,88 @@ NB_MODULE(_core, m) {
           return give(std::move(out));
         },
         nb::arg("seed"), nb::arg("tree"), nb::arg("n"));
+
+  m.def("maxnet_design",
+        [](ConstMat x, ConstF64 y, const std::string& classes, int knots, double regmult,
+           const std::string& formulation, bool add_samples, double max_design) {
+          const timesift::MaxnetDesign d = timesift::maxnet_design(
+              x.data(), y.data(), x.shape(0), x.shape(1),
+              maxnet_spec(classes, knots, regmult, formulation, add_samples, 1e-8, 1e6, 100,
+                          false, 1, max_design));
+          nb::dict out;
+          out["classes"] = d.classes;
+          out["rows"] = give(std::vector<std::int64_t>(d.rows.begin(), d.rows.end()));
+          out["y"] = give(std::vector<double>(d.y));
+          out["reg"] = give(std::vector<double>(d.reg));
+          give_features(out, d.features);
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("classes"), nb::arg("knots"), nb::arg("regmult"),
+        nb::arg("formulation"), nb::arg("add_samples"), nb::arg("max_design"));
+
+  m.def("maxnet_fit",
+        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& classes, int knots,
+           double regmult, const std::string& formulation, bool add_samples, double thresh,
+           double max_pass, int n_lambda, bool one_se, std::optional<ConstI32> fold, int n_fold,
+           int threads, double max_design) {
+          const timesift::MaxnetSpec spec =
+              maxnet_spec(classes, knots, regmult, formulation, add_samples, thresh, max_pass,
+                          n_lambda, one_se, threads, max_design);
+          timesift::Maxnet fit;
+          {
+            nb::gil_scoped_release release;
+            fit = timesift::maxnet_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
+                                       spec, fold.has_value() ? fold->data() : nullptr,
+                                       fold.has_value() ? n_fold : 0);
+          }
+          nb::dict out;
+          out["formulation"] = std::string(timesift::maxnet_formulation_name(fit.formulation));
+          out["classes"] = fit.classes;
+          out["n_column"] = fit.n_column;
+          out["n_presence"] = fit.n_presence;
+          out["n_feature"] = fit.n_feature;
+          out["var_min"] = give(std::move(fit.var_min));
+          out["var_max"] = give(std::move(fit.var_max));
+          out["feature_min"] = give(std::move(fit.feature_min));
+          out["feature_max"] = give(std::move(fit.feature_max));
+          out["beta"] = give(std::move(fit.beta));
+          out["intercept"] = fit.intercept;
+          out["lasso_intercept"] = fit.lasso_intercept;
+          out["entropy"] = fit.entropy;
+          out["lambda"] = fit.lambda;
+          out["stalled"] = fit.stalled;
+          out["fold_stalled"] = fit.fold_stalled;
+          give_features(out, fit.features);
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("classes"), nb::arg("knots"),
+        nb::arg("regmult"), nb::arg("formulation"), nb::arg("add_samples"), nb::arg("thresh"),
+        nb::arg("max_pass"), nb::arg("n_lambda"), nb::arg("one_se"),
+        nb::arg("fold") = nb::none(), nb::arg("n_fold") = 0, nb::arg("threads") = 1,
+        nb::arg("max_design") = 2.0);
+
+  m.def("maxnet_predict",
+        [](const nb::dict& fit, ConstMat newx, bool clamp, const std::string& type) {
+          timesift::Maxnet f;
+          f.formulation = timesift::maxnet_formulation_from_name(
+              nb::cast<std::string>(fit["formulation"]));
+          f.n_column = nb::cast<std::int32_t>(fit["n_column"]);
+          f.var_min = take_field<double>(fit, "var_min");
+          f.var_max = take_field<double>(fit, "var_max");
+          f.features.kind = take_field<std::int8_t>(fit, "kind");
+          f.features.a = take_field<std::int32_t>(fit, "a");
+          f.features.b = take_field<std::int32_t>(fit, "b");
+          f.features.lo = take_field<double>(fit, "lo");
+          f.features.hi = take_field<double>(fit, "hi");
+          f.feature_min = take_field<double>(fit, "feature_min");
+          f.feature_max = take_field<double>(fit, "feature_max");
+          f.beta = take_field<double>(fit, "beta");
+          f.intercept = nb::cast<double>(fit["intercept"]);
+          f.entropy = nb::cast<double>(fit["entropy"]);
+          std::vector<double> out(newx.shape(0));
+          timesift::maxnet_predict(f, newx.data(), newx.shape(0), newx.shape(1), clamp,
+                                   timesift::maxnet_output_from_name(type), out.data());
+          return give(std::move(out));
+        },
+        nb::arg("fit"), nb::arg("newx"), nb::arg("clamp"), nb::arg("type"));
 }

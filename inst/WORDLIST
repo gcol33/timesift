@@ -15,6 +15,7 @@ IANA
 Kadmon
 LF
 Massias
+MaxEnt
 NVIDIA's
 NumPy
 ORCID
@@ -33,6 +34,7 @@ artifacts
 binormal
 biomod
 climgrain
+cloglog
 contrast's
 dict
 docstring
@@ -56,6 +58,8 @@ lookback
 lookback's
 lookbacks
 matplotlib
+maxnet
+maxnet's
 nanobind
 ndarray
 np

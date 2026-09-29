@@ -53,6 +53,8 @@ your own goes through.
   Classification and regression tree on the flattened representation
 - [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md)
   : Gradient boosted trees on the flattened representation
+- [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md) :
+  maxnet's MaxEnt on the flattened representation
 - [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)

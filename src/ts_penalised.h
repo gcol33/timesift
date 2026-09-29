@@ -48,6 +48,8 @@ struct PenaltySpec {
                                        // ends the path; 0 to run every point
   double dev_max = 0.999;              // a fit explaining more than this ends the path
   int min_lambda = 5;                  // points fitted before either rule is read
+  double prob_floor = 1e-9;            // a fitted probability this close to zero or one is pinned
+                                       // there and carries no curvature, glmnet's `pmin`
   int threads = 1;                     // fits of a cross-validation run at once; 1 is serial
 };
 

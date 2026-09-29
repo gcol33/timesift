@@ -138,6 +138,27 @@ extern "C" SEXP _timesift_ts_forest_stream_(SEXP seed, SEXP tree, SEXP n) {
     return cpp11::as_sexp(ts_forest_stream_(cpp11::as_cpp<cpp11::decay_t<double>>(seed), cpp11::as_cpp<cpp11::decay_t<double>>(tree), cpp11::as_cpp<cpp11::decay_t<int>>(n)));
   END_CPP11
 }
+// ts_r.cpp
+cpp11::list ts_maxnet_design_(cpp11::doubles x, cpp11::doubles y, int n, int p, std::string classes, int knots, double regmult, std::string formulation, bool add_samples, double max_design);
+extern "C" SEXP _timesift_ts_maxnet_design_(SEXP x, SEXP y, SEXP n, SEXP p, SEXP classes, SEXP knots, SEXP regmult, SEXP formulation, SEXP add_samples, SEXP max_design) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_maxnet_design_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(classes), cpp11::as_cpp<cpp11::decay_t<int>>(knots), cpp11::as_cpp<cpp11::decay_t<double>>(regmult), cpp11::as_cpp<cpp11::decay_t<std::string>>(formulation), cpp11::as_cpp<cpp11::decay_t<bool>>(add_samples), cpp11::as_cpp<cpp11::decay_t<double>>(max_design)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::list ts_maxnet_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string classes, int knots, double regmult, std::string formulation, bool add_samples, double thresh, double max_pass, int n_lambda, bool one_se, cpp11::sexp fold, int n_fold, int threads, double max_design);
+extern "C" SEXP _timesift_ts_maxnet_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP classes, SEXP knots, SEXP regmult, SEXP formulation, SEXP add_samples, SEXP thresh, SEXP max_pass, SEXP n_lambda, SEXP one_se, SEXP fold, SEXP n_fold, SEXP threads, SEXP max_design) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_maxnet_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(classes), cpp11::as_cpp<cpp11::decay_t<int>>(knots), cpp11::as_cpp<cpp11::decay_t<double>>(regmult), cpp11::as_cpp<cpp11::decay_t<std::string>>(formulation), cpp11::as_cpp<cpp11::decay_t<bool>>(add_samples), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<double>>(max_pass), cpp11::as_cpp<cpp11::decay_t<int>>(n_lambda), cpp11::as_cpp<cpp11::decay_t<bool>>(one_se), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<int>>(n_fold), cpp11::as_cpp<cpp11::decay_t<int>>(threads), cpp11::as_cpp<cpp11::decay_t<double>>(max_design)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::doubles ts_maxnet_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p, bool clamp, std::string type);
+extern "C" SEXP _timesift_ts_maxnet_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p, SEXP clamp, SEXP type) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_maxnet_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<bool>>(clamp), cpp11::as_cpp<cpp11::decay_t<std::string>>(type)));
+  END_CPP11
+}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
@@ -151,6 +172,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_forest_fit_",        (DL_FUNC) &_timesift_ts_forest_fit_,        12},
     {"_timesift_ts_forest_predict_",    (DL_FUNC) &_timesift_ts_forest_predict_,     4},
     {"_timesift_ts_forest_stream_",     (DL_FUNC) &_timesift_ts_forest_stream_,      3},
+    {"_timesift_ts_maxnet_design_",     (DL_FUNC) &_timesift_ts_maxnet_design_,     10},
+    {"_timesift_ts_maxnet_fit_",        (DL_FUNC) &_timesift_ts_maxnet_fit_,        18},
+    {"_timesift_ts_maxnet_predict_",    (DL_FUNC) &_timesift_ts_maxnet_predict_,     6},
     {"_timesift_ts_penalised_coef_",    (DL_FUNC) &_timesift_ts_penalised_coef_,     5},
     {"_timesift_ts_penalised_cv_",      (DL_FUNC) &_timesift_ts_penalised_cv_,      17},
     {"_timesift_ts_penalised_path_",    (DL_FUNC) &_timesift_ts_penalised_path_,    14},

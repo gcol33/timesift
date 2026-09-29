@@ -22,7 +22,7 @@ from .fit import Timesift, timesift
 from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
 from .learners import (Fit, Learner, boosting, cnn, elasticnet, fit_learner, flatten, forest,
-                       mlp, rescnn, stepwise, tree)
+                       maxnet, mlp, rescnn, stepwise, tree)
 from .metrics import (average_precision, cohen_kappa, decision_threshold, kappa_score,
                       model_agreement, roc_auc, tss)
 from .occlusion import feature_matrix
@@ -66,6 +66,7 @@ register_learner("stepwise", stepwise)
 register_learner("forest", forest)
 register_learner("tree", tree)
 register_learner("boosting", boosting)
+register_learner("maxnet", maxnet)
 register_learner("mlp", mlp)
 register_learner("cnn", cnn)
 register_learner("rescnn", rescnn)
@@ -85,7 +86,8 @@ __all__ = [
     "expand_sift", "feature_matrix", "fit_learner", "flatten", "fold_map", "forest",
     "get_learner", "grain", "grain_contrasts",
     "grain_ladder", "grain_matrix", "grains", "grouped_cv", "implied_skill", "kappa_score",
-    "learners", "lookback", "lookback_matrix", "lookbacks", "metrics", "mlp", "model_agreement",
+    "learners", "lookback", "lookback_matrix", "lookbacks", "maxnet", "metrics", "mlp",
+    "model_agreement",
     "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "plot", "positive_weights",
     "procedure_table",
     "read_cells",

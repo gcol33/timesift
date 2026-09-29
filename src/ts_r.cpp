@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "ts_core.h"
+#include "ts_maxnet.h"
 #include "ts_penalised.h"
 #include "ts_tree.h"
 
@@ -619,4 +620,129 @@ cpp11::doubles ts_forest_stream_(double seed, double tree, int n) {
   std::vector<std::uint32_t> raw(static_cast<std::size_t>(n));
   timesift::forest_stream(take_seed(seed), take_seed(tree), raw.size(), raw.data());
   return give(std::vector<double>(raw.begin(), raw.end()));
+}
+
+// maxnet, from the same core the Python side calls. A fit crosses into R as a list of plain
+// vectors, the features it gave a coefficient one field each, and comes back the same way to
+// predict.
+namespace {
+
+timesift::MaxnetSpec maxnet_spec(const std::string& classes, int knots, double regmult,
+                                 const std::string& formulation, bool add_samples, double thresh,
+                                 double max_pass, int n_lambda, bool one_se, int threads,
+                                 double max_design) {
+  timesift::MaxnetSpec spec;
+  spec.classes = classes;
+  spec.knots = knots;
+  spec.regmult = regmult;
+  spec.formulation = timesift::maxnet_formulation_from_name(formulation);
+  spec.add_samples = add_samples;
+  spec.thresh = thresh;
+  spec.max_pass = static_cast<int>(max_pass);
+  spec.n_lambda = n_lambda;
+  spec.one_se = one_se;
+  spec.threads = threads;
+  spec.max_design = max_design;
+  return spec;
+}
+
+void give_features(cpp11::writable::list& out, const timesift::MaxnetFeatures& f) {
+  using namespace cpp11::literals;
+  out.push_back("kind"_nm = give(f.kind));
+  out.push_back("a"_nm = give(f.a));
+  out.push_back("b"_nm = give(f.b));
+  out.push_back("lo"_nm = give(f.lo));
+  out.push_back("hi"_nm = give(f.hi));
+}
+
+timesift::MaxnetFeatures take_features(const cpp11::list& fit) {
+  timesift::MaxnetFeatures f;
+  f.kind = take_field<std::int8_t>(fit, "kind");
+  f.a = take_field<std::int32_t>(fit, "a");
+  f.b = take_field<std::int32_t>(fit, "b");
+  f.lo = take_field<double>(fit, "lo");
+  f.hi = take_field<double>(fit, "hi");
+  return f;
+}
+
+}  // namespace
+
+[[cpp11::register]]
+cpp11::list ts_maxnet_design_(cpp11::doubles x, cpp11::doubles y, int n, int p,
+                              std::string classes, int knots, double regmult,
+                              std::string formulation, bool add_samples, double max_design) {
+  const timesift::MaxnetSpec spec = maxnet_spec(classes, knots, regmult, formulation, add_samples,
+                                                1e-8, 1e6, 100, false, 1, max_design);
+  const timesift::MaxnetDesign d =
+      timesift::maxnet_design(REAL_RO(x.data()), REAL_RO(y.data()), static_cast<std::size_t>(n),
+                              static_cast<std::size_t>(p), spec);
+  using namespace cpp11::literals;
+  std::vector<std::int32_t> rows(d.rows.begin(), d.rows.end());
+  cpp11::writable::list out({
+    "classes"_nm = cpp11::as_sexp(d.classes),
+    "rows"_nm = give(rows),
+    "y"_nm = give(d.y),
+    "reg"_nm = give(d.reg)
+  });
+  give_features(out, d.features);
+  return out;
+}
+
+[[cpp11::register]]
+cpp11::list ts_maxnet_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                           std::string classes, int knots, double regmult,
+                           std::string formulation, bool add_samples, double thresh,
+                           double max_pass, int n_lambda, bool one_se, cpp11::sexp fold,
+                           int n_fold, int threads, double max_design) {
+  const timesift::MaxnetSpec spec = maxnet_spec(classes, knots, regmult, formulation, add_samples,
+                                                thresh, max_pass, n_lambda, one_se, threads,
+                                                max_design);
+  const std::vector<std::int32_t> which = take_folds(fold);
+  const timesift::Maxnet fit = timesift::maxnet_fit(
+      REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
+      static_cast<std::size_t>(p), spec, which.empty() ? nullptr : which.data(),
+      which.empty() ? 0 : n_fold);
+  using namespace cpp11::literals;
+  cpp11::writable::list out({
+    "formulation"_nm = cpp11::as_sexp(std::string(timesift::maxnet_formulation_name(fit.formulation))),
+    "classes"_nm = cpp11::as_sexp(fit.classes),
+    "n_column"_nm = cpp11::as_sexp(fit.n_column),
+    "n_presence"_nm = cpp11::as_sexp(fit.n_presence),
+    "n_feature"_nm = cpp11::as_sexp(fit.n_feature),
+    "var_min"_nm = give(fit.var_min),
+    "var_max"_nm = give(fit.var_max),
+    "feature_min"_nm = give(fit.feature_min),
+    "feature_max"_nm = give(fit.feature_max),
+    "beta"_nm = give(fit.beta),
+    "intercept"_nm = cpp11::as_sexp(fit.intercept),
+    "lasso_intercept"_nm = cpp11::as_sexp(fit.lasso_intercept),
+    "entropy"_nm = cpp11::as_sexp(fit.entropy),
+    "lambda"_nm = cpp11::as_sexp(fit.lambda),
+    "stalled"_nm = cpp11::as_sexp(fit.stalled),
+    "fold_stalled"_nm = cpp11::as_sexp(fit.fold_stalled)
+  });
+  give_features(out, fit.features);
+  return out;
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_maxnet_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p, bool clamp,
+                                  std::string type) {
+  timesift::Maxnet m;
+  m.formulation =
+      timesift::maxnet_formulation_from_name(cpp11::as_cpp<std::string>(fit["formulation"]));
+  m.n_column = cpp11::as_cpp<int>(fit["n_column"]);
+  m.var_min = take_field<double>(fit, "var_min");
+  m.var_max = take_field<double>(fit, "var_max");
+  m.features = take_features(fit);
+  m.feature_min = take_field<double>(fit, "feature_min");
+  m.feature_max = take_field<double>(fit, "feature_max");
+  m.beta = take_field<double>(fit, "beta");
+  m.intercept = cpp11::as_cpp<double>(fit["intercept"]);
+  m.entropy = cpp11::as_cpp<double>(fit["entropy"]);
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::maxnet_predict(m, REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                           static_cast<std::size_t>(p), clamp,
+                           timesift::maxnet_output_from_name(type), out.data());
+  return give(out);
 }

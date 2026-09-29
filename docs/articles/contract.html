@@ -73,7 +73,7 @@
     <li><a class="dropdown-item" href="../articles/python-artifacts.html">What crosses the boundary</a></li>
   </ul>
 </li>
-<li class="nav-item"><a class="nav-link" href="../articles/contract.html">Contract</a></li>
+<li class="active nav-item"><a class="nav-link" href="../articles/contract.html">Contract</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
@@ -1444,6 +1444,140 @@ a failure both implementations would have to reproduce to match.</p>
 </div>
 </div>
 <div class="section level2">
+<h2 id="maxnet">maxnet<a class="anchor" aria-label="anchor" href="#maxnet"></a>
+</h2>
+<p><code><a href="../reference/maxnet.html">maxnet()</a></code> is one maxnet model per response, over
+<code>src/ts_maxnet.cpp</code>, which both languages compile, and which
+hands its design to the penalised fit above. Its features, their
+regularisation and its path are the maxnet package’s (0.1.4), because a
+biomod2 user’s <code>MAXNET</code> is maxnet’s and the model here has to
+be the one they already fit.</p>
+<ul>
+<li>The features are built over the rows fitted. A column holding one
+value there takes none. The classes are letters: <code>l</code> the
+column, <code>q</code> its square, <code>h</code> hinges, <code>t</code>
+thresholds, <code>p</code> the product of each pair of columns. Left
+open they follow the presence count: <code>l</code> under 10,
+<code>lq</code> under 15, <code>lqh</code> under 80, <code>lqph</code>
+from 80 on.</li>
+<li>The order is maxnet’s model matrix: every linear term, every square,
+each column’s hinges, each column’s thresholds, and the products, pair
+<code>(a, b)</code> with <code>a &lt; b</code> ordered by <code>a</code>
+and then by <code>b</code>.</li>
+<li>Knots are R’s <code>seq(min, max, length.out = m)</code>: the ends
+exactly and the interior as
+<code>min + i * ((max - min) / (m - 1))</code>. A column’s
+<code>knots - 1</code> forward hinges run from each of the first
+<code>knots - 1</code> knots to the maximum and its
+<code>knots - 1</code> reverse hinges from the minimum to each of the
+last <code>knots - 1</code>, each
+<code>min(1, max(0, (x - lo) / (hi - lo)))</code>. Its thresholds are
+<code>x &gt;= k</code> at points <code>3</code> to
+<code>knots + 1</code> of
+<code>seq(min, max, length.out = knots + 2)</code>, which is maxnet’s
+<code>[2:nknots + 1]</code>: 49 thresholds at the default of 50.</li>
+<li>A feature’s regularisation is
+<code>maxnet.default.regularization()</code>: with <code>np</code>
+presences, the larger of <code>0.001</code> times the feature’s range
+over the rows fitted, a floor, and its standard deviation over the
+presences (over <code>np - 1</code>) times a class factor over
+<code>sqrt(np)</code>, all times <code>regmult</code>. The class factor
+is R’s <code>approx(rule = 2)</code> at <code>np</code> of a table. The
+linear, quadratic and product features share one table, chosen by the
+richest class present: the product table where a product is, else the
+quadratic one where a square is, else the linear one. Hinges read
+<code>0.5</code> and thresholds interpolate from <code>2</code> at none
+to <code>1</code> at 100. The floor is
+<code>0.5 * max(sd, 1 / sqrt(np)) / sqrt(np)</code> for a hinge,
+<code>1</code> for a threshold constant over the presences, and zero
+otherwise.</li>
+<li>The background formulation is maxnet’s model. Every unit is
+background, and each presence is appended to it again, after every unit
+and in the order the presences come, unless an absence carries exactly
+its readings in every column. The rows are weighted <code>1</code> for a
+presence and <code>100</code> for the background, and the lasso is
+fitted without standardisation, with the regularisation as its penalty
+factors, glmnet’s probability floor at <code>1e-8</code> as maxnet sets
+it, along the 200 penalties
+<code>10^seq(4, 0, length.out = 200) * mean(reg) * sum(y) / sum(w)</code>,
+and read at the last. Its intercept is discarded: the link is
+<code>sum_k beta_k f_k + alpha</code>, with
+<code>alpha = -log(sum exp(link))</code> over the background rows and
+the entropy <code>-sum q log q</code> of
+<code>q = exp(link + alpha)</code>, both taken through the largest link.
+The outputs are maxnet’s: <code>exp(link)</code>, the cloglog
+<code>1 - exp(-exp(entropy + link))</code> and the logistic
+<code>1 / (1 + exp(-entropy - link))</code>.</li>
+<li>The background formulation reads no case weights, as maxnet takes
+none.</li>
+<li>The absence formulation fits the same features and penalty factors,
+without appending anything, as a logistic lasso under the caller’s case
+weights, along the penalised fit’s derived path of <code>n_lambda</code>
+points with glmnet’s default probability floor, and reads it at the
+cross-validated <code>lambda.min</code> or <code>lambda.1se</code> over
+the folds the caller dealt. It predicts the logistic of its own
+intercept plus the link.</li>
+<li>A fit keeps the features it gave a non-zero coefficient and nothing
+else, with each column’s range over the rows fitted and each kept
+feature’s range. Predicting with <code>clamp</code> holds each column
+inside its range, then each feature inside its own, as maxnet’s
+<code>predict(clamp = TRUE)</code>.</li>
+<li>A path that does not settle at a penalty is read at the last point
+it settled at, and <code>stalled</code> says where it stopped; maxnet
+stops with an error there instead.</li>
+<li>A design of more than <code>max_design</code> gigabytes, rows fitted
+times features times eight bytes, is refused before it is allocated,
+with its size in the message.</li>
+</ul>
+<div class="section level3">
+<h3 id="the-fixtures-1">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-1"></a>
+</h3>
+<p><code>maxnet_cases.csv</code> names twelve cases on the weekly
+columns of <code>penalised_input.csv</code>, without the squares:
+maxnet’s own classes at 27, 12 and 8 presences
+(<code>maxnet_response.csv</code> holds the two thinner responses, the
+first 12 and the first 8 presences in unit order), each richer class
+set, thresholds alone, hinges at <code>regmult = 2</code>,
+<code>lq</code> at <code>0.5</code>, linear features without the
+presences added to the background, a presence whose readings an absence
+repeats, and the absence formulation with and without the case weights,
+cross-validated over the fixture’s five folds. The reference is the
+maxnet package’s own fit, and <code>cv.glmnet</code> over maxnet’s
+features for the absence formulation, run at a threshold of
+<code>1e-14</code>. Each case carries the classes used, the rows and
+features fitted, the penalty read, the objective there, and the
+background’s entropy and <code>alpha</code>.
+<code>maxnet_regularization.csv</code> holds every feature’s penalty
+factor and <code>maxnet_predict.csv</code> the predictions on the
+fixture’s rows and, clamped, on every reading scaled by 1.3.</p>
+</div>
+<div class="section level3">
+<h3 id="how-exactly-2">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-2"></a>
+</h3>
+<ul>
+<li>
+<strong>The features and their penalty factors are
+arithmetic</strong> and are asserted to <code>1e-12</code> relative; the
+largest difference from maxnet is <code>7.4e-16</code>. The classes used
+and the counts of rows and features are asserted exactly.</li>
+<li>
+<strong>The objective is pinned tightly</strong>, to
+<code>1e-10</code> at the reference’s penalty, which is itself asserted
+to <code>1e-10</code> relative. At a matched threshold of
+<code>1e-14</code> the core and glmnet agree to <code>5.5e-14</code>
+across the twelve cases, the core below glmnet in five of them.</li>
+<li>
+<strong>The predictions, the entropy and <code>alpha</code> are
+allowed <code>1e-4</code>.</strong> Hinges at neighbouring knots are
+nearly collinear, and how a fit splits a coefficient between them is not
+determined to the precision the objective is. Across the twelve cases
+the predictions differ by at most <code>2.3e-5</code>, the entropy by
+<code>7.8e-8</code> and <code>alpha</code>, a number near
+<code>-10</code>, by <code>4.9e-5</code>.</li>
+</ul>
+</div>
+</div>
+<div class="section level2">
 <h2 id="the-tree">The tree<a class="anchor" aria-label="anchor" href="#the-tree"></a>
 </h2>
 <p><code><a href="../reference/tree.html">tree()</a></code> is one classification or regression tree per
@@ -1516,7 +1650,7 @@ whose complexity ties <code>cp</code> exactly can then fall the other
 way. The core falls the same way on every machine.</li>
 </ul>
 <div class="section level3">
-<h3 id="the-fixtures-1">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-1"></a>
+<h3 id="the-fixtures-2">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-2"></a>
 </h3>
 <p><code>tree_cases.csv</code> names twelve cases: each family, with
 every weight one and with the integer counts
@@ -1531,7 +1665,7 @@ of the tree rpart’s <code>prune()</code> leaves at the row biomod2’s
 rule picks.</p>
 </div>
 <div class="section level3">
-<h3 id="how-exactly-2">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-2"></a>
+<h3 id="how-exactly-3">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-3"></a>
 </h3>
 <p>The node numbers, the split columns, the split directions, the node
 counts and the number of splits in each row of the table are asserted
@@ -1648,7 +1782,7 @@ setting given explicitly beats either, and an <code>mtry</code> above
 the column count is the column count.</p>
 </div>
 <div class="section level3">
-<h3 id="the-fixtures-2">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-2"></a>
+<h3 id="the-fixtures-3">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-3"></a>
 </h3>
 <p>No package grows a forest from this generator, so the reference is
 the forest grown from this text in R alone,
@@ -1664,7 +1798,7 @@ for five seed and tree pairs, which the Python suite also checks against
 a reimplementation of the generator of its own.</p>
 </div>
 <div class="section level3">
-<h3 id="how-exactly-3">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-3"></a>
+<h3 id="how-exactly-4">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-4"></a>
 </h3>
 <p>Every field of every node, the thresholds and values included, and
 every prediction are asserted exactly: the core and the oracle perform
@@ -1793,7 +1927,7 @@ folds. With <code>newton</code> on, <code>"package"</code> is xgboost’s:
 are zero under gbm’s trees and an error to set otherwise.</p>
 </div>
 <div class="section level3">
-<h3 id="the-fixtures-3">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-3"></a>
+<h3 id="the-fixtures-4">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-4"></a>
 </h3>
 <p><code>boost_cases.csv</code> names twelve cases on the tree’s design.
 Six are gbm’s, each family with flat weights and the tree’s counts, and
@@ -1812,7 +1946,7 @@ unit and <code>boost_cv.csv</code> the cross-validated error after every
 tree.</p>
 </div>
 <div class="section level3">
-<h3 id="how-exactly-4">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-4"></a>
+<h3 id="how-exactly-5">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-5"></a>
 </h3>
 <p>The first-order predictions and the cross-validated errors are
 asserted to <code>1e-12</code> relative, the largest difference from gbm
@@ -1918,7 +2052,7 @@ fewer than two members carry weight. The array is
 both sides.</p>
 </div>
 <div class="section level3">
-<h3 id="the-fixtures-4">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-4"></a>
+<h3 id="the-fixtures-5">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-5"></a>
 </h3>
 <p><code>ensemble_oof.csv</code> holds five candidates’ out-of-fold
 predictions of the response fixture, rounded to six decimals, two of
@@ -1935,7 +2069,7 @@ each case’s combination and spread at <code>alpha = 0.1</code> for every
 unit and variable.</p>
 </div>
 <div class="section level3">
-<h3 id="how-exactly-5">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-5"></a>
+<h3 id="how-exactly-6">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-6"></a>
 </h3>
 <p>Everything is asserted to <code>1e-10</code> relative. The file holds
 twelve significant digits, and the largest difference either side reads
@@ -2038,56 +2172,60 @@ them</td>
 <td><code><a href="../reference/boosting.html">boosting()</a></code></td>
 </tr>
 <tr class="odd">
+<td>maxnet’s MaxEnt</td>
+<td><code><a href="../reference/maxnet.html">maxnet()</a></code></td>
+</tr>
+<tr class="even">
 <td>the encoders</td>
 <td>
 <code><a href="../reference/torch_learners.html">mlp()</a></code>, <code><a href="../reference/torch_learners.html">cnn()</a></code>, <code><a href="../reference/torch_learners.html">rescnn()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>how an encoder is trained</td>
 <td><code><a href="../reference/train_control.html">train_control()</a></code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>fitting one learner on one representation</td>
 <td><code><a href="../reference/fit_learner.html">fit_learner()</a></code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the resampling</td>
 <td>
 <code><a href="../reference/cv.html">cv()</a></code> and <code><a href="../reference/cv.html">grouped_cv()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the fold map and the mask</td>
 <td>
 <code><a href="../reference/fold_map.html">fold_map()</a></code> and <code><a href="../reference/scorable_cells.html">scorable_cells()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>fitting across a set of grains</td>
 <td>
 <code><a href="../reference/grain_ladder.html">grain_ladder()</a></code>, and <code><a href="../reference/select_grain.html">select_grain()</a></code> for the
 nested selection</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the combiner</td>
 <td>
 <code><a href="../reference/ensemble.html">ensemble()</a></code>, <code><a href="../reference/ensemble_fit.html">ensemble_fit()</a></code>,
 <code><a href="../reference/ensemble_combine.html">ensemble_combine()</a></code> and <code><a href="../reference/ensemble_weights.html">ensemble_weights()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>how far an ensemble’s members disagree</td>
 <td>
 <code><a href="../reference/ensemble_spread.html">ensemble_spread()</a></code>, and
 <code>predict(type = "spread")</code> on a run</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>scoring held-out predictions</td>
 <td>
 <code><a href="../reference/score_predictions.html">score_predictions()</a></code>, on the cells the mask allows</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the metrics</td>
 <td>
 <code><a href="../reference/tss.html">tss()</a></code>, <code><a href="../reference/roc_auc.html">roc_auc()</a></code>,
@@ -2095,46 +2233,46 @@ nested selection</td>
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> and <code><a href="../reference/kappa_score.html">model_agreement()</a></code>
 beside them</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the cut a fit applies</td>
 <td>
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> given a fit in place of the
 response, one cut per response learned from a candidate’s out-of-fold
 predictions</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>two arms on matched cells</td>
 <td><code><a href="../reference/paired_contrast.html">paired_contrast()</a></code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>every grain against a learner’s best</td>
 <td>
 <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code>, the mixed model of the per-cell
 scores and Dunnett’s many-to-one comparisons off it</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>a record with a planted grain</td>
 <td>
 <code><a href="../reference/simulate_records.html">simulate_records()</a></code>, the vignette’s and the recovery
 tests’ generator</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the inflation of a self-selected threshold</td>
 <td>
 <code><a href="../reference/tss_inflation.html">tss_inflation()</a></code>, and <code><a href="../reference/implied_skill.html">implied_skill()</a></code> for
 the level it implies</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>a set of representations</td>
 <td>
 <code><a href="../reference/timesift_set.html">timesift_set()</a></code>, which reads as a mapping of grain name
 to representation</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>folds of the inner cross-validation</td>
 <td><code>n_inner</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the three artifacts</td>
 <td>
 <code><a href="../reference/artifacts.html">write_folds()</a></code> and <code><a href="../reference/artifacts.html">read_folds()</a></code>,
@@ -2142,12 +2280,12 @@ to representation</td>
 <code><a href="../reference/artifacts.html">write_cells()</a></code> and <code><a href="../reference/artifacts.html">read_cells()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the digest</td>
 <td>
 <code><a href="../reference/digest_array.html">digest_array()</a></code>, exported</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the three registries</td>
 <td>
 <code><a href="../reference/register_learner.html">register_learner()</a></code> and <code><a href="../reference/register_learner.html">learners()</a></code>,
@@ -2155,7 +2293,7 @@ to representation</td>
 <code><a href="../reference/register_response.html">register_response()</a></code> and <code><a href="../reference/register_response.html">responses()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>what a rare response weighs</td>
 <td>
 <code><a href="../reference/positive_weights.html">positive_weights()</a></code>, the case weights the shipped

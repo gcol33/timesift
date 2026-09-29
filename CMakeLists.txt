@@ -19,6 +19,7 @@ nanobind_add_module(_core NB_STATIC
   src/ts_core.cpp
   src/ts_calendar.cpp
   src/ts_penalised.cpp
+  src/ts_maxnet.cpp
   src/ts_tree.cpp
   src/ts_boost.cpp
   python/ts_py.cpp)

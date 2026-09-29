@@ -1029,6 +1029,115 @@ truncates the path and returns the penalties it did reach; the generator
 refuses any reference glmnet warned about, so a fixture can never encode
 a failure both implementations would have to reproduce to match.
 
+## maxnet
+
+[`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md) is
+one maxnet model per response, over `src/ts_maxnet.cpp`, which both
+languages compile, and which hands its design to the penalised fit
+above. Its features, their regularisation and its path are the maxnet
+package’s (0.1.4), because a biomod2 user’s `MAXNET` is maxnet’s and the
+model here has to be the one they already fit.
+
+- The features are built over the rows fitted. A column holding one
+  value there takes none. The classes are letters: `l` the column, `q`
+  its square, `h` hinges, `t` thresholds, `p` the product of each pair
+  of columns. Left open they follow the presence count: `l` under 10,
+  `lq` under 15, `lqh` under 80, `lqph` from 80 on.
+- The order is maxnet’s model matrix: every linear term, every square,
+  each column’s hinges, each column’s thresholds, and the products, pair
+  `(a, b)` with `a < b` ordered by `a` and then by `b`.
+- Knots are R’s `seq(min, max, length.out = m)`: the ends exactly and
+  the interior as `min + i * ((max - min) / (m - 1))`. A column’s
+  `knots - 1` forward hinges run from each of the first `knots - 1`
+  knots to the maximum and its `knots - 1` reverse hinges from the
+  minimum to each of the last `knots - 1`, each
+  `min(1, max(0, (x - lo) / (hi - lo)))`. Its thresholds are `x >= k` at
+  points `3` to `knots + 1` of `seq(min, max, length.out = knots + 2)`,
+  which is maxnet’s `[2:nknots + 1]`: 49 thresholds at the default of
+  50.
+- A feature’s regularisation is `maxnet.default.regularization()`: with
+  `np` presences, the larger of `0.001` times the feature’s range over
+  the rows fitted, a floor, and its standard deviation over the
+  presences (over `np - 1`) times a class factor over `sqrt(np)`, all
+  times `regmult`. The class factor is R’s `approx(rule = 2)` at `np` of
+  a table. The linear, quadratic and product features share one table,
+  chosen by the richest class present: the product table where a product
+  is, else the quadratic one where a square is, else the linear one.
+  Hinges read `0.5` and thresholds interpolate from `2` at none to `1`
+  at 100. The floor is `0.5 * max(sd, 1 / sqrt(np)) / sqrt(np)` for a
+  hinge, `1` for a threshold constant over the presences, and zero
+  otherwise.
+- The background formulation is maxnet’s model. Every unit is
+  background, and each presence is appended to it again, after every
+  unit and in the order the presences come, unless an absence carries
+  exactly its readings in every column. The rows are weighted `1` for a
+  presence and `100` for the background, and the lasso is fitted without
+  standardisation, with the regularisation as its penalty factors,
+  glmnet’s probability floor at `1e-8` as maxnet sets it, along the 200
+  penalties
+  `10^seq(4, 0, length.out = 200) * mean(reg) * sum(y) / sum(w)`, and
+  read at the last. Its intercept is discarded: the link is
+  `sum_k beta_k f_k + alpha`, with `alpha = -log(sum exp(link))` over
+  the background rows and the entropy `-sum q log q` of
+  `q = exp(link + alpha)`, both taken through the largest link. The
+  outputs are maxnet’s: `exp(link)`, the cloglog
+  `1 - exp(-exp(entropy + link))` and the logistic
+  `1 / (1 + exp(-entropy - link))`.
+- The background formulation reads no case weights, as maxnet takes
+  none.
+- The absence formulation fits the same features and penalty factors,
+  without appending anything, as a logistic lasso under the caller’s
+  case weights, along the penalised fit’s derived path of `n_lambda`
+  points with glmnet’s default probability floor, and reads it at the
+  cross-validated `lambda.min` or `lambda.1se` over the folds the caller
+  dealt. It predicts the logistic of its own intercept plus the link.
+- A fit keeps the features it gave a non-zero coefficient and nothing
+  else, with each column’s range over the rows fitted and each kept
+  feature’s range. Predicting with `clamp` holds each column inside its
+  range, then each feature inside its own, as maxnet’s
+  `predict(clamp = TRUE)`.
+- A path that does not settle at a penalty is read at the last point it
+  settled at, and `stalled` says where it stopped; maxnet stops with an
+  error there instead.
+- A design of more than `max_design` gigabytes, rows fitted times
+  features times eight bytes, is refused before it is allocated, with
+  its size in the message.
+
+### The fixtures
+
+`maxnet_cases.csv` names twelve cases on the weekly columns of
+`penalised_input.csv`, without the squares: maxnet’s own classes at 27,
+12 and 8 presences (`maxnet_response.csv` holds the two thinner
+responses, the first 12 and the first 8 presences in unit order), each
+richer class set, thresholds alone, hinges at `regmult = 2`, `lq` at
+`0.5`, linear features without the presences added to the background, a
+presence whose readings an absence repeats, and the absence formulation
+with and without the case weights, cross-validated over the fixture’s
+five folds. The reference is the maxnet package’s own fit, and
+`cv.glmnet` over maxnet’s features for the absence formulation, run at a
+threshold of `1e-14`. Each case carries the classes used, the rows and
+features fitted, the penalty read, the objective there, and the
+background’s entropy and `alpha`. `maxnet_regularization.csv` holds
+every feature’s penalty factor and `maxnet_predict.csv` the predictions
+on the fixture’s rows and, clamped, on every reading scaled by 1.3.
+
+### How exactly
+
+- **The features and their penalty factors are arithmetic** and are
+  asserted to `1e-12` relative; the largest difference from maxnet is
+  `7.4e-16`. The classes used and the counts of rows and features are
+  asserted exactly.
+- **The objective is pinned tightly**, to `1e-10` at the reference’s
+  penalty, which is itself asserted to `1e-10` relative. At a matched
+  threshold of `1e-14` the core and glmnet agree to `5.5e-14` across the
+  twelve cases, the core below glmnet in five of them.
+- **The predictions, the entropy and `alpha` are allowed `1e-4`.**
+  Hinges at neighbouring knots are nearly collinear, and how a fit
+  splits a coefficient between them is not determined to the precision
+  the objective is. Across the twelve cases the predictions differ by at
+  most `2.3e-5`, the entropy by `7.8e-8` and `alpha`, a number near
+  `-10`, by `4.9e-5`.
+
 ## The tree
 
 [`tree()`](https://gillescolling.com/timesift/reference/tree.md) is one
@@ -1469,6 +1578,7 @@ the difference is recorded here rather than found at a call site.
 | the forest | [`forest()`](https://gillescolling.com/timesift/reference/forest.md) |
 | the classification and regression tree | [`tree()`](https://gillescolling.com/timesift/reference/tree.md) |
 | gradient boosted trees | [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md) |
+| maxnet’s MaxEnt | [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md) |
 | the encoders | [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md) |
 | how an encoder is trained | [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md) |
 | fitting one learner on one representation | [`fit_learner()`](https://gillescolling.com/timesift/reference/fit_learner.md) |

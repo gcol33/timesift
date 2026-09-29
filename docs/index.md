@@ -118,7 +118,9 @@ rpart’s tree over one,
 [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
 grows a probability forest over one,
 [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md)
-fits gbm’s or xgboost’s boosted trees over one, and the `torch` encoders
+fits gbm’s or xgboost’s boosted trees over one,
+[`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md)
+fits maxnet’s MaxEnt over one, and the `torch` encoders
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md),
 [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
 and

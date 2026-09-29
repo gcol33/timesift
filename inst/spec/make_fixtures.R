@@ -1226,3 +1226,142 @@ for (i in seq_len(nrow(BOOST_CASES))) {
 write_fixture(do.call(rbind, boost_predictions), "boost_predict.csv")
 write_fixture(do.call(rbind, boost_cv), "boost_cv.csv")
 cat("wrote the boosting reference\n")
+
+# maxnet.
+#
+# The reference is the maxnet package's own fit, on the design the penalised fixtures carry
+# without its squares: the weekly columns, read back from their file so every side sees the same
+# doubles. maxnet's features and its regularisation are arithmetic and are pinned to rounding. Its
+# lasso is glmnet's, run here at the tolerance the penalised reference is, and pinned the way that
+# one is: by the objective at maxnet's last penalty, which both sides reach to that tolerance, and by
+# the predictions, which the few features nearly collinear with each other leave slightly less
+# determined. maxnet moves glmnet's own controls for the whole session (`pmin = 1e-8, fdev = 0`),
+# so they are set back after every fit.
+if (!requireNamespace("maxnet", quietly = TRUE)) {
+  stop("the maxnet fixtures are the reference the maxnet package gives, so it has to be ",
+       "installed to regenerate them.", call. = FALSE)
+}
+mx_x <- tree_x[, !grepl("\\^2$", colnames(tree_x)), drop = FALSE]
+mx_names <- sprintf("v%02d", seq_len(ncol(mx_x)))
+mx_frame <- function(x) stats::setNames(as.data.frame(x), mx_names)
+# Two thinner responses, the first 8 and the first 12 presences of the binomial one in unit order,
+# put maxnet's own choice of classes at its two smallest presence counts.
+mx_first <- function(k) {
+  y <- pen_y_binomial
+  y[which(y == 1)[-seq_len(k)]] <- 0
+  y
+}
+mx_y <- list(y_binomial = pen_y_binomial, y_8 = mx_first(8L), y_12 = mx_first(12L))
+write_fixture(data.frame(unit = pen_units, y_8 = mx_y$y_8, y_12 = mx_y$y_12,
+                         stringsAsFactors = FALSE), "maxnet_response.csv")
+
+MX_THRESH <- 1e-14
+mx_case <- function(case, formulation = "background", response = "y_binomial", classes = "",
+                    regmult = 1, add_samples = TRUE, duplicate = FALSE, weighted = FALSE) {
+  data.frame(case = case, formulation = formulation, response = response, classes = classes,
+             regmult = regmult, add_samples = add_samples, duplicate = duplicate,
+             weighted = weighted, stringsAsFactors = FALSE)
+}
+MX_CASES <- rbind(
+  mx_case("default"),
+  mx_case("default_8", response = "y_8"),
+  mx_case("default_12", response = "y_12"),
+  mx_case("lqph", classes = "lqph"),
+  mx_case("lqpht", classes = "lqpht"),
+  mx_case("thresholds", classes = "t"),
+  mx_case("hinges_regmult2", classes = "h", regmult = 2),
+  mx_case("lq_regmult05", classes = "lq", regmult = 0.5),
+  mx_case("l_no_samples", classes = "l", add_samples = FALSE),
+  mx_case("lqh_duplicate", classes = "lqh", duplicate = TRUE),
+  mx_case("absence_flat", formulation = "absence", classes = "lqh"),
+  mx_case("absence_weighted", formulation = "absence", classes = "lqh", weighted = TRUE))
+
+mx_rows <- list()
+mx_reg <- list()
+mx_pred <- list()
+for (i in seq_len(nrow(MX_CASES))) {
+  row <- MX_CASES[i, ]
+  x <- mx_x
+  y <- mx_y[[row$response]]
+  # The duplicate case appends the first presence's readings once more as an absence, so that
+  # presence is not added to the background.
+  if (row$duplicate) {
+    x <- rbind(x, x[which(y == 1)[1L], , drop = FALSE])
+    y <- c(y, 0)
+  }
+  df <- mx_frame(x)
+  classes <- if (nzchar(row$classes)) row$classes else "default"
+  f <- maxnet::maxnet.formula(y, df, classes = classes)
+  used <- if (nzchar(row$classes)) row$classes else
+    as.character(timesift:::ts_maxnet_design_(as.numeric(x), y, nrow(x), ncol(x), "", 50L, 1,
+                                              "background", TRUE, 2)$classes)
+  if (row$formulation == "background") {
+    ref <- maxnet::maxnet(y, df, f, regmult = row$regmult,
+                          addsamplestobackground = row$add_samples,
+                          control = list(thresh = MX_THRESH, maxit = PEN_MAXIT))
+    glmnet::glmnet.control(factory = TRUE)
+    if (length(ref$lambda) != 200L) stop("maxnet did not complete its path on ", row$case)
+    grown <- if (row$add_samples) {
+      keep <- which(y == 1)
+      keep <- keep[!vapply(keep, function(k) any(apply(x[y == 0, , drop = FALSE], 1L,
+                                                       function(r) identical(r, x[k, ]))),
+                           logical(1L))]
+      list(x = rbind(x, x[keep, , drop = FALSE]), y = c(y, rep(0, length(keep))))
+    } else list(x = x, y = y)
+    mm <- stats::model.matrix(f, mx_frame(grown$x))
+    reg <- ref$penalty.factor
+    w <- grown$y + (1 - grown$y) * 100
+    lambda <- ref$lambda[200L]
+    a0 <- as.numeric(ref$a0[200L])
+    beta <- as.numeric(ref$beta[, 200L])
+    y_fit <- grown$y
+    out <- mx_frame(x * 1.3)
+    mx_pred[[i]] <- data.frame(
+      case = row$case, row = seq_len(nrow(x)),
+      cloglog = sprintf("%.12g", stats::predict(ref, df, type = "cloglog")),
+      logistic = sprintf("%.12g", stats::predict(ref, df, type = "logistic")),
+      cloglog_out = sprintf("%.12g", stats::predict(ref, out, type = "cloglog")),
+      logistic_out = sprintf("%.12g", stats::predict(ref, out, type = "logistic")),
+      stringsAsFactors = FALSE)
+    extra <- list(entropy = ref$entropy, alpha = ref$alpha, index = 200L, n_point = 200L)
+  } else {
+    mm <- stats::model.matrix(f, df)
+    reg <- maxnet::maxnet.default.regularization(y, mm) * row$regmult
+    w <- if (row$weighted) pen_w else rep(1, length(y))
+    cv <- settled(glmnet::cv.glmnet(mm, y, family = "binomial", weights = w, standardize = FALSE,
+                                    penalty.factor = reg, foldid = pen_fold + 1L,
+                                    type.measure = "deviance",
+                                    control = list(thresh = MX_THRESH, maxit = PEN_MAXIT)))
+    k <- which(cv$lambda == cv$lambda.min)
+    lambda <- cv$lambda.min
+    a0 <- as.numeric(cv$glmnet.fit$a0[k])
+    beta <- as.numeric(cv$glmnet.fit$beta[, k])
+    y_fit <- y
+    p <- stats::plogis(a0 + as.numeric(mm %*% beta))
+    mx_pred[[i]] <- data.frame(case = row$case, row = seq_len(nrow(x)),
+                               cloglog = "NA", logistic = sprintf("%.12g", p),
+                               cloglog_out = "NA", logistic_out = "NA", stringsAsFactors = FALSE)
+    extra <- list(entropy = NA_real_, alpha = NA_real_, index = k,
+                  n_point = length(cv$lambda))
+  }
+  vp <- reg * length(reg) / sum(reg)
+  wn <- w / sum(w)
+  eta <- a0 + as.numeric(mm %*% beta)
+  objective <- -sum(wn * (y_fit * eta - log1p(exp(eta)))) + lambda * sum(vp * abs(beta))
+  mx_rows[[i]] <- data.frame(
+    row, classes_used = used, n_row = nrow(mm), n_feature = ncol(mm),
+    lambda = sprintf("%.12g", lambda), objective = sprintf("%.15g", objective),
+    entropy = if (is.na(extra$entropy)) "NA" else sprintf("%.12g", extra$entropy),
+    alpha = if (is.na(extra$alpha)) "NA" else sprintf("%.12g", extra$alpha),
+    index = extra$index, n_point = extra$n_point, stringsAsFactors = FALSE)
+  mx_reg[[i]] <- data.frame(case = row$case, feature = seq_along(reg),
+                            reg = sprintf("%.17g", reg), stringsAsFactors = FALSE)
+}
+glmnet::glmnet.control(factory = TRUE)
+write_fixture(cbind(do.call(rbind, mx_rows), thresh = sprintf("%.12g", MX_THRESH),
+                    max_pass = sprintf("%.12g", PEN_MAXIT), reg_tolerance = 1e-12,
+                    objective_tolerance = 1e-10, prediction_tolerance = 1e-4),
+              "maxnet_cases.csv")
+write_fixture(do.call(rbind, mx_reg), "maxnet_regularization.csv")
+write_fixture(do.call(rbind, mx_pred), "maxnet_predict.csv")
+cat("wrote", nrow(MX_CASES), "maxnet cases\n")

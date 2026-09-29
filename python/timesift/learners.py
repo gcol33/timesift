@@ -943,6 +943,114 @@ def _boost_predict(model, x):
     return _predict_columns(model["models"], flatten(x), boost_predict)
 
 
+def maxnet(data=None, classes=None, regmult=1.0, formulation="background", type=None, knots=50,
+           add_samples=True, clamp=True, n_inner=5, s="lambda.min", thresh=1e-8, max_design=2.0,
+           threads=1, seed=1) -> Learner:
+    """One maxnet model per variable, over every bin-by-channel column: maxnet's feature classes,
+    its regularisation of each feature, and a lasso over them, fitted by the penalised core
+    :func:`elasticnet` runs on, which the R package calls too. With the maxnet package's own
+    settings the features and the penalty factors are maxnet's to rounding, and the fit settles at
+    the objective glmnet reaches for maxnet.
+
+    The feature classes are the letters of ``classes``: ``l`` the column itself, ``q`` its square,
+    ``p`` the product of each pair of columns, ``h`` forward and reverse hinges at the interior of
+    ``knots`` equally spaced points of each column's range, and ``t`` thresholds at 49 interior
+    points of it. Left ``None``, they follow the response's presence count as ``maxnet.formula()``
+    has them: ``"l"`` under 10 presences, ``"lq"`` under 15, ``"lqh"`` under 80, and ``"lqph"``
+    from 80 on. A column holding one value over the units fitted takes no feature.
+
+    ``formulation`` says what the absences are. ``"background"`` is maxnet's own and what biomod2
+    fits as ``MAXNET``: every unit is background, each presence joins the background again unless
+    an absence carries the same readings (``add_samples``), the background is weighted 100 against
+    a presence's 1, and the model is read at the last of maxnet's 200 penalties, which scale with
+    ``regmult``. Its output is maxnet's ``type``, ``"cloglog"`` by default as biomod2 predicts it.
+    ``"absence"`` reads the absences as absences: a logistic lasso over the same features and
+    penalty factors under the response head's case weights,
+    :func:`~timesift.response.positive_weights` under presence-absence, with the penalty chosen by
+    an inner cross-validation dealt as the elastic net's is (``n_inner`` folds, read at ``s``), and
+    a probability as output.
+
+    The background formulation takes no case weights, as maxnet takes none and biomod2 passes none:
+    the background weight is what sets a presence's weight there. Either formulation holds each
+    column inside the range it was fitted on, and each feature inside its own, before predicting,
+    as maxnet's ``predict(clamp=TRUE)`` does; ``clamp=False`` reads them as they are.
+
+    A hinge per column per knot makes the design large: a weekly three-channel representation,
+    471 columns, is 47,100 features under ``"lqh"``, and its products under ``"lqph"`` 110,685
+    more. The design is held in memory with a centred copy beside it, and a fit whose design would
+    take more than ``max_design`` gigabytes is refused with the size it would have taken.
+
+    A response with fewer than two presences, or one whose inner training sets cannot each hold two
+    of each outcome under the absence formulation, is predicted its share among the fitting units,
+    and the fit names it in ``unfitted``. A path that does not settle at a penalty ends there and is
+    read at its last settled point; the fit names every such response in ``stopped``. The learner
+    needs a presence-absence response, under a head whose loss is the binary cross-entropy.
+    """
+    if formulation not in ("background", "absence"):
+        raise ValueError(f'`formulation` is "background" or "absence", got {formulation!r}.')
+    if s not in ("lambda.min", "lambda.1se"):
+        raise ValueError(f'`s` is "lambda.min" or "lambda.1se", got {s!r}.')
+    if classes is not None and (not isinstance(classes, str) or not classes
+                                or any(c not in "lqpht" for c in classes)):
+        raise ValueError("`classes` is a string of the letters l, q, p, h and t, or None, "
+                         f"got {classes!r}.")
+    return Learner(name="maxnet", fit=_maxnet_fit, predict=_maxnet_predict, data=data,
+                   reads="tabular", multi="separate",
+                   params=dict(classes=classes, regmult=float(regmult), formulation=formulation,
+                               type=_maxnet_type(formulation, type), knots=int(knots),
+                               add_samples=bool(add_samples), clamp=bool(clamp),
+                               n_inner=int(n_inner), s=s, thresh=float(thresh),
+                               max_design=float(max_design), threads=int(threads),
+                               seed=int(seed)))
+
+
+def _maxnet_type(formulation, type) -> str:
+    """The output a formulation predicts: maxnet's cloglog by default under the background, and the
+    probability, which is the logistic output, under the absences."""
+    if type is None:
+        return "cloglog" if formulation == "background" else "logistic"
+    allowed = ("cloglog", "logistic") if formulation == "background" else ("logistic",)
+    if type not in allowed:
+        raise ValueError(f"the {formulation} formulation predicts "
+                         f"{' or '.join(repr(a) for a in allowed)}, got {type!r}.")
+    return type
+
+
+def _maxnet_fit(x, y, classes, regmult, formulation, type, knots, add_samples, clamp, n_inner, s,
+                thresh, max_design, threads, seed, head, variables, group=None, **_):
+    from ._maxnet import maxnet_fit
+    if _family(head) != "binomial":
+        raise ValueError("maxnet fits a presence-absence response, under a head whose loss is the "
+                         f"binary cross-entropy; this head's loss is {head['loss']!r}.")
+    m = flatten(x)
+
+    def make(design, yj, seed_j, w):
+        if (yj == 1).sum() < 2:
+            return float(yj.mean())
+        fold, n_fold = None, 0
+        if formulation == "absence":
+            fold = _inner_folds(yj, n_inner, seed_j, group)
+            if not _inner_fittable(yj, fold):
+                return float(yj.mean())
+            n_fold = int(fold.max()) + 1
+        return maxnet_fit(design, yj, w, classes=classes, knots=knots, regmult=regmult,
+                          formulation=formulation, add_samples=add_samples, thresh=thresh,
+                          one_se=s == "lambda.1se", fold=fold, n_fold=n_fold, threads=threads,
+                          max_design=max_design)
+
+    models = _fit_columns(m, y, make, _variable_seeds(seed, variables), _head_weights(head, y))
+    return dict(models=models, n_col=m.shape[1], type=type, clamp=clamp,
+                unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)],
+                stopped=[str(v) for v, f in zip(variables, models)
+                         if isinstance(f, dict) and (f["stalled"] > 0 or f["fold_stalled"] > 0)])
+
+
+def _maxnet_predict(model, x):
+    from ._maxnet import maxnet_predict
+    return _predict_columns(model["models"], flatten(x),
+                            lambda f, m: maxnet_predict(f, m, model["clamp"], model["type"]))
+
+
 def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prune="se_sum",
          n_inner=None, preset="package", seed=1) -> Learner:
     """One classification or regression tree per variable, over every bin-by-channel column,

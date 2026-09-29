@@ -42,6 +42,8 @@ sdist.include = [
   "src/ts_core.h",
   "src/ts_penalised.cpp",
   "src/ts_penalised.h",
+  "src/ts_maxnet.cpp",
+  "src/ts_maxnet.h",
   "src/ts_tree.cpp",
   "src/ts_tree.h",
   "src/ts_boost.cpp",
