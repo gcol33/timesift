@@ -73,7 +73,7 @@
     <li><a class="dropdown-item" href="../articles/python-artifacts.html">What crosses the boundary</a></li>
   </ul>
 </li>
-<li class="active nav-item"><a class="nav-link" href="../articles/contract.html">Contract</a></li>
+<li class="nav-item"><a class="nav-link" href="../articles/contract.html">Contract</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
@@ -1543,6 +1543,136 @@ difference from rpart is <code>1.1e-16</code>.</p>
 </div>
 </div>
 <div class="section level2">
+<h2 id="the-forest">The forest<a class="anchor" aria-label="anchor" href="#the-forest"></a>
+</h2>
+<p><code><a href="../reference/forest.html">forest()</a></code> is one random forest per response, over the
+same core. Its split search is the tree’s, and everything else it does
+is drawn, from one generator this section defines, so that a forest is
+the same forest in either language and on any number of threads.</p>
+<div class="section level3">
+<h3 id="the-generator">The generator<a class="anchor" aria-label="anchor" href="#the-generator"></a>
+</h3>
+<p>Every word is an unsigned 32-bit integer and every operation is taken
+modulo 2^32.</p>
+<ul>
+<li>SplitMix32 advances a counter by <code>0x9E3779B9</code> and returns
+<code>z ^ (z &gt;&gt; 16)</code>, where
+<code>z = (c ^ (c &gt;&gt; 16)) * 0x85EBCA6B</code>, then
+<code>z = (z ^ (z &gt;&gt; 13)) * 0xC2B2AE35</code>, <code>c</code> the
+advanced counter.</li>
+<li>Tree <code>t</code> of a forest seeded <code>s</code> starts the
+counter at <code>s + 4 t * 0x9E3779B9</code>, which makes its state the
+outputs <code>4t + 1</code> to <code>4t + 4</code> of one SplitMix32
+stream started at <code>s</code>. Those four words are the state
+<code>s0, s1, s2, s3</code> of a xoshiro128** generator (Blackman and
+Vigna).</li>
+<li>An output is <code>rotl(s1 * 5, 7) * 9</code>; the state then moves
+by <code>t = s1 &lt;&lt; 9</code>, <code>s2 ^= s0</code>,
+<code>s3 ^= s1</code>, <code>s1 ^= s2</code>, <code>s0 ^= s3</code>,
+<code>s2 ^= t</code>, <code>s3 = rotl(s3, 11)</code>.</li>
+<li>A uniform is an output times 2^-32, on <code>[0, 1)</code> and exact
+in a double. An index below <code>k</code> is that uniform times
+<code>k</code> rounded down, and <code>k - 1</code> should the product
+round up to <code>k</code>.</li>
+<li>A seed is taken modulo 2^32. The learners derive one per response as
+every other learner does, from the learner’s seed and the response’s
+name.</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="the-bootstrap">The bootstrap<a class="anchor" aria-label="anchor" href="#the-bootstrap"></a>
+</h3>
+<ul>
+<li>The observations are drawn with replacement, each in proportion to
+its case weight: a draw takes a uniform times the total weight and
+returns the first observation, in row order, whose running sum of
+weights exceeds it. The running sum is taken one addition at a time. An
+observation of zero weight is never drawn.</li>
+<li>A forest draws as many observations as there are. A balanced one
+draws from the zeros alone and then from the ones alone, each as many
+times as the smaller class holds observations of positive weight; a
+class of no weight is an error, and so is <code>balance</code> on a
+Gaussian family.</li>
+<li>The draws make one list of rows: every row in ascending order,
+repeated as many times as it was drawn. The order in which the draws
+came does not reach the tree.</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="the-tree-of-a-forest">The tree of a forest<a class="anchor" aria-label="anchor" href="#the-tree-of-a-forest"></a>
+</h3>
+<ul>
+<li>Each drawn observation weighs one. The tree is grown depth first, a
+node before its children and its left child’s subtree before its right
+child’s, and every draw a node makes is made in that order.</li>
+<li>A node holding fewer than <code>2 * min_leaf</code> observations, or
+observations whose responses are all equal, is a leaf. Nothing is pruned
+and there is no complexity threshold: a node is split wherever a split
+improves on it.</li>
+<li>A node that may be split first draws its columns. The tree keeps one
+arrangement of the column indices, the identity at its root and never
+reset between nodes; for <code>c</code> from 0 to <code>mtry - 1</code>,
+position <code>c</code> is swapped with position <code>c + j</code>,
+<code>j</code> an index below <code>p - c</code>. The first
+<code>mtry</code> positions are the node’s columns, tried in ascending
+order.</li>
+<li>For each column the node’s observations are sorted by it, ties kept
+in the order the node holds them, and searched as the tree’s split
+search searches: a split only between two distinct values, at their
+midpoint, at least <code>min_leaf</code> observations on each side, the
+Gini index of the counts or the sum of squares, the first position
+reaching the largest improvement. The node takes the first column
+reaching the largest improvement, and an improvement at or below
+<code>1e-10</code> of the largest the tree has seen, updated with the
+improvement read, is none.</li>
+<li>The node’s observations go left or right by its split, each side
+keeping the order the node held them in.</li>
+<li>A leaf’s value is the share of ones among its observations, or their
+mean, the mean’s sum taken one addition at a time in the node’s
+order.</li>
+<li>The forest’s prediction for a row is the sum of its trees’ leaf
+values, taken in tree order, over the number of trees.</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="the-settings">The settings<a class="anchor" aria-label="anchor" href="#the-settings"></a>
+</h3>
+<p><code>preset = "package"</code> is randomForest’s own defaults, which
+is what biomod2’s default option set fits: 500 trees, <code>mtry</code>
+the square root of the column count rounded down under a binomial family
+and a third of it under a Gaussian one, never below one, and
+<code>min_node</code>, the <code>min_leaf</code> above, one and five
+under the two. <code>preset = "bigboss"</code> is biomod2’s tuned option
+set: 500 trees, <code>mtry = 2</code>, <code>min_node = 5</code>. A
+setting given explicitly beats either, and an <code>mtry</code> above
+the column count is the column count.</p>
+</div>
+<div class="section level3">
+<h3 id="the-fixtures-2">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-2"></a>
+</h3>
+<p>No package grows a forest from this generator, so the reference is
+the forest grown from this text in R alone,
+<code>tests/testthat/helper-oracle-forest.R</code>, which computes the
+generator’s arithmetic in doubles where every step is exact.
+<code>forest_cases.csv</code> names six cases on the tree’s design: each
+family, flat weights and the tree’s counts, a balanced forest, one
+trying every column, and a seed of 2^32 - 1.
+<code>forest_nodes.csv</code> holds each tree’s node table and
+<code>forest_predict.csv</code> the forest’s prediction for every unit.
+<code>forest_stream.csv</code> holds the generator’s first eight outputs
+for five seed and tree pairs, which the Python suite also checks against
+a reimplementation of the generator of its own.</p>
+</div>
+<div class="section level3">
+<h3 id="how-exactly-3">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-3"></a>
+</h3>
+<p>Every field of every node, the thresholds and values included, and
+every prediction are asserted exactly: the core and the oracle perform
+the same operations in the same order, and no sum in a forest depends on
+a machine’s extended precision.</p>
+</div>
+</div>
+<div class="section level2">
 <h2 id="what-each-language-carries">What each language carries<a class="anchor" aria-label="anchor" href="#what-each-language-carries"></a>
 </h2>
 <p>The representation and the three artifacts are the contract.
@@ -1849,15 +1979,14 @@ per cell of the response, and the encoders, the penalised fit, the
 forest and the forward search all fit under it: the encoders as an
 elementwise weight on the loss, the penalised fit and the forward search
 as case weights, and the forest as the probability a unit is drawn into
-a tree’s bootstrap, which is what ranger’s case weights are and what the
-Python side’s forest does with its own draw, because scikit-learn’s
-forest grows the same pure-leaved tree under any sample weight. The
-weights function takes the response and a mask of the rows the model is
-fitted on, reads whatever it reads off those rows alone, and weights
-every row. The shipped presence-absence head weights each presence by
-the ratio of absences to presences among the fitting units, capped at
-50, and each absence by one; a head without a weights function fits
-unweighted. On both sides.</li>
+a tree’s bootstrap, since a tree grown to pure leaves is the same tree
+under any weight on its observations. The weights function takes the
+response and a mask of the rows the model is fitted on, reads whatever
+it reads off those rows alone, and weights every row. The shipped
+presence-absence head weights each presence by the ratio of absences to
+presences among the fitting units, capped at 50, and each absence by
+one; a head without a weights function fits unweighted. On both
+sides.</li>
 <li>The encoders standardise every channel by its own centre and sample
 standard deviation over every unit and bin of the fitting units, except
 a channel <code>position</code> names, which they read at its own

@@ -18,7 +18,7 @@ import pytest
 from timesift import Response, fit_learner, grain_matrix, tree
 from timesift.learners import flatten
 from timesift.metrics import roc_auc
-from timesift.tree import tree_fit, tree_predict, tree_prune, tree_prune_cp
+from timesift._tree import tree_fit, tree_predict, tree_prune, tree_prune_cp
 
 FIXTURES = Path(__file__).resolve().parents[2] / "inst" / "spec" / "fixtures"
 HELD = ("unit", "y_gaussian", "y_binomial", "w", "fold")

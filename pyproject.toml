@@ -18,8 +18,6 @@ dependencies = ["numpy>=1.24", "tzdata; platform_system == 'Windows'"]
 
 [project.optional-dependencies]
 torch = ["torch>=2.0"]
-# The trees `forest()` grows, and nothing else: the penalised fit is the shared core.
-sklearn = ["scikit-learn>=1.0"]
 # The multivariate t `grain_contrasts()` reads Dunnett's comparisons against, and the optimiser
 # its restricted fit is found by; the mixed model itself is written out in numpy.
 contrasts = ["scipy>=1.15"]
@@ -44,6 +42,8 @@ sdist.include = [
   "src/ts_core.h",
   "src/ts_penalised.cpp",
   "src/ts_penalised.h",
+  "src/ts_tree.cpp",
+  "src/ts_tree.h",
   "python/ts_py.cpp",
   "python/tests/**",
   "inst/spec/**",
@@ -84,7 +84,7 @@ regex = '(?im)^Version: *(?P<value>\S+)'
 [tool.cibuildwheel]
 build = "cp311-* cp312-* cp313-*"
 skip = "*-musllinux_* *-win32 *_i686"
-test-extras = ["test", "sklearn"]
+test-extras = ["test"]
 test-command = "pytest {project}/python/tests -q -p no:cacheprovider"
 
 [tool.pytest.ini_options]

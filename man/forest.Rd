@@ -4,7 +4,16 @@
 \alias{forest}
 \title{Random forest on the flattened representation}
 \usage{
-forest(data = NULL, trees = 500L, mtry = NULL, min_node = 1L, seed = 1L)
+forest(
+  data = NULL,
+  trees = NULL,
+  mtry = NULL,
+  min_node = NULL,
+  balance = FALSE,
+  preset = c("package", "bigboss"),
+  seed = 1L,
+  threads = 1L
+)
 }
 \arguments{
 \item{data}{A representation the learner is pinned to, or \code{NULL} to run across every
@@ -12,12 +21,17 @@ representation of the run.}
 
 \item{trees}{Trees in the forest.}
 
-\item{mtry}{Columns tried at each split, or \code{NULL} for the square root of the column count.}
+\item{mtry}{Columns drawn for each node, the best of which it is split on.}
 
-\item{min_node}{Smallest node a split is made on.}
+\item{min_node}{Units each side of a split keeps.}
 
-\item{seed}{Seed for the bootstrap draw and the split sampling, which are random and would
-otherwise make the fit irreproducible.}
+\item{balance}{Whether each tree draws as many units from each class as the smaller holds.}
+
+\item{preset}{Whose defaults the settings left \code{NULL} take: \code{"package"} or \code{"bigboss"}.}
+
+\item{seed}{Seed for the bootstrap draws and the column draws.}
+
+\item{threads}{Trees grown at once. The forest is the same on any number.}
 }
 \value{
 A \code{\link[=learner]{learner()}}.
@@ -31,11 +45,31 @@ and it finds an interaction between two bins that a linear model would need the 
 for.
 }
 \details{
+Each tree is grown on a bootstrap draw of the units, as many draws as there are units, and each
+node is split on the best of \code{mtry} columns drawn for it, by the Gini index or the sum of squares
+\code{\link[=tree]{tree()}} splits by. A tree is grown out: a node is split while it holds at least twice
+\code{min_node} units and its responses differ. A leaf reports the share of presences among the draws
+it holds, or their mean, and the forest the mean over its trees. The forest is grown by the core
+the Python package calls, and every draw comes from one generator seeded per tree, so the two
+languages grow the same forest on any number of threads.
+
+\code{balance = TRUE} is the down-sampled forest biomod2 fits as \code{RFd}: each tree draws as many units
+from each class as the smaller class holds, so a rare response's presences are half of every
+tree's draw.
+
+\code{preset} says whose defaults the settings left \code{NULL} take. \code{"package"} is randomForest's own,
+which is what biomod2's default option set fits: 500 trees, \code{mtry} the square root of the column
+count under presence-absence and a third of it under a squared-error loss, and \code{min_node} 1 and
+5 under the two. \code{"bigboss"} is biomod2's tuned option set: 500 trees, \code{mtry = 2} and
+\code{min_node = 5}. A setting given explicitly beats either, and an \code{mtry} above the column count is
+the column count.
+
 The case weights are the response head's, \code{\link[=positive_weights]{positive_weights()}} under presence-absence, and
-weight the bootstrap draw: a rare response is not fitted away here for a reason the other
-learners do not share, because every learner that ships reads the same weights.
+weight the bootstrap draw: a unit is drawn in proportion to its weight, and within its class
+under \code{balance}.
 }
 \examples{
 forest(trees = 200L)
+forest(preset = "bigboss", balance = TRUE)
 
 }

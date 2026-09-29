@@ -21,6 +21,23 @@
   ts_tree_predict_(tree, as.numeric(newx), nrow(newx), ncol(newx))
 }
 
+# The forest, over the same core. A seed is a number modulo 2^32 there, and crosses as a double
+# since an R integer cannot hold every one.
+.forest_fit <- function(x, y, w, family, trees, mtry, min_leaf, balance, seed, threads = 1L) {
+  ts_forest_fit_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x), family,
+                 as.integer(trees), as.integer(mtry), as.integer(min_leaf), isTRUE(balance),
+                 as.numeric(seed) %% 2^32, as.integer(threads))
+}
+
+.forest_predict <- function(forest, newx) {
+  ts_forest_predict_(forest, as.numeric(newx), nrow(newx), ncol(newx))
+}
+
+# The first `n` outputs of the generator tree `tree` of a forest seeded `seed` draws from.
+.forest_stream <- function(seed, tree, n) {
+  ts_forest_stream_(as.numeric(seed) %% 2^32, as.numeric(tree), as.integer(n))
+}
+
 # The complexity a tree is pruned back to, read off its cross-validated complexity table.
 # `"se_sum"` is the row of least cross-validated error plus its standard error among the rows
 # that keep a split, the last of them where several tie, which is how biomod2 prunes its

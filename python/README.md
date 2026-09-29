@@ -47,7 +47,7 @@ threshold learned from the fit's own out-of-fold predictions.
   count of readings per unit and bin, which is where a refused record's gaps are read off.
 - `cv`, `grouped_cv`, `fold_map`, `read_folds`, `scorable_cells`: the split, and which cells admit
   a score.
-- `elasticnet`, `stepwise`, `tree`, `forest` (scikit-learn), `mlp`, `cnn`, `rescnn` (torch), and `Learner`
+- `elasticnet`, `stepwise`, `tree`, `forest`, `mlp`, `cnn`, `rescnn` (torch), and `Learner`
   for one of your own. `train_control` carries how any of the neural ones is trained.
 - `ensemble`, `ensemble_fit`, `ensemble_combine`, `ensemble_weights`: the stack over the
   candidates' out-of-fold predictions.
@@ -103,6 +103,6 @@ The project directory is the repository root, because a source distribution cann
 itself and the shared sources are not vendored into a second copy. Build and test from there:
 
 ```
-pip install -e ".[test,torch,sklearn]"
+pip install -e ".[test,torch]"
 pytest
 ```

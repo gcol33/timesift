@@ -1,4 +1,4 @@
-"""The tree, over the core ``src/ts_tree.cpp`` compiles into both languages.
+"""The tree and the forest, over the core ``src/ts_tree.cpp`` compiles into both languages.
 
 Nothing here grows anything: the design, the family, the case weights and the inner folds are
 settled above, and what is left is to hand them over column-major and to read the complexity table
@@ -15,7 +15,8 @@ import numpy as np
 
 from . import _core
 
-__all__ = ["tree_fit", "tree_prune", "tree_predict", "tree_prune_cp"]
+__all__ = ["tree_fit", "tree_prune", "tree_predict", "tree_prune_cp", "forest_fit",
+           "forest_predict", "forest_stream"]
 
 PRUNE_RULES = ("se_sum", "one_se", "min", "none")
 
@@ -45,6 +46,26 @@ def tree_predict(tree: dict, newx) -> np.ndarray:
     """The value of the leaf each row of ``newx`` falls into: the probability of a 1, or the
     mean."""
     return _core.tree_predict(tree, _design(newx))
+
+
+def forest_fit(x, y, w, family, trees, mtry, min_leaf, balance, seed, threads=1) -> dict:
+    """A random forest grown by the core: each tree on a bootstrap draw weighted by ``w``, each
+    node split on the best of ``mtry`` columns drawn for it. ``seed`` is taken modulo 2^32."""
+    return _core.forest_fit(_design(x), np.ascontiguousarray(y, dtype=np.float64),
+                            np.ascontiguousarray(w, dtype=np.float64), family, int(trees),
+                            int(mtry), int(min_leaf), bool(balance), int(seed) & 0xFFFFFFFF,
+                            int(threads))
+
+
+def forest_predict(forest: dict, newx) -> np.ndarray:
+    """The mean over the forest's trees of the leaf each row of ``newx`` falls into."""
+    return _core.forest_predict(forest, _design(newx))
+
+
+def forest_stream(seed, tree, n) -> np.ndarray:
+    """The first ``n`` outputs of the generator tree ``tree`` of a forest seeded ``seed`` draws
+    from."""
+    return _core.forest_stream(int(seed) & 0xFFFFFFFF, int(tree), int(n))
 
 
 def tree_prune_cp(tree: dict, rule: str):

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 from dataclasses import replace
 
 import numpy as np
@@ -95,8 +94,6 @@ def test_every_unit_lands_in_exactly_one_fold():
 
 
 def test_a_signal_buried_in_hourly_noise_is_found_once_the_record_is_averaged():
-    if importlib.util.find_spec("sklearn") is None:
-        pytest.skip("scikit-learn is not installed")
     readings, y, _ = sim(n_unit=48, days=120, noise=20.0, seed=5)
     x = grain_matrix(readings, "id", "time", "value", grain=["day", "month"])
     lad = grain_ladder(x, y, "elasticnet", folds=fold_map(y, v=4, seed=3), verbose=False)

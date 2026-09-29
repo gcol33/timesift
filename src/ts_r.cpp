@@ -491,3 +491,61 @@ cpp11::doubles ts_tree_predict_(cpp11::list tree, cpp11::doubles newx, int n, in
                          static_cast<std::size_t>(p), out.data());
   return give(out);
 }
+
+// The forest crosses the same way: one vector per field of its node table, the trees one after
+// another, and the offset of each tree's first node. A seed is a number modulo 2^32, which an R
+// integer cannot carry, so it crosses as a double.
+[[cpp11::register]]
+cpp11::list ts_forest_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                           std::string family, int trees, int mtry, int min_leaf, bool balance,
+                           double seed, int threads) {
+  using namespace cpp11::literals;
+  timesift::ForestSpec spec;
+  spec.trees = trees;
+  spec.mtry = mtry;
+  spec.min_leaf = min_leaf;
+  spec.balance = balance;
+  spec.seed = static_cast<std::uint32_t>(static_cast<std::uint64_t>(seed));
+  spec.threads = threads;
+  const timesift::Forest forest = timesift::forest_fit(
+      REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
+      static_cast<std::size_t>(p), timesift::family_from_name(family), spec);
+  return cpp11::writable::list({
+    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(forest.family))),
+    "n_column"_nm = cpp11::as_sexp(forest.n_column),
+    "offset"_nm = give(forest.offset),
+    "column"_nm = give(forest.column),
+    "threshold"_nm = give(forest.threshold),
+    "less_left"_nm = give(forest.less_left),
+    "left"_nm = give(forest.left),
+    "right"_nm = give(forest.right),
+    "value"_nm = give(forest.value)
+  });
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_forest_predict_(cpp11::list forest, cpp11::doubles newx, int n, int p) {
+  timesift::Forest f;
+  f.family = timesift::family_from_name(cpp11::as_cpp<std::string>(forest["family"]));
+  f.n_column = cpp11::as_cpp<int>(forest["n_column"]);
+  f.offset = take_field<std::int32_t>(forest, "offset");
+  f.column = take_field<std::int32_t>(forest, "column");
+  f.threshold = take_field<double>(forest, "threshold");
+  f.less_left = take_field<std::int8_t>(forest, "less_left");
+  f.left = take_field<std::int32_t>(forest, "left");
+  f.right = take_field<std::int32_t>(forest, "right");
+  f.value = take_field<double>(forest, "value");
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::forest_predict(f, REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                           static_cast<std::size_t>(p), out.data());
+  return give(out);
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_forest_stream_(double seed, double tree, int n) {
+  std::vector<std::uint32_t> raw(static_cast<std::size_t>(n));
+  timesift::forest_stream(static_cast<std::uint32_t>(static_cast<std::uint64_t>(seed)),
+                          static_cast<std::uint32_t>(static_cast<std::uint64_t>(tree)),
+                          raw.size(), raw.data());
+  return give(std::vector<double>(raw.begin(), raw.end()));
+}

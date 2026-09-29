@@ -59,7 +59,7 @@
     <li><a class="dropdown-item" href="../articles/reproducing-schrankogel.html">Reproducing the study</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-python" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Python</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-python">
 <li><a class="dropdown-item" href="../articles/python.html">Overview</a></li>
@@ -242,16 +242,48 @@ rpart’s do.</p>
 <h2 id="forest">
 <code>forest()</code><a class="anchor" aria-label="anchor" href="#forest"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>forest(data<span class="op">=</span><span class="va">None</span>, trees<span class="op">=</span><span class="dv">500</span>, mtry<span class="op">=</span><span class="va">None</span>, min_node<span class="op">=</span><span class="dv">1</span>, seed<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>forest(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    trees<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    mtry<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    min_node<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    balance<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'package'</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>)</span></code></pre></div>
 <p>One random forest per variable, over every bin-by-channel column: a
-classifier under a presence-absence head and a regressor under a head
-with a squared-error loss.</p>
-<p><code>mtry</code> is how many columns are offered at a split,
-defaulting to the square root of how many there are, and
-<code>min_node</code> is the smallest leaf a split may produce. The
-forest reads the columns one at a time and carries no order between
-them, so it is the arm that asks what the features hold once nothing
-about the record’s shape is available to the model.</p>
+probability forest under a presence-absence head and a regression forest
+under a head with a squared-error loss. Trees split on one column at a
+time and pay nothing for columns that carry nothing, so a forest reads a
+wide tabular representation without a penalty path and without a
+selection step.</p>
+<p>Each tree is grown on a bootstrap draw of the units, as many draws as
+there are units, and each node is split on the best of <code>mtry</code>
+columns drawn for it, by the Gini index or the sum of squares
+<code>tree</code> splits by. A tree is grown out: a node is split while
+it holds at least twice <code>min_node</code> units and its responses
+differ. A leaf reports the share of presences among the draws it holds,
+or their mean, and the forest the mean over its trees. The forest is
+grown by the core the R package calls, and every draw comes from one
+generator seeded per tree, so the two languages grow the same forest on
+any number of threads.</p>
+<p><code>balance=True</code> is the down-sampled forest biomod2 fits as
+<code>RFd</code>: each tree draws as many units from each class as the
+smaller class holds.</p>
+<p><code>preset</code> says whose defaults the settings left
+<code>None</code> take. <code>"package"</code> is randomForest’s own,
+which is what biomod2’s default option set fits: 500 trees,
+<code>mtry</code> the square root of the column count under
+presence-absence and a third of it under a squared-error loss, and
+<code>min_node</code> 1 and 5 under the two. <code>"bigboss"</code> is
+biomod2’s tuned option set: 500 trees, <code>mtry=2</code> and
+<code>min_node=5</code>. A setting given explicitly beats either, and an
+<code>mtry</code> above the column count is the column count.</p>
+<p>The case weights are the response head’s,
+<code>timesift.response.positive_weights</code> under presence-absence,
+and weight the bootstrap draw: a unit is drawn in proportion to its
+weight, and within its class under <code>balance</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="mlp">

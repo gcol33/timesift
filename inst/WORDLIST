@@ -22,6 +22,7 @@ Olshen
 PyPI
 R's
 Schrankogel
+SplitMix
 TSS
 Tibshirani
 TimesiftSpec
@@ -59,6 +60,8 @@ np
 numpy
 numpy's
 pytest
+randomForest
+randomForest's
 rescored
 rescores
 rescoring
@@ -77,4 +80,5 @@ tidyselect
 tidyselect's
 unscorable
 vendored
+xoshiro
 zenodo

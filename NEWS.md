@@ -12,6 +12,32 @@
   languages, so the two grow the same tree; on the contract's twelve cases it reproduces rpart's
   node table, complexity table, cross-validated error and pruned predictions to `1.1e-16`. Both
   languages.
+* `forest(balance = TRUE)` is the down-sampled forest biomod2 fits as `RFd`: each tree draws as
+  many units from each class as the smaller class holds. `forest()` also takes `preset`
+  (`"package"`, randomForest's defaults, or `"bigboss"`, biomod2's tuned set) and `threads`. Both
+  languages.
+
+## Changed
+
+* `forest()` is grown by the core `src/ts_tree.cpp` on both sides, in place of ranger in R and
+  scikit-learn in Python. Its split search is the tree's, and its bootstrap and column draws come
+  from one generator the contract defines (SplitMix32 seeding xoshiro128\*\*, one stream per
+  tree), so R and Python grow the same forest, bit for bit, on any number of threads. The forest
+  is asserted node for node against one grown from the contract's text in R alone. ranger leaves
+  Suggests and the Python `sklearn` extra is gone. This changes `forest()`'s numbers on both sides.
+  Scored by TSS on the vignette's simulated record, on the vignette's folds, the old forest and the
+  new one read 0.718 and 0.733 weekly and 0.737 and 0.752 monthly on 60 plots, and 0.762 and 0.760
+  weekly and 0.748 and 0.742 monthly on 300, every difference inside one standard error. On
+  simulated presence-absence data its held-out AUC is level with randomForest's under the same
+  settings (a mean difference of -0.0025 over ten draws, paired t -0.62). One forest on 894 units
+  and 471 columns takes 5.3 s on one thread against ranger's 3.3 s. Nothing in the reproduction
+  or the selection benchmark fits a forest.
+* `min_node` is the fewest units each side of a split keeps, randomForest's `nodesize`; it had
+  been ranger's smallest node split in R and scikit-learn's smallest leaf in Python.
+* Python's internal module `timesift.tree` is `timesift._tree`. Importing the submodule replaced
+  the exported `tree()` on the package with the module.
+* The Python source distribution carries `src/ts_tree.cpp` and `src/ts_tree.h`, which a wheel
+  built from it needs.
 
 # timesift 0.4.0
 

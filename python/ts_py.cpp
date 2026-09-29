@@ -170,8 +170,8 @@ timesift::Tree take_tree(const nb::dict& tree) {
 }  // namespace
 
 NB_MODULE(_core, m) {
-  m.doc() = "The binning, the reduction, the penalised fit and the tree, shared with the R "
-            "package as src/ts_core.cpp, src/ts_penalised.cpp and src/ts_tree.cpp.";
+  m.doc() = "The binning, the reduction, the penalised fit, the tree and the forest, shared with "
+            "the R package as src/ts_core.cpp, src/ts_penalised.cpp and src/ts_tree.cpp.";
 
   nb::register_exception_translator(
       [](const std::exception_ptr& p, void*) {
@@ -377,4 +377,62 @@ NB_MODULE(_core, m) {
           return give(std::move(out));
         },
         nb::arg("tree"), nb::arg("newx"));
+
+  m.def("forest_fit",
+        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int trees, int mtry,
+           int min_leaf, bool balance, std::uint32_t seed, int threads) {
+          timesift::ForestSpec spec;
+          spec.trees = trees;
+          spec.mtry = mtry;
+          spec.min_leaf = min_leaf;
+          spec.balance = balance;
+          spec.seed = seed;
+          spec.threads = threads;
+          timesift::Forest forest;
+          {
+            nb::gil_scoped_release release;
+            forest = timesift::forest_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
+                                          timesift::family_from_name(family), spec);
+          }
+          nb::dict out;
+          out["family"] = std::string(timesift::family_name(forest.family));
+          out["n_column"] = forest.n_column;
+          out["offset"] = give(std::move(forest.offset));
+          out["column"] = give(std::move(forest.column));
+          out["threshold"] = give(std::move(forest.threshold));
+          out["less_left"] = give(std::move(forest.less_left));
+          out["left"] = give(std::move(forest.left));
+          out["right"] = give(std::move(forest.right));
+          out["value"] = give(std::move(forest.value));
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("trees"),
+        nb::arg("mtry"), nb::arg("min_leaf"), nb::arg("balance"), nb::arg("seed"),
+        nb::arg("threads") = 1);
+
+  m.def("forest_predict",
+        [](const nb::dict& forest, ConstMat newx) {
+          timesift::Forest f;
+          f.family = timesift::family_from_name(nb::cast<std::string>(forest["family"]));
+          f.n_column = nb::cast<std::int32_t>(forest["n_column"]);
+          f.offset = take_field<std::int32_t>(forest, "offset");
+          f.column = take_field<std::int32_t>(forest, "column");
+          f.threshold = take_field<double>(forest, "threshold");
+          f.less_left = take_field<std::int8_t>(forest, "less_left");
+          f.left = take_field<std::int32_t>(forest, "left");
+          f.right = take_field<std::int32_t>(forest, "right");
+          f.value = take_field<double>(forest, "value");
+          std::vector<double> out(newx.shape(0));
+          timesift::forest_predict(f, newx.data(), newx.shape(0), newx.shape(1), out.data());
+          return give(std::move(out));
+        },
+        nb::arg("forest"), nb::arg("newx"));
+
+  m.def("forest_stream",
+        [](std::uint32_t seed, std::uint32_t tree, std::size_t n) {
+          std::vector<std::uint32_t> out(n);
+          timesift::forest_stream(seed, tree, n, out.data());
+          return give(std::move(out));
+        },
+        nb::arg("seed"), nb::arg("tree"), nb::arg("n"));
 }

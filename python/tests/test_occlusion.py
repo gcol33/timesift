@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 
 import numpy as np
 import pytest
@@ -39,8 +38,6 @@ def test_a_feature_table_becomes_a_one_channel_representation():
 
 
 def test_the_bin_a_signal_was_planted_in_is_the_bin_the_profile_weights():
-    if importlib.util.find_spec("sklearn") is None:
-        pytest.skip("scikit-learn is not installed")
     readings, y, month = planted()
     x = grain_matrix(readings, "id", "time", "value", grain="month")
     lad = grain_ladder(x, y, "elasticnet", folds=fold_map(y, v=4, seed=6),
@@ -53,8 +50,6 @@ def test_the_bin_a_signal_was_planted_in_is_the_bin_the_profile_weights():
 
 
 def test_the_profile_is_read_by_the_metric_the_fit_was_scored_under():
-    if importlib.util.find_spec("sklearn") is None:
-        pytest.skip("scikit-learn is not installed")
     readings, y, _ = planted(n_unit=40, seed=64)
     x = grain_matrix(readings, "id", "time", "value", grain="month")
     lad = grain_ladder(x, y, "elasticnet", folds=fold_map(y, v=3, seed=6), metric="tss",
@@ -105,8 +100,6 @@ def _occlude_a_continuous_head():
 
 
 def test_holding_a_channel_back_asks_what_the_statistic_carries():
-    if importlib.util.find_spec("sklearn") is None:
-        pytest.skip("scikit-learn is not installed")
     readings, y, _ = planted(n_unit=40, seed=63)
     x = grain_matrix(readings, "id", "time", "value", grain="month",
                       stats=["cold_day", "mean", "warm_day"])

@@ -1117,6 +1117,113 @@ and their spreads, and every prediction of the pruned tree, is asserted
 to `1e-12` relative. On the twelve cases the largest difference from
 rpart is `1.1e-16`.
 
+## The forest
+
+[`forest()`](https://gillescolling.com/timesift/reference/forest.md) is
+one random forest per response, over the same core. Its split search is
+the tree’s, and everything else it does is drawn, from one generator
+this section defines, so that a forest is the same forest in either
+language and on any number of threads.
+
+### The generator
+
+Every word is an unsigned 32-bit integer and every operation is taken
+modulo 2^32.
+
+- SplitMix32 advances a counter by `0x9E3779B9` and returns
+  `z ^ (z >> 16)`, where `z = (c ^ (c >> 16)) * 0x85EBCA6B`, then
+  `z = (z ^ (z >> 13)) * 0xC2B2AE35`, `c` the advanced counter.
+- Tree `t` of a forest seeded `s` starts the counter at
+  `s + 4 t * 0x9E3779B9`, which makes its state the outputs `4t + 1` to
+  `4t + 4` of one SplitMix32 stream started at `s`. Those four words are
+  the state `s0, s1, s2, s3` of a xoshiro128\*\* generator (Blackman and
+  Vigna).
+- An output is `rotl(s1 * 5, 7) * 9`; the state then moves by
+  `t = s1 << 9`, `s2 ^= s0`, `s3 ^= s1`, `s1 ^= s2`, `s0 ^= s3`,
+  `s2 ^= t`, `s3 = rotl(s3, 11)`.
+- A uniform is an output times 2^-32, on `[0, 1)` and exact in a double.
+  An index below `k` is that uniform times `k` rounded down, and `k - 1`
+  should the product round up to `k`.
+- A seed is taken modulo 2^32. The learners derive one per response as
+  every other learner does, from the learner’s seed and the response’s
+  name.
+
+### The bootstrap
+
+- The observations are drawn with replacement, each in proportion to its
+  case weight: a draw takes a uniform times the total weight and returns
+  the first observation, in row order, whose running sum of weights
+  exceeds it. The running sum is taken one addition at a time. An
+  observation of zero weight is never drawn.
+- A forest draws as many observations as there are. A balanced one draws
+  from the zeros alone and then from the ones alone, each as many times
+  as the smaller class holds observations of positive weight; a class of
+  no weight is an error, and so is `balance` on a Gaussian family.
+- The draws make one list of rows: every row in ascending order,
+  repeated as many times as it was drawn. The order in which the draws
+  came does not reach the tree.
+
+### The tree of a forest
+
+- Each drawn observation weighs one. The tree is grown depth first, a
+  node before its children and its left child’s subtree before its right
+  child’s, and every draw a node makes is made in that order.
+- A node holding fewer than `2 * min_leaf` observations, or observations
+  whose responses are all equal, is a leaf. Nothing is pruned and there
+  is no complexity threshold: a node is split wherever a split improves
+  on it.
+- A node that may be split first draws its columns. The tree keeps one
+  arrangement of the column indices, the identity at its root and never
+  reset between nodes; for `c` from 0 to `mtry - 1`, position `c` is
+  swapped with position `c + j`, `j` an index below `p - c`. The first
+  `mtry` positions are the node’s columns, tried in ascending order.
+- For each column the node’s observations are sorted by it, ties kept in
+  the order the node holds them, and searched as the tree’s split search
+  searches: a split only between two distinct values, at their midpoint,
+  at least `min_leaf` observations on each side, the Gini index of the
+  counts or the sum of squares, the first position reaching the largest
+  improvement. The node takes the first column reaching the largest
+  improvement, and an improvement at or below `1e-10` of the largest the
+  tree has seen, updated with the improvement read, is none.
+- The node’s observations go left or right by its split, each side
+  keeping the order the node held them in.
+- A leaf’s value is the share of ones among its observations, or their
+  mean, the mean’s sum taken one addition at a time in the node’s order.
+- The forest’s prediction for a row is the sum of its trees’ leaf
+  values, taken in tree order, over the number of trees.
+
+### The settings
+
+`preset = "package"` is randomForest’s own defaults, which is what
+biomod2’s default option set fits: 500 trees, `mtry` the square root of
+the column count rounded down under a binomial family and a third of it
+under a Gaussian one, never below one, and `min_node`, the `min_leaf`
+above, one and five under the two. `preset = "bigboss"` is biomod2’s
+tuned option set: 500 trees, `mtry = 2`, `min_node = 5`. A setting given
+explicitly beats either, and an `mtry` above the column count is the
+column count.
+
+### The fixtures
+
+No package grows a forest from this generator, so the reference is the
+forest grown from this text in R alone,
+`tests/testthat/helper-oracle-forest.R`, which computes the generator’s
+arithmetic in doubles where every step is exact. `forest_cases.csv`
+names six cases on the tree’s design: each family, flat weights and the
+tree’s counts, a balanced forest, one trying every column, and a seed of
+2^32 - 1. `forest_nodes.csv` holds each tree’s node table and
+`forest_predict.csv` the forest’s prediction for every unit.
+`forest_stream.csv` holds the generator’s first eight outputs for five
+seed and tree pairs, which the Python suite also checks against a
+reimplementation of the generator of its own.
+
+### How exactly
+
+Every field of every node, the thresholds and values included, and every
+prediction are asserted exactly: the core and the oracle perform the
+same operations in the same order, and no sum in a forest depends on a
+machine’s extended precision.
+
 ## What each language carries
 
 The representation and the three artifacts are the contract. Everything
@@ -1252,15 +1359,14 @@ the difference is recorded here rather than found at a call site.
   the forward search all fit under it: the encoders as an elementwise
   weight on the loss, the penalised fit and the forward search as case
   weights, and the forest as the probability a unit is drawn into a
-  tree’s bootstrap, which is what ranger’s case weights are and what the
-  Python side’s forest does with its own draw, because scikit-learn’s
-  forest grows the same pure-leaved tree under any sample weight. The
-  weights function takes the response and a mask of the rows the model
-  is fitted on, reads whatever it reads off those rows alone, and
-  weights every row. The shipped presence-absence head weights each
-  presence by the ratio of absences to presences among the fitting
-  units, capped at 50, and each absence by one; a head without a weights
-  function fits unweighted. On both sides.
+  tree’s bootstrap, since a tree grown to pure leaves is the same tree
+  under any weight on its observations. The weights function takes the
+  response and a mask of the rows the model is fitted on, reads whatever
+  it reads off those rows alone, and weights every row. The shipped
+  presence-absence head weights each presence by the ratio of absences
+  to presences among the fitting units, capped at 50, and each absence
+  by one; a head without a weights function fits unweighted. On both
+  sides.
 - The encoders standardise every channel by its own centre and sample
   standard deviation over every unit and bin of the fitting units,
   except a channel `position` names, which they read at its own

@@ -121,16 +121,44 @@ presence-absence. They weigh every class count and sum of squares the tree is gr
 ## `forest()`
 
 ```python
-forest(data=None, trees=500, mtry=None, min_node=1, seed=1)
+forest(
+    data=None,
+    trees=None,
+    mtry=None,
+    min_node=None,
+    balance=False,
+    preset='package',
+    seed=1,
+    threads=1,
+)
 ```
 
-One random forest per variable, over every bin-by-channel column: a classifier under a
-presence-absence head and a regressor under a head with a squared-error loss.
+One random forest per variable, over every bin-by-channel column: a probability forest
+under a presence-absence head and a regression forest under a head with a squared-error loss.
+Trees split on one column at a time and pay nothing for columns that carry nothing, so a forest
+reads a wide tabular representation without a penalty path and without a selection step.
 
-`mtry` is how many columns are offered at a split, defaulting to the square root of how many
-there are, and `min_node` is the smallest leaf a split may produce. The forest reads the
-columns one at a time and carries no order between them, so it is the arm that asks what the
-features hold once nothing about the record's shape is available to the model.
+Each tree is grown on a bootstrap draw of the units, as many draws as there are units, and each
+node is split on the best of `mtry` columns drawn for it, by the Gini index or the sum of
+squares `tree` splits by. A tree is grown out: a node is split while it holds at least
+twice `min_node` units and its responses differ. A leaf reports the share of presences among
+the draws it holds, or their mean, and the forest the mean over its trees. The forest is grown
+by the core the R package calls, and every draw comes from one generator seeded per tree, so
+the two languages grow the same forest on any number of threads.
+
+`balance=True` is the down-sampled forest biomod2 fits as `RFd`: each tree draws as many
+units from each class as the smaller class holds.
+
+`preset` says whose defaults the settings left `None` take. `"package"` is
+randomForest's own, which is what biomod2's default option set fits: 500 trees, `mtry` the
+square root of the column count under presence-absence and a third of it under a squared-error
+loss, and `min_node` 1 and 5 under the two. `"bigboss"` is biomod2's tuned option set: 500
+trees, `mtry=2` and `min_node=5`. A setting given explicitly beats either, and an `mtry`
+above the column count is the column count.
+
+The case weights are the response head's, `timesift.response.positive_weights` under
+presence-absence, and weight the bootstrap draw: a unit is drawn in proportion to its weight,
+and within its class under `balance`.
 
 ## `mlp()`
 

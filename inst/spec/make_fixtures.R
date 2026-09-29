@@ -961,3 +961,68 @@ write_fixture(do.call(rbind, tree_nodes), "tree_nodes.csv")
 write_fixture(do.call(rbind, tree_tables), "tree_cptable.csv")
 write_fixture(do.call(rbind, tree_predictions), "tree_predict.csv")
 cat("wrote the tree reference\n")
+
+# The forest.
+#
+# No package grows a forest from this generator, so the reference is the forest grown from the
+# spec's own text in R alone, `tests/testthat/helper-oracle-forest.R`, on the tree's design and
+# counts. The core is asserted against it on both sides.
+source("tests/testthat/helper-oracle-forest.R")
+FOREST_CASES <- data.frame(
+  case = c("binomial_flat", "binomial_counts", "binomial_balance", "binomial_bagged",
+           "gaussian_flat", "gaussian_counts"),
+  family = c(rep("binomial", 4L), rep("gaussian", 2L)),
+  weights = c("flat", "counts", "counts", "flat", "flat", "counts"),
+  trees = 3L,
+  mtry = c(4L, 4L, 4L, ncol(tree_x), 7L, 7L),
+  min_leaf = c(1L, 2L, 1L, 1L, 5L, 3L),
+  balance = c(FALSE, FALSE, TRUE, FALSE, FALSE, FALSE),
+  seed = c(11, 12, 13, 14, 15, 4294967295),
+  stringsAsFactors = FALSE)
+write_fixture(transform(FOREST_CASES, seed = sprintf("%.0f", seed),
+                        balance = as.integer(balance)), "forest_cases.csv")
+
+forest_nodes <- list()
+forest_predictions <- list()
+for (i in seq_len(nrow(FOREST_CASES))) {
+  row <- FOREST_CASES[i, ]
+  y <- if (row$family == "binomial") pen_y_binomial else pen_y_gaussian
+  w <- if (row$weights == "counts") tree_count else rep(1, PEN_N)
+  grown <- oracle_forest(tree_x, y, w, row$family, row$trees, row$mtry, row$min_leaf,
+                         row$balance, row$seed)
+  forest_nodes[[i]] <- do.call(rbind, lapply(seq_along(grown), function(t) {
+    g <- grown[[t]]
+    data.frame(case = row$case, tree = t - 1L, node = seq_along(g$column) - 1L,
+               column = g$column, threshold = sprintf("%.17g", g$threshold),
+               less_left = g$less_left, left = g$left, right = g$right,
+               value = sprintf("%.17g", g$value), stringsAsFactors = FALSE)
+  }))
+  # The forest's prediction is the mean over its trees, summed in tree order.
+  leaf_value <- function(g, i) {
+    at <- 1L
+    while (g$column[at] >= 0L) {
+      below <- tree_x[i, g$column[at] + 1L] < g$threshold[at]
+      at <- 1L + if (below == (g$less_left[at] == 1L)) g$left[at] else g$right[at]
+    }
+    g$value[at]
+  }
+  predicted <- vapply(seq_len(PEN_N), function(i) {
+    oracle_serial_sum(vapply(grown, leaf_value, numeric(1L), i = i)) / length(grown)
+  }, numeric(1L))
+  forest_predictions[[i]] <- data.frame(case = row$case, unit = pen_units,
+                                        value = sprintf("%.17g", predicted),
+                                        stringsAsFactors = FALSE)
+}
+write_fixture(do.call(rbind, forest_nodes), "forest_nodes.csv")
+write_fixture(do.call(rbind, forest_predictions), "forest_predict.csv")
+
+# The generator's first outputs, for a seed at each end of its range and a tree far from the first.
+forest_stream <- do.call(rbind, lapply(list(c(1, 0), c(1, 1), c(0, 0), c(4294967295, 3),
+                                            c(20260929, 499)), function(st) {
+  s <- oracle_stream(st[1L], st[2L])
+  data.frame(seed = sprintf("%.0f", st[1L]), tree = st[2L], index = 0:7,
+             output = sprintf("%.0f", vapply(1:8, function(k) s$next_word(), numeric(1L))),
+             stringsAsFactors = FALSE)
+}))
+write_fixture(forest_stream, "forest_stream.csv")
+cat("wrote the forest reference\n")

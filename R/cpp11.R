@@ -55,3 +55,15 @@ ts_tree_prune_ <- function(tree, cp) {
 ts_tree_predict_ <- function(tree, newx, n, p) {
   .Call(`_timesift_ts_tree_predict_`, tree, newx, n, p)
 }
+
+ts_forest_fit_ <- function(x, y, w, n, p, family, trees, mtry, min_leaf, balance, seed, threads) {
+  .Call(`_timesift_ts_forest_fit_`, x, y, w, n, p, family, trees, mtry, min_leaf, balance, seed, threads)
+}
+
+ts_forest_predict_ <- function(forest, newx, n, p) {
+  .Call(`_timesift_ts_forest_predict_`, forest, newx, n, p)
+}
+
+ts_forest_stream_ <- function(seed, tree, n) {
+  .Call(`_timesift_ts_forest_stream_`, seed, tree, n)
+}

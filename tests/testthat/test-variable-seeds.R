@@ -40,7 +40,6 @@ test_that("a penalised fit of one response is the same fitted alone or beside ot
 })
 
 test_that("a forest fit of one response is the same fitted alone or beside others", {
-  skip_if_not_installed("ranger")
   sim <- sim_series(n_unit = 60L, days = 60L)
   y <- sim_response(sim, n_var = 3L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")

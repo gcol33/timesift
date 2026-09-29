@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 
 import numpy as np
 import pytest
@@ -15,9 +14,6 @@ from timesift.metrics import roc_auc
 from timesift.representation import grain_matrix
 from timesift.response import Response
 from timesift.specs import grain
-
-needs_sklearn = pytest.mark.skipif(importlib.util.find_spec("sklearn") is None,
-                                   reason="scikit-learn is not installed")
 
 
 def planted(n_unit=40, days=56, noise=1.0, seed=17):
@@ -226,7 +222,6 @@ def test_a_learner_names_the_install_it_needs():
         learner.require()
 
 
-@needs_sklearn
 def test_the_forest_fits_predicts_and_finds_the_planted_signal():
     x, y = planted()
     fit = fit_learner(forest(trees=50), x, y)
@@ -236,7 +231,6 @@ def test_the_forest_fits_predicts_and_finds_the_planted_signal():
     assert roc_auc(y.values[:, 0], p[:, 0]) > 0.75
 
 
-@needs_sklearn
 def test_the_forest_reads_the_flattened_representation_and_refuses_another_shape():
     x, y = planted(n_unit=24, days=28)
     fit = fit_learner(forest(trees=20), x, y)
@@ -250,7 +244,6 @@ def test_the_forest_reads_the_flattened_representation_and_refuses_another_shape
             "id", "time", "value", grain="day"))
 
 
-@needs_sklearn
 def test_the_forest_carries_its_own_seed_and_repeats_itself():
     x, y = planted(n_unit=24, days=28)
     a = fit_learner(forest(trees=30, seed=4), x, y).predict(x)
@@ -263,7 +256,6 @@ def test_the_forest_carries_its_own_seed_and_repeats_itself():
     assert np.allclose(a, d)
 
 
-@needs_sklearn
 def test_each_response_draws_its_own_bootstrap_from_a_seed_of_its_own_name():
     # Two responses with the same observations under different names would otherwise be the
     # same forest, and a response fitted alone would differ from the same response fitted beside
@@ -282,7 +274,6 @@ def test_each_response_draws_its_own_bootstrap_from_a_seed_of_its_own_name():
     assert _variable_seeds(1, ("sp_a", "sp_b")) == [1 + 80582, 1 + 80583]
 
 
-@needs_sklearn
 def test_a_response_with_one_outcome_is_its_share_whichever_model_covers_it():
     x, y = planted(n_unit=24, days=28)
     flat = Response(np.column_stack([y.values[:, 0], np.ones(len(y.units))]),
@@ -348,7 +339,6 @@ def test_the_basis_spans_the_polynomials_of_its_own_degree():
     assert not np.allclose(z @ np.linalg.lstsq(z, fourth, rcond=None)[0], fourth, atol=1e-6)
 
 
-@needs_sklearn
 def test_the_per_response_learners_fit_the_family_the_response_heads_loss_names(temporary_response):
     from timesift.response import as_response, scorable_cells
     temporary_response("continuous_test", dict(
@@ -507,7 +497,6 @@ def test_the_head_owns_what_a_rare_response_weighs(temporary_response):
         _head_weights({"weights": lambda y, fitting: np.ones(3)}, y)
 
 
-@needs_sklearn
 def test_every_shipped_learner_fits_a_rare_response_under_the_heads_weight(temporary_response):
     # The same planted signal, one head weighting presences and one not: every learner that ships
     # reads the head, so the unweighted head changes every one of them.

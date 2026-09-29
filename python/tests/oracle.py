@@ -318,3 +318,36 @@ def oracle_day_fraction(bin_start: np.ndarray, bin_end: np.ndarray) -> np.ndarra
 
 def oracle_cycle_fraction(cycle: str, bin_start: np.ndarray, bin_end: np.ndarray) -> np.ndarray:
     return {"year": oracle_year_fraction, "day": oracle_day_fraction}[cycle](bin_start, bin_end)
+
+
+# The forest's generator, from the spec's text: xoshiro128**, its four words of state the outputs
+# 4t + 1 to 4t + 4 of a SplitMix32 stream started at the forest's seed, for tree t. Python's
+# integers are unbounded, so every operation is masked back to 32 bits.
+_M32 = 0xFFFFFFFF
+_GOLDEN = 0x9E3779B9
+
+
+def _rotl32(x: int, k: int) -> int:
+    return ((x << k) | (x >> (32 - k))) & _M32
+
+
+def oracle_stream(seed: int, tree: int):
+    """A generator of the words tree ``tree`` of a forest seeded ``seed`` draws."""
+    counter = (seed + 4 * tree * _GOLDEN) & _M32
+    s = []
+    for _ in range(4):
+        counter = (counter + _GOLDEN) & _M32
+        z = counter
+        z = ((z ^ (z >> 16)) * 0x85EBCA6B) & _M32
+        z = ((z ^ (z >> 13)) * 0xC2B2AE35) & _M32
+        s.append(z ^ (z >> 16))
+    while True:
+        result = (_rotl32((s[1] * 5) & _M32, 7) * 9) & _M32
+        t = (s[1] << 9) & _M32
+        s[2] ^= s[0]
+        s[3] ^= s[1]
+        s[1] ^= s[2]
+        s[0] ^= s[3]
+        s[2] ^= t
+        s[3] = _rotl32(s[3], 11)
+        yield result

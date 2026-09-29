@@ -97,7 +97,16 @@ for.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">forest</span><span class="op">(</span>data <span class="op">=</span> <span class="cn">NULL</span>, trees <span class="op">=</span> <span class="fl">500L</span>, mtry <span class="op">=</span> <span class="cn">NULL</span>, min_node <span class="op">=</span> <span class="fl">1L</span>, seed <span class="op">=</span> <span class="fl">1L</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">forest</span><span class="op">(</span></span>
+<span>  data <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  trees <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  mtry <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  min_node <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  balance <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  preset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"package"</span>, <span class="st">"bigboss"</span><span class="op">)</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">1L</span>,</span>
+<span>  threads <span class="op">=</span> <span class="fl">1L</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -114,16 +123,27 @@ representation of the run.</p></dd>
 
 
 <dt id="arg-mtry">mtry<a class="anchor" aria-label="anchor" href="#arg-mtry"></a></dt>
-<dd><p>Columns tried at each split, or <code>NULL</code> for the square root of the column count.</p></dd>
+<dd><p>Columns drawn for each node, the best of which it is split on.</p></dd>
 
 
 <dt id="arg-min-node">min_node<a class="anchor" aria-label="anchor" href="#arg-min-node"></a></dt>
-<dd><p>Smallest node a split is made on.</p></dd>
+<dd><p>Units each side of a split keeps.</p></dd>
+
+
+<dt id="arg-balance">balance<a class="anchor" aria-label="anchor" href="#arg-balance"></a></dt>
+<dd><p>Whether each tree draws as many units from each class as the smaller holds.</p></dd>
+
+
+<dt id="arg-preset">preset<a class="anchor" aria-label="anchor" href="#arg-preset"></a></dt>
+<dd><p>Whose defaults the settings left <code>NULL</code> take: <code>"package"</code> or <code>"bigboss"</code>.</p></dd>
 
 
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
-<dd><p>Seed for the bootstrap draw and the split sampling, which are random and would
-otherwise make the fit irreproducible.</p></dd>
+<dd><p>Seed for the bootstrap draws and the column draws.</p></dd>
+
+
+<dt id="arg-threads">threads<a class="anchor" aria-label="anchor" href="#arg-threads"></a></dt>
+<dd><p>Trees grown at once. The forest is the same on any number.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -132,14 +152,31 @@ otherwise make the fit irreproducible.</p></dd>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>The case weights are the response head's, <code><a href="positive_weights.html">positive_weights()</a></code> under presence-absence, and
-weight the bootstrap draw: a rare response is not fitted away here for a reason the other
-learners do not share, because every learner that ships reads the same weights.</p>
+    <p>Each tree is grown on a bootstrap draw of the units, as many draws as there are units, and each
+node is split on the best of <code>mtry</code> columns drawn for it, by the Gini index or the sum of squares
+<code><a href="tree.html">tree()</a></code> splits by. A tree is grown out: a node is split while it holds at least twice
+<code>min_node</code> units and its responses differ. A leaf reports the share of presences among the draws
+it holds, or their mean, and the forest the mean over its trees. The forest is grown by the core
+the Python package calls, and every draw comes from one generator seeded per tree, so the two
+languages grow the same forest on any number of threads.</p>
+<p><code>balance = TRUE</code> is the down-sampled forest biomod2 fits as <code>RFd</code>: each tree draws as many units
+from each class as the smaller class holds, so a rare response's presences are half of every
+tree's draw.</p>
+<p><code>preset</code> says whose defaults the settings left <code>NULL</code> take. <code>"package"</code> is randomForest's own,
+which is what biomod2's default option set fits: 500 trees, <code>mtry</code> the square root of the column
+count under presence-absence and a third of it under a squared-error loss, and <code>min_node</code> 1 and
+5 under the two. <code>"bigboss"</code> is biomod2's tuned option set: 500 trees, <code>mtry = 2</code> and
+<code>min_node = 5</code>. A setting given explicitly beats either, and an <code>mtry</code> above the column count is
+the column count.</p>
+<p>The case weights are the response head's, <code><a href="positive_weights.html">positive_weights()</a></code> under presence-absence, and
+weight the bootstrap draw: a unit is drawn in proportion to its weight, and within its class
+under <code>balance</code>.</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">forest</span><span class="op">(</span>trees <span class="op">=</span> <span class="fl">200L</span><span class="op">)</span></span>
+<span><span class="fu">forest</span><span class="op">(</span>preset <span class="op">=</span> <span class="st">"bigboss"</span>, balance <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span></code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

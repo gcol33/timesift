@@ -237,7 +237,6 @@ test_that("score_predictions() refuses a prediction that is not a number on a sc
 })
 
 test_that("learners arrive as a character vector of registered names, as the docs say", {
-  skip_if_not_installed("ranger")
   f <- ladder_fixture()
   x <- timesift_set(list(week = f$x$week))
   lad <- grain_ladder(x, f$y, c("elasticnet", "forest"), folds = f$folds, verbose = FALSE)

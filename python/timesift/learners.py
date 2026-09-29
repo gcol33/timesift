@@ -674,11 +674,11 @@ def _name_offset(name: str) -> int:
     return code
 
 
-def _predict_columns(models: list, m: np.ndarray, n_col: int, family: str) -> np.ndarray:
-    return np.column_stack([
-        np.full(m.shape[0], f) if isinstance(f, float)
-        else f.predict_proba(m)[:, 1] if family == "binomial" else f.predict(m)
-        for f in models])
+def _predict_columns(models: list, m: np.ndarray, predict) -> np.ndarray:
+    """One column per response: the mean where the response held one value, else ``predict``
+    of that response's fit on ``m``."""
+    return np.column_stack([np.full(m.shape[0], f) if isinstance(f, float) else predict(f, m)
+                            for f in models])
 
 
 def _design(x: TimesiftMatrix, squares: bool) -> np.ndarray:
@@ -759,90 +759,82 @@ def _penalised_stopped(fit) -> bool:
 
 def _elasticnet_predict(model, x):
     from .penalised import penalised_predict
-    m = _design(x, model["squares"])
-    return np.column_stack([
-        np.full(m.shape[0], f) if isinstance(f, float) else penalised_predict(f, m, model["s"])
-        for f in model["models"]])
+    return _predict_columns(model["models"], _design(x, model["squares"]),
+                            lambda f, m: penalised_predict(f, m, model["s"]))
 
 
-def forest(data=None, trees=500, mtry=None, min_node=1, seed=1) -> Learner:
-    """One random forest per variable, over every bin-by-channel column: a classifier under a
-    presence-absence head and a regressor under a head with a squared-error loss.
+def forest(data=None, trees=None, mtry=None, min_node=None, balance=False, preset="package",
+           seed=1, threads=1) -> Learner:
+    """One random forest per variable, over every bin-by-channel column: a probability forest
+    under a presence-absence head and a regression forest under a head with a squared-error loss.
+    Trees split on one column at a time and pay nothing for columns that carry nothing, so a forest
+    reads a wide tabular representation without a penalty path and without a selection step.
 
-    ``mtry`` is how many columns are offered at a split, defaulting to the square root of how many
-    there are, and ``min_node`` is the smallest leaf a split may produce. The forest reads the
-    columns one at a time and carries no order between them, so it is the arm that asks what the
-    features hold once nothing about the record's shape is available to the model.
+    Each tree is grown on a bootstrap draw of the units, as many draws as there are units, and each
+    node is split on the best of ``mtry`` columns drawn for it, by the Gini index or the sum of
+    squares :func:`tree` splits by. A tree is grown out: a node is split while it holds at least
+    twice ``min_node`` units and its responses differ. A leaf reports the share of presences among
+    the draws it holds, or their mean, and the forest the mean over its trees. The forest is grown
+    by the core the R package calls, and every draw comes from one generator seeded per tree, so
+    the two languages grow the same forest on any number of threads.
+
+    ``balance=True`` is the down-sampled forest biomod2 fits as ``RFd``: each tree draws as many
+    units from each class as the smaller class holds.
+
+    ``preset`` says whose defaults the settings left ``None`` take. ``"package"`` is
+    randomForest's own, which is what biomod2's default option set fits: 500 trees, ``mtry`` the
+    square root of the column count under presence-absence and a third of it under a squared-error
+    loss, and ``min_node`` 1 and 5 under the two. ``"bigboss"`` is biomod2's tuned option set: 500
+    trees, ``mtry=2`` and ``min_node=5``. A setting given explicitly beats either, and an ``mtry``
+    above the column count is the column count.
+
+    The case weights are the response head's, :func:`~timesift.response.positive_weights` under
+    presence-absence, and weight the bootstrap draw: a unit is drawn in proportion to its weight,
+    and within its class under ``balance``.
     """
-    return Learner(name="forest", fit=_rf_fit, predict=_rf_predict, needs=("sklearn",),
-                   data=data, reads="tabular", multi="separate",
-                   params=dict(trees=trees, mtry=mtry, min_node=min_node, seed=seed))
+    if preset not in ("package", "bigboss"):
+        raise ValueError(f'`preset` is "package" or "bigboss", got {preset!r}.')
+    return Learner(name="forest", fit=_rf_fit, predict=_rf_predict, data=data, reads="tabular",
+                   multi="separate",
+                   params=dict(trees=trees, mtry=mtry, min_node=min_node, balance=bool(balance),
+                               preset=preset, seed=int(seed), threads=int(threads)))
 
 
-def _rf_fit(x, y, trees, mtry, min_node, seed, head, variables, **_):
+def _forest_settings(preset, family, n_column, trees, mtry, min_node) -> dict:
+    """The settings a forest is grown under: those given, and the preset's for the rest.
+    randomForest's own defaults depend on the family and on how many columns there are, so they
+    are settled at the fit."""
+    binomial = family == "binomial"
+    if preset == "bigboss":
+        base = dict(trees=500, mtry=2, min_node=5)
+    else:
+        base = dict(trees=500,
+                    mtry=max(1, int(np.floor(np.sqrt(n_column))) if binomial else n_column // 3),
+                    min_node=1 if binomial else 5)
+    given = dict(trees=trees, mtry=mtry, min_node=min_node)
+    out = {k: int(base[k] if v is None else v) for k, v in given.items()}
+    out["mtry"] = min(out["mtry"], n_column)
+    return out
+
+
+def _rf_fit(x, y, trees, mtry, min_node, balance, preset, seed, threads, head, variables, **_):
+    from ._tree import forest_fit
     family = _family(head)
     m = flatten(x)
+    settings = _forest_settings(preset, family, m.shape[1], trees, mtry, min_node)
 
     def make(design, yj, seed_j, w):
-        return _WeightedForest(trees, mtry, min_node, family).fit(design, yj, w, seed_j)
+        return forest_fit(design, yj, w, family, settings["trees"], settings["mtry"],
+                          settings["min_node"], balance, seed_j, threads)
 
     return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables),
                                     _head_weights(head, y)),
                 n_col=m.shape[1], family=family)
 
 
-class _WeightedForest:
-    """A forest whose bootstrap draw is weighted by the case weights, as ranger's is on the R
-    side.
-
-    scikit-learn's forest takes a sample weight into its impurities and its leaf values, and a
-    tree grown to pure leaves is the same tree under any weight, so a rare response's presences
-    would weigh nothing there. Here each tree is grown on a draw of the units with replacement in
-    which a unit is drawn in proportion to its weight, and the forest's prediction is the mean
-    over the trees.
-    """
-
-    def __init__(self, trees: int, mtry, min_node: int, family: str):
-        self.trees, self.mtry, self.min_node, self.family = trees, mtry, min_node, family
-        self.members = []
-
-    def fit(self, design, yj, w, seed):
-        from joblib import Parallel, delayed
-        from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-        rng = np.random.default_rng(seed)
-        n = len(yj)
-        p = np.asarray(w, dtype=np.float64) / np.sum(w)
-        draws = [rng.choice(n, size=n, replace=True, p=p) for _ in range(self.trees)]
-        states = rng.integers(0, 2 ** 31 - 1, size=self.trees)
-        tree_of = DecisionTreeClassifier if self.family == "binomial" else DecisionTreeRegressor
-
-        def grow(rows, state):
-            return tree_of(max_features="sqrt" if self.mtry is None else self.mtry,
-                           min_samples_leaf=self.min_node,
-                           random_state=int(state)).fit(design[rows], yj[rows])
-
-        self.members = Parallel(n_jobs=-1)(delayed(grow)(rows, state)
-                                           for rows, state in zip(draws, states))
-        return self
-
-    def predict_proba(self, m):
-        # A draw can hold one class alone, and that tree knows one column; the probability of a
-        # presence is read off whichever column carries class 1.
-        present = np.zeros(m.shape[0])
-        for tree in self.members:
-            proba = tree.predict_proba(m)
-            which = np.flatnonzero(tree.classes_ == 1)
-            if len(which):
-                present += proba[:, which[0]]
-        present /= len(self.members)
-        return np.column_stack([1 - present, present])
-
-    def predict(self, m):
-        return np.mean([tree.predict(m) for tree in self.members], axis=0)
-
-
 def _rf_predict(model, x):
-    return _predict_columns(model["models"], flatten(x), model["n_col"], model["family"])
+    from ._tree import forest_predict
+    return _predict_columns(model["models"], flatten(x), forest_predict)
 
 
 def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prune="se_sum",
@@ -874,7 +866,7 @@ def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prun
     presence-absence. They weigh every class count and sum of squares the tree is grown on;
     ``min_split`` and ``min_leaf`` count observations, as rpart's do.
     """
-    from .tree import PRUNE_RULES
+    from ._tree import PRUNE_RULES
     if prune not in PRUNE_RULES:
         raise ValueError(f"`prune` is one of {', '.join(PRUNE_RULES)}, got {prune!r}.")
     settings = _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner)
@@ -907,7 +899,7 @@ def _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner) -> dict:
 
 def _tree_fit(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, seed, head, variables,
               group=None, **_):
-    from .tree import tree_fit, tree_prune, tree_prune_cp
+    from ._tree import tree_fit, tree_prune, tree_prune_cp
     family = _family(head)
     m = flatten(x)
 
@@ -926,11 +918,8 @@ def _tree_fit(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, seed, he
 
 
 def _tree_predict(model, x):
-    from .tree import tree_predict
-    m = flatten(x)
-    return np.column_stack([
-        np.full(m.shape[0], f) if isinstance(f, float) else tree_predict(f, m)
-        for f in model["models"]])
+    from ._tree import tree_predict
+    return _predict_columns(model["models"], flatten(x), tree_predict)
 
 
 def stepwise(data=None, max_terms=3, degree=2) -> Learner:

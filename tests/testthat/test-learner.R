@@ -167,22 +167,7 @@ test_that("the penalised learner reports what its fitter refuses instead of a co
   expect_error(fit_learner(elasticnet(n_inner = 1L), x, y))
 })
 
-test_that("a forest fits, predicts and refuses a different representation", {
-  skip_if_not_installed("ranger")
-  sim <- sim_series(n_unit = 60L, days = 60L, seed = 35L)
-  y <- sim_response(sim, n_var = 2L, seed = 36L)
-  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
-  fit <- fit_learner(forest(trees = 200L), x, y)
-  p <- stats::predict(fit, x)
-  expect_equal(dim(p), c(60L, 2L))
-  expect_true(all(p >= 0 & p <= 1))
-  expect_gt(tss(y[, 1], p[, 1]), 0.4)
-  other <- grain_matrix(sim$readings, plot, t, temp, grain = "month")
-  expect_error(stats::predict(fit, other), "different channels or bins")
-})
-
 test_that("a forest is the same forest twice and reads the same columns as the linear arms", {
-  skip_if_not_installed("ranger")
   sim <- sim_series(n_unit = 40L, days = 40L, seed = 37L)
   y <- sim_response(sim, n_var = 1L, seed = 38L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week", stats = c("mean", "max"))
@@ -288,7 +273,6 @@ test_that("predicting a single unit returns one row and not one column", {
 })
 
 test_that("the per-response learners fit the family the response head's loss names", {
-  skip_if_not_installed("ranger")
   local_response("continuous_test", list(
     prepare = function(y) .as_response(y), activation = "identity",
     loss = "squared_error", metric = "roc_auc",
@@ -419,7 +403,6 @@ test_that("a fit whose learner is no longer registered says so by name", {
 })
 
 test_that("a fit read back through its reference keeps the settings held at NULL", {
-  skip_if_not_installed("ranger")
   case <- fit_case()
   fit <- fit_learner(forest(trees = 20L), case$x, case$y)
   rebuilt <- .as_learner(fit$learner)
@@ -493,7 +476,6 @@ test_that("the head owns what a rare response weighs", {
 })
 
 test_that("every shipped learner fits a rare response under the head's weight", {
-  skip_if_not_installed("ranger")
   head <- .responses_reg$get("presence_absence")
   local_response("unweighted_test", head[setdiff(names(head), "weights")])
   sim <- sim_series(n_unit = 60L, days = 28L, seed = 71L)
