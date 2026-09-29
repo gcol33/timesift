@@ -1098,9 +1098,9 @@ for (i in seq_len(nrow(FOREST_CASES))) {
   forest_nodes[[i]] <- do.call(rbind, lapply(seq_along(grown), function(t) {
     g <- grown[[t]]
     data.frame(case = row$case, tree = t - 1L, node = seq_along(g$column) - 1L,
-               column = g$column, threshold = sprintf("%.17g", g$threshold),
+               column = g$column, threshold = sprintf("%a", g$threshold),
                less_left = g$less_left, left = g$left, right = g$right,
-               value = sprintf("%.17g", g$value), stringsAsFactors = FALSE)
+               value = sprintf("%a", g$value), stringsAsFactors = FALSE)
   }))
   # The forest's prediction is the mean over its trees, summed in tree order.
   leaf_value <- function(g, i) {
@@ -1115,7 +1115,7 @@ for (i in seq_len(nrow(FOREST_CASES))) {
     oracle_serial_sum(vapply(grown, leaf_value, numeric(1L), i = i)) / length(grown)
   }, numeric(1L))
   forest_predictions[[i]] <- data.frame(case = row$case, unit = pen_units,
-                                        value = sprintf("%.17g", predicted),
+                                        value = sprintf("%a", predicted),
                                         stringsAsFactors = FALSE)
 }
 write_fixture(do.call(rbind, forest_nodes), "forest_nodes.csv")

@@ -1054,7 +1054,10 @@ in R alone, `tests/testthat/helper-oracle-forest.R`, which computes the generato
 doubles where every step is exact. `forest_cases.csv` names six cases on the tree's design: each
 family, flat weights and the tree's counts, a balanced forest, one trying every column, and a seed
 of 2^32 - 1. `forest_nodes.csv` holds each tree's node table and `forest_predict.csv` the forest's
-prediction for every unit. `forest_stream.csv` holds the generator's first eight outputs for five
+prediction for every unit, the thresholds, the values and the predictions as hexadecimal floats: R
+reads a seventeen-digit decimal exactly only where it has extended precision, and on arm64 macOS
+it reads 5/6 a unit in the last place off, where a hexadecimal float reads exactly on every
+platform and in both languages. `forest_stream.csv` holds the generator's first eight outputs for five
 seed and tree pairs, which the Python suite also checks against a reimplementation of the generator
 of its own.
 

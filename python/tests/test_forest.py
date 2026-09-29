@@ -72,12 +72,13 @@ def test_the_forest_core_grows_the_specs_forest_node_for_node(forest_input, row)
     for field in ("column", "less_left", "left", "right"):
         assert fit[field].tolist() == [int(r[field]) for r in ref], field
     for field in ("threshold", "value"):
-        assert fit[field].tolist() == [float(r[field]) for r in ref], field
+        assert fit[field].tolist() == [float.fromhex(r[field]) for r in ref], field
 
 
 @pytest.mark.parametrize("row", CASES, ids=lambda r: r["case"])
 def test_the_forest_predicts_the_mean_of_its_trees_as_the_specs_does(forest_input, row):
-    ref = [float(r["value"]) for r in read_rows("forest_predict.csv") if r["case"] == row["case"]]
+    ref = [float.fromhex(r["value"]) for r in read_rows("forest_predict.csv")
+           if r["case"] == row["case"]]
     assert forest_predict(case_fit(forest_input, row), forest_input["x"]).tolist() == ref
 
 

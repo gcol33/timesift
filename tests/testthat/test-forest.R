@@ -15,8 +15,10 @@ forest_fixture <- function() {
        gaussian = d$y_gaussian, count = counts$count[match(d$unit, counts$unit)],
        cases = utils::read.csv(file.path(dir, "forest_cases.csv"), stringsAsFactors = FALSE,
                                colClasses = c(seed = "numeric")),
-       nodes = utils::read.csv(file.path(dir, "forest_nodes.csv"), stringsAsFactors = FALSE),
-       predict = utils::read.csv(file.path(dir, "forest_predict.csv"), stringsAsFactors = FALSE),
+       nodes = utils::read.csv(file.path(dir, "forest_nodes.csv"), stringsAsFactors = FALSE,
+                               colClasses = c(threshold = "numeric", value = "numeric")),
+       predict = utils::read.csv(file.path(dir, "forest_predict.csv"), stringsAsFactors = FALSE,
+                                 colClasses = c(value = "numeric")),
        stream = utils::read.csv(file.path(dir, "forest_stream.csv"), stringsAsFactors = FALSE,
                                 colClasses = c(seed = "numeric", output = "numeric")))
 }
