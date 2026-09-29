@@ -1365,3 +1365,155 @@ write_fixture(cbind(do.call(rbind, mx_rows), thresh = sprintf("%.12g", MX_THRESH
 write_fixture(do.call(rbind, mx_reg), "maxnet_regularization.csv")
 write_fixture(do.call(rbind, mx_pred), "maxnet_predict.csv")
 cat("wrote", nrow(MX_CASES), "maxnet cases\n")
+# The envelope.
+#
+# The reference is biomod2's own `bm_SRE()`, on the weekly columns maxnet's fixtures read and the
+# three responses those carry: its bounds, read with `do.extrem = TRUE`, and its projection onto
+# the fixture's rows, where a quantile of zero puts a presence exactly on a bound, and onto every
+# reading scaled by 1.02. The bounds are arithmetic on the readings and are pinned to rounding.
+if (!requireNamespace("biomod2", quietly = TRUE)) {
+  stop("the envelope fixtures are the envelope biomod2 draws, so it has to be installed to ",
+       "regenerate them.", call. = FALSE)
+}
+ENV_CASES <- data.frame(
+  case = c("edges", "default", "default_12", "default_8", "tenth_12", "median"),
+  response = c("y_binomial", "y_binomial", "y_12", "y_8", "y_12", "y_binomial"),
+  quantile = c(0, 0.025, 0.025, 0.025, 0.1, 0.5),
+  stringsAsFactors = FALSE)
+env_rows <- list()
+env_bounds <- list()
+env_pred <- list()
+for (i in seq_len(nrow(ENV_CASES))) {
+  row <- ENV_CASES[i, ]
+  y <- mx_y[[row$response]]
+  df <- mx_frame(mx_x)
+  bounds <- biomod2::bm_SRE(resp.var = y, expl.var = df, quant = row$quantile, do.extrem = TRUE)
+  inside <- biomod2::bm_SRE(resp.var = y, expl.var = df, new.env = df, quant = row$quantile)
+  outside <- biomod2::bm_SRE(resp.var = y, expl.var = df, new.env = mx_frame(mx_x * 1.02),
+                             quant = row$quantile)
+  env_rows[[i]] <- data.frame(row, n_presence = sum(y == 1), stringsAsFactors = FALSE)
+  env_bounds[[i]] <- data.frame(case = row$case, column = seq_len(ncol(mx_x)),
+                                lo = sprintf("%.17g", bounds[, 1L]),
+                                hi = sprintf("%.17g", bounds[, 2L]), stringsAsFactors = FALSE)
+  env_pred[[i]] <- data.frame(case = row$case, row = seq_len(nrow(mx_x)),
+                              inside = as.integer(inside[, 1L]),
+                              inside_out = as.integer(outside[, 1L]), stringsAsFactors = FALSE)
+}
+write_fixture(cbind(do.call(rbind, env_rows), bound_tolerance = 1e-12), "envelope_cases.csv")
+write_fixture(do.call(rbind, env_bounds), "envelope_bounds.csv")
+write_fixture(do.call(rbind, env_pred), "envelope_predict.csv")
+cat("wrote", nrow(ENV_CASES), "envelope cases\n")
+
+# The stepwise model.
+#
+# Three references, each written separately from the core. MASS's `stepAIC()` over biomod2's
+# formula, a power of a column per term, for every direction a search runs: the terms in the order
+# the final model holds them, its deviance and rank, and its fitted means. `glm()` on every term for
+# the unselected fit. And the forward search over column terms in R alone,
+# `tests/testthat/helper-oracle-stepwise.R`, which is the arm the published comparison ran, under
+# fractional case weights. MASS reads the binomial family, whose criterion rounds fractional weights
+# into counts, so its binomial cases are unweighted; its Gaussian criterion differs from the core's
+# by a constant and orders the moves the same way under any weights. Two cases carry the first
+# column twice, so a term is aliased: the backward search drops it before anything else and the
+# two-way search never offers it.
+source("tests/testthat/helper-oracle-stepwise.R")
+if (!requireNamespace("MASS", quietly = TRUE)) {
+  stop("the stepwise fixtures are MASS's own search, so it has to be installed to regenerate ",
+       "them.", call. = FALSE)
+}
+sw_y <- c(mx_y, list(y_gaussian = pen_y_gaussian))
+sw_case <- function(case, reference, response, direction, terms = "power", degree = 2L,
+                    max_terms = Inf, weighted = FALSE, duplicate = FALSE) {
+  data.frame(case = case, reference = reference, response = response, direction = direction,
+             terms = terms, degree = degree, max_terms = max_terms, weighted = weighted,
+             duplicate = duplicate, stringsAsFactors = FALSE)
+}
+SW_CASES <- rbind(
+  sw_case("mass_both_cubic", "MASS", "y_binomial", "both", degree = 3L),
+  sw_case("mass_both_12", "MASS", "y_12", "both"),
+  sw_case("mass_forward_gaussian", "MASS", "y_gaussian", "forward"),
+  sw_case("mass_both_gaussian_weighted", "MASS", "y_gaussian", "both", weighted = TRUE),
+  sw_case("mass_backward", "MASS", "y_binomial", "backward"),
+  sw_case("mass_backward_duplicate", "MASS", "y_binomial", "backward", duplicate = TRUE),
+  sw_case("mass_both_duplicate", "MASS", "y_binomial", "both", duplicate = TRUE),
+  sw_case("glm_none", "glm", "y_binomial", "none"),
+  sw_case("glm_none_column_gaussian_weighted", "glm", "y_gaussian", "none", terms = "column",
+          weighted = TRUE),
+  sw_case("oracle_forward", "oracle", "y_binomial", "forward", terms = "column", max_terms = 3),
+  sw_case("oracle_forward_weighted", "oracle", "y_binomial", "forward", terms = "column",
+          max_terms = 3, weighted = TRUE),
+  sw_case("oracle_forward_12_weighted", "oracle", "y_12", "forward", terms = "column",
+          weighted = TRUE),
+  sw_case("oracle_forward_gaussian_weighted", "oracle", "y_gaussian", "forward",
+          terms = "column", max_terms = 6, weighted = TRUE))
+
+sw_design <- function(duplicate) if (duplicate) cbind(mx_x, mx_x[, 1L]) else mx_x
+sw_names <- function(x) sprintf("v%02d", seq_len(ncol(x)))
+# A term's label in the order the design lays the terms out: each column's powers, column by
+# column, which is the order biomod2's formula names them and the core catalogues them.
+sw_upper <- function(x, degree) {
+  labels <- unlist(lapply(sw_names(x), function(v) {
+    c(v, if (degree >= 2L) sprintf("I(%s^%d)", v, seq(2L, degree)))
+  }))
+  stats::as.formula(paste("~", paste(labels, collapse = " + ")))
+}
+sw_term_key <- function(label, x) {
+  power <- if (startsWith(label, "I(")) as.integer(sub(".*\\^([0-9]+)\\)$", "\\1", label)) else 1L
+  name <- if (startsWith(label, "I(")) sub("^I\\((v[0-9]+)\\^.*$", "\\1", label) else label
+  sprintf("%d:%d", match(name, sw_names(x)), power)
+}
+
+sw_rows <- list()
+sw_pred <- list()
+for (i in seq_len(nrow(SW_CASES))) {
+  row <- SW_CASES[i, ]
+  x <- sw_design(row$duplicate)
+  y <- sw_y[[row$response]]
+  w <- if (row$weighted) pen_w else rep(1, length(y))
+  gaussian <- row$response == "y_gaussian"
+  family <- if (gaussian) stats::gaussian() else stats::binomial()
+  df <- stats::setNames(as.data.frame(x), sw_names(x))
+  out <- stats::setNames(as.data.frame(x * 1.01), sw_names(x))
+  df$y <- y
+  df$w <- w
+  if (row$reference == "oracle") {
+    f <- oracle_forward_aic(x, y, row$max_terms, row$degree, if (gaussian) "gaussian" else
+                              "binomial", w)
+    chosen <- sprintf("%d:0", f$columns)
+    fitted <- oracle_predict_forward(f, x)
+    fitted_out <- oracle_predict_forward(f, x * 1.01)
+    deviance <- f$fit$deviance
+    rank <- f$fit$rank
+    converged <- f$fit$converged
+    steps <- length(f$columns)
+  } else {
+    upper <- sw_upper(x, row$degree)
+    full <- stats::update(upper, y ~ .)
+    start <- if (row$direction %in% c("backward", "none")) full else y ~ 1
+    g <- stats::glm(start, family = family, data = df, weights = w)
+    if (row$reference == "MASS") {
+      g <- MASS::stepAIC(g, scope = list(upper = upper, lower = ~1), direction = row$direction,
+                         trace = FALSE, k = 2)
+    }
+    labels <- attr(stats::terms(g), "term.labels")
+    chosen <- if (row$terms == "column") {
+      sprintf("%d:0", unique(match(sub("^I\\((v[0-9]+)\\^.*$", "\\1", labels), sw_names(x))))
+    } else vapply(labels, sw_term_key, character(1L), x = x)
+    fitted <- as.numeric(stats::fitted(g))
+    fitted_out <- as.numeric(stats::predict(g, out, type = "response"))
+    deviance <- g$deviance
+    rank <- g$rank
+    converged <- g$converged
+    steps <- if (row$reference == "MASS") nrow(g$anova) - 1L else 0L
+  }
+  sw_rows[[i]] <- data.frame(row, chosen = paste(chosen, collapse = " "), rank = rank,
+                             deviance = sprintf("%.15g", deviance), converged = converged,
+                             steps = steps, stringsAsFactors = FALSE)
+  sw_pred[[i]] <- data.frame(case = row$case, row = seq_len(nrow(x)),
+                             fitted = sprintf("%.15g", fitted),
+                             fitted_out = sprintf("%.15g", fitted_out), stringsAsFactors = FALSE)
+}
+write_fixture(cbind(do.call(rbind, sw_rows), deviance_tolerance = 1e-9,
+                    prediction_tolerance = 1e-8), "stepwise_cases.csv")
+write_fixture(do.call(rbind, sw_pred), "stepwise_predict.csv")
+cat("wrote", nrow(SW_CASES), "stepwise cases\n")

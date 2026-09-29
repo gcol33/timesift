@@ -57,7 +57,8 @@ timesift/
   src/                the shared core, compiled into both languages
     ts_core.h ts_calendar.cpp ts_core.cpp
     ts_penalised.h ts_penalised.cpp
-    ts_tree.h ts_tree.cpp
+    ts_tree.h ts_tree.cpp ts_boost.cpp ts_maxnet.h ts_maxnet.cpp
+    ts_envelope.h ts_envelope.cpp ts_stepwise.h ts_stepwise.cpp ts_internal.h
     ts_r.cpp          the cpp11 wrapper; cpp11.cpp is generated
   R/                  R package source
   tests/testthat/     including helper-oracle.R, the pure-R implementation
@@ -172,8 +173,8 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   and the combiner minimises the loss. A fit that declares a `head` argument is handed the head,
   as one that declares `control` is handed the control; no learner holds a response of its own.
   Same for learners: `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `stepwise()`, `forest()`,
-  `tree()`, `boosting()`, `maxnet()` and any user-supplied fit/predict pair go through one
-  interface.
+  `tree()`, `boosting()`, `maxnet()`, `envelope()` and any user-supplied fit/predict pair go
+  through one interface.
 - **A fitted encoder is a plain object.** Its weights are arrays and its device is the setting,
   not the resolved device; the network is rebuilt at prediction. `saveRDS()` and `pickle` round
   trip a fit, and a fit made on one machine predicts on another.
@@ -196,6 +197,10 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   classification tree a biomod2 user already fits. It is pinned against rpart's own output in the
   fixtures, and differs from rpart only where rpart's class priors, computed with R's
   extended-precision sums, break an exact tie at `cp` under fractional weights.
+- **So is the stepwise search.** `src/ts_stepwise.cpp` is `glm.fit`'s iteration over LINPACK's
+  `dqrdc2` and MASS's `stepAIC()` rules, so `stepwise()` over column terms is the published
+  forward arm and over power terms a biomod2 user's `GLM`. It is pinned against MASS, `glm()` and
+  the old R search (`tests/testthat/helper-oracle-stepwise.R`) in the fixtures.
 - **The pure-R and pure-NumPy implementations are kept as test oracles**, never reachable at
   runtime. The NumPy one was written from the spec rather than from the R source, so it is the
   evidence that the spec is complete; one shared binary would otherwise make the agreement between

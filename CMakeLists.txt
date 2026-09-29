@@ -22,6 +22,8 @@ nanobind_add_module(_core NB_STATIC
   src/ts_maxnet.cpp
   src/ts_tree.cpp
   src/ts_boost.cpp
+  src/ts_envelope.cpp
+  src/ts_stepwise.cpp
   python/ts_py.cpp)
 
 target_include_directories(_core PRIVATE src)

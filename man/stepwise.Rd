@@ -2,36 +2,76 @@
 % Please edit documentation in R/learners_linear.R
 \name{stepwise}
 \alias{stepwise}
-\title{Forward selection by AIC on the flattened representation}
+\title{Stepwise selection by AIC on the flattened representation}
 \usage{
-stepwise(data = NULL, max_terms = 3L, degree = 2L)
+stepwise(
+  data = NULL,
+  max_terms = 3L,
+  degree = 2L,
+  direction = c("forward", "both", "backward", "none"),
+  terms = c("column", "power"),
+  threads = 1L
+)
 }
 \arguments{
 \item{data}{A representation the learner is pinned to, or \code{NULL} to run across every
 representation of the run.}
 
-\item{max_terms}{Predictors admitted before selection stops.}
+\item{max_terms}{Terms a forward or two-way search holds at most; \code{Inf} for no bound.}
 
-\item{degree}{Polynomial degree each admitted column enters at.}
+\item{degree}{Polynomial degree each column enters at.}
+
+\item{direction}{\code{"forward"}, \code{"both"}, \code{"backward"} or \code{"none"}.}
+
+\item{terms}{\code{"column"} for a column's polynomial as one term, \code{"power"} for each power its own.}
+
+\item{threads}{How many of one step's candidate fits run at once. What comes back does not
+depend on it.}
 }
 \value{
 A \code{\link[=learner]{learner()}}.
 }
 \description{
-One generalised linear model per variable, its predictors chosen by forward selection over every
-bin-by-channel column, admitting a column while it lowers AIC and stopping at a fixed budget.
-Each candidate enters as an orthogonal polynomial, so a term can be non-monotone in the reading
-the way a niche optimum is. The family is the response head's: logistic under a binary
-cross-entropy loss, Gaussian under a squared-error one. So are the case weights, so a rare
-response weighs here what it weighs in every other learner.
+One generalised linear model per variable, its terms chosen by Akaike's criterion over every
+bin-by-channel column. The family is the response head's: logistic under a binary cross-entropy
+loss, Gaussian under a squared-error one. So are the case weights, so a rare response weighs here
+what it weighs in every other learner.
 }
 \details{
+\code{terms} says what one term is. Under \code{"column"} it is a column's orthogonal polynomial of degree
+\code{degree}, so a column enters with its curvature at once and can be non-monotone in the reading
+the way a niche optimum is. Under \code{"power"} each power of a column, \code{x}, \code{x^2} and so on, is a
+term of its own, which is how biomod2 writes a quadratic formula and how \code{MASS::stepAIC()} walks
+it. A column holding one value over the fitting units is not a term.
+
+\code{direction} is the search. \code{"forward"} starts from the intercept and admits the term that lowers
+the criterion most, while one does and the model holds fewer than \code{max_terms}. \code{"both"} does the
+same but also weighs dropping each term it holds at every step, and \code{"backward"} starts from
+every term and drops alone. \code{"none"} fits every term and selects nothing: with
+\code{terms = "power"} and \code{degree = 2} that is the model biomod2's GLM fits, \code{y ~ x + I(x^2)} over
+every column. The two-way and backward searches are MASS's \code{stepAIC()}, step for step: the model as it
+stands wins a tie, a term whose removal leaves the rank unchanged is dropped first, and an
+addition that does not raise the rank is not offered. \code{max_terms} bounds what a forward or
+two-way search adds, and the backward and unselected fits start from every term whatever it is.
+
+Each fit is R's \code{glm.fit}: iteratively reweighted least squares, the rank read off the same
+pivoted decomposition, and the same stopping rule. A move whose fit does not settle within its
+25 iterations is refused rather than taken, and the fit names every response whose final model
+did not settle in \code{stopped}.
+
+A model with nothing but the intercept predicts the response's share among the fitting units.
 Selection happens inside whichever units the learner is handed, so under \code{\link[=grain_ladder]{grain_ladder()}} it is
-redone in every fold. That is the footing the other learners are fitted on. Reported beside a
-penalised fit it also prices discrete selection: choosing a handful of columns out of hundreds
-is high variance, and that variance is a cost of the selector rather than of the features.
+redone in every fold. Reported beside a penalised fit it also prices discrete selection:
+choosing a handful of columns out of hundreds is high variance, and that variance is a cost of
+the selector rather than of the features. An unselected fit over hundreds of columns separates
+any response it is given and is meant for a coarse grain, \code{data = grain("season")}.
+
+The search and the fits run on the core the Python package calls, so the two select the same
+terms and return the same coefficients.
 }
 \examples{
 stepwise(max_terms = 3)
+stepwise(direction = "both", terms = "power", max_terms = Inf)
+stepwise(data = grain("season"), direction = "none", terms = "power")
 
 }

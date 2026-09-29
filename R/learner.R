@@ -523,21 +523,6 @@ as.matrix.timesift_matrix <- function(x, ...) {
   }, logical(1L)))
 }
 
-# The family the forward search fits under. The binomial one is the quasi-binomial: the
-# coefficients and the deviance are the same, and it takes a case weight that is not a whole
-# number without complaint, where the binomial family reads one as a fractional count of
-# successes. The criterion is read off the deviance, see `.glm_aic()`.
-.glm_family <- function(family) {
-  switch(family, binomial = stats::quasibinomial(), gaussian = stats::gaussian())
-}
-
-# Akaike's criterion of a forward-search fit. For a 0/1 response the saturated log-likelihood is
-# zero, so the criterion is the weighted deviance plus twice the rank, which is what the binomial
-# family reports for unweighted data; the Gaussian family reports its own.
-.glm_aic <- function(fit, family) {
-  if (identical(family, "binomial")) fit$deviance + 2 * fit$rank else fit$aic
-}
-
 # Scaling belongs to the fold it is computed on: each column is centred on its mean and divided by
 # its sample standard deviation, both taken over the fitting units alone. A linear model reads the
 # bin-by-channel columns through it; a sequence encoder reads the channels through the same scaler,

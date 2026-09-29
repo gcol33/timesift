@@ -9,7 +9,7 @@ from dataclasses import replace
 
 from timesift.control import train_control
 from timesift.learners import (Learner, elasticnet, fit_learner, flatten, forest, stepwise, tree,
-                               _apply_basis, _design, _logistic, _poly_basis)
+                               _design)
 from timesift.metrics import roc_auc
 from timesift.representation import grain_matrix
 from timesift.response import Response
@@ -44,7 +44,7 @@ def test_the_selector_admits_no_more_columns_than_its_budget():
     for budget in (1, 3):
         model = fit_learner(stepwise(max_terms=budget), x, y).model
         for f in model["models"]:
-            assert len(f.get("columns", [])) <= budget
+            assert isinstance(f, float) or len(f["term_column"]) <= budget
 
 
 def test_a_variable_with_one_outcome_is_predicted_as_its_share():
@@ -75,27 +75,6 @@ def test_the_selector_refuses_a_representation_it_was_not_fitted_on():
             "id", "time", "value", grain="day"))
 
 
-def test_the_polynomial_basis_is_orthonormal_and_travels_with_the_fit():
-    rng = np.random.default_rng(2)
-    v = rng.normal(size=50)
-    basis = _poly_basis(v, 3)
-    z = basis["values"]
-    # Orthonormal columns, and orthogonal to the constant: that is what makes a degree admitted
-    # after another one carry only what the earlier one does not.
-    assert np.allclose(z.T @ z, np.eye(3), atol=1e-10)
-    assert np.allclose(z.sum(axis=0), 0.0, atol=1e-10)
-    # New units are mapped through the basis the fit carries, never through one re-derived from
-    # themselves: a subset re-derived would give a different basis.
-    part = _apply_basis(basis, v[:10])
-    assert np.allclose(part, z[:10])
-    assert not np.allclose(_poly_basis(v[:10], 3)["values"], part)
-
-
-def test_a_degree_beyond_what_the_readings_distinguish_is_dropped():
-    assert _poly_basis(np.array([1.0, 1.0, 2.0, 2.0]), 3)["degree"] == 1
-    assert _poly_basis(np.array([1.0, 2.0, 3.0]), 5)["degree"] == 2
-
-
 def test_a_column_holding_one_value_is_not_offered_to_the_forward_search(temporary_response):
     from dataclasses import replace
 
@@ -117,24 +96,12 @@ def test_a_column_holding_one_value_is_not_offered_to_the_forward_search(tempora
             (Response(level.reshape(-1, 1), y.units, ("height",)), "constant_continuous_test")]
     for response, name in arms:
         fit = fit_learner(stepwise(max_terms=2), flat, response, response=name)
-        chosen = fit.model["models"][0]["columns"]
+        chosen = list(fit.model["models"][0]["term_column"])
         assert chosen, name
         # flatten() lays the channels out one block of bins after another, so the constant one is
         # every column from the last block on.
         assert max(chosen) < n_bin * len(x.stats), name
         assert fit.predict(flat).shape == (len(response.units), len(response.variables))
-
-    with pytest.raises(ValueError, match="no polynomial basis"):
-        _poly_basis(np.full(20, 7.0), 2)
-
-
-def test_a_separated_or_unsettled_fit_is_refused_rather_than_returned():
-    y = np.array([0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
-    separating = np.array([-3.0, -2.0, -1.0, 1.0, 2.0, 3.0]).reshape(-1, 1)
-    assert _logistic(separating, y) is None
-    overlapping = np.array([-1.0, 1.0, -0.5, 0.5, -0.2, 0.7]).reshape(-1, 1)
-    fit = _logistic(overlapping, y)
-    assert fit is not None and np.isfinite(fit["aic"])
 
 
 def test_the_penalised_fit_uses_the_mixing_it_was_given():
@@ -281,62 +248,6 @@ def test_a_response_with_one_outcome_is_its_share_whichever_model_covers_it():
     for learner in (forest(trees=20), elasticnet()):
         p = fit_learner(learner, x, flat).predict(x)
         assert np.allclose(p[:, 1], 1.0)
-
-
-def test_the_fit_is_the_maximum_likelihood_one_and_not_merely_a_settled_one():
-    """At the coefficients returned, the step a maximum-likelihood fitter would take next is
-    nothing.
-
-    The stopping rule is the relative change in the deviance, which is the one R's ``glm`` uses, so
-    the point reached is not exactly stationary. What has to hold is that it is inside any
-    precision a criterion is read at: the largest remaining step, measured across six designs, is
-    7e-8 in coefficient units against coefficients of order one. That is what makes the criterion
-    the selector reads comparable to another implementation's rather than to this fitter's own
-    tolerance.
-    """
-    for seed in range(6):
-        rng = np.random.default_rng(seed + 1)
-        n = 60
-        x1, x2 = rng.normal(size=n), rng.uniform(-2, 2, n)
-        y = rng.binomial(1, 1 / (1 + np.exp(-(-0.4 + 1.3 * x1 - 0.8 * x2)))).astype(float)
-        fit = _logistic(np.column_stack([x1, x2]), y)
-        assert fit is not None
-
-        x = np.column_stack([np.ones(n), x1, x2])
-        mu = 1.0 / (1.0 + np.exp(-(x @ fit["beta"])))
-        score = x.T @ (y - mu)
-        w = mu * (1.0 - mu)
-        step = np.linalg.solve((x * w[:, None]).T @ x, score)
-        assert np.max(np.abs(step)) < 1e-6
-
-        # The deviance reported is the one those coefficients give, so a criterion built on it
-        # counts the right number of parameters.
-        deviance = -2 * float(np.sum(y * np.log(mu) + (1 - y) * np.log1p(-mu)))
-        assert fit["deviance"] == pytest.approx(deviance)
-        assert fit["aic"] == pytest.approx(deviance + 2 * 3)
-
-        # And no coefficients a thousand times further out than that step do better, which is what
-        # a maximum means.
-        for _ in range(20):
-            nudged = fit["beta"] + rng.normal(0, 1e-3, len(fit["beta"]))
-            m = 1.0 / (1.0 + np.exp(-(x @ nudged)))
-            assert -2 * float(np.sum(y * np.log(m) + (1 - y) * np.log1p(-m))) >= deviance - 1e-9
-
-
-def test_the_basis_spans_the_polynomials_of_its_own_degree():
-    """Orthonormal columns alone would not make it a polynomial basis. Every raw power up to the
-    degree has to be a combination of the columns and the constant, which is what lets a term be
-    non-monotone in the reading the way a niche optimum is."""
-    rng = np.random.default_rng(6)
-    v = rng.normal(size=40)
-    z = np.column_stack([np.ones(len(v)), _poly_basis(v, 3)["values"]])
-    for power in (1, 2, 3):
-        raw = v ** power
-        fitted = z @ np.linalg.lstsq(z, raw, rcond=None)[0]
-        assert np.allclose(fitted, raw, atol=1e-9)
-    # And a fourth power is not, so the degree is the degree asked for.
-    fourth = v ** 4
-    assert not np.allclose(z @ np.linalg.lstsq(z, fourth, rcond=None)[0], fourth, atol=1e-6)
 
 
 def test_the_per_response_learners_fit_the_family_the_response_heads_loss_names(temporary_response):

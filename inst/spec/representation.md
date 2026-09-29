@@ -1157,6 +1157,108 @@ largest difference from gbm being `6.7e-16`; gbm rescales the weights before it 
 sum in the last place. The second-order predictions are asserted to `1e-5`, since xgboost stores the
 design and the gradients in single precision.
 
+## The envelope
+
+`envelope()` is one surface range envelope per response, biomod2's `SRE`, over
+`src/ts_envelope.cpp`, which both languages compile.
+
+- Over the rows whose response is one, each column's `q` and `1 - q` quantiles, `q` the
+  `quantile` setting in `[0, 0.5]`. The upper probability is formed as `1 - q` before it is used,
+  as R forms it.
+- The quantile is R's type 7, the default of `quantile()` and the one `bm_SRE()` reads: over the
+  `m` sorted values, the position `h = 1 + (m - 1) * prob`, the value at `floor(h)`, and where
+  `h` lies above it and the value at `ceiling(h)` differs, `(1 - f) * lo + f * hi` with
+  `f = h - floor(h)`.
+- A row is predicted one where every column lies inside its band, both ends included, and zero
+  elsewhere.
+- The absences and the case weights are not read. A response with no presence, or with nothing
+  else, is predicted its mean above the core, as every per-response learner predicts one.
+
+### The fixtures
+
+`envelope_cases.csv` names six cases on the weekly columns maxnet's fixtures read, over the three
+responses those carry: quantiles of `0`, `0.025` at each presence count, `0.1` and `0.5`.
+`envelope_bounds.csv` holds each column's two bounds from `bm_SRE(do.extrem = TRUE)`, and
+`envelope_predict.csv` its projection onto the fixture's rows and onto every reading scaled by
+`1.02`. At a quantile of zero a presence sits on each bound, which is where an exclusive
+comparison would differ.
+
+### How exactly
+
+- **The bounds are arithmetic on the readings** and are asserted to `1e-12` relative; the core and
+  biomod2 agree to the last bit.
+- **The projections are asserted exactly.**
+
+## The stepwise model
+
+`stepwise()` is one generalised linear model per response, its terms chosen by Akaike's criterion,
+over `src/ts_stepwise.cpp`, which both languages compile. Each fit is R's `glm.fit` and the search
+is MASS's `stepAIC()`, because the forward search over column terms is the arm the published
+comparison ran and the rest is what a biomod2 user's `GLM` is.
+
+- **The terms.** A column holding one value over the rows fitted is not a term. Under `"column"`
+  a term is the column's orthogonal polynomial of degree `min(degree, distinct values - 1)`; under
+  `"power"` each power `1` to `degree` of the column is a term of its own, the square taken as a
+  product and any higher power through `pow`, as R's `^` takes them. Terms are catalogued column
+  by column, each column's powers in order.
+- **The orthogonal polynomial** is the three-term recurrence of R's `poly()`: `P_0 = 1`,
+  `norm2_0 = n`, and for `k = 1..d`, `alpha_k = sum(v P_{k-1}^2) / norm2_{k-1}`,
+  `P_k = (v - alpha_k) P_{k-1} - (norm2_{k-1} / norm2_{k-2}) P_{k-2}` (the last term absent at
+  `k = 1`) and `norm2_k = sum(P_k^2)`; the columns are `P_k / sqrt(norm2_k)`. The alphas and norms
+  are kept with the fit and new rows are mapped through them, never through a basis re-derived
+  from themselves.
+- **The design** is the intercept followed by the columns of each term the model holds, in the
+  order it holds them.
+- **Each fit** is iteratively reweighted least squares as `glm.fit`: starting means
+  `(w y + 0.5) / (w + 1)` under the binomial family and `y` under the Gaussian one; at each
+  iteration the working response `eta + (y - mu) / mu_eta` and working weights
+  `sqrt(w mu_eta^2 / V(mu))`, solved by LINPACK's `dqrdc2` Householder decomposition with its
+  limited pivoting at a tolerance of `min(1e-7, epsilon / 1000)`, a column falling below that
+  share of its original norm moved to the end and given a coefficient of zero; and the stopping
+  rule `|dev - dev_old| / (|dev| + 0.1) < epsilon`, `epsilon = 1e-8`, within 25 iterations. The
+  logit link holds the linear predictor at 30 either side as R's does: below `-30` the mean is
+  `eps / (1 + eps)` and above `30` it is `1 / (1 + eps)` with `eps` the machine epsilon, and the
+  derivative is `eps` outside that range. The rank is the decomposition's at the last iteration.
+- **The criterion** is `deviance + 2 rank` under the binomial family and, under the Gaussian one,
+  `n (log(2 pi deviance / n) + 1) + 2 - sum(log w) + 2 rank`, the deviance weighted by the case
+  weights in both.
+- **The search.** `"forward"` and `"both"` start from the intercept, `"backward"` and `"none"`
+  from every term. `"none"` stops there. Otherwise each step fits the model with each held term
+  dropped, where the search drops (`"both"`, `"backward"`), and with each term it lacks added,
+  where it adds (`"forward"`, `"both"`) and holds fewer than `max_terms`. A move whose fit did not
+  settle is not a candidate. If any drop leaves the rank where it was, the last such term is
+  dropped and the step ends. Otherwise the moves that change the rank are compared in order,
+  drops in the model's order and then additions in catalogue order, and the first to reach the
+  lowest criterion is taken if that is strictly below the model's own; if none is, the search
+  stops. A taken addition goes to the end of the model.
+- **What a fit keeps**: each term's column, power and degree, the recurrences, the coefficients,
+  the rank, the deviance, the criterion, whether the last fit settled, and the number of steps.
+  A model holding no term predicts the mean of the response over the rows fitted, unweighted.
+  Otherwise the prediction is the linear predictor through the link.
+- The candidate fits of one step are independent, and `threads` runs them at once without
+  changing what comes back.
+
+### The fixtures
+
+`stepwise_cases.csv` names thirteen cases on the weekly columns maxnet's fixtures read. Seven are
+MASS's `stepAIC()` over biomod2's formula `x + I(x^2)` (`I(x^3)` beside them in one) from the
+intercept or from every term, in every direction: two of them carry the first column twice, so a
+term is aliased and the backward search drops it before anything else. MASS's binomial family
+rounds a fractional weight into a count, so its binomial cases are unweighted; its Gaussian
+criterion differs from the core's by a constant, and one Gaussian case is weighted. Two are
+`glm()` on every term, and four are the forward search over column terms written in R alone,
+`tests/testthat/helper-oracle-stepwise.R`, under fractional case weights. Each case carries the
+terms chosen as `column:power` in the order the model holds them, `0` for a polynomial, with the
+rank, the deviance, whether the fit settled and the number of steps. `stepwise_predict.csv` holds
+the fitted means on the fixture's rows and on every reading scaled by `1.01`.
+
+### How exactly
+
+- **The terms, the rank, the steps and whether the fit settled are asserted exactly.**
+- **The deviance is asserted to `1e-9` relative and the predictions to `1e-8`.** The iteration is
+  `glm.fit`'s own and the two settle on the same iterate; across the thirteen cases they agree to
+  about `1e-14`.
+
 ## The combiner
 
 `ensemble_fit()` is handed each candidate's out-of-fold predictions, the response, the mask and the
@@ -1254,11 +1356,12 @@ call site.
 | building one representation | `build_representation()` |
 | a channel added to an array | `bind_channels()`, and `calendar_channels()` for the sine and cosine of each bin's position in the year and, finer than a day, in the day, both as **The channels** defines them |
 | the penalised learner | `elasticnet()` |
-| the forward selector | `stepwise()` |
+| the stepwise selector | `stepwise()`, forward, two-way, backward or unselected |
 | the forest | `forest()` |
 | the classification and regression tree | `tree()` |
 | gradient boosted trees | `boosting()` |
 | maxnet's MaxEnt | `maxnet()` |
+| the surface range envelope | `envelope()` |
 | the encoders | `mlp()`, `cnn()`, `rescnn()` |
 | how an encoder is trained | `train_control()` |
 | fitting one learner on one representation | `fit_learner()` |
@@ -1340,8 +1443,8 @@ call site.
   sides. `swa_start` is at least 0 and under 1 on both.
 - What a rare response weighs is the response head's and not a training setting. The head's
   weights function returns one case weight per cell of the response, and the encoders, the
-  penalised fit, the forest and the forward search all fit under it: the encoders as an
-  elementwise weight on the loss, the penalised fit and the forward search as case weights, and
+  penalised fit, the forest and the stepwise search all fit under it: the encoders as an
+  elementwise weight on the loss, the penalised fit and the stepwise search as case weights, and
   the forest as the probability a unit is drawn into a tree's bootstrap, since a tree grown to
   pure leaves is the same tree under any weight on its observations. The weights
   function takes the response and a mask of the rows the model is fitted on, reads whatever it

@@ -159,6 +159,34 @@ extern "C" SEXP _timesift_ts_maxnet_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p
     return cpp11::as_sexp(ts_maxnet_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<bool>>(clamp), cpp11::as_cpp<cpp11::decay_t<std::string>>(type)));
   END_CPP11
 }
+// ts_r.cpp
+cpp11::list ts_envelope_fit_(cpp11::doubles x, cpp11::doubles y, int n, int p, double quantile);
+extern "C" SEXP _timesift_ts_envelope_fit_(SEXP x, SEXP y, SEXP n, SEXP p, SEXP quantile) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_envelope_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<double>>(quantile)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::doubles ts_envelope_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p);
+extern "C" SEXP _timesift_ts_envelope_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_envelope_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::list ts_stepwise_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, double max_terms, int degree, std::string direction, std::string terms, int threads);
+extern "C" SEXP _timesift_ts_stepwise_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP max_terms, SEXP degree, SEXP direction, SEXP terms, SEXP threads) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_stepwise_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<double>>(max_terms), cpp11::as_cpp<cpp11::decay_t<int>>(degree), cpp11::as_cpp<cpp11::decay_t<std::string>>(direction), cpp11::as_cpp<cpp11::decay_t<std::string>>(terms), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::doubles ts_stepwise_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p);
+extern "C" SEXP _timesift_ts_stepwise_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_stepwise_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p)));
+  END_CPP11
+}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
@@ -169,6 +197,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_coverage_",          (DL_FUNC) &_timesift_ts_coverage_,           8},
     {"_timesift_ts_cycle_fraction_",    (DL_FUNC) &_timesift_ts_cycle_fraction_,     3},
     {"_timesift_ts_cycle_phase_",       (DL_FUNC) &_timesift_ts_cycle_phase_,        3},
+    {"_timesift_ts_envelope_fit_",      (DL_FUNC) &_timesift_ts_envelope_fit_,       5},
+    {"_timesift_ts_envelope_predict_",  (DL_FUNC) &_timesift_ts_envelope_predict_,   4},
     {"_timesift_ts_forest_fit_",        (DL_FUNC) &_timesift_ts_forest_fit_,        12},
     {"_timesift_ts_forest_predict_",    (DL_FUNC) &_timesift_ts_forest_predict_,     4},
     {"_timesift_ts_forest_stream_",     (DL_FUNC) &_timesift_ts_forest_stream_,      3},
@@ -181,6 +211,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_penalised_predict_", (DL_FUNC) &_timesift_ts_penalised_predict_,  7},
     {"_timesift_ts_reduce_",            (DL_FUNC) &_timesift_ts_reduce_,            11},
     {"_timesift_ts_reduce_lookbacks_",  (DL_FUNC) &_timesift_ts_reduce_lookbacks_,  12},
+    {"_timesift_ts_stepwise_fit_",      (DL_FUNC) &_timesift_ts_stepwise_fit_,      11},
+    {"_timesift_ts_stepwise_predict_",  (DL_FUNC) &_timesift_ts_stepwise_predict_,   4},
     {"_timesift_ts_tree_fit_",          (DL_FUNC) &_timesift_ts_tree_fit_,          12},
     {"_timesift_ts_tree_predict_",      (DL_FUNC) &_timesift_ts_tree_predict_,       4},
     {"_timesift_ts_tree_prune_",        (DL_FUNC) &_timesift_ts_tree_prune_,         2},

@@ -87,3 +87,19 @@ ts_maxnet_fit_ <- function(x, y, w, n, p, classes, knots, regmult, formulation, 
 ts_maxnet_predict_ <- function(fit, newx, n, p, clamp, type) {
   .Call(`_timesift_ts_maxnet_predict_`, fit, newx, n, p, clamp, type)
 }
+
+ts_envelope_fit_ <- function(x, y, n, p, quantile) {
+  .Call(`_timesift_ts_envelope_fit_`, x, y, n, p, quantile)
+}
+
+ts_envelope_predict_ <- function(fit, newx, n, p) {
+  .Call(`_timesift_ts_envelope_predict_`, fit, newx, n, p)
+}
+
+ts_stepwise_fit_ <- function(x, y, w, n, p, family, max_terms, degree, direction, terms, threads) {
+  .Call(`_timesift_ts_stepwise_fit_`, x, y, w, n, p, family, max_terms, degree, direction, terms, threads)
+}
+
+ts_stepwise_predict_ <- function(fit, newx, n, p) {
+  .Call(`_timesift_ts_stepwise_predict_`, fit, newx, n, p)
+}

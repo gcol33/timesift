@@ -5,8 +5,10 @@
 #include <vector>
 
 #include "ts_core.h"
+#include "ts_envelope.h"
 #include "ts_maxnet.h"
 #include "ts_penalised.h"
+#include "ts_stepwise.h"
 #include "ts_tree.h"
 
 namespace {
@@ -744,5 +746,86 @@ cpp11::doubles ts_maxnet_predict_(cpp11::list fit, cpp11::doubles newx, int n, i
   timesift::maxnet_predict(m, REAL_RO(newx.data()), static_cast<std::size_t>(n),
                            static_cast<std::size_t>(p), clamp,
                            timesift::maxnet_output_from_name(type), out.data());
+  return give(out);
+}
+
+// The envelope, from the same core the Python side calls: each column's band over the presences.
+[[cpp11::register]]
+cpp11::list ts_envelope_fit_(cpp11::doubles x, cpp11::doubles y, int n, int p, double quantile) {
+  const timesift::Envelope fit =
+      timesift::envelope_fit(REAL_RO(x.data()), REAL_RO(y.data()), static_cast<std::size_t>(n),
+                             static_cast<std::size_t>(p), quantile);
+  using namespace cpp11::literals;
+  return cpp11::writable::list({
+    "n_column"_nm = cpp11::as_sexp(fit.n_column),
+    "n_presence"_nm = cpp11::as_sexp(fit.n_presence),
+    "lo"_nm = give(fit.lo),
+    "hi"_nm = give(fit.hi)
+  });
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_envelope_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p) {
+  timesift::Envelope e;
+  e.n_column = cpp11::as_cpp<int>(fit["n_column"]);
+  e.n_presence = cpp11::as_cpp<int>(fit["n_presence"]);
+  e.lo = take_field<double>(fit, "lo");
+  e.hi = take_field<double>(fit, "hi");
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::envelope_predict(e, REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                             static_cast<std::size_t>(p), out.data());
+  return give(out);
+}
+
+// The stepwise model, from the same core the Python side calls. A fit crosses into R as a list of
+// plain vectors, its terms one field each, and comes back the same way to predict.
+[[cpp11::register]]
+cpp11::list ts_stepwise_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                             std::string family, double max_terms, int degree,
+                             std::string direction, std::string terms, int threads) {
+  timesift::StepwiseSpec spec;
+  spec.family = timesift::family_from_name(family);
+  spec.max_terms = max_terms;
+  spec.degree = degree;
+  spec.direction = timesift::step_direction_from_name(direction);
+  spec.terms = timesift::step_terms_from_name(terms);
+  spec.threads = threads;
+  const timesift::Stepwise fit =
+      timesift::stepwise_fit(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()),
+                             static_cast<std::size_t>(n), static_cast<std::size_t>(p), spec);
+  using namespace cpp11::literals;
+  return cpp11::writable::list({
+    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
+    "n_column"_nm = cpp11::as_sexp(fit.n_column),
+    "constant"_nm = cpp11::as_sexp(fit.constant),
+    "term_column"_nm = give(fit.term_column),
+    "term_power"_nm = give(fit.term_power),
+    "term_degree"_nm = give(fit.term_degree),
+    "alpha"_nm = give(fit.alpha),
+    "norm2"_nm = give(fit.norm2),
+    "beta"_nm = give(fit.beta),
+    "rank"_nm = cpp11::as_sexp(fit.rank),
+    "deviance"_nm = cpp11::as_sexp(fit.deviance),
+    "aic"_nm = cpp11::as_sexp(fit.aic),
+    "converged"_nm = cpp11::as_sexp(fit.converged),
+    "steps"_nm = cpp11::as_sexp(fit.steps)
+  });
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_stepwise_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p) {
+  timesift::Stepwise s;
+  s.family = timesift::family_from_name(cpp11::as_cpp<std::string>(fit["family"]));
+  s.n_column = cpp11::as_cpp<int>(fit["n_column"]);
+  s.constant = cpp11::as_cpp<double>(fit["constant"]);
+  s.term_column = take_field<std::int32_t>(fit, "term_column");
+  s.term_power = take_field<std::int32_t>(fit, "term_power");
+  s.term_degree = take_field<std::int32_t>(fit, "term_degree");
+  s.alpha = take_field<double>(fit, "alpha");
+  s.norm2 = take_field<double>(fit, "norm2");
+  s.beta = take_field<double>(fit, "beta");
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::stepwise_predict(s, REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                             static_cast<std::size_t>(p), out.data());
   return give(out);
 }

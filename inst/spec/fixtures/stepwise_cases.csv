@@ -1,0 +1,14 @@
+case,reference,response,direction,terms,degree,max_terms,weighted,duplicate,chosen,rank,deviance,converged,steps,deviance_tolerance,prediction_tolerance
+mass_both_cubic,MASS,y_binomial,both,power,3,Inf,FALSE,FALSE,2:1 11:1 1:1 7:3 11:3 1:3,7,67.3085083650879,TRUE,8,1e-09,1e-08
+mass_both_12,MASS,y_12,both,power,2,Inf,FALSE,FALSE,11:1 2:1 9:2 8:1 8:2 11:2 6:2,8,38.9054315882421,TRUE,7,1e-09,1e-08
+mass_forward_gaussian,MASS,y_gaussian,forward,power,2,Inf,FALSE,FALSE,2:1 8:1 5:2 9:1 3:1 11:1 7:2 1:1 3:2 1:2,11,21.4882561579053,TRUE,10,1e-09,1e-08
+mass_both_gaussian_weighted,MASS,y_gaussian,both,power,2,Inf,TRUE,FALSE,2:1 10:1 8:2 5:2 3:1 9:1 7:1 1:1 11:1,10,37.4503306072758,TRUE,9,1e-09,1e-08
+mass_backward,MASS,y_binomial,backward,power,2,Inf,FALSE,FALSE,1:1 1:2 2:1 5:1 6:2 7:1 8:1 8:2 11:1 11:2,11,60.3018514719704,TRUE,12,1e-09,1e-08
+mass_backward_duplicate,MASS,y_binomial,backward,power,2,Inf,FALSE,TRUE,1:1 1:2 2:1 5:1 6:2 7:1 8:1 8:2 11:1 11:2,11,60.3018514719704,TRUE,14,1e-09,1e-08
+mass_both_duplicate,MASS,y_binomial,both,power,2,Inf,FALSE,TRUE,2:1 5:2 11:1 1:1 7:2,6,72.2679012195028,TRUE,5,1e-09,1e-08
+glm_none,glm,y_binomial,none,power,2,Inf,FALSE,FALSE,1:1 1:2 2:1 2:2 3:1 3:2 4:1 4:2 5:1 5:2 6:1 6:2 7:1 7:2 8:1 8:2 9:1 9:2 10:1 10:2 11:1 11:2,23,57.5060214624099,TRUE,0,1e-09,1e-08
+glm_none_column_gaussian_weighted,glm,y_gaussian,none,column,2,Inf,TRUE,FALSE,1:0 2:0 3:0 4:0 5:0 6:0 7:0 8:0 9:0 10:0 11:0,23,31.9484804021446,TRUE,0,1e-09,1e-08
+oracle_forward,oracle,y_binomial,forward,column,2,3,FALSE,FALSE,2:0 11:0 1:0,7,70.1644716516921,TRUE,3,1e-09,1e-08
+oracle_forward_weighted,oracle,y_binomial,forward,column,2,3,TRUE,FALSE,2:0 5:0 11:0,7,117.240370661611,TRUE,3,1e-09,1e-08
+oracle_forward_12_weighted,oracle,y_12,forward,column,2,Inf,TRUE,FALSE,5:0 6:0 9:0 8:0 11:0 2:0 7:0,15,30.1426614749939,TRUE,7,1e-09,1e-08
+oracle_forward_gaussian_weighted,oracle,y_gaussian,forward,column,2,6,TRUE,FALSE,2:0 10:0 8:0 5:0 3:0 9:0,13,40.0214653491538,TRUE,6,1e-09,1e-08

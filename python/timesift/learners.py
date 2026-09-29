@@ -24,7 +24,7 @@ from .representation import TimesiftMatrix
 from .response import fitting_rows
 
 __all__ = ["Fit", "Learner", "READS", "MULTI", "boosting", "cnn", "elasticnet", "fit_learner",
-           "flatten", "mlp", "rescnn", "forest", "stepwise", "tree"]
+           "envelope", "flatten", "mlp", "rescnn", "forest", "stepwise", "tree"]
 
 READS = ("tabular", "sequence")
 MULTI = ("joint", "separate")
@@ -1136,183 +1136,103 @@ def _tree_predict(model, x):
     return _predict_columns(model["models"], flatten(x), tree_predict)
 
 
-def stepwise(data=None, max_terms=3, degree=2) -> Learner:
-    """One generalised linear model per variable, its predictors chosen by forward selection over
-    every bin-by-channel column, admitting a column while it lowers Akaike's criterion and stopping
-    at a fixed budget.
+def stepwise(data=None, max_terms=3, degree=2, direction="forward", terms="column",
+             threads=1) -> Learner:
+    """One generalised linear model per variable, its terms chosen by Akaike's criterion over every
+    bin-by-channel column. The family is the response head's: logistic under a binary
+    cross-entropy loss, Gaussian under a squared-error one, and so are the case weights.
 
-    Each candidate enters as an orthogonal polynomial, so a term can be non-monotone in the reading
-    the way a niche optimum is. Selection happens inside whichever units the learner is handed, so
-    under :func:`grain_ladder` it is redone in every fold. Reported beside a penalised fit it also
-    prices discrete selection: choosing a handful of columns out of hundreds is high variance, and
-    that variance is a cost of the selector rather than of the features. The family is the
-    response head's: logistic under a binary cross-entropy loss, Gaussian under a squared-error
-    one.
+    ``terms`` says what one term is. Under ``"column"`` it is a column's orthogonal polynomial of
+    degree ``degree``, so a column enters with its curvature at once and can be non-monotone in the
+    reading the way a niche optimum is. Under ``"power"`` each power of a column is a term of its
+    own, which is how biomod2 writes a quadratic formula and how ``MASS::stepAIC()`` walks it. A
+    column holding one value over the fitting units is not a term.
+
+    ``direction`` is the search. ``"forward"`` starts from the intercept and admits the term that
+    lowers the criterion most, while one does and the model holds fewer than ``max_terms``.
+    ``"both"`` also weighs dropping each term it holds at every step, and ``"backward"`` starts
+    from every term and drops alone. ``"none"`` fits every term and selects nothing: with
+    ``terms="power"`` and ``degree=2`` that is the model biomod2's GLM fits. The two-way and
+    backward searches are MASS's ``stepAIC()``, step for step. ``max_terms`` bounds what a forward
+    or two-way search adds; ``float("inf")`` for no bound.
+
+    Each fit is R's ``glm.fit``: iteratively reweighted least squares, the rank read off the same
+    pivoted decomposition, and the same stopping rule. A move whose fit does not settle within its
+    25 iterations is refused rather than taken, and the fit names every response whose final model
+    did not settle in ``stopped``. A model with nothing but the intercept predicts the response's
+    share among the fitting units. The search runs on the core the R package calls, so the two
+    select the same terms and return the same coefficients; ``threads`` runs one step's candidate
+    fits at once and does not change what comes back.
     """
+    if direction not in ("forward", "both", "backward", "none"):
+        raise ValueError('`direction` is "forward", "both", "backward" or "none", '
+                         f"got {direction!r}.")
+    if terms not in ("column", "power"):
+        raise ValueError(f'`terms` is "column" or "power", got {terms!r}.')
+    if isinstance(max_terms, bool) or not isinstance(max_terms, (int, float))             or np.isnan(max_terms) or max_terms < 0:
+        raise ValueError(f"`max_terms` is one number of zero or more, or inf, got {max_terms!r}.")
+    if isinstance(degree, bool) or not float(degree).is_integer() or degree < 1:
+        raise ValueError(f"`degree` is one whole number of one or more, got {degree!r}.")
     return Learner(name="stepwise", fit=_stepwise_fit, predict=_stepwise_predict,
                    data=data, reads="tabular", multi="separate",
-                   params=dict(max_terms=max_terms, degree=degree))
+                   params=dict(max_terms=max_terms, degree=int(degree), direction=direction,
+                               terms=terms, threads=int(threads)))
 
 
-def _stepwise_fit(x, y, max_terms, degree, head, **_):
+def _stepwise_fit(x, y, max_terms, degree, direction, terms, threads, head, variables, **_):
+    from ._stepwise import stepwise_fit
     family = _family(head)
     m = flatten(x)
-    weights = _head_weights(head, y)
-    return dict(models=[_forward_aic(m, y[:, j], max_terms, degree, family, weights[:, j])
-                        for j in range(y.shape[1])],
-                n_col=m.shape[1], degree=degree, family=family)
+
+    def make(design, yj, seed_j, w):
+        return stepwise_fit(design, yj, w, family, max_terms=max_terms, degree=degree,
+                            direction=direction, terms=terms, threads=threads)
+
+    models = _fit_columns(m, y, make, [0] * y.shape[1], _head_weights(head, y))
+    return dict(models=models, n_col=m.shape[1], family=family,
+                stopped=[str(v) for v, f in zip(variables, models)
+                         if isinstance(f, dict) and not f["converged"]])
 
 
 def _stepwise_predict(model, x):
-    m = flatten(x)
-    return np.column_stack([_predict_forward(f, m, model["family"]) for f in model["models"]])
+    from ._stepwise import stepwise_predict
+    return _predict_columns(model["models"], flatten(x), stepwise_predict)
 
 
-# Forward selection by Akaike's criterion, one column admitted at a time. The polynomial basis is
-# stored with the fit rather than rebuilt, because an orthogonal basis refitted on new units is a
-# different basis.
-def _forward_aic(m: np.ndarray, y: np.ndarray, max_terms: int, degree: int,
-                 family: str, w=None) -> dict:
-    if len(np.unique(y)) < 2:
-        return dict(constant=float(y.mean()))
-    w = np.ones(len(y)) if w is None else np.asarray(w, dtype=np.float64)
-    fitter = _logistic if family == "binomial" else _least_squares
+def envelope(data=None, quantile=0.025) -> Learner:
+    """biomod2's surface range envelope, one per variable, over every bin-by-channel column: for
+    each column the ``quantile`` and ``1 - quantile`` quantiles of its readings over the units
+    present, and a unit predicted present where every column lies between its two, the ends
+    included. With the same quantile it draws the envelope ``bm_SRE()`` draws; the quantile is R's
+    default, type 7.
 
-    def glm(design, y):
-        return fitter(design, y, w)
+    The prediction is zero or one, and enters an ensemble as that. The envelope reads the presences
+    and nothing else: neither the absences nor the head's case weights move it. Every column has to
+    agree for a unit to be inside, so the more columns a representation has the fewer units any
+    envelope holds, and a coarse grain, ``data=grain("season")``, is what it is meant for.
 
-    chosen: list[int] = []
-    bases: list[dict] = []
-    current = None
-    best_aic = glm(np.empty((len(y), 0)), y)["aic"]
-    # A column holding one value has no polynomial basis to enter as, so it is not a candidate. It
-    # is the intercept the search already starts from, and offering it is what makes an orthogonal
-    # basis divide by a norm of zero.
-    candidates = [j for j in range(m.shape[1]) if len(np.unique(m[:, j])) > 1]
-    while len(chosen) < max_terms:
-        offered = []
-        for j in candidates:
-            if j in chosen:
-                continue
-            basis = _poly_basis(m[:, j], degree)
-            design = np.hstack([b["values"] for b in bases] + [basis["values"]])
-            fit = glm(design, y)
-            if fit is not None and np.isfinite(fit["aic"]):
-                offered.append((fit["aic"], j, fit, basis))
-        if not offered:
-            break
-        _, j, fit, basis = min(offered, key=lambda o: (o[0], o[1]))
-        if fit["aic"] >= best_aic:
-            break
-        best_aic, current = fit["aic"], fit
-        chosen.append(j)
-        bases.append(basis)
-    if not chosen:
-        return dict(constant=float(y.mean()))
-    return dict(columns=chosen, bases=bases, fit=current)
-
-
-def _predict_forward(f: dict, m: np.ndarray, family: str) -> np.ndarray:
-    if "constant" in f:
-        return np.full(m.shape[0], f["constant"])
-    design = np.hstack([_apply_basis(b, m[:, j]) for j, b in zip(f["columns"], f["bases"])])
-    eta = np.column_stack([np.ones(m.shape[0]), design]) @ f["fit"]["beta"]
-    return 1.0 / (1.0 + np.exp(-eta)) if family == "binomial" else eta
-
-
-def _least_squares(design: np.ndarray, y: np.ndarray, prior=None):
-    """One Gaussian regression by weighted least squares under the case weights ``prior``, and its
-    criterion as R's ``glm`` reports it for the Gaussian family. A fit with no residual has no
-    criterion to read and is refused."""
-    x = np.column_stack([np.ones(len(y)), design]) if design.shape[1] else np.ones((len(y), 1))
-    prior = np.ones(len(y)) if prior is None else np.asarray(prior, dtype=np.float64)
-    root = np.sqrt(prior)
-    beta, *_ = np.linalg.lstsq(x * root[:, None], y * root, rcond=None)
-    if not np.all(np.isfinite(beta)):
-        return None
-    rss = float(np.sum(prior * (y - x @ beta) ** 2))
-    n = len(y)
-    if rss <= 0:
-        return None
-    aic = n * (np.log(2 * np.pi * rss / n) + 1) + 2 - float(np.sum(np.log(prior))) \
-        + 2 * x.shape[1]
-    return dict(beta=beta, deviance=rss, aic=aic)
-
-
-def _logistic(design: np.ndarray, y: np.ndarray, prior=None, max_iter: int = 25):
-    """One logistic regression by iteratively reweighted least squares under the case weights
-    ``prior``, and its criterion: the weighted deviance plus twice the number of coefficients,
-    which is what R's fitter reports for a 0/1 response.
-
-    A candidate whose fit separates the response, or does not settle, is refused rather than
-    returned: those are the two states the criterion cannot be read off, and admitting one would
-    let the selector prefer a column for having no answer. It is where R's forward pass discards a
-    candidate its own fitter warned about.
+    A response with no presence, or with nothing else, is predicted its share among the fitting
+    units and named in ``unfitted``. The learner needs a presence-absence response, under a head
+    whose loss is the binary cross-entropy.
     """
-    x = np.column_stack([np.ones(len(y)), design]) if design.shape[1] else np.ones((len(y), 1))
-    prior = np.ones(len(y)) if prior is None else np.asarray(prior, dtype=np.float64)
-    share = float(np.sum(prior * y) / np.sum(prior))
-    beta = np.zeros(x.shape[1])
-    beta[0] = np.log(share / (1.0 - share))
-    deviance = np.inf
-    for _ in range(max_iter):
-        mu = _mu(x, beta)
-        if mu is None:
-            return None
-        w = prior * mu * (1.0 - mu)
-        z = x @ beta + (y - mu) / (mu * (1.0 - mu))
-        try:
-            beta = np.linalg.solve((x * w[:, None]).T @ x, (x * w[:, None]).T @ z)
-        except np.linalg.LinAlgError:
-            return None
-        if not np.all(np.isfinite(beta)):
-            return None
-        mu = _mu(x, beta)
-        if mu is None:
-            return None
-        new = -2.0 * float(np.sum(prior * (y * np.log(mu) + (1 - y) * np.log1p(-mu))))
-        if abs(new - deviance) / (abs(new) + 0.1) < 1e-8:
-            return dict(beta=beta, deviance=new, aic=new + 2 * x.shape[1])
-        deviance = new
-    return None
+    if isinstance(quantile, bool) or not isinstance(quantile, (int, float))             or not 0.0 <= quantile <= 0.5:
+        raise ValueError(f"`quantile` is one number in [0, 0.5], got {quantile!r}.")
+    return Learner(name="envelope", fit=_envelope_fit, predict=_envelope_predict, data=data,
+                   reads="tabular", multi="separate", params=dict(quantile=float(quantile)))
 
 
-def _mu(x: np.ndarray, beta: np.ndarray):
-    """The fitted probabilities, or nothing where one of them has reached zero or one."""
-    mu = 1.0 / (1.0 + np.exp(-(x @ beta)))
-    return None if np.any(mu < 1e-8) or np.any(mu > 1 - 1e-8) else mu
+def _envelope_fit(x, y, quantile, head, variables, **_):
+    from ._envelope import envelope_fit
+    if _family(head) != "binomial":
+        raise ValueError("the envelope is drawn around presences, under a head whose loss is the "
+                         f"binary cross-entropy; this head's loss is {head['loss']!r}.")
+    m = flatten(x)
+    models = _fit_columns(m, y, lambda design, yj, seed_j, w: envelope_fit(design, yj, quantile),
+                          [0] * y.shape[1], np.ones(y.shape))
+    return dict(models=models, n_col=m.shape[1],
+                unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)])
 
 
-# An orthogonal polynomial basis by the three-term recurrence, kept with the coefficients it was
-# fitted beside so that new units are mapped through the same basis rather than through one
-# re-derived from themselves. It is the basis R's poly() builds, by the same recurrence.
-def _poly_basis(v: np.ndarray, degree: int) -> dict:
-    degree = min(degree, len(np.unique(v)) - 1)
-    if degree < 1:
-        raise ValueError("a column holding one value has no polynomial basis to enter as")
-    powers = [np.ones(len(v))]
-    norm2 = [float(len(v))]
-    alpha = []
-    for k in range(1, degree + 1):
-        alpha.append(float(np.sum(v * powers[k - 1] ** 2) / norm2[k - 1]))
-        if k == 1:
-            nxt = (v - alpha[0]) * powers[0]
-        else:
-            nxt = (v - alpha[k - 1]) * powers[k - 1] - (norm2[k - 1] / norm2[k - 2]) * powers[k - 2]
-        powers.append(nxt)
-        norm2.append(float(np.sum(nxt ** 2)))
-    basis = dict(degree=degree, alpha=alpha, norm2=norm2)
-    basis["values"] = _apply_basis(basis, v)
-    return basis
-
-
-def _apply_basis(basis: dict, v: np.ndarray) -> np.ndarray:
-    alpha, norm2, degree = basis["alpha"], basis["norm2"], basis["degree"]
-    powers = [np.ones(len(v))]
-    for k in range(1, degree + 1):
-        if k == 1:
-            powers.append((v - alpha[0]) * powers[0])
-        else:
-            powers.append((v - alpha[k - 1]) * powers[k - 1]
-                          - (norm2[k - 1] / norm2[k - 2]) * powers[k - 2])
-    return np.column_stack([powers[k] / np.sqrt(norm2[k]) for k in range(1, degree + 1)])
+def _envelope_predict(model, x):
+    from ._envelope import envelope_predict
+    return _predict_columns(model["models"], flatten(x), envelope_predict)

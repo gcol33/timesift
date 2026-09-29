@@ -11,7 +11,7 @@ from timesift import (Learner, Response, decision_threshold, feature_matrix, fol
 from timesift._stats import norm_ppf
 from timesift.control import train_control
 from timesift.ladder import per_variable
-from timesift.learners import _logistic
+from timesift._stepwise import stepwise_fit
 from timesift.selection import SELECTED_ARM, _choose_candidate, _inner_splitter
 
 
@@ -24,9 +24,16 @@ def linear_learner(offset: float = 0.0, reduce: str = "mean") -> Learner:
     """
     take = {"mean": lambda v: v.mean(axis=1), "coldest": lambda v: v.min(axis=1)}[reduce]
 
+    def one(m, yj):
+        if len(np.unique(yj)) < 2:
+            return None
+        f = stepwise_fit(m.reshape(-1, 1), yj, np.ones(len(yj)), "binomial", direction="none",
+                         terms="power", degree=1)
+        return f if f["converged"] and len(f["beta"]) == 2 else None
+
     def fit(x, y, **_):
         m = take(x.values[:, :, 0])
-        beta = [_logistic(m.reshape(-1, 1), y[:, j]) for j in range(y.shape[1])]
+        beta = [one(m, y[:, j]) for j in range(y.shape[1])]
         return dict(beta=beta, offset=offset, rate=y.mean(axis=0))
 
     def predict(model, x):

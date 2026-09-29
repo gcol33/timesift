@@ -15,7 +15,7 @@ test_that("a learner of one's own needs nothing but a fit and a predict", {
 })
 
 test_that("a registered learner can be asked for by name", {
-  expect_true(all(c("elasticnet", "stepwise", "forest", "tree", "boosting", "maxnet",
+  expect_true(all(c("elasticnet", "stepwise", "forest", "tree", "boosting", "maxnet", "envelope",
                     "mlp", "cnn", "rescnn") %in% learners()))
   expect_s3_class(.as_learner("elasticnet"), "timesift_learner")
   expect_error(.as_learner("nope"), "unknown learner")
@@ -124,7 +124,7 @@ test_that("forward selection stops at its budget and is non-monotone in a predic
   y <- sim_response(sim, n_var = 1L, seed = 34L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "month")
   fit <- fit_learner(stepwise(max_terms = 2L), x, y)
-  chosen <- fit$model$models[[1L]]$columns
+  chosen <- fit$model$models[[1L]]$term_column + 1L
   expect_lte(length(chosen), 2L)
   p <- stats::predict(fit, x)
   expect_true(all(p >= 0 & p <= 1))
@@ -150,13 +150,12 @@ test_that("a column holding one value is not offered to the forward search", {
   for (arm in list(list(y = binary, response = "presence_absence"),
                    list(y = level, response = "constant_continuous_test"))) {
     fit <- fit_learner(stepwise(max_terms = 2L), flat, arm$y, response = arm$response)
-    chosen <- fit$model$models[[1L]]$columns
+    chosen <- fit$model$models[[1L]]$term_column + 1L
     expect_gt(length(chosen), 0L)
     expect_false(any(grepl("min", fit$model$columns[chosen], fixed = TRUE)), info = arm$response)
     expect_equal(dim(stats::predict(fit, flat)), c(40L, 1L), info = arm$response)
   }
 
-  expect_error(.poly_basis(rep(7, 20), 2L), "no polynomial basis")
 })
 
 test_that("the penalised learner reports what its fitter refuses instead of a constant", {
@@ -205,7 +204,7 @@ test_that("the old learner names are gone", {
                "rescnn_learner", "ensemble_learner")) {
     expect_false(nm %in% getNamespaceExports("timesift"), info = nm)
   }
-  expect_true(all(c("elasticnet", "stepwise", "forest", "tree", "boosting", "maxnet",
+  expect_true(all(c("elasticnet", "stepwise", "forest", "tree", "boosting", "maxnet", "envelope",
                     "mlp", "cnn", "rescnn") %in% learners()))
   expect_false("ensemble" %in% learners())
 })

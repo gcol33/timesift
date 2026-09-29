@@ -101,6 +101,7 @@ reference:
   - tree
   - boosting
   - maxnet
+  - envelope
   - torch_learners
   - train_control
   - learner

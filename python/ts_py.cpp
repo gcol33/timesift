@@ -11,8 +11,10 @@
 #include <vector>
 
 #include "ts_core.h"
+#include "ts_envelope.h"
 #include "ts_maxnet.h"
 #include "ts_penalised.h"
+#include "ts_stepwise.h"
 #include "ts_tree.h"
 
 namespace nb = nanobind;
@@ -223,9 +225,10 @@ timesift::TreeTable take_table(const nb::dict& from) {
 }  // namespace
 
 NB_MODULE(_core, m) {
-  m.doc() = "The binning, the reduction, the penalised fit, maxnet, the tree, the forest and the "
-            "boosted trees, shared with the R package as src/ts_core.cpp, "
-            "src/ts_penalised.cpp, src/ts_maxnet.cpp, src/ts_tree.cpp and src/ts_boost.cpp.";
+  m.doc() = "The binning, the reduction, the penalised fit, maxnet, the tree, the forest, the "
+            "boosted trees, the envelope and the stepwise model, shared with the R package as "
+            "src/ts_core.cpp, src/ts_penalised.cpp, src/ts_maxnet.cpp, src/ts_tree.cpp, "
+            "src/ts_boost.cpp, src/ts_envelope.cpp and src/ts_stepwise.cpp.";
 
   nb::register_exception_translator(
       [](const std::exception_ptr& p, void*) {
@@ -613,4 +616,84 @@ NB_MODULE(_core, m) {
           return give(std::move(out));
         },
         nb::arg("fit"), nb::arg("newx"), nb::arg("clamp"), nb::arg("type"));
+
+  m.def("envelope_fit",
+        [](ConstMat x, ConstF64 y, double quantile) {
+          timesift::Envelope fit =
+              timesift::envelope_fit(x.data(), y.data(), x.shape(0), x.shape(1), quantile);
+          nb::dict out;
+          out["n_column"] = fit.n_column;
+          out["n_presence"] = fit.n_presence;
+          out["lo"] = give(std::move(fit.lo));
+          out["hi"] = give(std::move(fit.hi));
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("quantile"));
+
+  m.def("envelope_predict",
+        [](const nb::dict& fit, ConstMat newx) {
+          timesift::Envelope e;
+          e.n_column = nb::cast<std::int32_t>(fit["n_column"]);
+          e.n_presence = nb::cast<std::int32_t>(fit["n_presence"]);
+          e.lo = take_field<double>(fit, "lo");
+          e.hi = take_field<double>(fit, "hi");
+          std::vector<double> out(newx.shape(0));
+          timesift::envelope_predict(e, newx.data(), newx.shape(0), newx.shape(1), out.data());
+          return give(std::move(out));
+        },
+        nb::arg("fit"), nb::arg("newx"));
+
+  m.def("stepwise_fit",
+        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, double max_terms,
+           int degree, const std::string& direction, const std::string& terms, int threads) {
+          timesift::StepwiseSpec spec;
+          spec.family = timesift::family_from_name(family);
+          spec.max_terms = max_terms;
+          spec.degree = degree;
+          spec.direction = timesift::step_direction_from_name(direction);
+          spec.terms = timesift::step_terms_from_name(terms);
+          spec.threads = threads;
+          timesift::Stepwise fit;
+          {
+            nb::gil_scoped_release release;
+            fit = timesift::stepwise_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
+                                         spec);
+          }
+          nb::dict out;
+          out["family"] = std::string(timesift::family_name(fit.family));
+          out["n_column"] = fit.n_column;
+          out["constant"] = fit.constant;
+          out["term_column"] = give(std::move(fit.term_column));
+          out["term_power"] = give(std::move(fit.term_power));
+          out["term_degree"] = give(std::move(fit.term_degree));
+          out["alpha"] = give(std::move(fit.alpha));
+          out["norm2"] = give(std::move(fit.norm2));
+          out["beta"] = give(std::move(fit.beta));
+          out["rank"] = fit.rank;
+          out["deviance"] = fit.deviance;
+          out["aic"] = fit.aic;
+          out["converged"] = fit.converged;
+          out["steps"] = fit.steps;
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("max_terms"),
+        nb::arg("degree"), nb::arg("direction"), nb::arg("terms"), nb::arg("threads") = 1);
+
+  m.def("stepwise_predict",
+        [](const nb::dict& fit, ConstMat newx) {
+          timesift::Stepwise s;
+          s.family = timesift::family_from_name(nb::cast<std::string>(fit["family"]));
+          s.n_column = nb::cast<std::int32_t>(fit["n_column"]);
+          s.constant = nb::cast<double>(fit["constant"]);
+          s.term_column = take_field<std::int32_t>(fit, "term_column");
+          s.term_power = take_field<std::int32_t>(fit, "term_power");
+          s.term_degree = take_field<std::int32_t>(fit, "term_degree");
+          s.alpha = take_field<double>(fit, "alpha");
+          s.norm2 = take_field<double>(fit, "norm2");
+          s.beta = take_field<double>(fit, "beta");
+          std::vector<double> out(newx.shape(0));
+          timesift::stepwise_predict(s, newx.data(), newx.shape(0), newx.shape(1), out.data());
+          return give(std::move(out));
+        },
+        nb::arg("fit"), nb::arg("newx"));
 }
