@@ -1026,3 +1026,98 @@ forest_stream <- do.call(rbind, lapply(list(c(1, 0), c(1, 1), c(0, 0), c(4294967
 }))
 write_fixture(forest_stream, "forest_stream.csv")
 cat("wrote the forest reference\n")
+
+# Boosting.
+#
+# The first-order trees are gbm's, and gbm fits them with nothing drawn when every unit is in the
+# bag, so gbm is the reference there, cross-validated folds included: each fold's fit is gbm's own
+# `gbm.fit()` with the fold held out behind `nTrain`, as `gbmDoFold` arranges it, and the folds'
+# held-out deviance is combined as `gbmCrossValErr` combines it. The second-order trees are
+# xgboost's exact ones, which store the design in single precision, so they agree to that and no
+# closer; the binomial cases carry weights that are not whole numbers, because under equal weights
+# the first round's gradients take two values, many splits then tie exactly, and the two libraries'
+# sums break the tie differently. The draws, which neither library makes as the spec does, are
+# pinned by the fit grown from the spec's text in R alone, `tests/testthat/helper-oracle-boost.R`.
+source("tests/testthat/helper-oracle-boost.R")
+set.seed(20260929L)
+boost_weight <- round(stats::runif(PEN_N, 0.5, 2), 3)
+write_fixture(data.frame(unit = pen_units, weight = sprintf("%.3f", boost_weight),
+                         stringsAsFactors = FALSE), "boost_weights.csv")
+BOOST_CASES <- data.frame(
+  case = c("gbm_binomial_flat", "gbm_binomial_counts", "gbm_gaussian_flat", "gbm_gaussian_counts",
+           "gbm_binomial_cv", "gbm_gaussian_cv", "xgboost_binomial_random",
+           "xgboost_binomial_gamma", "xgboost_gaussian_flat", "xgboost_gaussian_random",
+           "oracle_binomial_drawn", "oracle_gaussian_drawn"),
+  reference = c(rep("gbm", 6L), rep("xgboost", 4L), rep("oracle", 2L)),
+  family = c("binomial", "binomial", "gaussian", "gaussian", "binomial", "gaussian",
+             "binomial", "binomial", "gaussian", "gaussian", "binomial", "gaussian"),
+  weights = c("flat", "counts", "flat", "counts", "flat", "counts", "random", "random", "flat",
+              "random", "counts", "random"),
+  newton = c(rep(0L, 6L), rep(1L, 4L), 0L, 0L),
+  trees = c(50L, 50L, 40L, 40L, 60L, 60L, 20L, 20L, 20L, 20L, 20L, 20L),
+  depth = c(1L, 3L, 2L, 4L, 2L, 3L, 2L, 3L, 3L, 4L, 2L, 3L),
+  shrinkage = c(0.1, 0.05, 0.1, 0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.3, 0.1, 0.1),
+  min_leaf = c(10, 5, 5, 3, 5, 5, 1, 1, 1, 2, 3, 3),
+  subsample = c(rep(1, 10L), 0.6, 0.7),
+  colsample = c(rep(1, 10L), 0.5, 0.4),
+  lambda = c(rep(0, 6L), 1, 1, 1, 2, 0, 0),
+  gamma = c(rep(0, 6L), 0, 0.5, 0, 1, 0, 0),
+  cv = c(0L, 0L, 0L, 0L, 1L, 1L, rep(0L, 6L)),
+  seed = c(rep(1, 10L), 7, 4294967295),
+  stringsAsFactors = FALSE)
+write_fixture(transform(BOOST_CASES, seed = sprintf("%.0f", seed)), "boost_cases.csv")
+
+boost_x <- tree_x
+colnames(boost_x) <- make.names(colnames(boost_x))
+gbm_fit <- function(x, y, w, dist, row, n_train = nrow(x)) {
+  gbm::gbm.fit(x, y, w = w, distribution = dist, n.trees = row$trees,
+               interaction.depth = row$depth, shrinkage = row$shrinkage,
+               n.minobsinnode = row$min_leaf, bag.fraction = 1, nTrain = n_train,
+               verbose = FALSE, keep.data = FALSE)
+}
+boost_predictions <- list()
+boost_cv <- list()
+for (i in seq_len(nrow(BOOST_CASES))) {
+  row <- BOOST_CASES[i, ]
+  y <- if (row$family == "binomial") pen_y_binomial else pen_y_gaussian
+  w <- switch(row$weights, flat = rep(1, PEN_N), counts = tree_count, random = boost_weight)
+  if (row$reference == "gbm") {
+    dist <- if (row$family == "binomial") "bernoulli" else "gaussian"
+    n_trees <- row$trees
+    if (row$cv == 1L) {
+      folds <- sort(unique(pen_fold))
+      valid <- sapply(folds, function(g) {
+        i_fold <- order(pen_fold == g)
+        gbm_fit(boost_x[i_fold, , drop = FALSE], y[i_fold], w[i_fold], dist, row,
+                n_train = sum(pen_fold != g))$valid.error
+      })
+      held <- tabulate(match(pen_fold, folds), nbins = length(folds))
+      cv_error <- rowSums(sweep(valid, 2L, held, `*`)) / PEN_N
+      n_trees <- which.min(cv_error)
+      boost_cv[[length(boost_cv) + 1L]] <- data.frame(
+        case = row$case, tree = seq_along(cv_error), cv_error = sprintf("%.17g", cv_error),
+        stringsAsFactors = FALSE)
+    }
+    fit <- gbm_fit(boost_x, y, w, dist, row)
+    p <- gbm:::predict.gbm(fit, as.data.frame(boost_x), n.trees = n_trees, type = "response")
+  } else if (row$reference == "xgboost") {
+    dm <- xgboost::xgb.DMatrix(boost_x, label = y, weight = w)
+    fit <- xgboost::xgb.train(
+      params = list(objective = if (row$family == "binomial") "binary:logistic" else
+                      "reg:squarederror",
+                    tree_method = "exact", max_depth = row$depth, eta = row$shrinkage,
+                    lambda = row$lambda, gamma = row$gamma, min_child_weight = row$min_leaf,
+                    nthread = 1),
+      data = dm, nrounds = row$trees, verbose = 0)
+    p <- stats::predict(fit, dm)
+  } else {
+    fit <- oracle_boost(boost_x, y, w, row$family, row$trees, row$depth, row$shrinkage,
+                        row$min_leaf, row$subsample, row$colsample, row$seed)
+    p <- oracle_boost_predict(fit, boost_x, row$family == "binomial")
+  }
+  boost_predictions[[i]] <- data.frame(case = row$case, unit = pen_units,
+                                       value = sprintf("%.17g", p), stringsAsFactors = FALSE)
+}
+write_fixture(do.call(rbind, boost_predictions), "boost_predict.csv")
+write_fixture(do.call(rbind, boost_cv), "boost_cv.csv")
+cat("wrote the boosting reference\n")

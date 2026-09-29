@@ -986,6 +986,99 @@ Every field of every node, the thresholds and values included, and every predict
 exactly: the core and the oracle perform the same operations in the same order, and no sum in a
 forest depends on a machine's extended precision.
 
+## The boosted trees
+
+`boosting()` is one gradient boosted model per response, over `src/ts_boost.cpp`, which both
+languages compile. Its first-order trees are gbm's and its second-order ones xgboost's exact greedy
+trees, because those are what a biomod2 user fits as `GBM` and `XGBOOST`, and their draws come from
+the forest's generator.
+
+### The fit
+
+- The score of every observation starts at `log(S / (T - S))` under a binomial family and `S / T`
+  under a Gaussian one, `S` the sum of weight times response and `T` the sum of weights, each taken
+  in row order. A binomial fit with no weight on one class is an error.
+- Tree `t` of fit `f` draws from the stream `f * trees + t` of the fit's seed, fit 0 being the fit
+  on every observation and fit `g + 1` the one holding fold `g` out. It first draws its bag, gbm's
+  way: with `k` the floor of `subsample` times the fit's observations, observation `i` of `m`, in
+  row order, is kept where a uniform times `m - i` is below `k` less those kept so far. It then
+  draws its columns: the floor of `colsample` times the column count, at least one, by the
+  forest's partial shuffle of a fresh arrangement of the column indices, tried in ascending order.
+- The working response is, first order, `y - 1 / (1 + exp(-F))` or `y - F`; second order, the
+  gradient `w (p - y)` and hessian `w max(p (1 - p), 1e-16)` under a binomial family, `w (F - y)`
+  and `w` under a Gaussian one, `p` the logistic of the score `F`.
+- Each tree is grown on the bag's observations, and each column's observations are read in
+  ascending order, ties in row order.
+- A leaf's value is its step times `shrinkage`, and every observation's score moves by the value of
+  the leaf it falls into. A score is the starting score plus the leaves' values in tree order, and a
+  binomial prediction the logistic of it.
+
+### The first-order tree
+
+- gbm's tree is `depth` splits, grown best first. Every terminal node is searched once, when it is
+  made, over every column in turn: a candidate between two distinct values, at their midpoint,
+  with at least `min_leaf` observations on each side, improves by `lw rw (ls/lw - rs/rw)^2 /
+  (lw + rw)`, `ls` and `lw` the weighted working response and the weight to its left and `rs` and
+  `rw` to its right, the right side's sums the node's own less the left's, taken one observation at
+  a time. A node keeps the first split reaching its largest improvement.
+- The terminal node split is the first reaching the largest improvement over all of them; none
+  above zero ends the tree. A split leaves the left child in the node's place in that order and
+  appends the right child and then an empty node, gbm's branch for a missing value, which holds
+  nothing and is never split but keeps its place in the order.
+- A Gaussian leaf's step is its weighted mean working response, as its parent's split left the
+  sums. A binomial leaf's is one Newton step, the sum of `w z` over the sum of
+  `w (y - z) (1 - y + z)` over the bag's observations in it, in row order, and zero where that is
+  zero.
+
+### The second-order tree
+
+- xgboost's tree is grown level by level to `depth`. Every node of a level is searched over every
+  column in turn: a candidate between two distinct values, at their midpoint, with at least
+  `min_leaf` of hessian on each side, gains `GL^2 / (HL + lambda) + GR^2 / (HR + lambda) -
+  G^2 / (H + lambda)`, `GL` and `HL` the gradient and hessian to its left and `GR` and `HR` the
+  node's less those. A node keeps the first split reaching its largest gain, and is split where
+  that gain is above `1e-6`.
+- The grown tree is pruned from the leaves up: a split whose children are both leaves and whose
+  gain is below `gamma` is collapsed, which can make its parent such a split in turn.
+- A leaf's step is `-G / (H + lambda)` over the bag's observations in it, in row order, and zero
+  where the denominator is zero.
+
+### The number of trees
+
+Where folds are given, each fold's fit scores its held-out observations after every tree by the
+weighted deviance, `-2 sum w (y F - log(1 + exp(F))) / sum w` or `sum w (y - F)^2 / sum w`. The
+error after tree `t` is each fold's deviance times the observations the fold holds, summed over the
+folds in order and divided by all the observations, gbm's `gbmCrossValErr`, and the fit on every
+observation keeps its trees up to the first of least error.
+
+### The settings
+
+With `newton` off, `preset = "package"` is gbm's defaults as biomod2 passes them: 100 trees of one
+split, `shrinkage = 0.1`, `min_leaf = 10`, `subsample = 0.5`, no inner folds. `"bigboss"` is 2500
+trees of seven splits, `shrinkage = 0.001`, `min_leaf = 5`, `subsample = 0.5` and three inner folds.
+With `newton` on, `"package"` is xgboost's: 100 trees of depth 6, `shrinkage = 0.3`, `min_leaf = 1`,
+`lambda = 1`, `gamma = 0`, every observation and column; `"bigboss"` four trees of depth 2 at
+`shrinkage = 1`. `lambda` and `gamma` are zero under gbm's trees and an error to set otherwise.
+
+### The fixtures
+
+`boost_cases.csv` names twelve cases on the tree's design. Six are gbm's, each family with flat
+weights and the tree's counts, and a cross-validated fit of each over the design's five folds;
+gbm grows them with `bag.fraction = 1`, each fold's fit behind `nTrain` as `gbmDoFold` arranges it.
+Four are xgboost's `tree_method = "exact"`, with `lambda` and `gamma` set and, for a binomial
+response, the weights `boost_weights.csv` holds: under equal weights the first round's gradients
+take two values, many splits then tie exactly, and the two libraries' sums break such a tie
+differently. Two draw a subsample and a column sample and are grown from this text in R alone,
+`tests/testthat/helper-oracle-boost.R`. `boost_predict.csv` holds every case's prediction for
+every unit and `boost_cv.csv` the cross-validated error after every tree.
+
+### How exactly
+
+The first-order predictions and the cross-validated errors are asserted to `1e-12` relative, the
+largest difference from gbm being `6.7e-16`; gbm rescales the weights before it fits, which moves a
+sum in the last place. The second-order predictions are asserted to `1e-5`, since xgboost stores the
+design and the gradients in single precision.
+
 ## What each language carries
 
 The representation and the three artifacts are the contract. Everything built over them is meant to
@@ -1009,6 +1102,7 @@ call site.
 | the forward selector | `stepwise()` |
 | the forest | `forest()` |
 | the classification and regression tree | `tree()` |
+| gradient boosted trees | `boosting()` |
 | the encoders | `mlp()`, `cnn()`, `rescnn()` |
 | how an encoder is trained | `train_control()` |
 | fitting one learner on one representation | `fit_learner()` |
@@ -1237,6 +1331,7 @@ call site.
 | a set of learners, or of representations | `c()`, an S3 method on each spec class | a `list`, and `+` between two of them |
 | drawing a ladder, a run or a selection | `plot()`, a method on the base generic for each, on base graphics | `plot()`, one function taking any of the three, on matplotlib |
 | a simulated record | a `timesift_simulation` list whose `readings` is a data frame | the `Simulation` dataclass, whose `readings` is a mapping of column to array; the first reading instant is `from_`, since `from` is a keyword |
+| boosting's L2 penalty on a leaf | `boosting(lambda =)` | `boosting(lambda_=)`, since `lambda` is a keyword |
 
 All of these are shapes rather than behaviours: a setting given to a learner beats the run's
 control on both sides, the profile is one implementation on both sides, and a set is the same set.

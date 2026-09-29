@@ -64,6 +64,14 @@ ts_forest_predict_ <- function(forest, newx, n, p) {
   .Call(`_timesift_ts_forest_predict_`, forest, newx, n, p)
 }
 
+ts_boost_fit_ <- function(x, y, w, n, p, family, trees, depth, shrinkage, min_leaf, subsample, colsample, newton, lambda, gamma, seed, fold, n_fold, threads) {
+  .Call(`_timesift_ts_boost_fit_`, x, y, w, n, p, family, trees, depth, shrinkage, min_leaf, subsample, colsample, newton, lambda, gamma, seed, fold, n_fold, threads)
+}
+
+ts_boost_predict_ <- function(fit, newx, n, p) {
+  .Call(`_timesift_ts_boost_predict_`, fit, newx, n, p)
+}
+
 ts_forest_stream_ <- function(seed, tree, n) {
   .Call(`_timesift_ts_forest_stream_`, seed, tree, n)
 }

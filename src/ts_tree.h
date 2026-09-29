@@ -86,19 +86,24 @@ struct ForestSpec {
   int threads = 1;       // trees grown at once; 1 is serial
 };
 
-// The trees' nodes one after another, tree `t` at `offset[t]` to `offset[t + 1]`. Within a tree
+// Many trees' nodes one after another, tree `t` at `offset[t]` to `offset[t + 1]`. Within a tree
 // the nodes are depth first, left before right, and `left` and `right` count from the tree's first
 // node.
-struct Forest {
-  Family family = Family::gaussian;
-  std::int32_t n_column = 0;
+struct TreeTable {
   std::vector<std::int32_t> offset;
   std::vector<std::int32_t> column;      // -1 at a leaf
   std::vector<double> threshold;
   std::vector<std::int8_t> less_left;
   std::vector<std::int32_t> left;
   std::vector<std::int32_t> right;
-  std::vector<double> value;             // the share of ones among the leaf's draws, or their mean
+  std::vector<double> value;
+};
+
+// A forest's leaves hold the share of ones among their draws, or their mean.
+struct Forest {
+  Family family = Family::gaussian;
+  std::int32_t n_column = 0;
+  TreeTable trees;
 };
 
 // Throws Error for an empty design, a non-finite value, a negative weight, a binomial response
@@ -114,6 +119,56 @@ void forest_predict(const Forest& forest, const double* x, std::size_t n, std::s
 // The first `n` outputs of the generator tree `tree` of a forest seeded `seed` draws from, so a
 // reimplementation of the generator can be checked against this one output for output.
 void forest_stream(std::uint32_t seed, std::uint32_t tree, std::size_t n, std::uint32_t* out);
+
+// Gradient boosted trees. The score starts at the log-odds of the weighted share of ones, or the
+// weighted mean, and each tree is fitted to the loss's gradient at the current score and added to
+// it scaled by `shrinkage`. Each tree is grown on a subsample of the observations drawn without
+// replacement, and reads a subsample of the columns.
+//
+// With `newton` off the trees are gbm's: a tree is `depth` splits grown best first, each split
+// the one of largest reduction in the weighted squared error of the working response, with at
+// least `min_leaf` observations on each side, and a leaf takes one Newton step on the loss (the
+// mean of the working response under a Gaussian family). With `newton` on they are xgboost's
+// exact greedy trees: grown level by level to `depth`, a split chosen by the second-order gain
+// under the L2 penalty `lambda`, at least `min_leaf` of hessian on each side, pruned where a split
+// gains less than `gamma`, and a leaf the Newton step `-G / (H + lambda)`.
+//
+// Where folds are given, the fit is repeated on each fold's complement with the fold held out, and
+// the number of trees kept is the one of least held-out deviance summed over the folds, each
+// fold's weighted by how many observations it holds, as gbm's `cv.folds` chooses it.
+struct BoostSpec {
+  int trees = 100;
+  int depth = 1;
+  double shrinkage = 0.1;
+  double min_leaf = 10;
+  double subsample = 0.5;
+  double colsample = 1.0;
+  bool newton = false;
+  double lambda = 0.0;
+  double gamma = 0.0;
+  std::uint32_t seed = 1;
+  int threads = 1;      // the fit on every observation and the folds' fits run at once
+};
+
+// The trees' leaves hold their step already scaled by the shrinkage, so a score is `init` plus the
+// sum of the leaves a row falls into.
+struct Boosted {
+  Family family = Family::gaussian;
+  std::int32_t n_column = 0;
+  double init = 0.0;
+  TreeTable trees;               // the trees kept, the chosen number where folds were given
+  std::vector<double> cv_error;  // the held-out deviance after each tree, empty without folds
+};
+
+// Throws Error for an empty design, a non-finite value, a negative weight, a binomial response
+// other than 0 or 1 or holding one class alone, and settings outside their range.
+Boosted boost_fit(const double* x, const double* y, const double* w, std::size_t n,
+                  std::size_t p, Family family, const BoostSpec& spec, const std::int32_t* fold,
+                  std::int32_t n_fold);
+
+// The score of each row, through the logistic function under a binomial family.
+void boost_predict(const Boosted& model, const double* x, std::size_t n, std::size_t p,
+                   double* out);
 
 }  // namespace timesift
 

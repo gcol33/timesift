@@ -20,6 +20,7 @@ nanobind_add_module(_core NB_STATIC
   src/ts_calendar.cpp
   src/ts_penalised.cpp
   src/ts_tree.cpp
+  src/ts_boost.cpp
   python/ts_py.cpp)
 
 target_include_directories(_core PRIVATE src)

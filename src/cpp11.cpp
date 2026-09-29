@@ -118,6 +118,20 @@ extern "C" SEXP _timesift_ts_forest_predict_(SEXP forest, SEXP newx, SEXP n, SEX
   END_CPP11
 }
 // ts_r.cpp
+cpp11::list ts_boost_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, int trees, int depth, double shrinkage, double min_leaf, double subsample, double colsample, bool newton, double lambda, double gamma, double seed, cpp11::sexp fold, int n_fold, int threads);
+extern "C" SEXP _timesift_ts_boost_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP trees, SEXP depth, SEXP shrinkage, SEXP min_leaf, SEXP subsample, SEXP colsample, SEXP newton, SEXP lambda, SEXP gamma, SEXP seed, SEXP fold, SEXP n_fold, SEXP threads) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_boost_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(trees), cpp11::as_cpp<cpp11::decay_t<int>>(depth), cpp11::as_cpp<cpp11::decay_t<double>>(shrinkage), cpp11::as_cpp<cpp11::decay_t<double>>(min_leaf), cpp11::as_cpp<cpp11::decay_t<double>>(subsample), cpp11::as_cpp<cpp11::decay_t<double>>(colsample), cpp11::as_cpp<cpp11::decay_t<bool>>(newton), cpp11::as_cpp<cpp11::decay_t<double>>(lambda), cpp11::as_cpp<cpp11::decay_t<double>>(gamma), cpp11::as_cpp<cpp11::decay_t<double>>(seed), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<int>>(n_fold), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::doubles ts_boost_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p);
+extern "C" SEXP _timesift_ts_boost_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_boost_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p)));
+  END_CPP11
+}
+// ts_r.cpp
 cpp11::doubles ts_forest_stream_(double seed, double tree, int n);
 extern "C" SEXP _timesift_ts_forest_stream_(SEXP seed, SEXP tree, SEXP n) {
   BEGIN_CPP11
@@ -129,6 +143,8 @@ extern "C" {
 static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_bin_nexts_",         (DL_FUNC) &_timesift_ts_bin_nexts_,          4},
     {"_timesift_ts_bin_starts_",        (DL_FUNC) &_timesift_ts_bin_starts_,         4},
+    {"_timesift_ts_boost_fit_",         (DL_FUNC) &_timesift_ts_boost_fit_,         19},
+    {"_timesift_ts_boost_predict_",     (DL_FUNC) &_timesift_ts_boost_predict_,      4},
     {"_timesift_ts_coverage_",          (DL_FUNC) &_timesift_ts_coverage_,           8},
     {"_timesift_ts_cycle_fraction_",    (DL_FUNC) &_timesift_ts_cycle_fraction_,     3},
     {"_timesift_ts_cycle_phase_",       (DL_FUNC) &_timesift_ts_cycle_phase_,        3},

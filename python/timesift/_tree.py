@@ -1,4 +1,5 @@
-"""The tree and the forest, over the core ``src/ts_tree.cpp`` compiles into both languages.
+"""The tree, the forest and the boosted trees, over the core ``src/ts_tree.cpp`` and
+``src/ts_boost.cpp`` compile into both languages.
 
 Nothing here grows anything: the design, the family, the case weights and the inner folds are
 settled above, and what is left is to hand them over column-major and to read the complexity table
@@ -16,7 +17,7 @@ import numpy as np
 from . import _core
 
 __all__ = ["tree_fit", "tree_prune", "tree_predict", "tree_prune_cp", "forest_fit",
-           "forest_predict", "forest_stream"]
+           "forest_predict", "forest_stream", "boost_fit", "boost_predict"]
 
 PRUNE_RULES = ("se_sum", "one_se", "min", "none")
 
@@ -60,6 +61,26 @@ def forest_fit(x, y, w, family, trees, mtry, min_leaf, balance, seed, threads=1)
 def forest_predict(forest: dict, newx) -> np.ndarray:
     """The mean over the forest's trees of the leaf each row of ``newx`` falls into."""
     return _core.forest_predict(forest, _design(newx))
+
+
+def boost_fit(x, y, w, family, trees, depth, shrinkage, min_leaf, subsample, colsample, newton,
+              lambda_, gamma, seed, fold=None, n_fold=0, threads=1) -> dict:
+    """Gradient boosted trees grown by the core, gbm's or, under ``newton``, xgboost's. ``fold``
+    gives one 0-based fold index per unit, and the number of trees kept is then the one of least
+    held-out deviance. ``seed`` is taken modulo 2^32."""
+    return _core.boost_fit(_design(x), np.ascontiguousarray(y, dtype=np.float64),
+                           np.ascontiguousarray(w, dtype=np.float64), family, int(trees),
+                           int(depth), float(shrinkage), float(min_leaf), float(subsample),
+                           float(colsample), bool(newton), float(lambda_), float(gamma),
+                           int(seed) & 0xFFFFFFFF,
+                           None if fold is None else np.ascontiguousarray(fold, dtype=np.int32),
+                           int(n_fold), int(threads))
+
+
+def boost_predict(fit: dict, newx) -> np.ndarray:
+    """The score of each row of ``newx``, through the logistic function under a binomial
+    family."""
+    return _core.boost_predict(fit, _design(newx))
 
 
 def forest_stream(seed, tree, n) -> np.ndarray:

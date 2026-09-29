@@ -12,6 +12,17 @@
   languages, so the two grow the same tree; on the contract's twelve cases it reproduces rpart's
   node table, complexity table, cross-validated error and pruned predictions to `1.1e-16`. Both
   languages.
+* `boosting()` fits one gradient boosted model per response, gbm's trees by default and
+  xgboost's exact greedy second-order trees under `newton = TRUE`, which are what biomod2 fits as
+  `GBM` and `XGBOOST`. `n_inner` folds choose how many trees are kept as gbm's `cv.folds` does,
+  and `preset = "bigboss"` takes biomod2's tuned option set for either. It runs on a new core,
+  `src/ts_boost.cpp`, compiled into both languages. With every unit in the bag it reproduces gbm's
+  predictions and cross-validated error to `6.7e-16`, and xgboost's predictions to its
+  single-precision storage; the subsample and the column draw come from the forest's generator
+  and are pinned against a fit grown from the contract's text in R alone. On 894 units and 471
+  columns, one thread, biomod2's tuned gbm fit (2500 trees of seven splits) takes 56 s against
+  gbm's 68 s, and xgboost's defaults 1.2 s against xgboost's exact method's 2.6 s. Both
+  languages.
 * `forest(balance = TRUE)` is the down-sampled forest biomod2 fits as `RFd`: each tree draws as
   many units from each class as the smaller class holds. `forest()` also takes `preset`
   (`"package"`, randomForest's defaults, or `"bigboss"`, biomod2's tuned set) and `threads`. Both

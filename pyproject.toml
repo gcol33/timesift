@@ -44,6 +44,8 @@ sdist.include = [
   "src/ts_penalised.h",
   "src/ts_tree.cpp",
   "src/ts_tree.h",
+  "src/ts_boost.cpp",
+  "src/ts_trees_internal.h",
   "python/ts_py.cpp",
   "python/tests/**",
   "inst/spec/**",

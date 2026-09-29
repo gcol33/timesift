@@ -167,11 +167,35 @@ timesift::Tree take_tree(const nb::dict& tree) {
   return out;
 }
 
+// A forest and a boosted fit carry their trees as one node table, the trees one after another.
+void give_table(nb::dict& out, timesift::TreeTable&& table) {
+  out["offset"] = give(std::move(table.offset));
+  out["column"] = give(std::move(table.column));
+  out["threshold"] = give(std::move(table.threshold));
+  out["less_left"] = give(std::move(table.less_left));
+  out["left"] = give(std::move(table.left));
+  out["right"] = give(std::move(table.right));
+  out["value"] = give(std::move(table.value));
+}
+
+timesift::TreeTable take_table(const nb::dict& from) {
+  timesift::TreeTable table;
+  table.offset = take_field<std::int32_t>(from, "offset");
+  table.column = take_field<std::int32_t>(from, "column");
+  table.threshold = take_field<double>(from, "threshold");
+  table.less_left = take_field<std::int8_t>(from, "less_left");
+  table.left = take_field<std::int32_t>(from, "left");
+  table.right = take_field<std::int32_t>(from, "right");
+  table.value = take_field<double>(from, "value");
+  return table;
+}
+
 }  // namespace
 
 NB_MODULE(_core, m) {
-  m.doc() = "The binning, the reduction, the penalised fit, the tree and the forest, shared with "
-            "the R package as src/ts_core.cpp, src/ts_penalised.cpp and src/ts_tree.cpp.";
+  m.doc() = "The binning, the reduction, the penalised fit, the tree, the forest and the boosted "
+            "trees, shared with the R package as src/ts_core.cpp, src/ts_penalised.cpp, "
+            "src/ts_tree.cpp and src/ts_boost.cpp.";
 
   nb::register_exception_translator(
       [](const std::exception_ptr& p, void*) {
@@ -397,13 +421,7 @@ NB_MODULE(_core, m) {
           nb::dict out;
           out["family"] = std::string(timesift::family_name(forest.family));
           out["n_column"] = forest.n_column;
-          out["offset"] = give(std::move(forest.offset));
-          out["column"] = give(std::move(forest.column));
-          out["threshold"] = give(std::move(forest.threshold));
-          out["less_left"] = give(std::move(forest.less_left));
-          out["left"] = give(std::move(forest.left));
-          out["right"] = give(std::move(forest.right));
-          out["value"] = give(std::move(forest.value));
+          give_table(out, std::move(forest.trees));
           return out;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("trees"),
@@ -415,18 +433,64 @@ NB_MODULE(_core, m) {
           timesift::Forest f;
           f.family = timesift::family_from_name(nb::cast<std::string>(forest["family"]));
           f.n_column = nb::cast<std::int32_t>(forest["n_column"]);
-          f.offset = take_field<std::int32_t>(forest, "offset");
-          f.column = take_field<std::int32_t>(forest, "column");
-          f.threshold = take_field<double>(forest, "threshold");
-          f.less_left = take_field<std::int8_t>(forest, "less_left");
-          f.left = take_field<std::int32_t>(forest, "left");
-          f.right = take_field<std::int32_t>(forest, "right");
-          f.value = take_field<double>(forest, "value");
+          f.trees = take_table(forest);
           std::vector<double> out(newx.shape(0));
           timesift::forest_predict(f, newx.data(), newx.shape(0), newx.shape(1), out.data());
           return give(std::move(out));
         },
         nb::arg("forest"), nb::arg("newx"));
+
+  m.def("boost_fit",
+        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int trees, int depth,
+           double shrinkage, double min_leaf, double subsample, double colsample, bool newton,
+           double lambda, double gamma, std::uint32_t seed, std::optional<ConstI32> fold,
+           int n_fold, int threads) {
+          timesift::BoostSpec spec;
+          spec.trees = trees;
+          spec.depth = depth;
+          spec.shrinkage = shrinkage;
+          spec.min_leaf = min_leaf;
+          spec.subsample = subsample;
+          spec.colsample = colsample;
+          spec.newton = newton;
+          spec.lambda = lambda;
+          spec.gamma = gamma;
+          spec.seed = seed;
+          spec.threads = threads;
+          timesift::Boosted fit;
+          {
+            nb::gil_scoped_release release;
+            fit = timesift::boost_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
+                                      timesift::family_from_name(family), spec,
+                                      fold.has_value() ? fold->data() : nullptr,
+                                      fold.has_value() ? n_fold : 0);
+          }
+          nb::dict out;
+          out["family"] = std::string(timesift::family_name(fit.family));
+          out["n_column"] = fit.n_column;
+          out["init"] = fit.init;
+          out["cv_error"] = give(std::move(fit.cv_error));
+          give_table(out, std::move(fit.trees));
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("trees"),
+        nb::arg("depth"), nb::arg("shrinkage"), nb::arg("min_leaf"), nb::arg("subsample"),
+        nb::arg("colsample"), nb::arg("newton"), nb::arg("lambda"), nb::arg("gamma"),
+        nb::arg("seed"), nb::arg("fold") = nb::none(), nb::arg("n_fold") = 0,
+        nb::arg("threads") = 1);
+
+  m.def("boost_predict",
+        [](const nb::dict& fit, ConstMat newx) {
+          timesift::Boosted b;
+          b.family = timesift::family_from_name(nb::cast<std::string>(fit["family"]));
+          b.n_column = nb::cast<std::int32_t>(fit["n_column"]);
+          b.init = nb::cast<double>(fit["init"]);
+          b.trees = take_table(fit);
+          std::vector<double> out(newx.shape(0));
+          timesift::boost_predict(b, newx.data(), newx.shape(0), newx.shape(1), out.data());
+          return give(std::move(out));
+        },
+        nb::arg("fit"), nb::arg("newx"));
 
   m.def("forest_stream",
         [](std::uint32_t seed, std::uint32_t tree, std::size_t n) {

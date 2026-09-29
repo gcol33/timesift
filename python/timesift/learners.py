@@ -23,8 +23,8 @@ from .registry import get_learner
 from .representation import TimesiftMatrix
 from .response import fitting_rows
 
-__all__ = ["Fit", "Learner", "READS", "MULTI", "cnn", "elasticnet", "fit_learner", "flatten",
-           "mlp", "rescnn", "forest", "stepwise", "tree"]
+__all__ = ["Fit", "Learner", "READS", "MULTI", "boosting", "cnn", "elasticnet", "fit_learner",
+           "flatten", "mlp", "rescnn", "forest", "stepwise", "tree"]
 
 READS = ("tabular", "sequence")
 MULTI = ("joint", "separate")
@@ -835,6 +835,112 @@ def _rf_fit(x, y, trees, mtry, min_node, balance, preset, seed, threads, head, v
 def _rf_predict(model, x):
     from ._tree import forest_predict
     return _predict_columns(model["models"], flatten(x), forest_predict)
+
+
+def boosting(data=None, trees=None, depth=None, shrinkage=None, min_leaf=None, subsample=None,
+             colsample=None, newton=False, lambda_=None, gamma=None, n_inner=None,
+             preset="package", seed=1, threads=1) -> Learner:
+    """One boosted model per variable, over every bin-by-channel column: a logistic model under a
+    presence-absence head and a squared-error one under a head with a squared-error loss. The score
+    starts at the log-odds of the weighted share of presences, or the weighted mean, and each tree
+    is fitted to the loss's gradient at the current score and added to it scaled by ``shrinkage``.
+    Each tree is grown on a subsample of the units drawn without replacement, and reads a subsample
+    of the columns.
+
+    ``newton`` picks the trees. Off, they are gbm's, which is what biomod2 fits as ``GBM``:
+    ``depth`` splits grown best first, each the one that most reduces the weighted squared error of
+    the working response with at least ``min_leaf`` units on each side, and a leaf that takes one
+    Newton step on the loss. On, they are xgboost's exact greedy trees, which biomod2 fits as
+    ``XGBOOST``: grown level by level to ``depth``, each split chosen by the second-order gain under
+    the L2 penalty ``lambda_`` with at least ``min_leaf`` of hessian on each side, pruned where a
+    split gains less than ``gamma``, and a leaf the step ``-G / (H + lambda)``. Either way
+    ``depth`` is the order of interaction a tree can hold. With ``subsample=1`` the first-order fit
+    is gbm's own to rounding, and the second-order one xgboost's to its single-precision storage;
+    the model is grown by the core the R package calls, so the two languages fit the same model.
+
+    ``n_inner`` folds, when above zero, choose how many trees are kept: the fit is repeated on each
+    fold's complement, and the number of trees of least held-out deviance, summed over the folds
+    and weighted by how many units each holds, is kept, as gbm's ``cv.folds`` chooses it. The folds
+    are dealt for each response and stratified on it, as the elastic net's are.
+
+    ``preset`` says whose defaults the settings left ``None`` take. ``"package"`` is the fitting
+    package's own, which is what biomod2's default option set fits: under gbm 100 trees of one
+    split, ``shrinkage=0.1``, ``min_leaf=10`` and ``subsample=0.5``; under xgboost 100 trees of
+    depth 6, ``shrinkage=0.3``, ``min_leaf=1``, ``lambda_=1`` and every unit and column.
+    ``"bigboss"`` is biomod2's tuned option set: under gbm 2500 trees of seven splits,
+    ``shrinkage=0.001``, ``min_leaf=5``, ``subsample=0.5`` and three inner folds; under xgboost
+    four trees of depth 2 at ``shrinkage=1``. A setting given explicitly beats either.
+
+    ``lambda_`` is R's ``lambda``, spelled apart from Python's keyword. The case weights are the
+    response head's, :func:`~timesift.response.positive_weights` under presence-absence, and weigh
+    the gradient and every sum a tree is grown on; ``min_leaf`` counts units under gbm, as
+    ``n.minobsinnode`` does.
+    """
+    if preset not in ("package", "bigboss"):
+        raise ValueError(f'`preset` is "package" or "bigboss", got {preset!r}.')
+    settings = _boost_settings(preset, bool(newton), trees, depth, shrinkage, min_leaf, subsample,
+                               colsample, lambda_, gamma, n_inner)
+    return Learner(name="boosting", fit=_boost_fit, predict=_boost_predict, data=data,
+                   reads="tabular", multi="separate",
+                   params=dict(settings, newton=bool(newton), seed=int(seed),
+                               threads=int(threads)))
+
+
+_BOOST_PRESETS = {
+    ("package", False): dict(trees=100, depth=1, shrinkage=0.1, min_leaf=10, subsample=0.5,
+                             colsample=1, lambda_=0, gamma=0, n_inner=0),
+    ("bigboss", False): dict(trees=2500, depth=7, shrinkage=0.001, min_leaf=5, subsample=0.5,
+                             colsample=1, lambda_=0, gamma=0, n_inner=3),
+    ("package", True): dict(trees=100, depth=6, shrinkage=0.3, min_leaf=1, subsample=1,
+                            colsample=1, lambda_=1, gamma=0, n_inner=0),
+    ("bigboss", True): dict(trees=4, depth=2, shrinkage=1, min_leaf=1, subsample=1, colsample=1,
+                            lambda_=1, gamma=0, n_inner=0),
+}
+
+
+def _boost_settings(preset, newton, trees, depth, shrinkage, min_leaf, subsample, colsample,
+                    lambda_, gamma, n_inner) -> dict:
+    """The settings boosted trees are fitted under: those given, and the preset's for the rest,
+    which are gbm's or xgboost's as ``newton`` picks. gbm's trees take no penalty and no least
+    gain."""
+    penalised = any(v is not None and v != 0 for v in (lambda_, gamma))
+    if not newton and penalised:
+        raise ValueError("`lambda_` and `gamma` are the second-order trees' settings; "
+                         "set `newton=True` to use them.")
+    base = _BOOST_PRESETS[(preset, newton)]
+    given = dict(trees=trees, depth=depth, shrinkage=shrinkage, min_leaf=min_leaf,
+                 subsample=subsample, colsample=colsample, lambda_=lambda_, gamma=gamma,
+                 n_inner=n_inner)
+    out = {k: base[k] if v is None else v for k, v in given.items()}
+    for k in ("trees", "depth", "n_inner"):
+        out[k] = int(out[k])
+    for k in ("shrinkage", "min_leaf", "subsample", "colsample", "lambda_", "gamma"):
+        out[k] = float(out[k])
+    return out
+
+
+def _boost_fit(x, y, trees, depth, shrinkage, min_leaf, subsample, colsample, newton, lambda_,
+               gamma, n_inner, seed, threads, head, variables, group=None, **_):
+    from ._tree import boost_fit
+    family = _family(head)
+    m = flatten(x)
+
+    def make(design, yj, seed_j, w):
+        fold, n_fold = None, 0
+        if n_inner > 0:
+            fold = _inner_folds(yj, n_inner, seed_j, group)
+            n_fold = int(fold.max()) + 1
+        return boost_fit(design, yj, w, family, trees, depth, shrinkage, min_leaf, subsample,
+                         colsample, newton, lambda_, gamma, seed_j, fold, n_fold, threads)
+
+    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables),
+                                    _head_weights(head, y)),
+                n_col=m.shape[1], family=family)
+
+
+def _boost_predict(model, x):
+    from ._tree import boost_predict
+    return _predict_columns(model["models"], flatten(x), boost_predict)
 
 
 def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prune="se_sum",

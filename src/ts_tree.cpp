@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "ts_core.h"
+#include "ts_trees_internal.h"
 
 // Every sum, product and quotient here is rpart's, operation for operation, and a fused
 // multiply-add rounds once where rpart rounds twice. The difference is a unit in the last place,
@@ -267,28 +268,6 @@ void best_cut(const double* x, const double* y, const double* wt, int n, int edg
 bool improves(double improve, double& iscale) {
   if (improve > iscale) iscale = improve;
   return improve > iscale * 1e-10;
-}
-
-// The index of the leaf row `i` of the column-major `x` falls into, from the node table of one
-// tree, its children counted from its first node.
-std::size_t leaf_of(const std::int32_t* column, const double* threshold,
-                    const std::int8_t* less_left, const std::int32_t* left,
-                    const std::int32_t* right, const double* x, std::size_t i, std::size_t n,
-                    std::size_t p) {
-  std::size_t at = 0;
-  while (column[at] >= 0) {
-    const std::size_t c = static_cast<std::size_t>(column[at]);
-    if (c >= p) throw Error("the design predicted on has fewer columns than the tree splits on.");
-    const double v = x[i + c * n];
-    if (!std::isfinite(v)) {
-      throw Error("a tree predicts from finite values, and row " + std::to_string(i + 1) +
-                  " holds one that is not in a column it splits on.");
-    }
-    const bool below = v < threshold[at];
-    const bool go_left = below == (less_left[at] == 1);
-    at = static_cast<std::size_t>(go_left ? left[at] : right[at]);
-  }
-  return at;
 }
 
 // One row of the complexity table, linked the way rpart links them so the table is filled in the
@@ -695,15 +674,6 @@ class Grower {
   std::vector<double> wtemp_;
 };
 
-void check_finite(const double* v, std::size_t n, const char* what) {
-  for (std::size_t i = 0; i < n; ++i) {
-    if (!std::isfinite(v[i])) {
-      throw Error(std::string("a tree is fitted on finite values, and the ") + what +
-                  " holds one that is not, at position " + std::to_string(i + 1) + ".");
-    }
-  }
-}
-
 // The fitted nodes in rpart's frame order, a node's children after it where it keeps them.
 void flatten(const Node* me, long long number, double scale, double alpha, bool gini, Tree& out) {
   const std::size_t at = out.number.size();
@@ -747,54 +717,6 @@ void copy_node(const Tree& from, std::size_t i, double cp, Tree& out) {
   copy_node(from, static_cast<std::size_t>(from.right[i]), cp, out);
 }
 
-// The generator every draw of a forest comes from: xoshiro128** (Blackman and Vigna), its four
-// words of state the outputs `4t + 1` to `4t + 4` of a SplitMix32 stream started at the forest's
-// seed, for tree `t`. Everything is arithmetic modulo 2^32, which a reimplementation in a language
-// without unsigned integers can do exactly in doubles.
-class Stream {
- public:
-  Stream(std::uint32_t seed, std::uint32_t tree) {
-    std::uint32_t counter = seed + 4u * tree * kGolden;
-    for (std::uint32_t& word : s_) word = splitmix(counter);
-  }
-
-  std::uint32_t next() {
-    const std::uint32_t result = rotl(s_[1] * 5u, 7) * 9u;
-    const std::uint32_t t = s_[1] << 9;
-    s_[2] ^= s_[0];
-    s_[3] ^= s_[1];
-    s_[1] ^= s_[2];
-    s_[0] ^= s_[3];
-    s_[2] ^= t;
-    s_[3] = rotl(s_[3], 11);
-    return result;
-  }
-
-  // A uniform on [0, 1): the output times 2^-32, exact.
-  double uniform() { return static_cast<double>(next()) * 0x1p-32; }
-
-  // An index on 0 to `k - 1`: the uniform times `k`, rounded down.
-  std::size_t below(std::size_t k) {
-    const std::size_t j = static_cast<std::size_t>(uniform() * static_cast<double>(k));
-    return j < k ? j : k - 1;
-  }
-
- private:
-  static constexpr std::uint32_t kGolden = 0x9E3779B9u;
-
-  static std::uint32_t rotl(std::uint32_t x, int k) { return (x << k) | (x >> (32 - k)); }
-
-  static std::uint32_t splitmix(std::uint32_t& counter) {
-    counter += kGolden;
-    std::uint32_t z = counter;
-    z = (z ^ (z >> 16)) * 0x85EBCA6Bu;
-    z = (z ^ (z >> 13)) * 0xC2B2AE35u;
-    return z ^ (z >> 16);
-  }
-
-  std::uint32_t s_[4];
-};
-
 // The running sum of the weights of some observations, in the order given, and the draw of one of
 // them: the first whose running sum exceeds a uniform times the total. An observation of zero
 // weight is never drawn.
@@ -807,23 +729,13 @@ struct Urn {
     cum.push_back((cum.empty() ? 0.0 : cum.back()) + w);
   }
 
-  int draw(Stream& stream) const {
+  int draw(detail::Stream& stream) const {
     const double target = stream.uniform() * cum.back();
     std::size_t at = static_cast<std::size_t>(
         std::upper_bound(cum.begin(), cum.end(), target) - cum.begin());
     if (at >= cum.size()) at = cum.size() - 1;
     return row[at];
   }
-};
-
-// One tree's nodes, children counted from its own first node.
-struct Nodes {
-  std::vector<std::int32_t> column;
-  std::vector<double> threshold;
-  std::vector<std::int8_t> less_left;
-  std::vector<std::int32_t> left;
-  std::vector<std::int32_t> right;
-  std::vector<double> value;
 };
 
 // Grows one tree of a forest. The drawn observations are held as row numbers, a row drawn twice
@@ -836,9 +748,9 @@ class ForestGrower {
       : x_(x), y_(y), n_(n), p_(p), gini_(gini), min_leaf_(spec.min_leaf),
         mtry_(static_cast<std::size_t>(spec.mtry)) {}
 
-  Nodes grow(const std::vector<Urn>& urns, const std::vector<int>& draws, std::uint32_t seed,
-             std::uint32_t tree) {
-    Stream stream(seed, tree);
+  detail::Nodes grow(const std::vector<Urn>& urns, const std::vector<int>& draws,
+                     std::uint32_t seed, std::uint32_t tree) {
+    detail::Stream stream(seed, tree);
     std::vector<int> count(n_, 0);
     for (std::size_t u = 0; u < urns.size(); ++u) {
       for (int k = 0; k < draws[u]; ++k) count[static_cast<std::size_t>(urns[u].draw(stream))]++;
@@ -850,7 +762,7 @@ class ForestGrower {
     for (std::size_t j = 0; j < p_; ++j) perm[j] = static_cast<int>(j);
     const std::size_t m = obs.size();
     std::vector<double> xs(m), ys(m), ws(m, 1.0);
-    std::vector<int> chosen(mtry_), spill(m);
+    std::vector<int> chosen, spill(m);
     // A column's values in the node with their position in it: sorted by value and then by
     // position, which is the node's order among ties.
     std::vector<std::pair<double, int>> keyed(m);
@@ -862,7 +774,7 @@ class ForestGrower {
       bool right;
     };
     std::vector<Pending> stack{{0, m, -1, false}};
-    Nodes out;
+    detail::Nodes out;
     while (!stack.empty()) {
       const Pending node = stack.back();
       stack.pop_back();
@@ -878,22 +790,12 @@ class ForestGrower {
       double est[4] = {0.0, 0.0, 0.0, 0.0};
       double risk = 0.0;
       node_estimate(ys.data(), ws.data(), k, gini_, est, &risk);
-      out.column.push_back(-1);
-      out.threshold.push_back(0.0);
-      out.less_left.push_back(0);
-      out.left.push_back(-1);
-      out.right.push_back(-1);
-      out.value.push_back(node_value(est, gini_));
+      out.add_leaf(node_value(est, gini_));
       if (k < 2 * min_leaf_ || equal) continue;
 
-      // The node's columns: a partial Fisher-Yates shuffle of an arrangement of the column
-      // indices the tree keeps from node to node, the first `mtry` taken and tried in ascending
-      // order.
-      for (std::size_t c = 0; c < mtry_; ++c) {
-        std::swap(perm[c], perm[c + stream.below(p_ - c)]);
-      }
-      std::copy(perm.begin(), perm.begin() + static_cast<std::ptrdiff_t>(mtry_), chosen.begin());
-      std::sort(chosen.begin(), chosen.end());
+      // The node's columns, drawn from an arrangement of the column indices the tree keeps from
+      // node to node.
+      detail::draw_columns(stream, perm, mtry_, chosen);
 
       bool found = false;
       double best = 0.0;
@@ -970,9 +872,9 @@ Tree tree_fit(const double* x, const double* y, const double* w, std::size_t n, 
   if (spec.max_depth < 0 || spec.max_depth > 30) {
     throw Error("a tree's `max_depth` is between 0 and 30, as rpart's is.");
   }
-  check_finite(x, n * p, "design");
-  check_finite(y, n, "response");
-  check_finite(w, n, "weights");
+  detail::check_finite(x, n * p, "a tree", "design");
+  detail::check_finite(y, n, "a tree", "response");
+  detail::check_finite(w, n, "a tree", "weights");
   double total = 0.0;
   for (std::size_t i = 0; i < n; ++i) {
     if (w[i] < 0) throw Error("a tree's case weights are zero or more.");
@@ -1031,8 +933,9 @@ Tree tree_prune(const Tree& tree, double cp) {
 void tree_predict(const Tree& tree, const double* x, std::size_t n, std::size_t p, double* out) {
   if (tree.number.empty()) throw Error("the tree holds no node to predict from.");
   for (std::size_t i = 0; i < n; ++i) {
-    out[i] = tree.value[leaf_of(tree.column.data(), tree.threshold.data(), tree.less_left.data(),
-                                tree.left.data(), tree.right.data(), x, i, n, p)];
+    out[i] = tree.value[detail::leaf_of(tree.column.data(), tree.threshold.data(),
+                                        tree.less_left.data(), tree.left.data(),
+                                        tree.right.data(), x, i, n, p)];
   }
 }
 
@@ -1045,9 +948,9 @@ Forest forest_fit(const double* x, const double* y, const double* w, std::size_t
                 " columns it reads.");
   }
   if (spec.min_leaf < 1) throw Error("a forest's `min_leaf` is at least one observation.");
-  check_finite(x, n * p, "design");
-  check_finite(y, n, "response");
-  check_finite(w, n, "weights");
+  detail::check_finite(x, n * p, "a forest", "design");
+  detail::check_finite(y, n, "a forest", "response");
+  detail::check_finite(w, n, "a forest", "weights");
   const bool gini = family == Family::binomial;
   if (spec.balance && !gini) {
     throw Error("a balanced forest draws from each class, and reads a binomial response.");
@@ -1091,81 +994,35 @@ Forest forest_fit(const double* x, const double* y, const double* w, std::size_t
   // Every tree is a function of the seed, its own index and the data alone, so trees run at once
   // where the caller asks for it and land in their own slot.
   const std::size_t trees = static_cast<std::size_t>(spec.trees);
-  std::vector<Nodes> grown(trees);
-  std::vector<std::exception_ptr> failed(trees);
-  auto grow = [&](std::size_t t) {
-    try {
-      ForestGrower grower(x, y, n, p, gini, spec);
-      grown[t] = grower.grow(urns, draws, spec.seed, static_cast<std::uint32_t>(t));
-    } catch (...) {
-      failed[t] = std::current_exception();
-    }
-  };
-  const int workers = std::max(1, spec.threads);
-  if (workers <= 1) {
-    for (std::size_t t = 0; t < trees; ++t) grow(t);
-  } else {
-    std::atomic<std::size_t> next{0};
-    auto take = [&]() {
-      for (;;) {
-        const std::size_t t = next.fetch_add(1);
-        if (t >= trees) return;
-        grow(t);
-      }
-    };
-    std::vector<std::thread> pool;
-    const std::size_t spare = std::min<std::size_t>(static_cast<std::size_t>(workers) - 1, trees);
-    pool.reserve(spare);
-    // A machine that will not give another thread is a reason to run on fewer, not to fail.
-    for (std::size_t t = 0; t < spare; ++t) {
-      try {
-        pool.emplace_back(take);
-      } catch (const std::system_error&) {
-        break;
-      }
-    }
-    take();
-    for (std::thread& t : pool) t.join();
-  }
-  for (const std::exception_ptr& e : failed) {
-    if (e) std::rethrow_exception(e);
-  }
+  std::vector<detail::Nodes> grown(trees);
+  detail::run_tasks(trees, spec.threads, [&](std::size_t t) {
+    ForestGrower grower(x, y, n, p, gini, spec);
+    grown[t] = grower.grow(urns, draws, spec.seed, static_cast<std::uint32_t>(t));
+  });
 
   Forest out;
   out.family = family;
   out.n_column = static_cast<std::int32_t>(p);
-  out.offset.push_back(0);
-  for (Nodes& nodes : grown) {
-    out.column.insert(out.column.end(), nodes.column.begin(), nodes.column.end());
-    out.threshold.insert(out.threshold.end(), nodes.threshold.begin(), nodes.threshold.end());
-    out.less_left.insert(out.less_left.end(), nodes.less_left.begin(), nodes.less_left.end());
-    out.left.insert(out.left.end(), nodes.left.begin(), nodes.left.end());
-    out.right.insert(out.right.end(), nodes.right.begin(), nodes.right.end());
-    out.value.insert(out.value.end(), nodes.value.begin(), nodes.value.end());
-    out.offset.push_back(static_cast<std::int32_t>(out.column.size()));
-    nodes = Nodes();
+  for (detail::Nodes& nodes : grown) {
+    detail::append(out.trees, nodes);
+    nodes = detail::Nodes();
   }
   return out;
 }
 
 void forest_predict(const Forest& forest, const double* x, std::size_t n, std::size_t p,
                     double* out) {
-  const std::size_t trees = forest.offset.empty() ? 0 : forest.offset.size() - 1;
+  const std::size_t trees = detail::table_trees(forest.trees);
   if (trees == 0) throw Error("the forest holds no tree to predict from.");
   for (std::size_t i = 0; i < n; ++i) {
     double sum = 0.0;
-    for (std::size_t t = 0; t < trees; ++t) {
-      const std::size_t o = static_cast<std::size_t>(forest.offset[t]);
-      sum += forest.value[o + leaf_of(forest.column.data() + o, forest.threshold.data() + o,
-                                      forest.less_left.data() + o, forest.left.data() + o,
-                                      forest.right.data() + o, x, i, n, p)];
-    }
+    for (std::size_t t = 0; t < trees; ++t) sum += detail::table_value(forest.trees, t, x, i, n, p);
     out[i] = sum / static_cast<double>(trees);
   }
 }
 
 void forest_stream(std::uint32_t seed, std::uint32_t tree, std::size_t n, std::uint32_t* out) {
-  Stream stream(seed, tree);
+  detail::Stream stream(seed, tree);
   for (std::size_t i = 0; i < n; ++i) out[i] = stream.next();
 }
 

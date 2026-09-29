@@ -15,7 +15,8 @@ test_that("a learner of one's own needs nothing but a fit and a predict", {
 })
 
 test_that("a registered learner can be asked for by name", {
-  expect_true(all(c("elasticnet", "stepwise", "forest", "mlp", "cnn", "rescnn") %in% learners()))
+  expect_true(all(c("elasticnet", "stepwise", "forest", "tree", "boosting", "mlp", "cnn",
+                    "rescnn") %in% learners()))
   expect_s3_class(.as_learner("elasticnet"), "timesift_learner")
   expect_error(.as_learner("nope"), "unknown learner")
   register_learner("test_only", function() learner("test_only",
@@ -204,7 +205,8 @@ test_that("the old learner names are gone", {
                "rescnn_learner", "ensemble_learner")) {
     expect_false(nm %in% getNamespaceExports("timesift"), info = nm)
   }
-  expect_true(all(c("elasticnet", "stepwise", "forest", "mlp", "cnn", "rescnn") %in% learners()))
+  expect_true(all(c("elasticnet", "stepwise", "forest", "tree", "boosting", "mlp", "cnn",
+                    "rescnn") %in% learners()))
   expect_false("ensemble" %in% learners())
 })
 

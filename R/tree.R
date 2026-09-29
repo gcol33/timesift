@@ -33,6 +33,22 @@
   ts_forest_predict_(forest, as.numeric(newx), nrow(newx), ncol(newx))
 }
 
+# Boosted trees, over the same core. `fold` is one 0-based index per unit, or `NULL` to keep every
+# tree.
+.boost_fit <- function(x, y, w, family, trees, depth, shrinkage, min_leaf, subsample, colsample,
+                       newton, lambda, gamma, seed, fold = NULL, n_fold = 0L, threads = 1L) {
+  ts_boost_fit_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x), family,
+                as.integer(trees), as.integer(depth), as.numeric(shrinkage),
+                as.numeric(min_leaf), as.numeric(subsample), as.numeric(colsample),
+                isTRUE(newton), as.numeric(lambda), as.numeric(gamma), as.numeric(seed) %% 2^32,
+                if (is.null(fold)) NULL else as.integer(fold), as.integer(n_fold),
+                as.integer(threads))
+}
+
+.boost_predict <- function(fit, newx) {
+  ts_boost_predict_(fit, as.numeric(newx), nrow(newx), ncol(newx))
+}
+
 # The first `n` outputs of the generator tree `tree` of a forest seeded `seed` draws from.
 .forest_stream <- function(seed, tree, n) {
   ts_forest_stream_(as.numeric(seed) %% 2^32, as.numeric(tree), as.integer(n))

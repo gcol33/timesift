@@ -99,6 +99,7 @@ reference:
   - stepwise
   - forest
   - tree
+  - boosting
   - torch_learners
   - train_control
   - learner

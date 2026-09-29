@@ -51,6 +51,8 @@ your own goes through.
   Random forest on the flattened representation
 - [`tree()`](https://gillescolling.com/timesift/reference/tree.md) :
   Classification and regression tree on the flattened representation
+- [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md)
+  : Gradient boosted trees on the flattened representation
 - [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)

@@ -433,6 +433,16 @@ std::vector<T> take_field(const cpp11::list& tree, const char* name) {
   return out;
 }
 
+// One 0-based fold index per observation, or none.
+std::vector<std::int32_t> take_folds(cpp11::sexp fold) {
+  std::vector<std::int32_t> which;
+  if (fold != R_NilValue) {
+    cpp11::integers given(fold);
+    for (R_xlen_t i = 0; i < given.size(); ++i) which.push_back(given[i]);
+  }
+  return which;
+}
+
 timesift::Tree take_tree(const cpp11::list& tree) {
   timesift::Tree out;
   out.family = timesift::family_from_name(cpp11::as_cpp<std::string>(tree["family"]));
@@ -467,11 +477,7 @@ cpp11::list ts_tree_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, i
   spec.min_leaf = min_leaf;
   spec.cp = cp;
   spec.max_depth = max_depth;
-  std::vector<std::int32_t> which;
-  if (fold != R_NilValue) {
-    cpp11::integers given(fold);
-    for (R_xlen_t i = 0; i < given.size(); ++i) which.push_back(given[i]);
-  }
+  const std::vector<std::int32_t> which = take_folds(fold);
   const timesift::Tree tree = timesift::tree_fit(
       REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
       static_cast<std::size_t>(p), timesift::family_from_name(family), spec,
@@ -492,9 +498,40 @@ cpp11::doubles ts_tree_predict_(cpp11::list tree, cpp11::doubles newx, int n, in
   return give(out);
 }
 
-// The forest crosses the same way: one vector per field of its node table, the trees one after
-// another, and the offset of each tree's first node. A seed is a number modulo 2^32, which an R
-// integer cannot carry, so it crosses as a double.
+// A forest and a boosted fit cross the same way: one vector per field of their node table, the
+// trees one after another, and the offset of each tree's first node. A seed is a number modulo
+// 2^32, which an R integer cannot carry, so it crosses as a double.
+namespace {
+
+std::uint32_t take_seed(double seed) {
+  return static_cast<std::uint32_t>(static_cast<std::uint64_t>(seed));
+}
+
+void give_table(cpp11::writable::list& out, const timesift::TreeTable& table) {
+  using namespace cpp11::literals;
+  out.push_back("offset"_nm = give(table.offset));
+  out.push_back("column"_nm = give(table.column));
+  out.push_back("threshold"_nm = give(table.threshold));
+  out.push_back("less_left"_nm = give(table.less_left));
+  out.push_back("left"_nm = give(table.left));
+  out.push_back("right"_nm = give(table.right));
+  out.push_back("value"_nm = give(table.value));
+}
+
+timesift::TreeTable take_table(const cpp11::list& from) {
+  timesift::TreeTable table;
+  table.offset = take_field<std::int32_t>(from, "offset");
+  table.column = take_field<std::int32_t>(from, "column");
+  table.threshold = take_field<double>(from, "threshold");
+  table.less_left = take_field<std::int8_t>(from, "less_left");
+  table.left = take_field<std::int32_t>(from, "left");
+  table.right = take_field<std::int32_t>(from, "right");
+  table.value = take_field<double>(from, "value");
+  return table;
+}
+
+}  // namespace
+
 [[cpp11::register]]
 cpp11::list ts_forest_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
                            std::string family, int trees, int mtry, int min_leaf, bool balance,
@@ -505,22 +542,17 @@ cpp11::list ts_forest_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w,
   spec.mtry = mtry;
   spec.min_leaf = min_leaf;
   spec.balance = balance;
-  spec.seed = static_cast<std::uint32_t>(static_cast<std::uint64_t>(seed));
+  spec.seed = take_seed(seed);
   spec.threads = threads;
   const timesift::Forest forest = timesift::forest_fit(
       REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
       static_cast<std::size_t>(p), timesift::family_from_name(family), spec);
-  return cpp11::writable::list({
+  cpp11::writable::list out({
     "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(forest.family))),
-    "n_column"_nm = cpp11::as_sexp(forest.n_column),
-    "offset"_nm = give(forest.offset),
-    "column"_nm = give(forest.column),
-    "threshold"_nm = give(forest.threshold),
-    "less_left"_nm = give(forest.less_left),
-    "left"_nm = give(forest.left),
-    "right"_nm = give(forest.right),
-    "value"_nm = give(forest.value)
+    "n_column"_nm = cpp11::as_sexp(forest.n_column)
   });
+  give_table(out, forest.trees);
+  return out;
 }
 
 [[cpp11::register]]
@@ -528,13 +560,7 @@ cpp11::doubles ts_forest_predict_(cpp11::list forest, cpp11::doubles newx, int n
   timesift::Forest f;
   f.family = timesift::family_from_name(cpp11::as_cpp<std::string>(forest["family"]));
   f.n_column = cpp11::as_cpp<int>(forest["n_column"]);
-  f.offset = take_field<std::int32_t>(forest, "offset");
-  f.column = take_field<std::int32_t>(forest, "column");
-  f.threshold = take_field<double>(forest, "threshold");
-  f.less_left = take_field<std::int8_t>(forest, "less_left");
-  f.left = take_field<std::int32_t>(forest, "left");
-  f.right = take_field<std::int32_t>(forest, "right");
-  f.value = take_field<double>(forest, "value");
+  f.trees = take_table(forest);
   std::vector<double> out(static_cast<std::size_t>(n));
   timesift::forest_predict(f, REAL_RO(newx.data()), static_cast<std::size_t>(n),
                            static_cast<std::size_t>(p), out.data());
@@ -542,10 +568,55 @@ cpp11::doubles ts_forest_predict_(cpp11::list forest, cpp11::doubles newx, int n
 }
 
 [[cpp11::register]]
+cpp11::list ts_boost_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                          std::string family, int trees, int depth, double shrinkage,
+                          double min_leaf, double subsample, double colsample, bool newton,
+                          double lambda, double gamma, double seed, cpp11::sexp fold, int n_fold,
+                          int threads) {
+  using namespace cpp11::literals;
+  timesift::BoostSpec spec;
+  spec.trees = trees;
+  spec.depth = depth;
+  spec.shrinkage = shrinkage;
+  spec.min_leaf = min_leaf;
+  spec.subsample = subsample;
+  spec.colsample = colsample;
+  spec.newton = newton;
+  spec.lambda = lambda;
+  spec.gamma = gamma;
+  spec.seed = take_seed(seed);
+  spec.threads = threads;
+  const std::vector<std::int32_t> which = take_folds(fold);
+  const timesift::Boosted fit = timesift::boost_fit(
+      REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
+      static_cast<std::size_t>(p), timesift::family_from_name(family), spec,
+      which.empty() ? nullptr : which.data(), which.empty() ? 0 : n_fold);
+  cpp11::writable::list out({
+    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
+    "n_column"_nm = cpp11::as_sexp(fit.n_column),
+    "init"_nm = cpp11::as_sexp(fit.init),
+    "cv_error"_nm = give(fit.cv_error)
+  });
+  give_table(out, fit.trees);
+  return out;
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_boost_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p) {
+  timesift::Boosted b;
+  b.family = timesift::family_from_name(cpp11::as_cpp<std::string>(fit["family"]));
+  b.n_column = cpp11::as_cpp<int>(fit["n_column"]);
+  b.init = cpp11::as_cpp<double>(fit["init"]);
+  b.trees = take_table(fit);
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::boost_predict(b, REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                          static_cast<std::size_t>(p), out.data());
+  return give(out);
+}
+
+[[cpp11::register]]
 cpp11::doubles ts_forest_stream_(double seed, double tree, int n) {
   std::vector<std::uint32_t> raw(static_cast<std::size_t>(n));
-  timesift::forest_stream(static_cast<std::uint32_t>(static_cast<std::uint64_t>(seed)),
-                          static_cast<std::uint32_t>(static_cast<std::uint64_t>(tree)),
-                          raw.size(), raw.data());
+  timesift::forest_stream(take_seed(seed), take_seed(tree), raw.size(), raw.data());
   return give(std::vector<double>(raw.begin(), raw.end()));
 }
