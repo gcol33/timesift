@@ -43,7 +43,8 @@ from .specs import (Representation, Resampling, Sift, TimesiftSpec, as_resamplin
                     auto_grains, build_representation, cv, expand_sift, grain, grains,
                     grouped_cv, lookback, lookbacks, multigrain, n_targets, native,
                     resolve_folds, target_labels)
-from .stack import EnsembleSpec, Stack, ensemble, ensemble_combine, ensemble_fit
+from .stack import (SPREAD_STATISTICS, EnsembleSpec, Stack, ensemble, ensemble_combine,
+                    ensemble_fit, ensemble_spread)
 
 # The version the wheel was built with, which `pyproject.toml` reads from `DESCRIPTION`. It is
 # not written here as well: two literals are two versions the moment one bump misses one.
@@ -72,14 +73,15 @@ register_learner("rescnn", rescnn)
 __all__ = [
     "Cells", "Coverage", "DAY_LEVEL_STATS", "EnsembleSpec", "Fit", "Folds",
     "GRAINS",
-    "Ladder", "Learner", "PRESENCE_ABSENCE", "Representation", "Resampling", "Response", "STATS",
+    "Ladder", "Learner", "PRESENCE_ABSENCE", "Representation", "Resampling", "Response",
+    "SPREAD_STATISTICS", "STATS",
     "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
     "average_precision",
     "bind_channels", "boosting", "build_representation", "calendar_channels", "candidate_table", "cnn",
     "cohen_kappa", "column_names", "coverage", "cv", "decision_threshold", "digest_array",
     "elasticnet",
-    "ensemble", "ensemble_combine", "ensemble_fit", "ensemble_weights",
+    "ensemble", "ensemble_combine", "ensemble_fit", "ensemble_spread", "ensemble_weights",
     "expand_sift", "feature_matrix", "fit_learner", "flatten", "fold_map", "forest",
     "get_learner", "grain", "grain_contrasts",
     "grain_ladder", "grain_matrix", "grains", "grouped_cv", "implied_skill", "kappa_score",

@@ -56,8 +56,8 @@ SECTIONS = (
         names=("timesift", "Timesift", "TimesiftSpec", "n_targets",
                "target_labels", "select_columns", "column_names", "summary", "candidate_table",
                "procedure_table", "ensemble", "ensemble_fit", "ensemble_combine",
-               "ensemble_weights", "EnsembleSpec", "Stack", "grain_ladder", "fit_learner",
-               "select_grain", "Ladder", "Fit", "Selection", "plot"),
+               "ensemble_spread", "SPREAD_STATISTICS", "ensemble_weights", "EnsembleSpec", "Stack",
+               "grain_ladder", "fit_learner", "select_grain", "Ladder", "Fit", "Selection", "plot"),
     ),
     dict(
         slug="python-learners",

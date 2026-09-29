@@ -646,6 +646,111 @@ cat("wrote the response, the fold map, the mask,",
     nrow(utils::read.csv(file.path(out_dir, "metrics.csv"))),
     "metric values, the contrast and the inflation", "\n")
 
+# ---- the combiner ---------------------------------------------------------------------------------
+# Out-of-fold predictions of the response above for five candidates, rounded so the file holds them
+# exactly, and every combination read off them. "forest / week" is "elasticnet / week" again, so
+# two candidates score the same to the last bit and the decay's rule for a tie is exercised; the
+# response carries a variable present nowhere and one present everywhere, on which no member holds
+# a cut and a committee has no vote. Each side scores the candidates under its own `tss`, which the
+# metric fixtures pin, and hands those scores to the combiner as a run does.
+set.seed(20260929L)
+ens_signal <- c("cnn / week" = 1.6, "cnn / month" = 1.1, "elasticnet / week" = 0.8,
+                "mlp / week" = 0.2)
+ens_oof <- lapply(ens_signal, function(a) {
+  z <- a * (2 * y_fix - 1) + matrix(stats::rnorm(length(y_fix), sd = 1), nrow = nrow(y_fix))
+  matrix(round(stats::plogis(z), 6), nrow = nrow(y_fix), dimnames = dimnames(y_fix))
+})
+ens_oof[["forest / week"]] <- ens_oof[["elasticnet / week"]]
+write_fixture(
+  do.call(rbind, lapply(names(ens_oof), function(nm) {
+    p <- ens_oof[[nm]]
+    data.frame(candidate = nm, id = rep(rownames(p), ncol(p)),
+               variable = rep(colnames(p), each = nrow(p)), p = sprintf("%.6f", as.numeric(p)),
+               stringsAsFactors = FALSE)
+  })),
+  "ensemble_oof.csv"
+)
+
+ens_cells <- scorable_cells(y_fix, f_fix)
+ens_fold <- .as_folds(f_fix, rownames(y_fix))
+ens_scores <- do.call(rbind, lapply(names(ens_oof), function(nm) {
+  out <- .score_arm(nm, nm, y_fix, ens_oof[[nm]], ens_fold, sort(unique(ens_fold)), ens_cells,
+                    tss)
+  data.frame(candidate = nm, variable = out$variable, fold = out$fold, score = out$score,
+             scorable = out$scorable, stringsAsFactors = FALSE)
+}))
+
+# One row per case. An empty field is the argument left at its default.
+ENSEMBLE_CASES <- list(
+  stack = ensemble("stack"),
+  mean = ensemble("mean"),
+  median = ensemble("median"),
+  weighted = ensemble("weighted"),
+  weighted_auc = ensemble("weighted", metric = "roc_auc"),
+  decay = ensemble("weighted", decay = 1.6),
+  decay_min_score = ensemble("weighted", decay = 2, min_score = 0.6),
+  committee = ensemble("committee"),
+  committee_kappa = ensemble("committee", rule = "kappa"),
+  committee_prevalence = ensemble("committee", rule = "prevalence"),
+  min_score_learners = ensemble("mean", scope = "learners", min_score = 0.7),
+  stack_representations = ensemble("stack", scope = "representations")
+)
+ens_field <- function(x) if (is.null(x)) "" else as.character(x)
+write_fixture(
+  do.call(rbind, lapply(names(ENSEMBLE_CASES), function(nm) {
+    s <- ENSEMBLE_CASES[[nm]]
+    data.frame(case = nm, method = s$method, scope = s$scope, metric = ens_field(s$metric),
+               min_score = ens_field(s$min_score),
+               decay = if (identical(s$decay, "proportional")) "" else ens_field(s$decay),
+               rule = if (identical(s$rule, "youden")) "" else ens_field(s$rule),
+               stringsAsFactors = FALSE)
+  })),
+  "ensemble_cases.csv"
+)
+
+ens_fits <- lapply(ENSEMBLE_CASES, function(s) {
+  ensemble_fit(ens_oof, y_fix, ens_cells, f_fix, s, ens_scores)
+})
+ens_number <- function(v) ifelse(is.finite(v), sprintf("%.12g", v), "NA")
+write_fixture(
+  do.call(rbind, lapply(names(ens_fits), function(nm) {
+    st <- ens_fits[[nm]]
+    data.frame(case = nm, member = names(st$weights), weight = ens_number(st$weights),
+               stringsAsFactors = FALSE)
+  })),
+  "ensemble_weights.csv"
+)
+write_fixture(
+  do.call(rbind, lapply(names(ens_fits), function(nm) {
+    thr <- ens_fits[[nm]]$thresholds
+    if (is.null(thr)) {
+      return(NULL)
+    }
+    data.frame(case = nm, member = rep(rownames(thr), ncol(thr)),
+               variable = rep(colnames(thr), each = nrow(thr)),
+               threshold = ens_number(as.numeric(thr)), stringsAsFactors = FALSE)
+  })),
+  "ensemble_thresholds.csv"
+)
+# The combination and the spread, each read on the out-of-fold predictions themselves.
+write_fixture(
+  do.call(rbind, lapply(names(ens_fits), function(nm) {
+    p <- ensemble_combine(ens_fits[[nm]], ens_oof)
+    s <- ensemble_spread(ens_fits[[nm]], ens_oof, alpha = 0.1)
+    data.frame(case = nm, id = rep(rownames(p), ncol(p)),
+               variable = rep(colnames(p), each = nrow(p)),
+               combined = ens_number(as.numeric(p)),
+               mean = ens_number(as.numeric(s[, , "mean"])),
+               sd = ens_number(as.numeric(s[, , "sd"])),
+               cv = ens_number(as.numeric(s[, , "cv"])),
+               lower = ens_number(as.numeric(s[, , "lower"])),
+               upper = ens_number(as.numeric(s[, , "upper"])),
+               stringsAsFactors = FALSE)
+  })),
+  "ensemble_predict.csv"
+)
+cat("wrote", length(ens_fits), "combiner cases\n")
+
 # ---------------------------------------------------------------------------------------------
 # The penalised fit.
 #

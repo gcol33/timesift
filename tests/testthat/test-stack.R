@@ -397,3 +397,143 @@ test_that("a combiner handed no scorable cell says so rather than fitting on not
               b = matrix(0.4, 6L, 1L, dimnames = dimnames(y)))
   expect_error(ensemble_fit(oof, y, cells, f), "no cell is scorable")
 })
+
+# ---- biomod2's combinations ---------------------------------------------------------------------
+
+test_that("a specification refuses a setting its method does not have", {
+  expect_identical(ensemble("weighted")$decay, "proportional")
+  expect_identical(ensemble("committee")$rule, "youden")
+  expect_null(ensemble("mean")$decay)
+  expect_error(ensemble("mean", decay = 2), "\"weighted\" method")
+  expect_error(ensemble("weighted", decay = 0.5), "at least one")
+  expect_error(ensemble("weighted", decay = "linear"), "at least one")
+  expect_error(ensemble("stack", rule = "kappa"), "member of a committee")
+  expect_error(ensemble("committee", rule = "otsu"), "should be one of")
+  expect_error(ensemble(min_score = c(0.1, 0.2)), "one finite number")
+  expect_output(print(ensemble("weighted", decay = 1.6, min_score = 0.4)), "decay 1.6")
+})
+
+test_that("a decay weighs each rank down by the same ratio and shares it across a tie", {
+  expect_equal(.score_weights(c(0.9, 0.5, 0.7), 2), c(8, 2, 4) / 14)
+  # The gap between scores does not enter, only their order.
+  expect_equal(.score_weights(c(0.9, 0.1, 0.8), 2), c(8, 2, 4) / 14)
+  expect_equal(.score_weights(c(0.9, 0.7, 0.7, 0.2), 2), c(16, 6, 6, 2) / 30)
+  expect_equal(.score_weights(c(0.9, 0.7, -0.1), 3), c(9, 3, 0) / 12)
+  expect_equal(.score_weights(c(-0.2, 0, NA), 3), rep(1 / 3, 3))
+  expect_equal(.score_weights(c(0.6, 0.2), "proportional"), c(0.75, 0.25))
+})
+
+test_that("a minimum score is applied before the scope picks, and refuses to leave one", {
+  f <- stack_fixture()
+  named <- stats::setNames(f$oof, c("cnn / week", "cnn / month", "elasticnet / week"))
+  scores <- stack_scores(list(y = f$y, folds = f$folds, cells = f$cells, oof = named))
+  level <- ensemble_fit(named, f$y, f$cells, f$folds, ensemble("mean"), scores)$score
+  cut <- mean(sort(level)[1:2])
+  kept <- ensemble_fit(named, f$y, f$cells, f$folds, ensemble("mean", min_score = cut), scores)
+  expect_named(kept$weights, names(level)[level >= cut])
+  expect_error(ensemble_fit(named, f$y, f$cells, f$folds,
+                            ensemble("mean", min_score = max(level) + 0.01), scores),
+               "leaves 0 candidates")
+  expect_error(ensemble_fit(named, f$y, f$cells, f$folds, ensemble("mean", min_score = 0)),
+               "Neither was given")
+})
+
+test_that("a committee member votes at its own cut, and one holding no cut does not vote", {
+  f <- stack_fixture()
+  st <- ensemble_fit(f$oof, f$y, f$cells, f$folds, ensemble("committee", rule = "kappa"))
+  expect_equal(unname(st$weights), rep(1 / 3, 3L))
+  for (m in names(f$oof)) {
+    for (v in colnames(f$y)) {
+      expect_identical(st$thresholds[m, v], decision_threshold(f$y[, v], f$oof[[m]][, v], "kappa"))
+    }
+  }
+  votes <- Reduce(`+`, lapply(names(f$oof), function(m) {
+    f$oof[[m]] >= matrix(st$thresholds[m, ], nrow(f$y), ncol(f$y), byrow = TRUE)
+  })) / 3
+  expect_equal(ensemble_combine(st, f$oof), votes)
+
+  st$thresholds["noise", "v1"] <- NA_real_
+  share <- ensemble_combine(st, f$oof)[, "v1"]
+  two <- (f$oof$good[, "v1"] >= st$thresholds["good", "v1"]) +
+    (f$oof$fair[, "v1"] >= st$thresholds["fair", "v1"])
+  expect_equal(unname(share), unname(two / 2))
+  st$thresholds[, "v1"] <- NA_real_
+  expect_true(all(is.na(ensemble_combine(st, f$oof)[, "v1"])))
+})
+
+test_that("a spread is the members' mean, spread and t interval under the stack's weights", {
+  f <- stack_fixture()
+  plain <- ensemble_fit(f$oof, f$y, f$cells, f$folds, ensemble("mean"))
+  s <- ensemble_spread(plain, f$oof, alpha = 0.1)
+  x <- vapply(f$oof, function(p) p[7L, 3L], numeric(1L))
+  expect_equal(s[7L, 3L, "mean"], mean(x))
+  expect_equal(s[7L, 3L, "sd"], stats::sd(x))
+  expect_equal(s[7L, 3L, "cv"], stats::sd(x) / mean(x))
+  half <- stats::qt(0.95, 2) * stats::sd(x) / sqrt(3)
+  expect_equal(s[7L, 3L, c("lower", "upper")], c(lower = max(mean(x) - half, 0),
+                                                  upper = min(mean(x) + half, 1)))
+  expect_true(all(s[, , "lower"] >= 0 & s[, , "upper"] <= 1))
+
+  stacked <- ensemble_fit(f$oof, f$y, f$cells, f$folds)
+  expect_equal(ensemble_spread(stacked, f$oof)[, , "mean"], ensemble_combine(stacked, f$oof))
+  lone <- stacked
+  lone$weights[] <- c(1, 0, 0)
+  one <- ensemble_spread(lone, f$oof)
+  expect_true(all(is.na(one[, , c("sd", "cv", "lower", "upper")])))
+  expect_error(ensemble_spread(stacked, f$oof, alpha = 1), "strictly between")
+})
+
+test_that("every combination lands on the numbers the contract pins", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures not found")
+  y <- read_response(file.path(dir, "response.csv"))
+  folds <- read_folds(file.path(dir, "folds.csv"))
+  cells <- scorable_cells(y, folds)
+  long <- utils::read.csv(file.path(dir, "ensemble_oof.csv"), stringsAsFactors = FALSE,
+                          check.names = FALSE)
+  oof <- lapply(split(long, factor(long$candidate, unique(long$candidate))), function(d) {
+    m <- matrix(NA_real_, nrow(y), ncol(y), dimnames = dimnames(y))
+    m[cbind(d$id, d$variable)] <- d$p
+    m
+  })
+  fold <- .as_folds(folds, rownames(y))
+  scores <- do.call(rbind, lapply(names(oof), function(nm) {
+    out <- .score_arm(nm, nm, y, oof[[nm]], fold, sort(unique(fold)), cells, tss)
+    data.frame(candidate = nm, variable = out$variable, fold = out$fold, score = out$score,
+               scorable = out$scorable, stringsAsFactors = FALSE)
+  }))
+  read <- function(file) {
+    utils::read.csv(file.path(dir, file), stringsAsFactors = FALSE, colClasses = "character",
+                    check.names = FALSE, na.strings = "NA")
+  }
+  cases <- read("ensemble_cases.csv")
+  weights <- read("ensemble_weights.csv")
+  thresholds <- read("ensemble_thresholds.csv")
+  expected <- read("ensemble_predict.csv")
+  field <- function(x, as = identity) if (nzchar(x)) as(x) else NULL
+  for (i in seq_len(nrow(cases))) {
+    row <- cases[i, ]
+    spec <- ensemble(row$method, scope = row$scope, metric = field(row$metric),
+                     min_score = field(row$min_score, as.numeric),
+                     decay = field(row$decay, as.numeric), rule = field(row$rule))
+    st <- ensemble_fit(oof, y, cells, folds, spec, scores)
+    w <- weights[weights$case == row$case, ]
+    expect_identical(names(st$weights), w$member, info = row$case)
+    tol <- 1e-10
+    expect_equal(unname(st$weights), as.numeric(w$weight), tolerance = tol, info = row$case)
+    th <- thresholds[thresholds$case == row$case, ]
+    if (nrow(th)) {
+      expect_equal(st$thresholds[cbind(th$member, th$variable)], as.numeric(th$threshold),
+                   tolerance = 1e-10, info = row$case)
+    }
+    e <- expected[expected$case == row$case, ]
+    at <- cbind(e$id, e$variable)
+    p <- ensemble_combine(st, oof)
+    s <- ensemble_spread(st, oof, alpha = 0.1)
+    expect_equal(p[at], as.numeric(e$combined), tolerance = tol, info = row$case)
+    for (stat in c("mean", "sd", "cv", "lower", "upper")) {
+      expect_equal(s[, , stat][at], as.numeric(e[[stat]]), tolerance = tol,
+                   info = paste(row$case, stat))
+    }
+  }
+})

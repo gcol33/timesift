@@ -457,6 +457,34 @@ test_that("a binary prediction cuts each response where its held-out predictions
   }
 })
 
+test_that("a committee votes through cuts learned on held-out predictions, nested and refitted", {
+  case <- toy_case(n_unit = 30L, days = 60L)
+  fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
+                  models = list(a = toy(), b = toy("b")), sift = grains("week"),
+                  resampling = cv(v = 3L), ensemble = ensemble("committee"), control = NULL,
+                  verbose = FALSE)
+  expect_identical(fit$stack$method, "committee")
+  # The refitted committee's cuts are the ones decision_threshold() learns for each member.
+  for (m in names(fit$stack$weights)) {
+    expect_identical(fit$stack$thresholds[m, ], decision_threshold(fit, candidate = m))
+  }
+  # The nested estimate of the committee is a share of votes on every outer test target.
+  held <- fit$predictions$ensemble
+  expect_true(all(held[is.finite(held)] %in% c(0, 0.5, 1)))
+  expect_true("ensemble" %in% fit$estimate$arm)
+
+  p <- predict(fit, case$targets, case$series)
+  s <- predict(fit, case$targets, case$series, type = "spread", alpha = 0.1)
+  expect_identical(dimnames(s)[1:2], dimnames(p))
+  expect_identical(dimnames(s)[[3L]], c("mean", "sd", "cv", "lower", "upper"))
+  members <- lapply(names(fit$stack$weights), function(m) {
+    predict(fit, case$targets, case$series, candidate = m)
+  })
+  expect_equal(s[, , "mean"], (members[[1L]] + members[[2L]]) / 2)
+  expect_error(predict(fit, case$targets, case$series, candidate = "a / week", type = "spread"),
+               "one candidate")
+})
+
 test_that("a cut is refused on a response that is not presence-absence", {
   fit <- run_toy(toy_case())
   fit$y[1L, 1L] <- 0.5

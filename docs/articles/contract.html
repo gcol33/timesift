@@ -1823,6 +1823,127 @@ gradients in single precision.</p>
 </div>
 </div>
 <div class="section level2">
+<h2 id="the-combiner">The combiner<a class="anchor" aria-label="anchor" href="#the-combiner"></a>
+</h2>
+<p><code><a href="../reference/ensemble_fit.html">ensemble_fit()</a></code> is handed each candidate’s out-of-fold
+predictions, the response, the mask and the fold map, and the
+candidates’ scores where the specification reads them; it never sees a
+model. Its methods are the ones biomod2’s
+<code>BIOMOD_EnsembleModeling()</code> offers on the same predictions,
+under the names this contract gives them.</p>
+<div class="section level3">
+<h3 id="which-candidates-are-members">Which candidates are members<a class="anchor" aria-label="anchor" href="#which-candidates-are-members"></a>
+</h3>
+<p>A candidate’s score is its mean over the variables of its mean over
+the scorable folds of each variable. It is read off the run’s scores, or
+recomputed from the out-of-fold predictions on the mask where the
+specification names a metric of its own. <code>min_score</code>,
+biomod2’s <code>metric.select.thresh</code>, then keeps the candidates
+scoring at least it; biomod2 keeps those scoring above it, which differs
+only on a score equal to the threshold. <code>scope</code> picks among
+what is left: the best-scoring candidate, the first offered among any on
+its score, fixes the representation (<code>"learners"</code>) or the
+learner (<code>"representations"</code>). An ensemble of fewer than two
+members is refused, naming the filter or the scope that left it.</p>
+<p>biomod2’s <code>em.by</code> needs no argument of its own here. It
+groups the models of its pseudo-absence sets and runs before combining
+them; a candidate’s out-of-fold prediction already covers every fold of
+the one map, so <code>em.by = "algo"</code> is each candidate itself,
+and <code>"all"</code> is <code>scope = "all"</code>.</p>
+</div>
+<div class="section level3">
+<h3 id="the-weights">The weights<a class="anchor" aria-label="anchor" href="#the-weights"></a>
+</h3>
+<p><code>"stack"</code> minimises the head’s loss over the scorable
+cells on the simplex. <code>"mean"</code>, <code>"median"</code> and
+<code>"committee"</code> weigh every member the same.
+<code>"weighted"</code> with <code>decay = "proportional"</code> takes
+each member’s score, zero where it is at or below zero, over their sum.
+With a number <code>d</code> the <code>K</code> members scoring above
+zero are ordered from the highest, the one in place <code>r</code> takes
+<code>d^(K - r + 1)</code>, members on exactly the same score take the
+mean of their places’ weights, a member at or below zero takes none, and
+the weights are divided by their sum. This is biomod2’s
+<code>EMwmean.decay</code>, less its rounding of the scores and the
+weights to three decimals. Where no member scores above zero, every
+member weighs the same under either rule.</p>
+</div>
+<div class="section level3">
+<h3 id="the-committee">The committee<a class="anchor" aria-label="anchor" href="#the-committee"></a>
+</h3>
+<p>biomod2’s <code>EMca</code>. Each member’s cut on each variable is
+<code><a href="../reference/kappa_score.html">decision_threshold()</a></code> under <code>rule</code>
+(<code>"youden"</code> unless named) on that member’s out-of-fold
+predictions of every target, the cut a fit’s
+<code><a href="../reference/kappa_score.html">decision_threshold()</a></code> learns for that candidate. The
+combination on a variable is the weighted share of the members holding a
+finite cut on it whose prediction is at least that cut; a variable on
+which no member holds a cut is <code>NA</code> in R and NaN in Python.
+Inside <code><a href="../reference/timesift.html">timesift()</a></code> the cuts of each outer fold are learned
+on the inner out-of-fold predictions of its training targets, as a
+stack’s weights are.</p>
+</div>
+<div class="section level3">
+<h3 id="the-spread">The spread<a class="anchor" aria-label="anchor" href="#the-spread"></a>
+</h3>
+<p><code><a href="../reference/ensemble_spread.html">ensemble_spread()</a></code>, and
+<code>predict(type = "spread")</code> on a run’s ensemble, read
+biomod2’s <code>EMcv</code> and <code>EMci</code> under the stack’s
+weights <code>w</code>, taken as equal for a median and a committee. For
+each unit and variable, with <code>p</code> the members’
+predictions:</p>
+<ul>
+<li>
+<code>mean</code> is <code>m = sum(w p)</code>;</li>
+<li>
+<code>sd</code> is
+<code>s = sqrt(sum(w (p - m)^2) / (1 - sum(w^2)))</code>, the sample
+standard deviation under equal weights;</li>
+<li>
+<code>cv</code> is <code>s / m</code>, a ratio where biomod2 reports
+a percentage;</li>
+<li>
+<code>lower</code> and <code>upper</code> are
+<code>m -+ t(1 - alpha / 2, n - 1) s sqrt(sum(w^2))</code>,
+<code>n</code> the members carrying a weight above zero, held inside the
+range of the head’s predictions, <code>[0, 1]</code> under
+<code>binary_cross_entropy</code>. Under equal weights this is the t
+interval of a mean of <code>n</code> members. biomod2 reads its quantile
+on <code>n + 1</code> degrees of freedom; <code>n - 1</code> is the
+interval’s own.</li>
+</ul>
+<p><code>sd</code>, <code>cv</code> and the interval are missing where
+fewer than two members carry weight. The array is
+<code>[unit, variable, statistic]</code> in that order of statistics on
+both sides.</p>
+</div>
+<div class="section level3">
+<h3 id="the-fixtures-4">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-4"></a>
+</h3>
+<p><code>ensemble_oof.csv</code> holds five candidates’ out-of-fold
+predictions of the response fixture, rounded to six decimals, two of
+them identical so their scores tie exactly.
+<code>ensemble_cases.csv</code> names twelve specifications, one per
+method, the three committee rules, a decay alone, a decay after a
+<code>min_score</code>, a <code>min_score</code> before a scope, a stack
+under a scope and weights under <code>roc_auc</code>; each suite scores
+the candidates under its own <code>tss</code> and hands those scores
+over as a run does. <code>ensemble_weights.csv</code> holds each case’s
+members and weights, <code>ensemble_thresholds.csv</code> each committee
+member’s cut on each variable, and <code>ensemble_predict.csv</code>
+each case’s combination and spread at <code>alpha = 0.1</code> for every
+unit and variable.</p>
+</div>
+<div class="section level3">
+<h3 id="how-exactly-5">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-5"></a>
+</h3>
+<p>Everything is asserted to <code>1e-10</code> relative. The file holds
+twelve significant digits, and the largest difference either side reads
+is <code>4.8e-12</code>, the stack’s weights included: the two solvers
+take the same steps.</p>
+</div>
+</div>
+<div class="section level2">
 <h2 id="what-each-language-carries">What each language carries<a class="anchor" aria-label="anchor" href="#what-each-language-carries"></a>
 </h2>
 <p>The representation and the three artifacts are the contract.
@@ -1956,11 +2077,17 @@ nested selection</td>
 </td>
 </tr>
 <tr class="even">
+<td>how far an ensemble’s members disagree</td>
+<td>
+<code><a href="../reference/ensemble_spread.html">ensemble_spread()</a></code>, and
+<code>predict(type = "spread")</code> on a run</td>
+</tr>
+<tr class="odd">
 <td>scoring held-out predictions</td>
 <td>
 <code><a href="../reference/score_predictions.html">score_predictions()</a></code>, on the cells the mask allows</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the metrics</td>
 <td>
 <code><a href="../reference/tss.html">tss()</a></code>, <code><a href="../reference/roc_auc.html">roc_auc()</a></code>,
@@ -1968,46 +2095,46 @@ nested selection</td>
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> and <code><a href="../reference/kappa_score.html">model_agreement()</a></code>
 beside them</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the cut a fit applies</td>
 <td>
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> given a fit in place of the
 response, one cut per response learned from a candidate’s out-of-fold
 predictions</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>two arms on matched cells</td>
 <td><code><a href="../reference/paired_contrast.html">paired_contrast()</a></code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>every grain against a learner’s best</td>
 <td>
 <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code>, the mixed model of the per-cell
 scores and Dunnett’s many-to-one comparisons off it</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>a record with a planted grain</td>
 <td>
 <code><a href="../reference/simulate_records.html">simulate_records()</a></code>, the vignette’s and the recovery
 tests’ generator</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the inflation of a self-selected threshold</td>
 <td>
 <code><a href="../reference/tss_inflation.html">tss_inflation()</a></code>, and <code><a href="../reference/implied_skill.html">implied_skill()</a></code> for
 the level it implies</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>a set of representations</td>
 <td>
 <code><a href="../reference/timesift_set.html">timesift_set()</a></code>, which reads as a mapping of grain name
 to representation</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>folds of the inner cross-validation</td>
 <td><code>n_inner</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the three artifacts</td>
 <td>
 <code><a href="../reference/artifacts.html">write_folds()</a></code> and <code><a href="../reference/artifacts.html">read_folds()</a></code>,
@@ -2015,12 +2142,12 @@ to representation</td>
 <code><a href="../reference/artifacts.html">write_cells()</a></code> and <code><a href="../reference/artifacts.html">read_cells()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the digest</td>
 <td>
 <code><a href="../reference/digest_array.html">digest_array()</a></code>, exported</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the three registries</td>
 <td>
 <code><a href="../reference/register_learner.html">register_learner()</a></code> and <code><a href="../reference/register_learner.html">learners()</a></code>,
@@ -2028,7 +2155,7 @@ to representation</td>
 <code><a href="../reference/register_response.html">register_response()</a></code> and <code><a href="../reference/register_response.html">responses()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>what a rare response weighs</td>
 <td>
 <code><a href="../reference/positive_weights.html">positive_weights()</a></code>, the case weights the shipped
@@ -2393,6 +2520,13 @@ learned</td>
 <td>a float array of 0.0 and 1.0, NaN where no cut is learned</td>
 </tr>
 <tr class="odd">
+<td>a spread</td>
+<td>an array whose third dimension is named by the statistic</td>
+<td>an array whose last axis is ordered as
+<code>SPREAD_STATISTICS</code>
+</td>
+</tr>
+<tr class="even">
 <td>the cuts of a fit</td>
 <td>
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code>, an S3 generic with a method on a
@@ -2401,19 +2535,19 @@ fit, returning a named vector</td>
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code>, one function taking a fit or a
 response, returning a dict</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>a representation as a block of predictors</td>
 <td>
 <code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix()</a></code>, a method on the base generic</td>
 <td><code>flatten()</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>a set of learners, or of representations</td>
 <td>
 <code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code>, an S3 method on each spec class</td>
 <td>a <code>list</code>, and <code>+</code> between two of them</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>drawing a ladder, a run or a selection</td>
 <td>
 <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code>, a method on the base generic for each, on base
@@ -2422,7 +2556,7 @@ graphics</td>
 <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code>, one function taking any of the three, on
 matplotlib</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>a simulated record</td>
 <td>a <code>timesift_simulation</code> list whose <code>readings</code>
 is a data frame</td>
@@ -2430,7 +2564,7 @@ is a data frame</td>
 is a mapping of column to array; the first reading instant is
 <code>from_</code>, since <code>from</code> is a keyword</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>boosting’s L2 penalty on a leaf</td>
 <td><code>boosting(lambda =)</code></td>
 <td>
@@ -2523,13 +2657,14 @@ it by name.</td>
 <tr class="odd">
 <td>
 <code>GRAINS</code>, <code>STATS</code>,
-<code>DAY_LEVEL_STATS</code>, <code>PRESENCE_ABSENCE</code>
+<code>DAY_LEVEL_STATS</code>, <code>SPREAD_STATISTICS</code>,
+<code>PRESENCE_ABSENCE</code>
 </td>
-<td>the grain and statistic vocabularies as tuples, and the shipped head
-as the mapping <code><a href="../reference/register_response.html">register_response()</a></code> takes. R holds the
-vocabularies unexported and prints them in the error that refuses a
-name; the head is reached through <code><a href="../reference/register_response.html">responses()</a></code> on both
-sides.</td>
+<td>the grain, statistic and spread vocabularies as tuples, and the
+shipped head as the mapping <code><a href="../reference/register_response.html">register_response()</a></code> takes. R
+holds the vocabularies unexported and prints them in the error that
+refuses a name; the head is reached through <code><a href="../reference/register_response.html">responses()</a></code> on
+both sides.</td>
 </tr>
 </tbody>
 </table>

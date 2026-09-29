@@ -1,0 +1,13 @@
+case,method,scope,metric,min_score,decay,rule
+stack,stack,all,,,,
+mean,mean,all,,,,
+median,median,all,,,,
+weighted,weighted,all,,,,
+weighted_auc,weighted,all,roc_auc,,,
+decay,weighted,all,,,1.6,
+decay_min_score,weighted,all,,0.6,2,
+committee,committee,all,,,,
+committee_kappa,committee,all,,,,kappa
+committee_prevalence,committee,all,,,,prevalence
+min_score_learners,mean,learners,,0.7,,
+stack_representations,stack,representations,,,,

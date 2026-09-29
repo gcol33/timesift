@@ -11,16 +11,20 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from .ladder import scored_cells, variable_means
+from ._stats import t_ppf
+from .ladder import score_arm, scored_cells, variable_means
 from .registry import METRICS, RESPONSES
 from .response import align_folds, as_response
 
-__all__ = ["CLAMP", "EnsembleSpec", "METHODS", "SCOPES", "STACK_LOSSES", "Stack", "as_ensemble",
-           "candidate_means", "ensemble", "ensemble_combine", "ensemble_fit", "in_scope",
-           "run_ensemble", "simplex_weights", "stack_loss"]
+__all__ = ["CLAMP", "EnsembleSpec", "METHODS", "SCOPES", "SPREAD_STATISTICS", "STACK_LOSSES",
+           "Stack", "as_ensemble", "candidate_means", "ensemble", "ensemble_combine",
+           "ensemble_fit", "ensemble_spread", "in_scope", "run_ensemble", "score_weights",
+           "simplex_weights", "stack_loss"]
 
-METHODS = ("stack", "mean", "median", "weighted")
+METHODS = ("stack", "mean", "median", "weighted", "committee")
 SCOPES = ("all", "learners", "representations")
+RULES = ("youden", "kappa", "prevalence")
+SPREAD_STATISTICS = ("mean", "sd", "cv", "lower", "upper")
 
 # A candidate is named for the learner and the representation it pairs, and the ensemble reads the
 # pair back out of the name to keep a scope on one of the two axes.
@@ -40,10 +44,12 @@ def _clamp(p: np.ndarray) -> np.ndarray:
 # averaged over the cells, so the solver is the same forty lines whatever the response head is.
 STACK_LOSSES = {
     "binary_cross_entropy": dict(
+        range=(0.0, 1.0),
         value=lambda p, y: -float(np.mean(y * np.log(_clamp(p)) + (1 - y)
                                           * np.log1p(-_clamp(p)))),
         gradient=lambda p, y: (_clamp(p) - y) / (_clamp(p) * (1 - _clamp(p))) / len(y)),
     "squared_error": dict(
+        range=(-np.inf, np.inf),
         value=lambda p, y: float(np.mean((p - y) ** 2)),
         gradient=lambda p, y: 2 * (p - y) / len(y)),
 }
@@ -57,15 +63,25 @@ class EnsembleSpec:
     scope: str = "all"
     metric: object = None
     response: str | None = None
+    min_score: float | None = None
+    decay: object = None
+    rule: str | None = None
 
 
 @dataclass(frozen=True)
 class Stack:
-    """A fitted combiner: what it does and what weight it gave each of its members."""
+    """A fitted combiner: what it does and what weight it gave each of its members.
+
+    A committee also carries each member's cut on each response, ``thresholds[member, variable]``
+    in the response's own variable order, NaN where a member holds no cut.
+    """
 
     method: str
     weights: dict
     members: tuple[str, ...]
+    loss: str = "binary_cross_entropy"
+    thresholds: np.ndarray | None = None
+    variables: tuple[str, ...] | None = None
 
     def __repr__(self) -> str:  # pragma: no cover - display only
         shown = sorted(self.weights.items(), key=lambda kv: (-kv[1], kv[0]))
@@ -74,18 +90,32 @@ class Stack:
 
 
 def ensemble(method: str = "stack", scope: str = "all", metric=None,
-             response: str | None = None) -> EnsembleSpec:
+             response: str | None = None, min_score: float | None = None, decay=None,
+             rule: str | None = None) -> EnsembleSpec:
     """Ask for an ensemble of the candidates a fit produced.
 
     ``stack`` fits non-negative weights summing to one on the out-of-fold predictions, ``mean`` and
-    ``median`` combine without fitting, and ``weighted`` uses each candidate's own mean score
-    rescaled to sum to one. ``scope`` is which candidates are eligible: every one of them, only the
-    several learners sharing the best candidate's representation, or only its learner across the
-    representations. ``metric`` names the metric the ensemble is reported in, or ``None`` for the
-    fit's own, and ``response`` is the registered head whose loss the weights minimise, or ``None``
-    for the head the run was fitted under. Naming a head the run does not fit toward is an error
-    rather than an override, and :func:`ensemble_fit` called on its own reads ``None`` as
-    ``"presence_absence"``.
+    ``median`` combine without fitting, and ``weighted`` uses each candidate's own mean score,
+    its positive part rescaled to sum to one; where no candidate scores above zero every candidate
+    weighs the same. ``decay``, biomod2's ``EMwmean.decay``, changes that: given a number ``d``,
+    the ``K`` candidates scoring above zero take ``d**K`` for the best down to ``d**1`` for the
+    ``K``-th, candidates on the same score share the mean of their ranks' weights, and a candidate
+    at or below zero takes none.
+
+    ``committee`` is biomod2's committee averaging: each member cuts each response at the
+    threshold ``decision_threshold()`` learns under ``rule`` from that member's out-of-fold
+    predictions of every target, and the combination is the share of members voting presence. A
+    member holding no cut on a response does not vote on it.
+
+    ``min_score``, biomod2's ``metric.select.thresh``, leaves a candidate whose mean score is below
+    it ineligible, before ``scope`` picks among what is left. ``scope`` is which candidates are
+    eligible: every one of them, only the several learners sharing the best candidate's
+    representation, or only its learner across the representations. ``metric`` names the metric
+    the eligibility, ``min_score`` and the weighted weights are read by, or ``None`` for the scores
+    the run already carries, and ``response`` is the registered head whose loss the weights
+    minimise, or ``None`` for the head the run was fitted under. Naming a head the run does not fit
+    toward is an error rather than an override, and :func:`ensemble_fit` called on its own reads
+    ``None`` as ``"presence_absence"``.
     """
     if method not in METHODS:
         raise ValueError(f"`method` is one of {', '.join(METHODS)}, got {method!r}")
@@ -95,7 +125,28 @@ def ensemble(method: str = "stack", scope: str = "all", metric=None,
         METRICS.get(metric)
     if response is not None:
         RESPONSES.get(response)
-    return EnsembleSpec(method=method, scope=scope, metric=metric, response=response)
+    if min_score is not None and (isinstance(min_score, bool)
+                                  or not isinstance(min_score, (int, float))
+                                  or not np.isfinite(min_score)):
+        raise ValueError("`min_score` is one finite number, or None for no filter")
+    if decay is not None:
+        if method != "weighted":
+            raise ValueError(f'`decay` sets how the "weighted" method turns scores into weights, '
+                             f'and the method here is "{method}"')
+        if decay != "proportional" and (isinstance(decay, bool)
+                                        or not isinstance(decay, (int, float))
+                                        or not np.isfinite(decay) or decay < 1):
+            raise ValueError('`decay` is "proportional" or one number of at least one')
+    if rule is not None:
+        if method != "committee":
+            raise ValueError(f"`rule` sets where each member of a committee cuts its prediction, "
+                             f'and the method here is "{method}"')
+        if rule not in RULES:
+            raise ValueError(f"`rule` is one of {', '.join(RULES)}, got {rule!r}")
+    return EnsembleSpec(method=method, scope=scope, metric=metric, response=response,
+                        min_score=None if min_score is None else float(min_score),
+                        decay=(decay or "proportional") if method == "weighted" else None,
+                        rule=(rule or "youden") if method == "committee" else None)
 
 
 def run_ensemble(spec, response: str) -> EnsembleSpec | None:
@@ -162,32 +213,113 @@ def ensemble_fit(oof: dict, y, cells, folds, spec=None, scores=None) -> Stack:
     if spec.response is None:
         spec = replace(spec, response="presence_absence")
     y = as_response(y)
-    members = in_scope(tuple(oof), spec.scope, scores)
+    level = _member_levels(oof, y, cells, folds, spec, scores)
+    members = in_scope(_passing(tuple(oof), level, spec.min_score), spec.scope, level)
     if len(members) < 2:
         raise ValueError(f"an ensemble needs at least two candidates, and the {spec.scope} scope "
                          f"leaves {len(members)}")
+    p, observed = _stacking_block({name: oof[name] for name in members}, y, cells, folds)
+    loss_name = RESPONSES.get(spec.response)["loss"]
+    thresholds = None
     if spec.method == "stack":
-        p, observed = _stacking_block({name: oof[name] for name in members}, y, cells, folds)
         w = simplex_weights(p, observed, stack_loss(spec.response))
     elif spec.method == "weighted":
-        w = _score_weights(members, scores)
+        w = score_weights([level[name] for name in members], spec.decay or "proportional")
     else:
         w = np.full(len(members), 1.0 / len(members))
+    if spec.method == "committee":
+        thresholds = _member_thresholds({name: oof[name] for name in members}, y,
+                                        spec.rule or "youden")
     return Stack(method=spec.method, members=members,
-                 weights={name: float(value) for name, value in zip(members, w)})
+                 weights={name: float(value) for name, value in zip(members, w)},
+                 loss=loss_name, thresholds=thresholds, variables=tuple(y.variables))
 
 
 def ensemble_combine(stack: Stack, preds: dict) -> np.ndarray:
     """One ``[n, response]`` matrix from each member's ``[n, response]`` matrix."""
+    p = _member_block(stack, preds)
+    w = np.asarray([stack.weights[m] for m in stack.members], dtype=np.float64)
+    if stack.method == "median":
+        return np.median(p, axis=0)
+    if stack.method == "committee":
+        return _committee_share(p, w, stack.thresholds)
+    return np.tensordot(w, p, axes=(0, 0))
+
+
+def ensemble_spread(stack: Stack, preds: dict, alpha: float = 0.05) -> np.ndarray:
+    """How far the members of an ensemble disagree: biomod2's ``EMcv`` and ``EMci``.
+
+    Returns an ``[n, response, statistic]`` array, the statistics being ``SPREAD_STATISTICS``: the
+    weighted mean ``m`` of the members' predictions under the stack's weights; their weighted
+    standard deviation ``s``, the square root of ``sum(w (p - m)**2) / (1 - sum(w**2))``, which is
+    the sample standard deviation when the weights are equal; the coefficient of variation
+    ``s / m``; and the interval ``m -+ t(1 - alpha / 2, n - 1) s sqrt(sum(w**2))``, ``n`` the
+    number of members carrying weight, the t interval of a mean of ``n`` members when the weights
+    are equal. Under a head whose predictions are probabilities the interval is held inside zero
+    and one. A committee's and a median's members are read at equal weight, and a committee's
+    spread is that of the members' predictions rather than of their votes. ``sd``, ``cv`` and the
+    interval are NaN where fewer than two members carry weight.
+    """
+    if isinstance(alpha, bool) or not isinstance(alpha, (int, float)) or not 0 < alpha < 1:
+        raise ValueError("`alpha` is one number strictly between 0 and 1")
+    p = _member_block(stack, preds)
+    k = p.shape[0]
+    if stack.method in ("median", "committee"):
+        w = np.full(k, 1.0 / k)
+    else:
+        w = np.asarray([stack.weights[m] for m in stack.members], dtype=np.float64)
+        w = w / w.sum()
+    m = np.tensordot(w, p, axes=(0, 0))
+    sq = float(np.sum(w ** 2))
+    n = int(np.sum(w > 0))
+    if n >= 2:
+        s = np.sqrt(np.tensordot(w, (p - m) ** 2, axes=(0, 0)) / (1 - sq))
+        half = t_ppf(1 - alpha / 2, n - 1) * s * np.sqrt(sq)
+    else:
+        s = np.full(m.shape, np.nan)
+        half = s
+    low, high = STACK_LOSSES[stack.loss]["range"]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        cv = s / m
+    return np.stack([m, s, cv, np.maximum(m - half, low), np.minimum(m + half, high)], axis=-1)
+
+
+def _member_block(stack: Stack, preds: dict) -> np.ndarray:
+    """The members' predictions stacked in the stack's order, ``[member, n, response]``."""
     missing = [m for m in stack.members if m not in preds]
     if missing:
         raise KeyError(f"{len(missing)} member{'s have' if len(missing) > 1 else ' has'} no "
                        f"prediction to combine, first: {missing[0]}")
-    p = np.stack([np.asarray(preds[m], dtype=np.float64) for m in stack.members])
-    if stack.method == "median":
-        return np.median(p, axis=0)
-    w = np.asarray([stack.weights[m] for m in stack.members], dtype=np.float64)
-    return np.tensordot(w, p, axes=(0, 0))
+    p = [np.asarray(preds[m], dtype=np.float64) for m in stack.members]
+    wrong = [m for m, one in zip(stack.members, p) if one.shape != p[0].shape]
+    if wrong:
+        raise ValueError(f"every member's prediction must have the same shape; "
+                         f"{', '.join(wrong)} does not")
+    return np.stack(p)
+
+
+def _committee_share(p: np.ndarray, w: np.ndarray, thresholds: np.ndarray) -> np.ndarray:
+    """Each response's vote: the weighted share of the members holding a cut on it that read
+    presence, ``p >= cut``. A response no member holds a cut on predicts NaN."""
+    out = np.full(p.shape[1:], np.nan)
+    for j in range(p.shape[2]):
+        voting = np.isfinite(thresholds[:, j])
+        if not voting.any():
+            continue
+        share = w[voting] / w[voting].sum()
+        votes = (p[voting, :, j] >= thresholds[voting, j][:, None]).astype(np.float64)
+        out[:, j] = share @ votes
+    return out
+
+
+def _member_thresholds(oof: dict, y, rule: str) -> np.ndarray:
+    """A committee member's cut on each response, learned from its own out-of-fold predictions of
+    every target as ``decision_threshold()`` learns a fit's: ``[member, variable]``."""
+    from .metrics import decision_threshold
+    return np.array([[decision_threshold(y.values[:, j], np.asarray(p, dtype=np.float64)[:, j],
+                                         rule)
+                      for j in range(len(y.variables))] for p in oof.values()],
+                    dtype=np.float64)
 
 
 def candidate_means(scores) -> dict:
@@ -196,10 +328,11 @@ def candidate_means(scores) -> dict:
             for name, per in variable_means(*scored_cells(scores)).items()}
 
 
-def in_scope(names, scope: str, scores) -> tuple[str, ...]:
+def in_scope(names, scope: str, level: dict) -> tuple[str, ...]:
     """The candidates a scope leaves eligible, in the order they were offered.
 
-    ``learners`` keeps the several learners sharing the representation of the best candidate and
+    ``level`` is each candidate's mean score, as :func:`candidate_means` reads it. ``learners``
+    keeps the several learners sharing the representation of the best candidate and
     ``representations`` keeps the one learner across its representations, so an ensemble under
     either scope varies one axis and holds the other.
     """
@@ -208,8 +341,35 @@ def in_scope(names, scope: str, scores) -> tuple[str, ...]:
     if scope not in SCOPES:
         raise ValueError(f"`scope` is one of {', '.join(SCOPES)}, got {scope!r}")
     axis = 1 if scope == "learners" else 0
-    held = _split_candidate(_best(names, scores))[axis]
+    held = _split_candidate(_best(names, level))[axis]
     return tuple(n for n in names if _split_candidate(n)[axis] == held)
+
+
+def score_weights(score, decay="proportional") -> np.ndarray:
+    """biomod2's EMwmean: weights from the members' mean scores, summing to one.
+
+    Proportional weights are the positive part of each score. With a number for ``decay``, the
+    ``K`` members scoring above zero take ``decay**K`` for the best down to ``decay**1`` for the
+    ``K``-th, members on exactly the same score share the mean of their ranks' weights, and a
+    member at or below zero takes none. Where no member scores above zero every member weighs the
+    same.
+    """
+    score = np.asarray([s if np.isfinite(s) else 0.0 for s in score], dtype=np.float64)
+    positive = score > 0
+    if not positive.any():
+        return np.full(len(score), 1.0 / len(score))
+    if decay == "proportional":
+        w = np.maximum(score, 0.0)
+    else:
+        k = int(positive.sum())
+        rank_weight = np.zeros(len(score))
+        top = np.argsort(-score, kind="stable")[:k]
+        rank_weight[top] = float(decay) ** (k - np.arange(k))
+        w = np.zeros(len(score))
+        for value in np.unique(score[positive]):
+            tied = score == value
+            w[tied] = rank_weight[tied].mean()
+    return w / w.sum()
 
 
 def simplex_weights(p: np.ndarray, y: np.ndarray, loss: dict, iterations: int = 500,
@@ -305,26 +465,50 @@ def _scorable_mask(cells, y, f: np.ndarray) -> np.ndarray:
     return np.array([[admits.get((str(v), int(k)), False) for v in y.variables] for k in f])
 
 
-def _levels(scores, why: str) -> dict:
-    if scores is None:
-        raise ValueError(f"{why} reads the candidates' own scores, and none were given")
-    return candidate_means(scores)
+def _member_levels(oof: dict, y, cells, folds, spec: EnsembleSpec, scores) -> dict:
+    """Each candidate's mean score: recomputed from the out-of-fold predictions where the spec
+    names its own metric, and read off the run's own scores where it does not. A combination that
+    weighs no candidate against another needs neither, and gets NaN for every one."""
+    if spec.metric is not None:
+        score = METRICS.get(spec.metric)
+        f = align_folds(folds, y.units)
+        table = dict(candidate=[], variable=[], score=[], scorable=[])
+        for name, p in oof.items():
+            got = score_arm("", name, y, _matrix(p, y, name), f, np.unique(f), cells, score)
+            table["candidate"] += [name] * len(got["variable"])
+            for key in ("variable", "score", "scorable"):
+                table[key] += list(got[key])
+        level = candidate_means(table)
+    elif scores is not None:
+        level = candidate_means(scores)
+    elif spec.scope != "all" or spec.method == "weighted" or spec.min_score is not None:
+        raise ValueError(f"a {spec.method} combination over the {spec.scope} candidates weighs "
+                         f"them by their score, which is read off `scores` or recomputed from a "
+                         f"metric named in ensemble(metric=). Neither was given.")
+    else:
+        level = {}
+    return {name: level.get(name, float("nan")) for name in oof}
 
 
-def _score_weights(members, scores) -> np.ndarray:
-    level = _levels(scores, "the weighted method")
-    w = np.asarray([max(level.get(name, 0.0), 0.0) for name in members], dtype=np.float64)
-    if w.sum() <= 0:
-        raise ValueError("no candidate scores above zero, so there is nothing to weight them by")
-    return w / w.sum()
+def _passing(names, level: dict, min_score) -> tuple[str, ...]:
+    """biomod2's metric.select.thresh, read as the name says: a candidate scoring at least the
+    minimum is kept, and one carrying no score is not."""
+    if min_score is None:
+        return tuple(names)
+    keep = tuple(n for n in names if np.isfinite(level[n]) and level[n] >= min_score)
+    if len(keep) < 2:
+        best = max((v for v in level.values() if np.isfinite(v)), default=float("nan"))
+        raise ValueError(f"`min_score = {min_score:g}` leaves {len(keep)} candidate"
+                         f"{'' if len(keep) == 1 else 's'} to combine; the best scores {best:.3g}")
+    return keep
 
 
-def _best(names, scores) -> str:
-    level = _levels(scores, "a scope on one axis")
+def _best(names, level: dict) -> str:
+    """The best-scoring candidate, the first offered among any on the same score."""
     best, top = None, -np.inf
-    for name in sorted(names):
+    for name in names:
         value = level.get(name, -np.inf)
-        if value > top:
+        if np.isfinite(value) and value > top:
             best, top = name, value
     if best is None:
         raise ValueError("no candidate carries a score to read a scope off")

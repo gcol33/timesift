@@ -561,11 +561,13 @@ mask and the fold map, and never a model. <code>"stack"</code> fits
 non-negative weights summing to one by minimising the response head’s
 own loss over the scorable cells; <code>"mean"</code>,
 <code>"median"</code> and <code>"weighted"</code> combine without
-fitting anything. The weights below are fitted on the outer out-of-fold
-predictions of every target and are what <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> uses.
-The ensemble’s score is not read with them, because they were fitted to
-the responses it would be scored against; each outer fold’s weights are
-in <code>fit$fold_weights</code>.</p>
+fitting anything, and <code>"committee"</code> is the share of members
+voting presence, each at the cut its own out-of-fold predictions give.
+The weights below are fitted on the outer out-of-fold predictions of
+every target and are what <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> uses. The ensemble’s
+score is not read with them, because they were fitted to the responses
+it would be scored against; each outer fold’s weights are in
+<code>fit$fold_weights</code>.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/ensemble_weights.html">ensemble_weights</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   elasticnet / day  elasticnet / week elasticnet / month </span></span>

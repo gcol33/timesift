@@ -42,7 +42,7 @@ UNREDUCED = "native"
 
 SCORE_COLUMNS = ("candidate", "variable", "fold", "score", "scorable")
 
-PREDICTION_TYPES = ("response", "binary")
+PREDICTION_TYPES = ("response", "binary", "spread")
 
 
 @dataclass
@@ -87,7 +87,7 @@ class Timesift:
                        f'{", ".join(self.candidates["candidate"])}.')
 
     def predict(self, targets, series=None, candidate: str = "ensemble", type: str = "response",
-                rule: str = "youden") -> np.ndarray:
+                rule: str = "youden", alpha: float = 0.05) -> np.ndarray:
         """Predict new targets, rebuilding each member's representation from the stored settings.
 
         Every candidate is refitted on all the targets at the end of a fit, so what predicts here
@@ -100,9 +100,17 @@ class Timesift:
         predictions of the fit's own targets, and returns 0.0 and 1.0, NaN for a response whose
         held-out predictions give no cut. A binary map of a species is this prediction on one
         target per map cell.
+
+        ``type="spread"`` reads the ensemble's members side by side rather than combining them:
+        ``ensemble_spread()`` gives their weighted mean, standard deviation, coefficient of
+        variation and interval at ``alpha`` as an ``[n, response, statistic]`` array, biomod2's
+        ``EMcv`` and ``EMci``, and on one target per map cell an uncertainty map.
         """
         if type not in PREDICTION_TYPES:
             raise ValueError(f"`type` is one of {', '.join(PREDICTION_TYPES)}, got {type!r}")
+        if type == "spread" and candidate != "ensemble":
+            raise ValueError(f'a spread is read across the members of the ensemble, and '
+                             f'"{candidate}" is one candidate')
         members = self._members(candidate)
         # The cut is learned before anything is built, so a response it cannot be learned on is
         # refused before the new targets' representations are.
@@ -112,6 +120,9 @@ class Timesift:
             cut = decision_threshold(self, candidate=candidate, rule=rule)
         built = self._rebuild(members, targets, series)
         preds = {name: self.models[name].predict(built[name]) for name in members}
+        if type == "spread":
+            from .stack import ensemble_spread
+            return ensemble_spread(self.stack, preds, alpha)
         if candidate == "ensemble":
             from .stack import ensemble_combine
             p = ensemble_combine(self.stack, preds)

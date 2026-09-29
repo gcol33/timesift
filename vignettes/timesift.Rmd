@@ -253,7 +253,8 @@ summary(both)
 The combiner is handed out-of-fold predictions, the response, the mask and the fold map, and
 never a model. `"stack"` fits non-negative weights summing to one by minimising the response
 head's own loss over the scorable cells; `"mean"`, `"median"` and `"weighted"` combine without
-fitting anything. The weights below are fitted on the outer out-of-fold predictions of every
+fitting anything, and `"committee"` is the share of members voting presence, each at the cut its
+own out-of-fold predictions give. The weights below are fitted on the outer out-of-fold predictions of every
 target and are what `predict()` uses. The ensemble's score is not read with them, because they were
 fitted to the responses it would be scored against; each outer fold's weights are in
 `fit$fold_weights`.

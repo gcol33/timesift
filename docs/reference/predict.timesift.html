@@ -94,8 +94,9 @@ ensemble is asked for.</p>
 <span>  <span class="va">targets</span>,</span>
 <span>  series <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  candidate <span class="op">=</span> <span class="st">"ensemble"</span>,</span>
-<span>  type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"response"</span>, <span class="st">"binary"</span><span class="op">)</span>,</span>
+<span>  type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"response"</span>, <span class="st">"binary"</span>, <span class="st">"spread"</span><span class="op">)</span>,</span>
 <span>  rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"youden"</span>, <span class="st">"kappa"</span>, <span class="st">"prevalence"</span><span class="op">)</span>,</span>
+<span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -124,11 +125,16 @@ the rule chose on every target (<code>object$choice</code>); or the name of one 
 
 <dt id="arg-type">type<a class="anchor" aria-label="anchor" href="#arg-type"></a></dt>
 <dd><p><code>"response"</code> for the prediction on the scale of the response head, a probability
-of presence under the shipped one, or <code>"binary"</code> for presence and absence.</p></dd>
+of presence under the shipped one, <code>"binary"</code> for presence and absence, or <code>"spread"</code> for how
+far the ensemble's members disagree.</p></dd>
 
 
 <dt id="arg-rule">rule<a class="anchor" aria-label="anchor" href="#arg-rule"></a></dt>
 <dd><p>With <code>type = "binary"</code>, the rule of <code><a href="kappa_score.html">decision_threshold()</a></code> the cut is learned by.</p></dd>
+
+
+<dt id="arg-alpha">alpha<a class="anchor" aria-label="anchor" href="#arg-alpha"></a></dt>
+<dd><p>With <code>type = "spread"</code>, one minus the coverage of the interval.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -140,7 +146,7 @@ of presence under the shipped one, or <code>"binary"</code> for presence and abs
     <p>A <code>[target, response]</code> matrix of predictions, named by target and in the order the fit
 carries its own targets: sorted by identifier, or the targets' own order where <code>target_time</code>
 anchors them. Under <code>type = "binary"</code> an integer matrix of 0 and 1, <code>NA</code> for a response
-whose held-out predictions give no cut.</p>
+whose held-out predictions give no cut. Under <code>type = "spread"</code> the <code>[target, response, statistic]</code> array of <code><a href="ensemble_spread.html">ensemble_spread()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -149,6 +155,10 @@ whose held-out predictions give no cut.</p>
 own targets: never from predictions of units the model was fitted on, and never from the new
 targets, which carry no response. <code>rule</code> is the rule that picks it. A binary map of a species
 is this prediction on one target per map cell.</p>
+<p>With <code>type = "spread"</code> the ensemble's members are read side by side rather than combined:
+<code><a href="ensemble_spread.html">ensemble_spread()</a></code> gives their weighted mean, standard deviation, coefficient of variation and
+interval at <code>alpha</code>, which is biomod2's <code>EMcv</code> and <code>EMci</code> and, on one target per map cell, an
+uncertainty map.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

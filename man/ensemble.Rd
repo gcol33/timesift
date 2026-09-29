@@ -5,10 +5,13 @@
 \title{How the candidates are combined}
 \usage{
 ensemble(
-  method = c("stack", "mean", "median", "weighted"),
+  method = c("stack", "mean", "median", "weighted", "committee"),
   scope = c("all", "learners", "representations"),
   metric = NULL,
-  response = NULL
+  response = NULL,
+  min_score = NULL,
+  decay = NULL,
+  rule = NULL
 )
 }
 \arguments{
@@ -16,13 +19,21 @@ ensemble(
 
 \item{scope}{Which candidates are eligible.}
 
-\item{metric}{Name of the registered metric the eligibility and the \code{"weighted"} weights are
-read by, or \code{NULL} for the score the run already carries.}
+\item{metric}{Name of the registered metric the eligibility, \code{min_score} and the \code{"weighted"}
+weights are read by, or \code{NULL} for the score the run already carries.}
 
 \item{response}{Name of the registered response head whose loss \code{"stack"} minimises, or \code{NULL}
 for the head the run was fitted under. Naming a head the run does not fit toward is an error
 rather than an override, and \code{\link[=ensemble_fit]{ensemble_fit()}} called on its own reads \code{NULL} as
 \code{"presence_absence"}.}
+
+\item{min_score}{\code{NULL}, or the mean score a candidate needs to be eligible.}
+
+\item{decay}{For \code{"weighted"}, \code{"proportional"} (the default) or a number of at least one, the
+ratio of one rank's weight to the next one's.}
+
+\item{rule}{For \code{"committee"}, the rule of \code{\link[=decision_threshold]{decision_threshold()}} each member's cut is learned
+by; \code{"youden"} by default.}
 }
 \value{
 A \code{timesift_ensemble}.
@@ -39,7 +50,25 @@ for presence-absence. One weight vector covers every response, because per-respo
 be fitted on the handful of cells a rare response has. \code{"mean"} and \code{"median"} combine without
 fitting anything. \code{"weighted"} takes each candidate's own mean score, keeps its non-negative
 part and rescales those to sum to one, so a candidate scoring at or below zero is left out and
-the rest are weighted by how well they scored.
+the rest are weighted by how well they scored; where no candidate scores above zero the scores
+order nothing worth weighting by, and every candidate weighs the same.
+
+\code{decay} changes how \code{"weighted"} turns scores into weights, as biomod2's \code{EMwmean.decay} does.
+Given a number \code{d}, the candidates scoring above zero are ranked from the best down, the one
+ranked \code{r} of \code{K} takes \code{d^(K - r + 1)}, candidates on the same score share the mean of their
+ranks' weights, and the weights are rescaled to sum to one. Each rank down weighs \code{1 / d} of the
+one above it, whatever the gap in score between them.
+
+\code{"committee"} is biomod2's committee averaging. Each member cuts each response at its own
+threshold, learned by \code{\link[=decision_threshold]{decision_threshold()}} under \code{rule} from that member's out-of-fold
+predictions of every target, and the combined prediction is the share of members voting
+presence. A member whose predictions of a response give no cut does not vote on it. Under
+\code{\link[=timesift]{timesift()}} the thresholds of each outer fold are learned from the inner out-of-fold
+predictions of its training targets, as a stack's weights are, so the estimate never reads a cut
+chosen on the targets it scores.
+
+\code{min_score} is biomod2's \code{metric.select.thresh}: a candidate whose mean score is below it is
+not eligible, and the filter is applied before \code{scope} picks among what is left.
 
 \code{scope} says which candidates are eligible. \code{"all"} is every candidate. \code{"learners"} keeps the
 several learners that read the representation of the best-scoring candidate, and
@@ -49,5 +78,7 @@ representations it ran on; both are read off the same mean scores the report sho
 \examples{
 ensemble()
 ensemble("weighted", scope = "learners")
+ensemble("weighted", decay = 1.6, min_score = 0.4)
+ensemble("committee", rule = "kappa")
 
 }

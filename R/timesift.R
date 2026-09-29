@@ -673,6 +673,11 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 #' targets, which carry no response. `rule` is the rule that picks it. A binary map of a species
 #' is this prediction on one target per map cell.
 #'
+#' With `type = "spread"` the ensemble's members are read side by side rather than combined:
+#' [ensemble_spread()] gives their weighted mean, standard deviation, coefficient of variation and
+#' interval at `alpha`, which is biomod2's `EMcv` and `EMci` and, on one target per map cell, an
+#' uncertainty map.
+#'
 #' @param object A [timesift()] fit.
 #' @param targets A data frame of targets, carrying the identifier, the anchor and the static
 #'   columns the fit was given.
@@ -680,24 +685,31 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 #' @param candidate `"ensemble"`, the stack refitted on every target; `"selected"`, the candidate
 #'   the rule chose on every target (`object$choice`); or the name of one candidate.
 #' @param type `"response"` for the prediction on the scale of the response head, a probability
-#'   of presence under the shipped one, or `"binary"` for presence and absence.
+#'   of presence under the shipped one, `"binary"` for presence and absence, or `"spread"` for how
+#'   far the ensemble's members disagree.
 #' @param rule With `type = "binary"`, the rule of [decision_threshold()] the cut is learned by.
+#' @param alpha With `type = "spread"`, one minus the coverage of the interval.
 #' @param ... Ignored.
 #'
 #' @return A `[target, response]` matrix of predictions, named by target and in the order the fit
 #'   carries its own targets: sorted by identifier, or the targets' own order where `target_time`
 #'   anchors them. Under `type = "binary"` an integer matrix of 0 and 1, `NA` for a response
-#'   whose held-out predictions give no cut.
+#'   whose held-out predictions give no cut. Under `type = "spread"` the `[target, response,
+#'   statistic]` array of [ensemble_spread()].
 #'
 #' @seealso [decision_threshold()] for the cuts themselves.
 #'
 #' @export
 predict.timesift <- function(object, targets, series = NULL, candidate = "ensemble",
-                             type = c("response", "binary"),
-                             rule = c("youden", "kappa", "prevalence"), ...) {
+                             type = c("response", "binary", "spread"),
+                             rule = c("youden", "kappa", "prevalence"), alpha = 0.05, ...) {
   type <- match.arg(type)
   rule <- match.arg(rule)
   spec <- object$spec
+  if (identical(type, "spread") && !identical(candidate, "ensemble")) {
+    stop("a spread is read across the members of the ensemble, and \"", candidate,
+         "\" is one candidate.", call. = FALSE)
+  }
   members <- .run_members(object, candidate)
   # The cut is learned before anything is built, so a response it cannot be learned on is refused
   # before the new targets' representations are.
@@ -712,6 +724,9 @@ predict.timesift <- function(object, targets, series = NULL, candidate = "ensemb
   preds <- stats::setNames(lapply(seq_along(members), function(i) {
     stats::predict(object$models[[members[i]]], built[[labels[i]]])
   }), members)
+  if (identical(type, "spread")) {
+    return(ensemble_spread(object$stack, preds, alpha))
+  }
   p <- if (identical(candidate, "ensemble")) {
     ensemble_combine(object$stack, preds)
   } else {

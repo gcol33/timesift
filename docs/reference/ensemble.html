@@ -89,10 +89,13 @@ arithmetic.</p>
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">ensemble</span><span class="op">(</span></span>
-<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stack"</span>, <span class="st">"mean"</span>, <span class="st">"median"</span>, <span class="st">"weighted"</span><span class="op">)</span>,</span>
+<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stack"</span>, <span class="st">"mean"</span>, <span class="st">"median"</span>, <span class="st">"weighted"</span>, <span class="st">"committee"</span><span class="op">)</span>,</span>
 <span>  scope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"all"</span>, <span class="st">"learners"</span>, <span class="st">"representations"</span><span class="op">)</span>,</span>
 <span>  metric <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  response <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  response <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  min_score <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  decay <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  rule <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -109,8 +112,8 @@ arithmetic.</p>
 
 
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
-<dd><p>Name of the registered metric the eligibility and the <code>"weighted"</code> weights are
-read by, or <code>NULL</code> for the score the run already carries.</p></dd>
+<dd><p>Name of the registered metric the eligibility, <code>min_score</code> and the <code>"weighted"</code>
+weights are read by, or <code>NULL</code> for the score the run already carries.</p></dd>
 
 
 <dt id="arg-response">response<a class="anchor" aria-label="anchor" href="#arg-response"></a></dt>
@@ -118,6 +121,20 @@ read by, or <code>NULL</code> for the score the run already carries.</p></dd>
 for the head the run was fitted under. Naming a head the run does not fit toward is an error
 rather than an override, and <code><a href="ensemble_fit.html">ensemble_fit()</a></code> called on its own reads <code>NULL</code> as
 <code>"presence_absence"</code>.</p></dd>
+
+
+<dt id="arg-min-score">min_score<a class="anchor" aria-label="anchor" href="#arg-min-score"></a></dt>
+<dd><p><code>NULL</code>, or the mean score a candidate needs to be eligible.</p></dd>
+
+
+<dt id="arg-decay">decay<a class="anchor" aria-label="anchor" href="#arg-decay"></a></dt>
+<dd><p>For <code>"weighted"</code>, <code>"proportional"</code> (the default) or a number of at least one, the
+ratio of one rank's weight to the next one's.</p></dd>
+
+
+<dt id="arg-rule">rule<a class="anchor" aria-label="anchor" href="#arg-rule"></a></dt>
+<dd><p>For <code>"committee"</code>, the rule of <code><a href="kappa_score.html">decision_threshold()</a></code> each member's cut is learned
+by; <code>"youden"</code> by default.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -132,7 +149,22 @@ for presence-absence. One weight vector covers every response, because per-respo
 be fitted on the handful of cells a rare response has. <code>"mean"</code> and <code>"median"</code> combine without
 fitting anything. <code>"weighted"</code> takes each candidate's own mean score, keeps its non-negative
 part and rescales those to sum to one, so a candidate scoring at or below zero is left out and
-the rest are weighted by how well they scored.</p>
+the rest are weighted by how well they scored; where no candidate scores above zero the scores
+order nothing worth weighting by, and every candidate weighs the same.</p>
+<p><code>decay</code> changes how <code>"weighted"</code> turns scores into weights, as biomod2's <code>EMwmean.decay</code> does.
+Given a number <code>d</code>, the candidates scoring above zero are ranked from the best down, the one
+ranked <code>r</code> of <code>K</code> takes <code>d^(K - r + 1)</code>, candidates on the same score share the mean of their
+ranks' weights, and the weights are rescaled to sum to one. Each rank down weighs <code>1 / d</code> of the
+one above it, whatever the gap in score between them.</p>
+<p><code>"committee"</code> is biomod2's committee averaging. Each member cuts each response at its own
+threshold, learned by <code><a href="kappa_score.html">decision_threshold()</a></code> under <code>rule</code> from that member's out-of-fold
+predictions of every target, and the combined prediction is the share of members voting
+presence. A member whose predictions of a response give no cut does not vote on it. Under
+<code><a href="timesift.html">timesift()</a></code> the thresholds of each outer fold are learned from the inner out-of-fold
+predictions of its training targets, as a stack's weights are, so the estimate never reads a cut
+chosen on the targets it scores.</p>
+<p><code>min_score</code> is biomod2's <code>metric.select.thresh</code>: a candidate whose mean score is below it is
+not eligible, and the filter is applied before <code>scope</code> picks among what is left.</p>
 <p><code>scope</code> says which candidates are eligible. <code>"all"</code> is every candidate. <code>"learners"</code> keeps the
 several learners that read the representation of the best-scoring candidate, and
 <code>"representations"</code> keeps the one learner of the best-scoring candidate across the
@@ -143,6 +175,8 @@ representations it ran on; both are read off the same mean scores the report sho
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">ensemble</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">ensemble</span><span class="op">(</span><span class="st">"weighted"</span>, scope <span class="op">=</span> <span class="st">"learners"</span><span class="op">)</span></span>
+<span><span class="fu">ensemble</span><span class="op">(</span><span class="st">"weighted"</span>, decay <span class="op">=</span> <span class="fl">1.6</span>, min_score <span class="op">=</span> <span class="fl">0.4</span><span class="op">)</span></span>
+<span><span class="fu">ensemble</span><span class="op">(</span><span class="st">"committee"</span>, rule <span class="op">=</span> <span class="st">"kappa"</span><span class="op">)</span></span>
 <span></span></code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

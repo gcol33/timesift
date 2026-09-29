@@ -118,6 +118,7 @@ reference:
   - ensemble
   - ensemble_fit
   - ensemble_combine
+  - ensemble_spread
   - ensemble_weights
 - title: Scoring and comparison
   contents:

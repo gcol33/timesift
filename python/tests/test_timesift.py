@@ -365,6 +365,28 @@ def test_a_binary_prediction_cuts_each_response_where_its_held_out_predictions_p
         decision_threshold(fit, y)
 
 
+def test_a_committee_votes_through_cuts_learned_on_held_out_predictions():
+    from timesift.metrics import decision_threshold
+    from timesift.stack import SPREAD_STATISTICS, ensemble
+    fit = fitted(models=[learner("a"), learner("b", multi="joint")], sift=grains("week"),
+                 ensemble=ensemble(method="committee"))
+    assert fit.stack.method == "committee"
+    # The refitted committee's cuts are the ones decision_threshold() learns for each member.
+    for i, m in enumerate(fit.stack.members):
+        cut = decision_threshold(fit, candidate=m)
+        want = np.array([cut[v] for v in fit.y.variables])
+        np.testing.assert_array_equal(fit.stack.thresholds[i], want)
+    held = fit.predictions["ensemble"]
+    assert np.isin(held[np.isfinite(held)], (0.0, 0.5, 1.0)).all()
+
+    s = fit.predict(targets(), series(), type="spread", alpha=0.1)
+    assert s.shape == fit.y.values.shape + (len(SPREAD_STATISTICS),)
+    members = [fit.predict(targets(), series(), candidate=m) for m in fit.stack.members]
+    np.testing.assert_allclose(s[..., 0], np.mean(members, axis=0))
+    with pytest.raises(ValueError, match="one candidate"):
+        fit.predict(targets(), series(), candidate=f"a{SEPARATOR}week", type="spread")
+
+
 def test_a_cut_is_refused_on_a_response_that_is_not_presence_absence():
     from timesift.metrics import decision_threshold
     fit = fitted()

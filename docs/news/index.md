@@ -39,8 +39,31 @@
   [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
   also takes `preset` (`"package"`, randomForest’s defaults, or
   `"bigboss"`, biomod2’s tuned set) and `threads`. Both languages.
+- [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md)
+  takes biomod2’s ensemble set. `ensemble("committee", rule =)` is
+  committee averaging: each member cuts each response at its own
+  [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md),
+  learned from its out-of-fold predictions, and the combination is the
+  share of members voting presence; inside
+  [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+  each outer fold’s cuts are learned on its inner out-of-fold
+  predictions, so the estimate reads no cut chosen on the targets it
+  scores. `min_score` leaves out the candidates scoring below it before
+  `scope` picks, and `ensemble("weighted", decay = d)` weighs each rank
+  `1 / d` of the one above it, as `EMwmean.decay` does. Both languages.
+- [`ensemble_spread()`](https://gillescolling.com/timesift/reference/ensemble_spread.md)
+  and `predict(type = "spread")` read how far an ensemble’s members
+  disagree: their weighted mean, standard deviation, coefficient of
+  variation and t interval at `alpha`, biomod2’s `EMcv` and `EMci`. On
+  one target per map cell it is an uncertainty map. Both languages.
 
 ### Changed
+
+- A `"weighted"` ensemble in Python gives every member the same weight
+  where none scores above zero, as R’s always did, where it used to
+  stop; `ensemble(metric =)` in Python now recomputes the scores it
+  weighs and filters by, as R’s does, and a scope’s best candidate is
+  the first offered among any on its score on both sides.
 
 - [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
   is grown by the core `src/ts_tree.cpp` on both sides, in place of
@@ -62,13 +85,16 @@
   -0.62). One forest on 894 units and 471 columns takes 5.3 s on one
   thread against ranger’s 3.3 s. Nothing in the reproduction or the
   selection benchmark fits a forest.
+
 - `min_node` is the fewest units each side of a split keeps,
   randomForest’s `nodesize`; it had been ranger’s smallest node split in
   R and scikit-learn’s smallest leaf in Python.
+
 - Python’s internal module `timesift.tree` is `timesift._tree`.
   Importing the submodule replaced the exported
   [`tree()`](https://gillescolling.com/timesift/reference/tree.md) on
   the package with the module.
+
 - The Python source distribution carries `src/ts_tree.cpp` and
   `src/ts_tree.h`, which a wheel built from it needs.
 

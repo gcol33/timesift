@@ -27,8 +27,24 @@
   many units from each class as the smaller class holds. `forest()` also takes `preset`
   (`"package"`, randomForest's defaults, or `"bigboss"`, biomod2's tuned set) and `threads`. Both
   languages.
+* `ensemble()` takes biomod2's ensemble set. `ensemble("committee", rule =)` is committee
+  averaging: each member cuts each response at its own `decision_threshold()`, learned from its
+  out-of-fold predictions, and the combination is the share of members voting presence; inside
+  `timesift()` each outer fold's cuts are learned on its inner out-of-fold predictions, so the
+  estimate reads no cut chosen on the targets it scores. `min_score` leaves out the candidates
+  scoring below it before `scope` picks, and `ensemble("weighted", decay = d)` weighs each rank
+  `1 / d` of the one above it, as `EMwmean.decay` does. Both languages.
+* `ensemble_spread()` and `predict(type = "spread")` read how far an ensemble's members disagree:
+  their weighted mean, standard deviation, coefficient of variation and t interval at `alpha`,
+  biomod2's `EMcv` and `EMci`. On one target per map cell it is an uncertainty map. Both
+  languages.
 
 ## Changed
+
+* A `"weighted"` ensemble in Python gives every member the same weight where none scores above
+  zero, as R's always did, where it used to stop; `ensemble(metric =)` in Python now recomputes
+  the scores it weighs and filters by, as R's does, and a scope's best candidate is the first
+  offered among any on its score on both sides.
 
 * `forest()` is grown by the core `src/ts_tree.cpp` on both sides, in place of ranger in R and
   scikit-learn in Python. Its split search is the tree's, and its bootstrap and column draws come

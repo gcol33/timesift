@@ -103,6 +103,8 @@ fit
 predicts through the ensemble fitted on every target; `candidate = "selected"` predicts with the
 chosen candidate. `type = "binary"` cuts each species into presence and absence at a threshold
 learned from the fit's own out-of-fold predictions, so a binary map is one prediction per map cell.
+`type = "spread"` gives how far the ensemble's members disagree, which on the same cells is an
+uncertainty map.
 
 ## Four things, and one contract
 
@@ -189,7 +191,8 @@ through its twenty-fourth of that day's mean.
 
 `ensemble()` combines the candidates by stacking: non-negative weights summing to one, fitted on
 out-of-fold predictions alone, minimising the response head's own loss over the scorable cells.
-`"mean"`, `"median"` and `"weighted"` combine without fitting. The combiner is handed the
+`"mean"`, `"median"` and `"weighted"` combine without fitting, and `"committee"` is the share of
+members voting presence, each at its own threshold. The combiner is handed the
 predictions, the response, the fold map and the mask, and never a model. The ensemble's reported
 score uses weights fitted inside each outer training fold; the weights `ensemble_weights()` returns
 are fitted on every target, for prediction.

@@ -6,12 +6,15 @@ matrices rather than from models, which is also the guarantee being checked.
 
 from __future__ import annotations
 
+import csv
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
+from timesift import read_folds, read_response
 from timesift.ladder import grain_ladder, score_arm
 from timesift.learners import Learner
 from timesift.metrics import roc_auc, tss
@@ -21,8 +24,8 @@ from timesift.report import (candidate_table, ensemble_weights, occlusion, proce
 from timesift.representation import grain_matrix
 from timesift.response import Response, align_folds, fold_map, scorable_cells
 from timesift.stack import (EnsembleSpec, Stack, as_ensemble, candidate_means, ensemble,
-                            ensemble_combine, ensemble_fit, in_scope, run_ensemble,
-                            simplex_weights, stack_loss)
+                            ensemble_combine, ensemble_fit, ensemble_spread, in_scope,
+                            run_ensemble, score_weights, simplex_weights, stack_loss)
 
 DEVIANCE = stack_loss("presence_absence")
 
@@ -259,11 +262,12 @@ def test_a_scope_holds_one_axis_and_varies_the_other():
     oof, y, cells, folds = board()
     scores = score_table(oof, y, folds, cells)
     names = tuple(oof)
-    assert in_scope(names, "all", scores) == names
+    level = candidate_means(scores)
+    assert in_scope(names, "all", level) == names
     # The best candidate reads the week representation, so the learners scope keeps the learners
     # on it and the representations scope keeps that learner's representations.
-    assert in_scope(names, "learners", scores) == ("cnn / week", "elasticnet / week")
-    assert in_scope(names, "representations", scores) == ("cnn / week",)
+    assert in_scope(names, "learners", level) == ("cnn / week", "elasticnet / week")
+    assert in_scope(names, "representations", level) == ("cnn / week",)
     fitted = ensemble_fit(oof, y, cells, folds, ensemble(scope="learners"), scores)
     assert fitted.members == ("cnn / week", "elasticnet / week")
     with pytest.raises(ValueError, match="at least two candidates"):
@@ -505,3 +509,140 @@ def test_the_combiner_refuses_to_drop_a_scorable_cell_rather_than_fitting_on_few
     spoiled["forest / month"][a, b] = np.nan
     with pytest.raises(ValueError, match="did not settle"):
         ensemble_fit(spoiled, y, cells, folds, ensemble(), score_table(oof, y, folds, cells))
+
+
+# ---- biomod2's combinations -------------------------------------------------------------------
+
+FIXTURES = Path(__file__).resolve().parents[2] / "inst" / "spec" / "fixtures"
+
+
+def rows(name):
+    with open(FIXTURES / name, newline="") as fh:
+        return list(csv.DictReader(fh))
+
+
+def number(text):
+    return float("nan") if text == "NA" else float(text)
+
+
+def test_a_specification_refuses_a_setting_its_method_does_not_have():
+    assert ensemble(method="weighted").decay == "proportional"
+    assert ensemble(method="committee").rule == "youden"
+    assert ensemble(method="mean").decay is None
+    with pytest.raises(ValueError, match='"weighted" method'):
+        ensemble(method="mean", decay=2)
+    with pytest.raises(ValueError, match="at least one"):
+        ensemble(method="weighted", decay=0.5)
+    with pytest.raises(ValueError, match="at least one"):
+        ensemble(method="weighted", decay="linear")
+    with pytest.raises(ValueError, match="member of a committee"):
+        ensemble(rule="kappa")
+    with pytest.raises(ValueError, match="`rule` is one of"):
+        ensemble(method="committee", rule="otsu")
+    with pytest.raises(ValueError, match="one finite number"):
+        ensemble(min_score=float("nan"))
+
+
+def test_a_decay_weighs_each_rank_down_by_the_same_ratio_and_shares_it_across_a_tie():
+    assert score_weights([0.9, 0.5, 0.7], 2) == pytest.approx(np.array([8, 2, 4]) / 14)
+    assert score_weights([0.9, 0.1, 0.8], 2) == pytest.approx(np.array([8, 2, 4]) / 14)
+    assert score_weights([0.9, 0.7, 0.7, 0.2], 2) == pytest.approx(np.array([16, 6, 6, 2]) / 30)
+    assert score_weights([0.9, 0.7, -0.1], 3) == pytest.approx(np.array([9, 3, 0]) / 12)
+    assert score_weights([-0.2, 0.0, float("nan")], 3) == pytest.approx(np.full(3, 1 / 3))
+    assert score_weights([0.6, 0.2]) == pytest.approx([0.75, 0.25])
+
+
+def test_a_minimum_score_is_applied_before_the_scope_picks_and_refuses_to_leave_one():
+    oof, y, cells, folds = board()
+    scores = score_table(oof, y, folds, cells)
+    level = candidate_means(scores)
+    cut = float(np.mean(sorted(level.values())[:2]))
+    kept = ensemble_fit(oof, y, cells, folds, ensemble(method="mean", min_score=cut), scores)
+    assert kept.members == tuple(n for n in oof if level[n] >= cut)
+    with pytest.raises(ValueError, match="leaves 0 candidates"):
+        ensemble_fit(oof, y, cells, folds,
+                     ensemble(method="mean", min_score=max(level.values()) + 0.01), scores)
+    with pytest.raises(ValueError, match="Neither was given"):
+        ensemble_fit(oof, y, cells, folds, ensemble(method="mean", min_score=0.0))
+
+
+def test_a_committee_member_votes_at_its_own_cut_and_one_holding_no_cut_does_not_vote():
+    from timesift.metrics import decision_threshold
+    oof, y, cells, folds = board()
+    st = ensemble_fit(oof, y, cells, folds, ensemble(method="committee", rule="kappa"))
+    names = list(oof)
+    for i, name in enumerate(names):
+        for j in range(len(y.variables)):
+            want = decision_threshold(y.values[:, j], oof[name][:, j], "kappa")
+            assert st.thresholds[i, j] == want or (np.isnan(want) and np.isnan(st.thresholds[i, j]))
+    votes = sum((oof[n] >= st.thresholds[i]) for i, n in enumerate(names)) / 3
+    combined = ensemble_combine(st, oof)
+    finite = np.isfinite(st.thresholds).all(axis=0)
+    assert np.array_equal(combined[:, finite], votes[:, finite])
+
+    cut = st.thresholds.copy()
+    cut[2, 0] = np.nan
+    share = ensemble_combine(replace(st, thresholds=cut), oof)[:, 0]
+    two = (oof[names[0]][:, 0] >= cut[0, 0]).astype(float) + (oof[names[1]][:, 0] >= cut[1, 0])
+    assert np.array_equal(share, two / 2)
+    cut[:, 0] = np.nan
+    assert np.isnan(ensemble_combine(replace(st, thresholds=cut), oof)[:, 0]).all()
+
+
+def test_a_spread_is_the_members_mean_spread_and_t_interval_under_the_stacks_weights():
+    oof, y, cells, folds = board()
+    plain = ensemble_fit(oof, y, cells, folds, ensemble(method="mean"))
+    s = ensemble_spread(plain, oof, alpha=0.1)
+    assert s.shape == y.values.shape + (5,)
+    x = np.array([p[7, 2] for p in oof.values()])
+    assert s[7, 2, 0] == pytest.approx(x.mean())
+    assert s[7, 2, 1] == pytest.approx(x.std(ddof=1))
+    assert s[7, 2, 2] == pytest.approx(x.std(ddof=1) / x.mean())
+    half = 2.919985580355516 * x.std(ddof=1) / np.sqrt(3)
+    assert s[7, 2, 3] == pytest.approx(max(x.mean() - half, 0.0))
+    assert s[7, 2, 4] == pytest.approx(min(x.mean() + half, 1.0))
+    assert (s[..., 3] >= 0).all() and (s[..., 4] <= 1).all()
+
+    stacked = ensemble_fit(oof, y, cells, folds, ensemble(), score_table(oof, y, folds, cells))
+    assert np.allclose(ensemble_spread(stacked, oof)[..., 0], ensemble_combine(stacked, oof))
+    lone = replace(stacked, weights={n: float(i == 0) for i, n in enumerate(stacked.members)})
+    assert np.isnan(ensemble_spread(lone, oof)[..., 1:]).all()
+    with pytest.raises(ValueError, match="strictly between"):
+        ensemble_spread(stacked, oof, alpha=1.0)
+
+
+def test_every_combination_lands_on_the_numbers_the_contract_pins():
+    y = read_response(FIXTURES / "response.csv")
+    folds = read_folds(FIXTURES / "folds.csv", y.units)
+    cells = scorable_cells(y, folds)
+    where = {(u, v): (i, j) for i, u in enumerate(y.units) for j, v in enumerate(y.variables)}
+    oof = {}
+    for row in rows("ensemble_oof.csv"):
+        p = oof.setdefault(row["candidate"], np.full(y.values.shape, np.nan))
+        p[where[(row["id"], row["variable"])]] = float(row["p"])
+    scores = score_table(oof, y, folds, cells)
+    weights, thresholds, expected = (rows("ensemble_weights.csv"),
+                                     rows("ensemble_thresholds.csv"),
+                                     rows("ensemble_predict.csv"))
+    for case in rows("ensemble_cases.csv"):
+        spec = ensemble(method=case["method"], scope=case["scope"], metric=case["metric"] or None,
+                        min_score=float(case["min_score"]) if case["min_score"] else None,
+                        decay=float(case["decay"]) if case["decay"] else None,
+                        rule=case["rule"] or None)
+        st = ensemble_fit(oof, y, cells, folds, spec, scores)
+        tol = 1e-10
+        w = [r for r in weights if r["case"] == case["case"]]
+        assert st.members == tuple(r["member"] for r in w), case["case"]
+        for r in w:
+            assert st.weights[r["member"]] == pytest.approx(float(r["weight"]), rel=tol, abs=1e-9)
+        for r in (r for r in thresholds if r["case"] == case["case"]):
+            got = st.thresholds[st.members.index(r["member"]), y.variables.index(r["variable"])]
+            want = number(r["threshold"])
+            assert got == pytest.approx(want, rel=1e-10, nan_ok=True), (case["case"], r)
+        p = ensemble_combine(st, oof)
+        s = ensemble_spread(st, oof, alpha=0.1)
+        for r in (r for r in expected if r["case"] == case["case"]):
+            i, j = where[(r["id"], r["variable"])]
+            got = [p[i, j], *s[i, j]]
+            want = [number(r[k]) for k in ("combined", "mean", "sd", "cv", "lower", "upper")]
+            assert got == pytest.approx(want, rel=tol, abs=1e-9, nan_ok=True), (case["case"], r)

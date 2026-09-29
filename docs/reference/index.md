@@ -88,6 +88,8 @@ Weights fitted on the out-of-fold predictions alone.
   : Fit the combiner on the out-of-fold predictions
 - [`ensemble_combine()`](https://gillescolling.com/timesift/reference/ensemble_combine.md)
   : Combine one prediction per member into one prediction
+- [`ensemble_spread()`](https://gillescolling.com/timesift/reference/ensemble_spread.md)
+  : How far the members of an ensemble disagree
 - [`ensemble_weights()`](https://gillescolling.com/timesift/reference/ensemble_weights.md)
   : The weights the combiner fitted
 

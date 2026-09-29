@@ -10,7 +10,25 @@
 #' be fitted on the handful of cells a rare response has. `"mean"` and `"median"` combine without
 #' fitting anything. `"weighted"` takes each candidate's own mean score, keeps its non-negative
 #' part and rescales those to sum to one, so a candidate scoring at or below zero is left out and
-#' the rest are weighted by how well they scored.
+#' the rest are weighted by how well they scored; where no candidate scores above zero the scores
+#' order nothing worth weighting by, and every candidate weighs the same.
+#'
+#' `decay` changes how `"weighted"` turns scores into weights, as biomod2's `EMwmean.decay` does.
+#' Given a number `d`, the candidates scoring above zero are ranked from the best down, the one
+#' ranked `r` of `K` takes `d^(K - r + 1)`, candidates on the same score share the mean of their
+#' ranks' weights, and the weights are rescaled to sum to one. Each rank down weighs `1 / d` of the
+#' one above it, whatever the gap in score between them.
+#'
+#' `"committee"` is biomod2's committee averaging. Each member cuts each response at its own
+#' threshold, learned by [decision_threshold()] under `rule` from that member's out-of-fold
+#' predictions of every target, and the combined prediction is the share of members voting
+#' presence. A member whose predictions of a response give no cut does not vote on it. Under
+#' [timesift()] the thresholds of each outer fold are learned from the inner out-of-fold
+#' predictions of its training targets, as a stack's weights are, so the estimate never reads a cut
+#' chosen on the targets it scores.
+#'
+#' `min_score` is biomod2's `metric.select.thresh`: a candidate whose mean score is below it is
+#' not eligible, and the filter is applied before `scope` picks among what is left.
 #'
 #' `scope` says which candidates are eligible. `"all"` is every candidate. `"learners"` keeps the
 #' several learners that read the representation of the best-scoring candidate, and
@@ -19,23 +37,30 @@
 #'
 #' @param method How the members are combined.
 #' @param scope Which candidates are eligible.
-#' @param metric Name of the registered metric the eligibility and the `"weighted"` weights are
-#'   read by, or `NULL` for the score the run already carries.
+#' @param metric Name of the registered metric the eligibility, `min_score` and the `"weighted"`
+#'   weights are read by, or `NULL` for the score the run already carries.
 #' @param response Name of the registered response head whose loss `"stack"` minimises, or `NULL`
 #'   for the head the run was fitted under. Naming a head the run does not fit toward is an error
 #'   rather than an override, and [ensemble_fit()] called on its own reads `NULL` as
 #'   `"presence_absence"`.
+#' @param min_score `NULL`, or the mean score a candidate needs to be eligible.
+#' @param decay For `"weighted"`, `"proportional"` (the default) or a number of at least one, the
+#'   ratio of one rank's weight to the next one's.
+#' @param rule For `"committee"`, the rule of [decision_threshold()] each member's cut is learned
+#'   by; `"youden"` by default.
 #'
 #' @return A `timesift_ensemble`.
 #'
 #' @examples
 #' ensemble()
 #' ensemble("weighted", scope = "learners")
+#' ensemble("weighted", decay = 1.6, min_score = 0.4)
+#' ensemble("committee", rule = "kappa")
 #'
 #' @export
-ensemble <- function(method = c("stack", "mean", "median", "weighted"),
+ensemble <- function(method = c("stack", "mean", "median", "weighted", "committee"),
                      scope = c("all", "learners", "representations"), metric = NULL,
-                     response = NULL) {
+                     response = NULL, min_score = NULL, decay = NULL, rule = NULL) {
   method <- match.arg(method)
   scope <- match.arg(scope)
   if (!is.null(metric)) {
@@ -44,13 +69,42 @@ ensemble <- function(method = c("stack", "mean", "median", "weighted"),
   if (!is.null(response)) {
     .responses_reg$get(response)
   }
-  structure(list(method = method, scope = scope, metric = metric, response = response),
+  if (!is.null(min_score) &&
+      (!is.numeric(min_score) || length(min_score) != 1L || !is.finite(min_score))) {
+    stop("`min_score` is one finite number, or NULL for no filter.", call. = FALSE)
+  }
+  if (!is.null(decay)) {
+    if (!identical(method, "weighted")) {
+      stop("`decay` sets how the \"weighted\" method turns scores into weights, and the ",
+           "method here is \"", method, "\".", call. = FALSE)
+    }
+    if (!identical(decay, "proportional") &&
+        (!is.numeric(decay) || length(decay) != 1L || !is.finite(decay) || decay < 1)) {
+      stop("`decay` is \"proportional\" or one number of at least one.", call. = FALSE)
+    }
+  }
+  if (!is.null(rule)) {
+    if (!identical(method, "committee")) {
+      stop("`rule` sets where each member of a committee cuts its prediction, and the method ",
+           "here is \"", method, "\".", call. = FALSE)
+    }
+    rule <- match.arg(rule, c("youden", "kappa", "prevalence"))
+  }
+  structure(list(method = method, scope = scope, metric = metric, response = response,
+                 min_score = min_score,
+                 decay = if (identical(method, "weighted")) decay %||% "proportional",
+                 rule = if (identical(method, "committee")) rule %||% "youden"),
             class = "timesift_ensemble")
 }
 
 #' @export
 print.timesift_ensemble <- function(x, ...) {
-  cat("<timesift ensemble>", x$method, "over the", x$scope, "candidates\n")
+  how <- switch(x$method,
+    weighted = paste0(" (", if (is.numeric(x$decay)) paste("decay", x$decay) else x$decay, ")"),
+    committee = paste0(" (cut by ", x$rule, ")"),
+    "")
+  cat("<timesift ensemble> ", x$method, how, " over the ", x$scope, " candidates",
+      if (!is.null(x$min_score)) paste(" scoring at least", x$min_score), "\n", sep = "")
   cat("response:", x$response %||% "the run's own", "; metric:", x$metric %||% "the run's own",
       "\n")
   invisible(x)
@@ -130,29 +184,60 @@ ensemble_fit <- function(oof, y, cells, folds, spec = ensemble(), scores = NULL)
   }
   mean_score <- .member_scores(oof, y, cells, folds, spec, scores,
                                required = !identical(spec$scope, "all") ||
-                                 identical(spec$method, "weighted"))
-  members <- .eligible_members(names(oof), spec$scope, mean_score)
+                                 identical(spec$method, "weighted") || !is.null(spec$min_score))
+  members <- .eligible_members(.passing_members(names(oof), mean_score, spec$min_score),
+                               spec$scope, mean_score)
 
   mask <- .scorable_matrix(y, cells, folds)
   block <- .stacking_block(oof[members], y, mask)
   loss <- .stack_loss(spec$response)
 
+  equal <- list(weights = rep(1 / length(members), length(members)), value = NA_real_,
+                iterations = 0L)
   fitted <- switch(
     spec$method,
     stack = .simplex_weights(block$predictions, block$response, loss),
-    mean = list(weights = rep(1 / length(members), length(members)), value = NA_real_,
-                iterations = 0L),
-    median = list(weights = rep(1 / length(members), length(members)), value = NA_real_,
-                  iterations = 0L),
-    weighted = list(weights = .score_weights(mean_score[members]), value = NA_real_,
-                    iterations = 0L)
+    mean = equal,
+    median = equal,
+    committee = equal,
+    weighted = list(weights = .score_weights(mean_score[members], spec$decay %||% "proportional"),
+                    value = NA_real_, iterations = 0L)
   )
   weights <- stats::setNames(fitted$weights, members)
   structure(list(method = spec$method, weights = weights, scope = spec$scope,
                  metric = spec$metric, response = spec$response, loss = loss$name,
                  score = mean_score[members], n_cell = length(block$response),
-                 value = fitted$value, iterations = fitted$iterations),
+                 value = fitted$value, iterations = fitted$iterations,
+                 min_score = spec$min_score, decay = spec$decay, rule = spec$rule,
+                 thresholds = if (identical(spec$method, "committee")) {
+                   .member_thresholds(oof[members], y, spec$rule %||% "youden")
+                 }),
             class = "timesift_stack")
+}
+
+# A committee member's cut on each response, learned from its own out-of-fold predictions of
+# every target, as decision_threshold() learns the cut of a fit's candidate: a [member, response]
+# matrix, NA where a member's predictions of a response give no cut.
+.member_thresholds <- function(oof, y, rule) {
+  t(vapply(oof, function(p) {
+    vapply(colnames(y), function(v) decision_threshold.default(y[, v], p[, v], rule),
+           numeric(1L))
+  }, numeric(ncol(y))))
+}
+
+# biomod2's metric.select.thresh, read as the name says: a candidate scoring at least the minimum
+# is kept, and one carrying no score is not.
+.passing_members <- function(members, score, min_score) {
+  if (is.null(min_score)) {
+    return(members)
+  }
+  keep <- members[is.finite(score[members]) & score[members] >= min_score]
+  if (length(keep) < 2L) {
+    stop("`min_score = ", min_score, "` leaves ", .plural(length(keep), "candidate"),
+         " to combine; the best scores ", format(max(score, na.rm = TRUE), digits = 3), ".",
+         call. = FALSE)
+  }
+  keep
 }
 
 #' @export
@@ -184,6 +269,18 @@ print.timesift_stack <- function(x, ...) {
 #'
 #' @export
 ensemble_combine <- function(stack, preds) {
+  parts <- .member_parts(stack, preds)
+  d <- dim(parts[[1L]])
+  out <- switch(stack$method,
+    median = apply(array(unlist(parts, use.names = FALSE), dim = c(d, length(parts))), c(1L, 2L),
+                   stats::median),
+    committee = .committee_share(parts, stack$weights, stack$thresholds),
+    Reduce(`+`, Map(function(p, w) p * w, parts, as.numeric(stack$weights))))
+  matrix(out, nrow = d[1L], ncol = d[2L], dimnames = dimnames(parts[[1L]]))
+}
+
+# The members' predictions in the stack's order, each a matrix of the one shape.
+.member_parts <- function(stack, preds) {
   if (!inherits(stack, "timesift_stack")) {
     stop("expected an ensemble_fit() result, got ", class(stack)[1L], ".", call. = FALSE)
   }
@@ -200,13 +297,84 @@ ensemble_combine <- function(stack, preds) {
     stop("every member's prediction must have the same shape; ",
          paste(members[!same], collapse = ", "), " does not.", call. = FALSE)
   }
-  out <- if (identical(stack$method, "median")) {
-    apply(array(unlist(parts, use.names = FALSE), dim = c(d, length(parts))), c(1L, 2L),
-          stats::median)
-  } else {
-    Reduce(`+`, Map(function(p, w) p * w, parts, as.numeric(stack$weights)))
+  parts
+}
+
+# Each response's vote: the weighted share of the members holding a cut on it that read presence,
+# `p >= cut`. A response no member holds a cut on has no vote to share and predicts NA.
+.committee_share <- function(parts, weights, thresholds) {
+  out <- matrix(NA_real_, nrow = nrow(parts[[1L]]), ncol = ncol(parts[[1L]]))
+  for (j in seq_len(ncol(out))) {
+    v <- colnames(parts[[1L]])[j]
+    voting <- which(is.finite(thresholds[, v]))
+    if (!length(voting)) {
+      next
+    }
+    w <- as.numeric(weights[voting]) / sum(weights[voting])
+    votes <- vapply(voting, function(m) as.numeric(parts[[m]][, j] >= thresholds[m, v]),
+                    numeric(nrow(out)))
+    out[, j] <- as.numeric(matrix(votes, nrow = nrow(out)) %*% w)
   }
-  matrix(out, nrow = d[1L], ncol = d[2L], dimnames = dimnames(parts[[1L]]))
+  out
+}
+
+#' How far the members of an ensemble disagree
+#'
+#' biomod2's `EMcv` and `EMci`, read on the members' predictions under the weights the stack
+#' carries. For each target and response: the weighted mean `m` of the members' predictions; their
+#' weighted standard deviation `s`, the square root of `sum(w * (p - m)^2) / (1 - sum(w^2))`, which
+#' is the sample standard deviation when the weights are equal; the coefficient of variation `s /
+#' m`; and the interval `m -+ qt(1 - alpha / 2, n - 1) * s * sqrt(sum(w^2))`, `n` the number of
+#' members carrying weight, which is the t interval of a mean of `n` members when the weights are
+#' equal. Under a response head whose predictions are probabilities, the interval is held inside
+#' zero and one. An uncertainty map is this on one target per map cell.
+#'
+#' A committee's and a median's members are read at equal weight, and a committee's spread is that
+#' of the members' predictions rather than of their votes.
+#'
+#' @param stack A [ensemble_fit()] result.
+#' @param preds Named list of `[target, response]` matrices, one per member of the stack.
+#' @param alpha One minus the interval's coverage.
+#'
+#' @return A `[target, response, statistic]` array, the statistics being `mean`, `sd`, `cv`,
+#'   `lower` and `upper`. `sd`, `cv` and the interval are `NA` where fewer than two members carry
+#'   weight.
+#'
+#' @examples
+#' set.seed(1)
+#' y <- matrix(rbinom(200, 1, 0.4), nrow = 50,
+#'             dimnames = list(sprintf("p%02d", 1:50), paste0("sp", 1:4)))
+#' folds <- fold_map(y, v = 5)
+#' truth <- matrix(runif(200), nrow = 50, dimnames = dimnames(y))
+#' oof <- list(good = 0.8 * y + 0.2 * truth, fair = 0.6 * y + 0.4 * truth, noise = truth)
+#' st <- ensemble_fit(oof, y, scorable_cells(y, folds), folds, ensemble("mean"))
+#' ensemble_spread(st, oof)[1:3, "sp1", ]
+#'
+#' @export
+ensemble_spread <- function(stack, preds, alpha = 0.05) {
+  if (!is.numeric(alpha) || length(alpha) != 1L || !(alpha > 0 && alpha < 1)) {
+    stop("`alpha` is one number strictly between 0 and 1.", call. = FALSE)
+  }
+  parts <- .member_parts(stack, preds)
+  d <- dim(parts[[1L]])
+  w <- if (stack$method %in% c("median", "committee")) {
+    rep(1 / length(parts), length(parts))
+  } else {
+    as.numeric(stack$weights) / sum(stack$weights)
+  }
+  m <- Reduce(`+`, Map(function(p, wk) wk * p, parts, w))
+  sq <- sum(w^2)
+  n <- sum(w > 0)
+  s <- if (n >= 2L) {
+    sqrt(Reduce(`+`, Map(function(p, wk) wk * (p - m)^2, parts, w)) / (1 - sq))
+  } else {
+    matrix(NA_real_, nrow = d[1L], ncol = d[2L])
+  }
+  half <- if (n >= 2L) stats::qt(1 - alpha / 2, n - 1L) * s * sqrt(sq) else s
+  range <- .stack_losses[[stack$loss]]$range
+  array(c(m, s, s / m, pmax(m - half, range[1L]), pmin(m + half, range[2L])),
+        dim = c(d, 5L),
+        dimnames = c(dimnames(parts[[1L]]), list(c("mean", "sd", "cv", "lower", "upper"))))
 }
 
 #' The weights the combiner fitted
@@ -293,6 +461,7 @@ ensemble_weights <- function(fit) {
 # averaged over the cells, so the solver is the same forty lines whatever the response head is.
 .stack_losses <- list(
   binary_cross_entropy = list(
+    range = c(0, 1),
     value = function(p, y) {
       p <- .clamp_unit(p)
       -mean(y * log(p) + (1 - y) * log(1 - p))
@@ -303,6 +472,7 @@ ensemble_weights <- function(fit) {
     }
   ),
   squared_error = list(
+    range = c(-Inf, Inf),
     value = function(p, y) mean((p - y)^2),
     gradient = function(p, y) 2 * (p - y) / length(y)
   )
@@ -320,10 +490,24 @@ ensemble_weights <- function(fit) {
   c(.stack_losses[[name]], list(name = name))
 }
 
-.score_weights <- function(score) {
-  w <- pmax(ifelse(is.finite(score), score, 0), 0)
-  if (sum(w) <= 0) {
-    return(rep(1 / length(w), length(w)))
+# biomod2's EMwmean. Proportional weights are the positive part of each score; with a decay, the
+# K candidates scoring above zero take decay^K for the best down to decay^1 for the K-th, tied
+# scores share the mean of their ranks' weights, and a candidate at or below zero takes none.
+.score_weights <- function(score, decay = "proportional") {
+  score <- ifelse(is.finite(score), score, 0)
+  positive <- score > 0
+  if (!any(positive)) {
+    return(rep(1 / length(score), length(score)))
+  }
+  w <- if (identical(decay, "proportional")) {
+    pmax(score, 0)
+  } else {
+    k <- sum(positive)
+    rank_weight <- numeric(length(score))
+    top <- order(-score)[seq_len(k)]
+    rank_weight[top] <- decay^(k - seq_len(k) + 1)
+    tied <- stats::ave(rank_weight, match(score, unique(score)), FUN = mean)
+    ifelse(positive, tied, 0)
   }
   as.numeric(w / sum(w))
 }
@@ -401,6 +585,7 @@ ensemble_weights <- function(fit) {
          "name, and ", paste(members[is.na(side)], collapse = ", "),
          " is not named \"learner / representation\".", call. = FALSE)
   }
+  score <- score[members]
   best <- which.max(ifelse(is.finite(score), score, -Inf))
   keep <- members[side == side[best]]
   if (length(keep) < 2L) {

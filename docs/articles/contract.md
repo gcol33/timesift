@@ -1342,6 +1342,109 @@ gbm rescales the weights before it fits, which moves a sum in the last
 place. The second-order predictions are asserted to `1e-5`, since
 xgboost stores the design and the gradients in single precision.
 
+## The combiner
+
+[`ensemble_fit()`](https://gillescolling.com/timesift/reference/ensemble_fit.md)
+is handed each candidate’s out-of-fold predictions, the response, the
+mask and the fold map, and the candidates’ scores where the
+specification reads them; it never sees a model. Its methods are the
+ones biomod2’s `BIOMOD_EnsembleModeling()` offers on the same
+predictions, under the names this contract gives them.
+
+### Which candidates are members
+
+A candidate’s score is its mean over the variables of its mean over the
+scorable folds of each variable. It is read off the run’s scores, or
+recomputed from the out-of-fold predictions on the mask where the
+specification names a metric of its own. `min_score`, biomod2’s
+`metric.select.thresh`, then keeps the candidates scoring at least it;
+biomod2 keeps those scoring above it, which differs only on a score
+equal to the threshold. `scope` picks among what is left: the
+best-scoring candidate, the first offered among any on its score, fixes
+the representation (`"learners"`) or the learner (`"representations"`).
+An ensemble of fewer than two members is refused, naming the filter or
+the scope that left it.
+
+biomod2’s `em.by` needs no argument of its own here. It groups the
+models of its pseudo-absence sets and runs before combining them; a
+candidate’s out-of-fold prediction already covers every fold of the one
+map, so `em.by = "algo"` is each candidate itself, and `"all"` is
+`scope = "all"`.
+
+### The weights
+
+`"stack"` minimises the head’s loss over the scorable cells on the
+simplex. `"mean"`, `"median"` and `"committee"` weigh every member the
+same. `"weighted"` with `decay = "proportional"` takes each member’s
+score, zero where it is at or below zero, over their sum. With a number
+`d` the `K` members scoring above zero are ordered from the highest, the
+one in place `r` takes `d^(K - r + 1)`, members on exactly the same
+score take the mean of their places’ weights, a member at or below zero
+takes none, and the weights are divided by their sum. This is biomod2’s
+`EMwmean.decay`, less its rounding of the scores and the weights to
+three decimals. Where no member scores above zero, every member weighs
+the same under either rule.
+
+### The committee
+
+biomod2’s `EMca`. Each member’s cut on each variable is
+[`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+under `rule` (`"youden"` unless named) on that member’s out-of-fold
+predictions of every target, the cut a fit’s
+[`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+learns for that candidate. The combination on a variable is the weighted
+share of the members holding a finite cut on it whose prediction is at
+least that cut; a variable on which no member holds a cut is `NA` in R
+and NaN in Python. Inside
+[`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+the cuts of each outer fold are learned on the inner out-of-fold
+predictions of its training targets, as a stack’s weights are.
+
+### The spread
+
+[`ensemble_spread()`](https://gillescolling.com/timesift/reference/ensemble_spread.md),
+and `predict(type = "spread")` on a run’s ensemble, read biomod2’s
+`EMcv` and `EMci` under the stack’s weights `w`, taken as equal for a
+median and a committee. For each unit and variable, with `p` the
+members’ predictions:
+
+- `mean` is `m = sum(w p)`;
+- `sd` is `s = sqrt(sum(w (p - m)^2) / (1 - sum(w^2)))`, the sample
+  standard deviation under equal weights;
+- `cv` is `s / m`, a ratio where biomod2 reports a percentage;
+- `lower` and `upper` are
+  `m -+ t(1 - alpha / 2, n - 1) s sqrt(sum(w^2))`, `n` the members
+  carrying a weight above zero, held inside the range of the head’s
+  predictions, `[0, 1]` under `binary_cross_entropy`. Under equal
+  weights this is the t interval of a mean of `n` members. biomod2 reads
+  its quantile on `n + 1` degrees of freedom; `n - 1` is the interval’s
+  own.
+
+`sd`, `cv` and the interval are missing where fewer than two members
+carry weight. The array is `[unit, variable, statistic]` in that order
+of statistics on both sides.
+
+### The fixtures
+
+`ensemble_oof.csv` holds five candidates’ out-of-fold predictions of the
+response fixture, rounded to six decimals, two of them identical so
+their scores tie exactly. `ensemble_cases.csv` names twelve
+specifications, one per method, the three committee rules, a decay
+alone, a decay after a `min_score`, a `min_score` before a scope, a
+stack under a scope and weights under `roc_auc`; each suite scores the
+candidates under its own `tss` and hands those scores over as a run
+does. `ensemble_weights.csv` holds each case’s members and weights,
+`ensemble_thresholds.csv` each committee member’s cut on each variable,
+and `ensemble_predict.csv` each case’s combination and spread at
+`alpha = 0.1` for every unit and variable.
+
+### How exactly
+
+Everything is asserted to `1e-10` relative. The file holds twelve
+significant digits, and the largest difference either side reads is
+`4.8e-12`, the stack’s weights included: the two solvers take the same
+steps.
+
 ## What each language carries
 
 The representation and the three artifacts are the contract. Everything
@@ -1373,6 +1476,7 @@ the difference is recorded here rather than found at a call site.
 | the fold map and the mask | [`fold_map()`](https://gillescolling.com/timesift/reference/fold_map.md) and [`scorable_cells()`](https://gillescolling.com/timesift/reference/scorable_cells.md) |
 | fitting across a set of grains | [`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md), and [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md) for the nested selection |
 | the combiner | [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md), [`ensemble_fit()`](https://gillescolling.com/timesift/reference/ensemble_fit.md), [`ensemble_combine()`](https://gillescolling.com/timesift/reference/ensemble_combine.md) and [`ensemble_weights()`](https://gillescolling.com/timesift/reference/ensemble_weights.md) |
+| how far an ensemble’s members disagree | [`ensemble_spread()`](https://gillescolling.com/timesift/reference/ensemble_spread.md), and `predict(type = "spread")` on a run |
 | scoring held-out predictions | [`score_predictions()`](https://gillescolling.com/timesift/reference/score_predictions.md), on the cells the mask allows |
 | the metrics | [`tss()`](https://gillescolling.com/timesift/reference/tss.md), [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md), [`average_precision()`](https://gillescolling.com/timesift/reference/average_precision.md) and [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md), with [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md) and [`model_agreement()`](https://gillescolling.com/timesift/reference/kappa_score.md) beside them |
 | the cut a fit applies | [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md) given a fit in place of the response, one cut per response learned from a candidate’s out-of-fold predictions |
@@ -1679,6 +1783,7 @@ the difference is recorded here rather than found at a call site.
 | the report on a run | [`summary()`](https://rdrr.io/r/base/summary.html), a method on the base generic, printing the candidates and the procedure | [`summary()`](https://rdrr.io/r/base/summary.html), one function returning the text, with `candidate_table()` and `procedure_table()` for the two tables it prints |
 | predicting new targets | [`predict()`](https://rdrr.io/r/stats/predict.html), a method on the base generic | `.predict()`, a method on the fit |
 | a binary prediction | an integer matrix of 0 and 1, `NA` where no cut is learned | a float array of 0.0 and 1.0, NaN where no cut is learned |
+| a spread | an array whose third dimension is named by the statistic | an array whose last axis is ordered as `SPREAD_STATISTICS` |
 | the cuts of a fit | [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md), an S3 generic with a method on a fit, returning a named vector | [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md), one function taking a fit or a response, returning a dict |
 | a representation as a block of predictors | [`as.matrix()`](https://rdrr.io/r/base/matrix.html), a method on the base generic | `flatten()` |
 | a set of learners, or of representations | [`c()`](https://rdrr.io/r/base/c.html), an S3 method on each spec class | a `list`, and `+` between two of them |
@@ -1709,7 +1814,7 @@ it has none.
 |----|----|
 | `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
 | `Representation`, `Sift`, `Resampling`, `TimesiftSpec`, `Learner`, `TrainControl`, `TimesiftMatrix`, `TimesiftSet`, `Coverage`, `Response`, `Folds`, `Cells`, `Fit`, `Ladder`, `Selection`, `Timesift`, `Stack`, `EnsembleSpec`, `Simulation` | the types. R attaches a class attribute to a list or an array and the constructor is the only door to it; a Python dataclass is the type itself, and a user annotating a function or building one by hand reaches it by name. |
-| `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `PRESENCE_ABSENCE` | the grain and statistic vocabularies as tuples, and the shipped head as the mapping [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through [`responses()`](https://gillescolling.com/timesift/reference/register_response.md) on both sides. |
+| `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `SPREAD_STATISTICS`, `PRESENCE_ABSENCE` | the grain, statistic and spread vocabularies as tuples, and the shipped head as the mapping [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through [`responses()`](https://gillescolling.com/timesift/reference/register_response.md) on both sides. |
 
 Models are the one thing neither side promises. A fit in torch and a fit
 in libtorch cannot be byte-identical, and the encoders match module for
