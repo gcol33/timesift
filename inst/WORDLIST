@@ -14,8 +14,10 @@ Gini
 Hastie
 Hochberg
 IANA
+IRLS
 Kadmon
 LF
+Lanczos
 MARS
 Massias
 MaxEnt
@@ -44,6 +46,7 @@ dict
 docstring
 doi
 draw's
+eigensolver
 emmeans
 ensembling
 estimate's
