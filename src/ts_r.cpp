@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "ts_additive.h"
 #include "ts_core.h"
 #include "ts_envelope.h"
 #include "ts_fda.h"
@@ -953,5 +954,73 @@ cpp11::doubles ts_fda_predict_(cpp11::list fit, cpp11::doubles newx, int n, int 
   std::vector<double> out(static_cast<std::size_t>(n));
   timesift::fda_predict(f, REAL_RO(newx.data()), static_cast<std::size_t>(n),
                         static_cast<std::size_t>(p), out.data());
+  return give(out);
+}
+
+// The additive model, from the same core the Python side calls. A fit crosses into R as a list of
+// plain vectors: every column's term, shared by the responses, and each response's coefficients,
+// smoothing parameters and effective degrees of freedom.
+[[cpp11::register]]
+cpp11::list ts_additive_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                             int r, std::string family, int k, double gamma, int max_knots,
+                             int threads) {
+  timesift::AdditiveSpec spec;
+  spec.family = timesift::family_from_name(family);
+  spec.k = k;
+  spec.gamma = gamma;
+  spec.max_knots = max_knots;
+  spec.threads = threads;
+  const timesift::Additive fit = timesift::additive_fit(
+      REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
+      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec);
+  using namespace cpp11::literals;
+  return cpp11::writable::list({
+    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
+    "n_column"_nm = cpp11::as_sexp(fit.n_column),
+    "n_coef"_nm = cpp11::as_sexp(fit.n_coef),
+    "term_column"_nm = give(fit.term_column),
+    "term_basis"_nm = give(fit.term_basis),
+    "term_size"_nm = give(fit.term_size),
+    "term_penalised"_nm = give(fit.term_penalised),
+    "term_shift"_nm = give(fit.term_shift),
+    "knot_start"_nm = give(fit.knot_start),
+    "knots"_nm = give(fit.knots),
+    "radial_start"_nm = give(fit.radial_start),
+    "radial"_nm = give(fit.radial),
+    "map_start"_nm = give(fit.map_start),
+    "map"_nm = give(fit.map),
+    "aliased"_nm = give(fit.aliased),
+    "n_response"_nm = cpp11::as_sexp(fit.n_response),
+    "beta"_nm = give(fit.beta),
+    "sp"_nm = give(fit.sp),
+    "edf"_nm = give(fit.edf),
+    "score"_nm = give(fit.score),
+    "outer"_nm = give(fit.outer),
+    "converged"_nm = give(fit.converged)
+  });
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_additive_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p) {
+  timesift::Additive a;
+  a.family = timesift::family_from_name(cpp11::as_cpp<std::string>(fit["family"]));
+  a.n_column = cpp11::as_cpp<int>(fit["n_column"]);
+  a.n_coef = cpp11::as_cpp<int>(fit["n_coef"]);
+  a.term_column = take_field<std::int32_t>(fit, "term_column");
+  a.term_basis = take_field<std::int32_t>(fit, "term_basis");
+  a.term_size = take_field<std::int32_t>(fit, "term_size");
+  a.term_penalised = take_field<std::int32_t>(fit, "term_penalised");
+  a.term_shift = take_field<double>(fit, "term_shift");
+  a.knot_start = take_field<std::int32_t>(fit, "knot_start");
+  a.knots = take_field<double>(fit, "knots");
+  a.radial_start = take_field<std::int32_t>(fit, "radial_start");
+  a.radial = take_field<double>(fit, "radial");
+  a.map_start = take_field<std::int32_t>(fit, "map_start");
+  a.map = take_field<double>(fit, "map");
+  a.n_response = cpp11::as_cpp<int>(fit["n_response"]);
+  a.beta = take_field<double>(fit, "beta");
+  std::vector<double> out(static_cast<std::size_t>(n) * static_cast<std::size_t>(a.n_response));
+  timesift::additive_predict(a, REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                             static_cast<std::size_t>(p), out.data());
   return give(out);
 }

@@ -60,6 +60,7 @@ timesift/
     ts_tree.h ts_tree.cpp ts_boost.cpp ts_maxnet.h ts_maxnet.cpp
     ts_envelope.h ts_envelope.cpp ts_stepwise.h ts_stepwise.cpp ts_glm.h ts_glm.cpp
     ts_mars.h ts_mars.cpp ts_fda.h ts_fda.cpp ts_normal.h ts_normal.cpp ts_internal.h
+    ts_additive.h ts_additive.cpp
     ts_r.cpp          the cpp11 wrapper; cpp11.cpp is generated
   R/                  R package source
   tests/testthat/     including helper-oracle.R, the pure-R implementation
@@ -174,8 +175,8 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   and the combiner minimises the loss. A fit that declares a `head` argument is handed the head,
   as one that declares `control` is handed the control; no learner holds a response of its own.
   Same for learners: `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `stepwise()`, `forest()`,
-  `tree()`, `boosting()`, `maxnet()`, `envelope()`, `mars()`, `discriminant()` and any
-  user-supplied fit/predict pair go through one interface.
+  `tree()`, `boosting()`, `maxnet()`, `envelope()`, `mars()`, `discriminant()`, `additive()` and
+  any user-supplied fit/predict pair go through one interface.
 - **A fitted encoder is a plain object.** Its weights are arrays and its device is the setting,
   not the resolved device; the network is rebuilt at prediction. `saveRDS()` and `pickle` round
   trip a fit, and a fit made on one machine predicts on another.
@@ -214,6 +215,13 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   is pinned against mda's terms, coefficients and posteriors and R's probit `glm()` in the
   fixtures. The probit runs through the IRLS in `src/ts_glm.cpp` on the normal distribution
   of `src/ts_normal.cpp` (Cody 1969, Wichura's AS 241).
+- **So is the additive model.** `src/ts_additive.cpp` is a thin plate regression spline per
+  column (Wood 2003) with its smoothing parameters chosen by UBRE or GCV through Newton's method
+  on exact derivatives (Wood 2008), so `additive()` is the `GAM` a biomod2 user fits, mgcv's
+  `gam(method = "GCV.Cp")`, the knots past 2000 values drawn as mgcv draws them. It is pinned
+  against mgcv's criterion, degrees of freedom and fitted means in the fixtures, on cases where
+  the criterion has one minimum: where it has several, mgcv's start reads its own
+  parametrisation and the two searches can settle in different ones.
 - **Every core is timesift's own code, written from the published method.** A reference package
   fixes the numbers a core must give, never its code: the structure, the decomposition and the
   names are ours, comments cite the paper, and the reference is named only where a comment states

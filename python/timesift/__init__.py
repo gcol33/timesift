@@ -21,7 +21,7 @@ from .digest import digest_array
 from .fit import Timesift, timesift
 from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
-from .learners import (Fit, Learner, boosting, cnn, discriminant, elasticnet, envelope,
+from .learners import (Fit, Learner, additive, boosting, cnn, discriminant, elasticnet, envelope,
                        fit_learner, flatten, forest, mars, maxnet, mlp, rescnn, stepwise, tree)
 from .metrics import (average_precision, cohen_kappa, decision_threshold, kappa_score,
                       model_agreement, roc_auc, tss)
@@ -70,6 +70,7 @@ register_learner("maxnet", maxnet)
 register_learner("envelope", envelope)
 register_learner("mars", mars)
 register_learner("discriminant", discriminant)
+register_learner("additive", additive)
 register_learner("mlp", mlp)
 register_learner("cnn", cnn)
 register_learner("rescnn", rescnn)
@@ -80,7 +81,7 @@ __all__ = [
     "Ladder", "Learner", "PRESENCE_ABSENCE", "Representation", "Resampling", "Response",
     "SPREAD_STATISTICS", "STATS",
     "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",
-    "TrainControl", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
+    "TrainControl", "additive", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
     "average_precision",
     "bind_channels", "boosting", "build_representation", "calendar_channels", "candidate_table", "cnn",
     "cohen_kappa", "column_names", "coverage", "cv", "decision_threshold", "digest_array", "discriminant",

@@ -1648,3 +1648,125 @@ write_fixture(cbind(do.call(rbind, fda_rows), cut_tolerance = 1e-12, coef_tolera
 write_fixture(do.call(rbind, fda_coef), "fda_coef.csv")
 write_fixture(do.call(rbind, fda_pred), "fda_predict.csv")
 cat("wrote", nrow(FDA_CASES), "discriminant cases\n")
+
+# The additive model.
+#
+# mgcv's own fits, `gam(y ~ 1 + s(v01) + ..., method = "GCV.Cp")` with mgcv's default thin plate
+# basis, which is what biomod2's `GAM` calls. Each is run to a tight tolerance, so that the
+# reference sits at the criterion's minimum rather than where mgcv's default tolerance stops it,
+# and the Gaussian ones are refused unless a direct penalised least-squares solve at the smoothing
+# parameters mgcv reports gives its coefficients: past a smoothing parameter of about 1e9 mgcv's
+# `magic` loses directions of the design to its rank tolerance, and a reference taken there would
+# pin that. Each case carries the criterion, every column's effective degrees of freedom and, in
+# `additive_predict.csv`, the fitted mean on the design scaled by 1.01.
+#
+# `weekly` is the first four weekly columns, `first` the first three, `late` the fifth to the
+# eighth and `all` the eleven. `few` is the first four with the second cut to five distinct values
+# and the third to two, against mgcv's `s(v02, k = 5)` and the linear `v03`, since mgcv refuses a
+# basis larger than the values it spans. `knots` is 2100 units of two columns, past the 2000
+# distinct values above which the radial functions are centred on mgcv's subsample.
+if (!requireNamespace("mgcv", quietly = TRUE)) {
+  stop("the additive fixtures are the fits the mgcv package gives, so it has to be installed to ",
+       "regenerate them.", call. = FALSE)
+}
+ad_x <- unname(mx_x[, 1:4])
+ad_few <- ad_x
+ad_few[, 2] <- as.numeric(cut(ad_x[, 2], stats::quantile(ad_x[, 2], 0:5 / 5),
+                              include.lowest = TRUE))
+ad_few[, 3] <- as.numeric(ad_x[, 3] > stats::median(ad_x[, 3]))
+write_fixture(data.frame(unit = pen_units, v01 = sprintf("%.17g", ad_few[, 1]),
+                         v02 = sprintf("%.17g", ad_few[, 2]), v03 = sprintf("%.17g", ad_few[, 3]),
+                         v04 = sprintf("%.17g", ad_few[, 4]), stringsAsFactors = FALSE),
+              "additive_input.csv")
+set.seed(2100L)
+AD_KNOT_N <- 2100L
+ad_knot <- data.frame(v01 = round(stats::rnorm(AD_KNOT_N), 6), v02 = round(stats::runif(AD_KNOT_N), 6))
+ad_knot$y <- stats::rbinom(AD_KNOT_N, 1L, stats::plogis(sin(2 * ad_knot$v01) + ad_knot$v02 - 0.5))
+write_fixture(data.frame(v01 = sprintf("%.17g", ad_knot$v01), v02 = sprintf("%.17g", ad_knot$v02),
+                         y = ad_knot$y, stringsAsFactors = FALSE), "additive_knots_input.csv")
+
+ad_case <- function(case, design = "weekly", response = "y_binomial", weighted = TRUE, k = 10L,
+                    gamma = 1) {
+  data.frame(case = case, design = design, response = response, weighted = weighted, k = k,
+             gamma = gamma, stringsAsFactors = FALSE)
+}
+AD_CASES <- rbind(
+  ad_case("binomial", design = "late"),
+  ad_case("unweighted", design = "first", weighted = FALSE),
+  ad_case("gaussian", response = "y_gaussian"),
+  ad_case("all_k5", design = "all", response = "y_gaussian", k = 5L),
+  ad_case("gamma", design = "all", response = "y_gaussian", k = 5L, gamma = 1.4),
+  ad_case("few", design = "few"),
+  ad_case("knots", design = "knots", response = "y", weighted = FALSE))
+ad_tight <- mgcv::gam.control(epsilon = 1e-13, mgcv.tol = 1e-15, maxit = 500L,
+                              newton = list(conv.tol = 1e-13, maxNstep = 5, maxSstep = 2,
+                                            maxHalf = 60))
+ad_rows <- list()
+ad_pred <- list()
+for (i in seq_len(nrow(AD_CASES))) {
+  row <- AD_CASES[i, ]
+  x <- switch(row$design, weekly = ad_x, late = unname(mx_x[, 5:8]), first = ad_x[, 1:3],
+              all = unname(mx_x), few = ad_few, knots = as.matrix(ad_knot[, c("v01", "v02")]))
+  colnames(x) <- sprintf("v%02d", seq_len(ncol(x)))
+  y <- switch(row$response, y_binomial = pen_y_binomial, y_gaussian = pen_y_gaussian,
+              y = ad_knot$y)
+  w <- if (row$weighted) pen_w else rep(1, nrow(x))
+  distinct <- apply(x, 2L, function(v) length(unique(v)))
+  terms <- vapply(seq_len(ncol(x)), function(j) {
+    v <- colnames(x)[j]
+    if (distinct[j] == 2L) v
+    else if (distinct[j] < row$k) sprintf("s(%s, k = %d)", v, distinct[j])
+    else sprintf("s(%s, k = %d)", v, row$k)
+  }, character(1L))
+  f <- stats::as.formula(paste("y ~ 1 +", paste(terms, collapse = " + ")))
+  family <- if (row$response == "y_gaussian") stats::gaussian() else stats::binomial()
+  g <- suppressWarnings(mgcv::gam(f, family = family, data = data.frame(y = y, x), weights = w,
+                                  method = "GCV.Cp", gamma = row$gamma, control = ad_tight))
+  # A criterion with more than one local minimum has no one reference: which of them a search
+  # settles in depends on where it starts. mgcv is restarted, under its default tolerances, from
+  # smoothing parameters spread over six orders of magnitude, and a case is refused unless every
+  # restart reaches the same criterion to those tolerances.
+  for (sp0 in c(1e-2, 1, 1e2, 1e4)) {
+    r <- tryCatch(suppressWarnings(mgcv::gam(f, family = family, data = data.frame(y = y, x),
+                                             weights = w, method = "GCV.Cp", gamma = row$gamma,
+                                             in.out = list(sp = rep(sp0, length(g$sp)),
+                                                           scale = if (identical(family$family, "binomial")) 1 else g$scale))),
+                  error = function(e) NULL)
+    if (!is.null(r) && abs(r$gcv.ubre - g$gcv.ubre) > 1e-6 * (1 + abs(g$gcv.ubre))) {
+      stop("the ", row$case, " case's criterion has more than one local minimum: from smoothing ",
+           "parameters of ", sp0, " mgcv settles at ", format(r$gcv.ubre, digits = 12),
+           " rather than ", format(g$gcv.ubre, digits = 12), ".", call. = FALSE)
+    }
+  }
+  if (identical(family$family, "gaussian")) {
+    xd <- stats::predict(g, type = "lpmatrix")
+    s <- matrix(0, ncol(xd), ncol(xd))
+    for (j in seq_along(g$smooth)) {
+      sm <- g$smooth[[j]]
+      at <- sm$first.para:sm$last.para
+      s[at, at] <- s[at, at] + g$sp[j] * sm$S[[1L]]
+    }
+    direct <- solve(crossprod(xd * w, xd) + s, crossprod(xd, w * y))
+    if (max(abs(direct - stats::coef(g))) > 1e-8) {
+      stop("mgcv's fit for the ", row$case, " case is not the penalised least-squares solution ",
+           "at the smoothing parameters it reports; it is not a reference.", call. = FALSE)
+    }
+  }
+  # Every column's effective degrees of freedom in column order, a linear column's one.
+  edf <- vapply(colnames(x), function(v) {
+    sm <- Filter(function(s) identical(s$term, v), g$smooth)
+    if (length(sm)) sum(g$edf[sm[[1L]]$first.para:sm[[1L]]$last.para]) else 1
+  }, numeric(1L))
+  rows_out <- if (row$design == "knots") seq(1L, nrow(x), by = 10L) else seq_len(nrow(x))
+  newx <- as.data.frame(x[rows_out, , drop = FALSE] * 1.01)
+  ad_rows[[i]] <- data.frame(row, score = sprintf("%.15g", g$gcv.ubre),
+                             edf = paste(sprintf("%.15g", edf), collapse = " "),
+                             stringsAsFactors = FALSE)
+  ad_pred[[i]] <- data.frame(case = row$case, row = rows_out,
+                             fitted = sprintf("%.15g", stats::predict(g, newx, type = "response")),
+                             stringsAsFactors = FALSE)
+}
+write_fixture(cbind(do.call(rbind, ad_rows), score_tolerance = 1e-9, edf_tolerance = 1e-6,
+                    prediction_tolerance = 1e-7), "additive_cases.csv")
+write_fixture(do.call(rbind, ad_pred), "additive_predict.csv")
+cat("wrote", nrow(AD_CASES), "additive cases\n")

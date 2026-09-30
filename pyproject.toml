@@ -55,6 +55,8 @@ sdist.include = [
   "src/ts_stepwise.h",
   "src/ts_glm.cpp",
   "src/ts_glm.h",
+  "src/ts_additive.cpp",
+  "src/ts_additive.h",
   "src/ts_mars.cpp",
   "src/ts_mars.h",
   "src/ts_fda.cpp",

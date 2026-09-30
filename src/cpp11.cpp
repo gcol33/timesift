@@ -215,9 +215,25 @@ extern "C" SEXP _timesift_ts_fda_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p) {
     return cpp11::as_sexp(ts_fda_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p)));
   END_CPP11
 }
+// ts_r.cpp
+cpp11::list ts_additive_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int r, std::string family, int k, double gamma, int max_knots, int threads);
+extern "C" SEXP _timesift_ts_additive_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP r, SEXP family, SEXP k, SEXP gamma, SEXP max_knots, SEXP threads) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_additive_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<int>>(r), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(k), cpp11::as_cpp<cpp11::decay_t<double>>(gamma), cpp11::as_cpp<cpp11::decay_t<int>>(max_knots), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::doubles ts_additive_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p);
+extern "C" SEXP _timesift_ts_additive_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_additive_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p)));
+  END_CPP11
+}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
+    {"_timesift_ts_additive_fit_",      (DL_FUNC) &_timesift_ts_additive_fit_,      11},
+    {"_timesift_ts_additive_predict_",  (DL_FUNC) &_timesift_ts_additive_predict_,   4},
     {"_timesift_ts_bin_nexts_",         (DL_FUNC) &_timesift_ts_bin_nexts_,          4},
     {"_timesift_ts_bin_starts_",        (DL_FUNC) &_timesift_ts_bin_starts_,         4},
     {"_timesift_ts_boost_fit_",         (DL_FUNC) &_timesift_ts_boost_fit_,         19},

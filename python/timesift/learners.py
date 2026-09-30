@@ -23,7 +23,7 @@ from .registry import get_learner
 from .representation import TimesiftMatrix
 from .response import fitting_rows
 
-__all__ = ["Fit", "Learner", "READS", "MULTI", "boosting", "cnn", "discriminant", "elasticnet",
+__all__ = ["Fit", "Learner", "READS", "MULTI", "additive", "boosting", "cnn", "discriminant", "elasticnet",
            "fit_learner", "envelope", "flatten", "mars", "mlp", "rescnn", "forest", "stepwise",
            "tree"]
 
@@ -1320,6 +1320,74 @@ def _mars_fit(x, y, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_
 def _mars_predict(model, x):
     from ._mars import mars_predict
     return _predict_columns(model["models"], flatten(x), mars_predict)
+
+
+def additive(data=None, k=10, gamma=1.0, max_knots=2000, threads=1) -> Learner:
+    """One additive model per variable, a smooth function of every bin-by-channel column, fitted as
+    mgcv's ``gam(y ~ s(x1) + s(x2) + ..., method = "GCV.Cp")`` fits it and as biomod2 fits
+    ``GAM``. Each column enters as a thin plate regression spline of ``k`` basis functions (Wood
+    2003): a cubic radial function centred on each of the column's distinct values, reduced to its
+    ``k - 2`` directions of greatest eigenvalue, together with the linear function, which the
+    penalty on the spline's squared second derivative leaves free. Each smooth sums to zero over
+    the units, beside one intercept.
+
+    The coefficients maximise the penalised likelihood and the smoothing parameters, one per
+    column, minimise the unbiased risk estimator under a binary cross-entropy head and the
+    generalised cross-validation score under a squared-error one, by Newton's method with the
+    exact derivatives (Wood 2008). ``gamma`` multiplies the charge each effective degree of
+    freedom adds to that criterion. Over columns as alike as neighbouring weeks the criterion can
+    have more than one local minimum; the one the search settles in then depends on where it
+    starts, and mgcv, starting from a rule of its own parametrisation, can settle in another. The
+    defaults are mgcv's, which biomod2 passes unchanged.
+    Above ``max_knots`` distinct values the radial functions are centred on that many of them,
+    drawn as mgcv draws them. A column of fewer than ``k`` distinct values takes as many basis
+    functions as it holds values, a column of two enters linearly and a column of one is left out;
+    a column whose linear part the columns before it span keeps only its penalised part.
+
+    The head's case weights enter the likelihood as mgcv's prior weights. The model holds at most
+    as many coefficients as there are units, one for the intercept and ``k - 1`` per column. The
+    fit runs on the core the R package calls, so the two languages fit the same model; ``threads``
+    works that many columns and variables at once and does not change what comes back. A variable
+    holding one value is predicted its mean and named in ``unfitted``, and one whose smoothing
+    parameter search stopped short of its tolerance is named in ``stopped``.
+    """
+    _whole(k, "k", 3)
+    _whole(max_knots, "max_knots", 3)
+    _whole(threads, "threads", 1)
+    if max_knots < k:
+        raise ValueError("`max_knots` is at least `k`.")
+    if isinstance(gamma, bool) or not isinstance(gamma, (int, float, np.integer, np.floating))             or not np.isfinite(gamma) or gamma <= 0:
+        raise ValueError(f"`gamma` is one positive number, got {gamma!r}.")
+    return Learner(name="additive", fit=_additive_fit, predict=_additive_predict, data=data,
+                   reads="tabular", multi="separate",
+                   params=dict(k=int(k), gamma=float(gamma), max_knots=int(max_knots),
+                               threads=int(threads)))
+
+
+def _additive_fit(x, y, k, gamma, max_knots, threads, head, variables, **_):
+    from ._additive import additive_fit
+    family = _family(head)
+    m = flatten(x)
+    w = _head_weights(head, y)
+    fittable = np.array([len(np.unique(y[:, j])) > 1 for j in range(y.shape[1])])
+    fit = None
+    stopped = np.zeros(y.shape[1], dtype=bool)
+    if fittable.any():
+        fit = additive_fit(m, y[:, fittable], w[:, fittable], family, k=k, gamma=gamma,
+                           max_knots=max_knots, threads=threads)
+        stopped[fittable] = np.asarray(fit["converged"]) == 0
+    return dict(fit=fit, fittable=fittable, means=y.mean(axis=0), n_col=m.shape[1],
+                unfitted=[str(v) for v, f in zip(variables, fittable) if not f],
+                stopped=[str(v) for v, s in zip(variables, stopped) if s])
+
+
+def _additive_predict(model, x):
+    from ._additive import additive_predict
+    m = flatten(x)
+    out = np.tile(np.asarray(model["means"], dtype=np.float64), (m.shape[0], 1))
+    if model["fit"] is not None:
+        out[:, model["fittable"]] = additive_predict(model["fit"], m)
+    return out
 
 
 def discriminant(data=None, degree=1, penalty=None, nk=None, thresh=0.001, prune=True,

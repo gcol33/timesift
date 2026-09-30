@@ -1496,6 +1496,114 @@ recalibration of it.
   posteriors and recalibrated probabilities to `1e-10`.** Across the five cases the core and mda
   agree to `1.4e-14` or better in the coefficients and `4.1e-15` in the predictions.
 
+## The additive model
+
+`additive()` is one generalised additive model per response, over `src/ts_additive.cpp`, which
+both languages compile. A biomod2 user's `GAM` is `mgcv::gam(y ~ 1 + s(x1) + s(x2) + ..., family,
+weights = w, method = "GCV.Cp")` under mgcv's (1.9-4) defaults: a thin plate regression spline of
+basis dimension 10 per column (Wood 2003), the smoothing parameters chosen by the unbiased risk
+estimator under the binomial family and by generalised cross-validation under the Gaussian one
+(Wood 2008). The least squares are the Householder QR of `src/ts_glm.cpp`.
+
+- **A column's term.** Its distinct values, sorted, are `u`. A column of one value has no term. A
+  column of two enters linearly: the one column `(x - mean(x)) / rms(x - mean(x))`, unpenalised.
+  Otherwise the basis dimension is `k' = min(k, length(u))`; mgcv refuses `k` above the distinct
+  values, and taking the dimension down to them is the only place the two differ.
+- **The knots** are `u`, or, where `u` holds more than `max_knots` values, the `max_knots` of them
+  R's `sample()` draws after `set.seed(1)`, sorted. That generator is the Mersenne Twister seeded
+  as R seeds it: the seed is taken fifty steps along `s <- 69069 s + 1` (modulo 2^32), the next
+  step is a position word that is discarded, and the 624 after it are the state. A uniform is the
+  tempered output times `2^-32`, moved to `2^-33` or `1 - 2^-33` where it would be zero or one. An
+  index below `m` is drawn by rejection: with `b = ceiling(log2(m))`, `floor(65536 u)` of
+  successive uniforms are packed into an integer sixteen bits at a time, as many times as `b + 1`
+  bits need, masked to its low `b` bits, and drawn again until it is below `m`. The draws without
+  replacement start from the indices `0..n-1`; each takes an index `j` below the count left, keeps
+  the index at `j`, and moves the last of those left into its place.
+- **The radial basis.** `eta(r) = |r|^3 / 12` among the knots makes the symmetric matrix `E`. Its
+  `k'` eigenvectors of greatest eigenvalue in magnitude are `U` and their eigenvalues `D`, each
+  eigenvector turned so that its entry of greatest magnitude, the first where two tie, is positive.
+  With `T` the knots' rows `(1, t - shift)`, `shift = mean(x)` over the units, `Z` is the last
+  `k' - 2` columns of the Q of a Householder QR of `U'T`, so that `T'UZ = 0`. The raw basis at a
+  value `x` is `eta(|x - t_i|)` over the knots times `UZ`, then `1` and `x - shift`: `k'`
+  functions, and the penalty on them `Z'DZ` on the first `k' - 2` and nothing on the last two.
+- **Scaling.** Every raw column is divided by its root mean square over the units, and the penalty
+  by the matching products. The penalty is then multiplied by the square of the design's largest
+  absolute row sum over its largest absolute column sum.
+- **The constraint.** With `c` the scaled columns' sums over the units, `Z_c` is the last `k' - 1`
+  columns of the Q of a Householder QR of `c`, and the term's columns are the scaled basis times
+  `Z_c`, its penalty `S_c = Z_c' S Z_c`.
+- **Turning.** `S_c`'s eigenvectors, its eigenvalues descending and each eigenvector turned as the
+  radial ones are, make the term's columns the constrained ones times them: `k' - 2` penalised
+  columns, the penalty on each its eigenvalue, and last the one column the penalty leaves free,
+  whose eigenvalue is zero.
+- **The model** is the intercept and every term's columns, in column order. It is refused where
+  it holds more coefficients than units, as mgcv refuses it. A free column spanned by the free
+  columns before it, the intercept first, by the limited pivoting of `src/ts_glm.cpp` at `1e-7`,
+  is dropped and its coefficient held at zero.
+- **The fit at smoothing parameters `lambda`.** Penalised iteratively reweighted least squares: the
+  working weights `W = w mu (1 - mu)` and response `z = eta + (y - mu) / (mu (1 - mu))` under the
+  binomial family, `W = w` and `z = y` under the Gaussian one, and each step the least squares of
+  `sqrt(W) z` on `sqrt(W) X` stacked on the diagonal `sqrt(lambda_j d_c)` of the penalty. The
+  first step starts from the means `(w y + 0.5) / (w + 1)`, later fits from the coefficients the
+  search last reached, and a step that raises the penalised deviance is halved back towards the
+  coefficients it left, at most thirty times. The fit stops once the penalised deviance moves by
+  at most `1e-13 (|pdev| + 0.1)`; the Gaussian one is one step. The mean is the inverse logit with
+  the linear predictor held at 30 either side.
+- **The criterion.** With `D` the deviance, `n` the units and `tau = tr((X'WX + S)^-1 X'WX)`, the
+  unbiased risk estimator `D / n + 2 gamma tau / n - 1` under the binomial family and the
+  generalised cross-validation `n D / (n - gamma tau)^2` under the Gaussian one.
+- **The search.** Newton's method on `rho = log(lambda)`, each held to `[-25, 25]`, with the exact
+  gradient and Hessian, from the start that makes each penalty's mean diagonal that of `X'W_0X`
+  over its columns, `W_0` the working weights at the starting means. The derivatives come from
+  differentiating the score equations `X'(w (y - mu)) = S beta` implicitly: `d beta / d rho_j =
+  -lambda_j H^-1 S_j beta` with `H = X'WX + S`, the second derivatives through the derivative of
+  `W` in the linear predictor, and the trace's through `H^-1`. At each step a parameter whose
+  gradient is below `tol (|V| + D / n)` stays where it is, and so does one at a bound with its
+  gradient pointing out; the search has settled when no other is left. The Hessian over the others
+  is scaled by the root of its diagonal, its eigenvalues replaced by their magnitudes held above
+  `1e-7` of the largest, and the step is at most 5 in any coordinate and halved until the
+  criterion falls, at most thirty times; where no halving of it does, the steepest descent step of
+  at most 2 is tried the same way, and where neither falls the search stops unsettled. `tol` is
+  `1e-10` and the steps at most 200.
+- **A criterion of several local minima.** Which one a search settles in depends on where it starts
+  and how it steps. mgcv starts from a rule that reads its own parametrisation, which differs from
+  this one in the eigenvectors' signs and the columns' rotation, so where the criterion has more
+  than one minimum the two searches can settle in different ones. Each is a minimum of the same
+  criterion over the same model.
+- **What a fit keeps**: every term's column, basis dimension, columns, penalised columns and shift,
+  its knots, `UZ` and the map from its raw basis to its columns; the coefficients held at zero;
+  and per response the coefficients, the smoothing parameters, each term's effective degrees of
+  freedom, the criterion, the Newton steps taken and whether the search settled. The prediction
+  is the terms' columns at each value times the coefficients, through the inverse logit under the
+  binomial family.
+- The terms are built one column at a time and the responses fitted one at a time, and `threads`
+  runs either at once; each writes its own slot, so what comes back does not depend on it. The
+  responses share the terms, so fitting them together is fitting each alone.
+
+### The fixtures
+
+`additive_cases.csv` names seven cases on the weekly columns maxnet's fixtures read and on inputs of
+their own: mgcv's own fits under the fractional weights and without them, under the Gaussian
+response, with every one of the eleven columns at `k = 5` under the Gaussian response, at
+`gamma = 1.4`, on `additive_input.csv`, whose second column holds five distinct values and whose
+third holds two, against mgcv's `s(v02, k = 5)` and the linear `v03`, and on
+`additive_knots_input.csv`, 2100 units of two columns, past the subsample. Each is run to a tight
+tolerance (`epsilon = 1e-13`, `mgcv.tol = 1e-15`, Newton's `conv.tol = 1e-13`), and refused unless
+mgcv, restarted under its default tolerances from smoothing parameters of `1e-2`, `1`, `1e2` and
+`1e4`, settles at the same criterion to `1e-6` from each, and, under the Gaussian response, unless a direct penalised least-squares solve at the smoothing
+parameters mgcv reports gives its coefficients: past about `1e9` mgcv's `magic` loses directions of
+the design to its rank tolerance. Each case carries the criterion and every column's effective
+degrees of freedom, and `additive_predict.csv` the fitted mean on the design scaled by `1.01`, at
+every tenth unit of the subsample's input.
+
+### How exactly
+
+- **The criterion is asserted to `1e-9` relative, the effective degrees of freedom to `1e-6` and
+  the fitted means to `1e-7`.** Two searches of the same criterion settle at the same point to the
+  tolerance they are run at and no closer, and the basis is an eigenproblem each solves to its own
+  tolerance. Across the seven cases the core and mgcv agree to `5e-10` in the criterion, `3.5e-7`
+  in the degrees of freedom and `1e-8` in the fitted means.
+
 ## The combiner
 
 `ensemble_fit()` is handed each candidate's out-of-fold predictions, the response, the mask and the
@@ -1601,6 +1709,7 @@ call site.
 | the surface range envelope | `envelope()` |
 | multivariate adaptive regression splines | `mars()` |
 | flexible discriminant analysis | `discriminant()` |
+| generalised additive models | `additive()` |
 | the encoders | `mlp()`, `cnn()`, `rescnn()` |
 | how an encoder is trained | `train_control()` |
 | fitting one learner on one representation | `fit_learner()` |

@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "ts_additive.h"
 #include "ts_core.h"
 #include "ts_envelope.h"
 #include "ts_fda.h"
@@ -228,10 +229,11 @@ timesift::TreeTable take_table(const nb::dict& from) {
 
 NB_MODULE(_core, m) {
   m.doc() = "The binning, the reduction, the penalised fit, maxnet, the tree, the forest, the "
-            "boosted trees, the envelope, the stepwise model and MARS, shared with the R package "
+            "boosted trees, the envelope, the stepwise model, MARS and the additive model, shared "
+            "with the R package "
             "as src/ts_core.cpp, src/ts_penalised.cpp, src/ts_maxnet.cpp, src/ts_tree.cpp, "
-            "src/ts_boost.cpp, src/ts_envelope.cpp, src/ts_stepwise.cpp, src/ts_glm.cpp and "
-            "src/ts_mars.cpp.";
+            "src/ts_boost.cpp, src/ts_envelope.cpp, src/ts_stepwise.cpp, src/ts_glm.cpp, "
+            "src/ts_mars.cpp and src/ts_additive.cpp.";
 
   nb::register_exception_translator(
       [](const std::exception_ptr& p, void*) {
@@ -754,6 +756,78 @@ NB_MODULE(_core, m) {
           s.beta = take_field<double>(fit, "beta");
           std::vector<double> out(newx.shape(0));
           timesift::mars_predict(s, newx.data(), newx.shape(0), newx.shape(1), out.data());
+          return give(std::move(out));
+        },
+        nb::arg("fit"), nb::arg("newx"));
+
+  m.def("additive_fit",
+        [](ConstMat x, ConstMat y, ConstMat w, const std::string& family, int k, double gamma,
+           int max_knots, int threads) {
+          if (y.shape(0) != x.shape(0) || w.shape(0) != x.shape(0) || w.shape(1) != y.shape(1)) {
+            throw timesift::Error("an additive model's response and weights have a row per unit "
+                                  "and the same columns.");
+          }
+          timesift::AdditiveSpec spec;
+          spec.family = timesift::family_from_name(family);
+          spec.k = k;
+          spec.gamma = gamma;
+          spec.max_knots = max_knots;
+          spec.threads = threads;
+          timesift::Additive fit;
+          {
+            nb::gil_scoped_release release;
+            fit = timesift::additive_fit(x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+                                         y.shape(1), spec);
+          }
+          nb::dict out;
+          out["family"] = std::string(timesift::family_name(fit.family));
+          out["n_column"] = fit.n_column;
+          out["n_coef"] = fit.n_coef;
+          out["term_column"] = give(std::move(fit.term_column));
+          out["term_basis"] = give(std::move(fit.term_basis));
+          out["term_size"] = give(std::move(fit.term_size));
+          out["term_penalised"] = give(std::move(fit.term_penalised));
+          out["term_shift"] = give(std::move(fit.term_shift));
+          out["knot_start"] = give(std::move(fit.knot_start));
+          out["knots"] = give(std::move(fit.knots));
+          out["radial_start"] = give(std::move(fit.radial_start));
+          out["radial"] = give(std::move(fit.radial));
+          out["map_start"] = give(std::move(fit.map_start));
+          out["map"] = give(std::move(fit.map));
+          out["aliased"] = give(std::move(fit.aliased));
+          out["n_response"] = fit.n_response;
+          out["beta"] = give(std::move(fit.beta));
+          out["sp"] = give(std::move(fit.sp));
+          out["edf"] = give(std::move(fit.edf));
+          out["score"] = give(std::move(fit.score));
+          out["outer"] = give(std::move(fit.outer));
+          out["converged"] = give(std::move(fit.converged));
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("k"),
+        nb::arg("gamma"), nb::arg("max_knots"), nb::arg("threads") = 1);
+
+  m.def("additive_predict",
+        [](const nb::dict& fit, ConstMat newx) {
+          timesift::Additive a;
+          a.family = timesift::family_from_name(nb::cast<std::string>(fit["family"]));
+          a.n_column = nb::cast<std::int32_t>(fit["n_column"]);
+          a.n_coef = nb::cast<std::int32_t>(fit["n_coef"]);
+          a.term_column = take_field<std::int32_t>(fit, "term_column");
+          a.term_basis = take_field<std::int32_t>(fit, "term_basis");
+          a.term_size = take_field<std::int32_t>(fit, "term_size");
+          a.term_penalised = take_field<std::int32_t>(fit, "term_penalised");
+          a.term_shift = take_field<double>(fit, "term_shift");
+          a.knot_start = take_field<std::int32_t>(fit, "knot_start");
+          a.knots = take_field<double>(fit, "knots");
+          a.radial_start = take_field<std::int32_t>(fit, "radial_start");
+          a.radial = take_field<double>(fit, "radial");
+          a.map_start = take_field<std::int32_t>(fit, "map_start");
+          a.map = take_field<double>(fit, "map");
+          a.n_response = nb::cast<std::int32_t>(fit["n_response"]);
+          a.beta = take_field<double>(fit, "beta");
+          std::vector<double> out(newx.shape(0) * static_cast<std::size_t>(a.n_response));
+          timesift::additive_predict(a, newx.data(), newx.shape(0), newx.shape(1), out.data());
           return give(std::move(out));
         },
         nb::arg("fit"), nb::arg("newx"));

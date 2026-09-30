@@ -104,6 +104,7 @@ reference:
   - envelope
   - mars
   - discriminant
+  - additive
   - torch_learners
   - train_control
   - learner
