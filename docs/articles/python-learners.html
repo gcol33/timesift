@@ -524,10 +524,57 @@ and does not change what comes back. A variable holding one value is
 predicted its mean.</p>
 </div>
 <div class="section level2">
+<h2 id="discriminant">
+<code>discriminant()</code><a class="anchor" aria-label="anchor" href="#discriminant"></a>
+</h2>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>discriminant(</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>    degree<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>    penalty<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>    nk<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>    thresh<span class="op">=</span><span class="fl">0.001</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>    prune<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>    calibrate<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>)</span></code></pre></div>
+<p>One flexible discriminant per variable over every bin-by-channel
+column, fitted as mda’s <code>fda(method = mars)</code> fits it and as
+biomod2 fits <code>FDA</code>. Optimal scoring gives presence and
+absence one score each and regresses the scored response on a MARS basis
+of the columns; the fitted score is the one canonical variate, and the
+prediction is the posterior probability of presence under two normal
+classes around the class centroids on it, the classes’ shares among the
+fitting units as priors.</p>
+<p>The basis is mda’s own MARS, not earth’s that <code>mars</code>
+ports: each forward step adds a column linearly or a pair of hinges on
+it, and the pass stops when a step lowers the residuals by less than
+<code>thresh</code> of them, when they fall to <code>thresh</code> of
+the null model’s, when the generalised cross-validation passes ten times
+the null model’s, or at <code>nk</code> terms. The pruning drops the
+term of least t statistic, one at a time, and keeps the subset of least
+generalised cross-validation, which counts each term beyond the
+intercept as <code>1 + penalty / 2</code> degrees of freedom. The
+defaults are mda’s, which biomod2 passes unchanged: degree one,
+<code>penalty</code> 2 (3 above degree one), <code>thresh=0.001</code>
+and <code>nk = max(21, 2 p + 1)</code> for <code>p</code> columns.</p>
+<p>The head’s case weights set the classes’ scores and the variate, and
+not the basis, whose forward pass mda runs unweighted.
+<code>calibrate=True</code> recalibrates the posterior by a probit
+regression of the response on it under the case weights, on the fitting
+units, as biomod2 always does for <code>FDA</code>; <code>False</code>
+predicts the posterior. The passes run on the core the R package calls,
+so the two keep the same terms and predict the same probabilities;
+<code>threads</code> searches that many columns at once and does not
+change what comes back. A variable holding one value, or one the basis
+does not reach, is predicted its mean and named in
+<code>unfitted</code>. The learner needs a presence-absence response,
+under a head whose loss is the binary cross-entropy.</p>
+</div>
+<div class="section level2">
 <h2 id="mlp">
 <code>mlp()</code><a class="anchor" aria-label="anchor" href="#mlp"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>mlp(data<span class="op">=</span><span class="va">None</span>, hidden<span class="op">=</span>(<span class="dv">512</span>, <span class="dv">256</span>), dropout<span class="op">=</span><span class="fl">0.3</span>, <span class="op">**</span>settings)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>mlp(data<span class="op">=</span><span class="va">None</span>, hidden<span class="op">=</span>(<span class="dv">512</span>, <span class="dv">256</span>), dropout<span class="op">=</span><span class="fl">0.3</span>, <span class="op">**</span>settings)</span></code></pre></div>
 <p>Flattens the channels and builds in no temporal geometry.</p>
 <p><code>hidden</code> and <code>dropout</code> are the architecture;
 anything else named is a training setting applied on top of the
@@ -537,7 +584,7 @@ anything else named is a training setting applied on top of the
 <h2 id="cnn">
 <code>cnn()</code><a class="anchor" aria-label="anchor" href="#cnn"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>cnn(data<span class="op">=</span><span class="va">None</span>, channels<span class="op">=</span>(<span class="dv">16</span>, <span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>), kernel<span class="op">=</span><span class="dv">7</span>, dropout<span class="op">=</span><span class="fl">0.3</span>, <span class="op">**</span>settings)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>cnn(data<span class="op">=</span><span class="va">None</span>, channels<span class="op">=</span>(<span class="dv">16</span>, <span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>), kernel<span class="op">=</span><span class="dv">7</span>, dropout<span class="op">=</span><span class="fl">0.3</span>, <span class="op">**</span>settings)</span></code></pre></div>
 <p>Convolution, batch normalisation, activation and pooling, then global
 average pooling.</p>
 </div>
@@ -545,15 +592,15 @@ average pooling.</p>
 <h2 id="rescnn">
 <code>rescnn()</code><a class="anchor" aria-label="anchor" href="#rescnn"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>rescnn(</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    channels<span class="op">=</span>(<span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>, <span class="dv">256</span>),</span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>    blocks_per_stage<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    kernel<span class="op">=</span><span class="dv">7</span>,</span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    dilations<span class="op">=</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>),</span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>    dropout<span class="op">=</span><span class="fl">0.3</span>,</span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>    <span class="op">**</span>settings,</span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>rescnn(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>    channels<span class="op">=</span>(<span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>, <span class="dv">256</span>),</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>    blocks_per_stage<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>    kernel<span class="op">=</span><span class="dv">7</span>,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>    dilations<span class="op">=</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>),</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>    dropout<span class="op">=</span><span class="fl">0.3</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>    <span class="op">**</span>settings,</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>)</span></code></pre></div>
 <p>Dilated residual blocks with channel gates, pooling average and
 maximum together.</p>
 </div>
@@ -561,7 +608,7 @@ maximum together.</p>
 <h2 id="learner">
 <code>Learner</code><a class="anchor" aria-label="anchor" href="#learner"></a>
 </h2>
-<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>Learner(name, fit, predict, needs, params, data, reads, multi)</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>Learner(name, fit, predict, needs, params, data, reads, multi)</span></code></pre></div>
 <p>A name, a fit and a predict, what has to be installed for them to
 run, and what the learner reads.</p>
 <p>The one interface every arm goes through, the ones that ship and a
@@ -594,7 +641,7 @@ the matrix assembled from them.</p>
 <h3 id="require">
 <code>require()</code><a class="anchor" aria-label="anchor" href="#require"></a>
 </h3>
-<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>require(<span class="va">self</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>require(<span class="va">self</span>)</span></code></pre></div>
 <p>Error, naming the install, unless what the learner needs is
 importable.</p>
 </div>
@@ -603,7 +650,7 @@ importable.</p>
 <h2 id="train_control">
 <code>train_control()</code><a class="anchor" aria-label="anchor" href="#train_control"></a>
 </h2>
-<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>train_control(<span class="op">**</span>settings)</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>train_control(<span class="op">**</span>settings)</span></code></pre></div>
 <p>The settings every neural learner reads, with anything named here
 replacing its default.</p>
 <p><code>epochs</code>, <code>batch_size</code>,
@@ -631,18 +678,18 @@ resolved to, so a fit made on one machine predicts on another.</p>
 <h2 id="traincontrol">
 <code>TrainControl</code><a class="anchor" aria-label="anchor" href="#traincontrol"></a>
 </h2>
-<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>TrainControl(</span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>    epochs,</span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>    batch_size,</span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>    learning_rate,</span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>    weight_decay,</span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>    early_stopping,</span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>    val_frac,</span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>    device,</span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>    seed,</span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>    swa,</span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>    swa_start,</span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>TrainControl(</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>    epochs,</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>    batch_size,</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>    learning_rate,</span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>    weight_decay,</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>    early_stopping,</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>    val_frac,</span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>    device,</span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>    seed,</span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a>    swa,</span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a>    swa_start,</span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a>)</span></code></pre></div>
 <p>How long to train, on what, and when to stop.</p>
 <p>Attributes:</p>
 <ul>
@@ -671,7 +718,7 @@ resolved to, so a fit made on one machine predicts on another.</p>
 <h3 id="override">
 <code>override()</code><a class="anchor" aria-label="anchor" href="#override"></a>
 </h3>
-<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>override(<span class="va">self</span>, settings: <span class="bu">dict</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>override(<span class="va">self</span>, settings: <span class="bu">dict</span>)</span></code></pre></div>
 <p>The control with the settings a learner or a call gave applied on top
 of it.</p>
 </div>
@@ -680,7 +727,7 @@ of it.</p>
 <h2 id="flatten">
 <code>flatten()</code><a class="anchor" aria-label="anchor" href="#flatten"></a>
 </h2>
-<div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>flatten(x: TimesiftMatrix)</span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>flatten(x: TimesiftMatrix)</span></code></pre></div>
 <p><code>[unit, bin, channel]</code> to
 <code>[unit, bin * channel]</code> in the array’s own order.</p>
 <p>A channel that holds the same number in every bin carries no bin of

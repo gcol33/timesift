@@ -60,6 +60,8 @@ your own goes through.
 - [`mars()`](https://gillescolling.com/timesift/reference/mars.md) :
   Multivariate adaptive regression splines on the flattened
   representation
+- [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
+  : Flexible discriminant analysis on the flattened representation
 - [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
