@@ -11,9 +11,11 @@
 // The penalised fit, once, for both languages.
 //
 // An elastic net over a dense design, fitted by iteratively reweighted least squares with a
-// cyclic coordinate descent inside it, along a path of penalties with a warm start at each step.
-// The conventions are glmnet's, because the penalised arm is what the networks are measured
-// against and a baseline that moves between the languages would make the tool the confound:
+// cyclic coordinate descent inside it, along a path of penalties with a warm start at each step
+// (Friedman, Hastie and Tibshirani 2010, Journal of Statistical Software 33(1)). The conventions
+// are the ones the fixtures pin against glmnet, because the penalised arm is what the networks
+// are measured against and a baseline that moves between the languages would make the tool the
+// confound:
 // weights normalised to sum to one, columns centred and scaled by their weighted mean and
 // weighted standard deviation, the penalty path geometric from the smallest penalty that leaves
 // every coefficient at zero, and the penalty chosen by cross-validated deviance.
@@ -49,7 +51,7 @@ struct PenaltySpec {
   double dev_max = 0.999;              // a fit explaining more than this ends the path
   int min_lambda = 5;                  // points fitted before either rule is read
   double prob_floor = 1e-9;            // a fitted probability this close to zero or one is pinned
-                                       // there and carries no curvature, glmnet's `pmin`
+                                       // there and carries no curvature
   int threads = 1;                     // fits of a cross-validation run at once; 1 is serial
 };
 
@@ -64,8 +66,8 @@ struct PenaltyPath {
   double null_deviance = 0.0;
   std::int32_t passes = 0;            // coordinate descent passes the whole path took
   std::int32_t stalled = 0;           // the 1-based point of the path the fit did not settle at,
-                                      // whose earlier points are the ones returned, as glmnet's
-                                      // jerr = -m; 0 where the path ran to its end
+                                      // whose earlier points are the ones returned; 0 where the
+                                      // path ran to its end
   Family family = Family::gaussian;
 };
 
@@ -93,7 +95,8 @@ PenaltyCV penalised_cv(const double* x, const double* y, const double* w, std::s
                        const std::int32_t* fold, std::int32_t n_fold);
 
 // The coefficients at one penalty, interpolated between the two points of the path around it
-// where the penalty is not one of them, as glmnet's `predict(s = )` interpolates.
+// where the penalty is not one of them: linear in the penalty, the reading the fixtures pin
+// against glmnet's `predict(s = )`.
 void penalised_coef(const PenaltyPath& path, double lambda, double* a0, double* beta);
 
 // The response at one penalty: the linear predictor for a Gaussian family, the probability for a

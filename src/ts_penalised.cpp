@@ -3,29 +3,38 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <exception>
 #include <functional>
 #include <limits>
 #include <system_error>
 #include <thread>
 
+// The elastic net by pathwise coordinate descent (Friedman, Hastie and Tibshirani 2010, "Regularization
+// paths for generalized linear models via coordinate descent", Journal of Statistical Software
+// 33(1)): the penalised objective is minimised one coefficient at a time by soft thresholding, at
+// each penalty of a descending path, starting from the solution at the penalty above. A binomial
+// response is fitted by iteratively reweighted least squares, one penalised quadratic per
+// reweighting. The sequential strong rule (Tibshirani et al. 2012, "Strong rules for discarding
+// predictors in lasso-type problems", JRSSB 74:245-266) screens the columns offered at each
+// penalty, and the optimality condition is checked afterwards over the columns it left out.
 namespace timesift {
 namespace {
 
-// glmnet's own control constants, which are part of what is being matched rather than settings of
-// ours: the linear predictor's clamp, the floor under the mixing when the largest penalty is
-// derived, and the probability the held-out deviance is read at. The probability a fitted case is
-// pinned at is glmnet's too, and is the spec's, because maxnet moves it.
-constexpr double kEtaClamp = 250.0;
-constexpr double kAlphaFloor = 1e-3;
-constexpr double kCVProbFloor = 1e-5;
+// Constants of the numerical conventions the fixtures pin: the bound on a binomial linear
+// predictor, the floor under the mixing when the largest penalty is derived (it gives a ridge a
+// finite start), and the probability a held-out case is read at no closer than to zero or one.
+constexpr double kLinkBound = 250.0;
+constexpr double kMixingFloor = 1e-3;
+constexpr double kHeldOutProbFloor = 1e-5;
 
+// ---------------------------------------------------------------------------------------------
+// Vector arithmetic.
+//
+// The inner products are summed into four accumulators. A single accumulator chains every addition
+// on the one before it, so the descent would run at the latency of a floating-point add rather than
+// at its throughput; the package is compiled at the optimisation R sets, which neither vectorises
+// this nor reassociates it. The order is fixed, so the sum is the same number on every platform.
 
-
-// The inner products the descent lives on, summed into four accumulators. A single accumulator
-// chains every addition on the one before it, and the descent then runs at the latency of a
-// floating-point add rather than at the throughput of one; the package is compiled at the
-// optimisation R sets, which neither vectorises this nor reassociates it. The order is fixed, so
-// the sum is the same number on every platform.
 double dot(const double* a, const double* b, std::size_t n) {
   double s0 = 0.0, s1 = 0.0, s2 = 0.0, s3 = 0.0;
   std::size_t i = 0;
@@ -40,7 +49,7 @@ double dot(const double* a, const double* b, std::size_t n) {
   return s;
 }
 
-double dot3(const double* a, const double* b, const double* c, std::size_t n) {
+double weighted_dot(const double* a, const double* b, const double* c, std::size_t n) {
   double s0 = 0.0, s1 = 0.0, s2 = 0.0, s3 = 0.0;
   std::size_t i = 0;
   for (; i + 4 <= n; i += 4) {
@@ -54,7 +63,7 @@ double dot3(const double* a, const double* b, const double* c, std::size_t n) {
   return s;
 }
 
-double total(const double* a, std::size_t n) {
+double sum_of(const double* a, std::size_t n) {
   double s0 = 0.0, s1 = 0.0, s2 = 0.0, s3 = 0.0;
   std::size_t i = 0;
   for (; i + 4 <= n; i += 4) {
@@ -68,11 +77,10 @@ double total(const double* a, std::size_t n) {
   return s;
 }
 
-// The maps the descent lives on beside the inner products: a case's own arithmetic, over every
-// case. Two cases are written per turn of the loop, which is what lets the compiler issue the two
-// as one at the optimisation R builds a package at; each case is still the expression it was, in
-// the order it was, so the numbers are the ones a case-at-a-time loop gives.
-void add_scaled(double* out, const double* a, double b, std::size_t n) {
+// `out += b * a` and `out += b * a * c`, case by case. Two cases are written per turn of the loop,
+// which lets the compiler issue them as one at the optimisation R builds a package at; each case is
+// still its own expression in its own order, so the numbers are those of a case-at-a-time loop.
+void axpy(double* out, const double* a, double b, std::size_t n) {
   std::size_t i = 0;
   for (; i + 2 <= n; i += 2) {
     out[i] += b * a[i];
@@ -81,7 +89,7 @@ void add_scaled(double* out, const double* a, double b, std::size_t n) {
   for (; i < n; ++i) out[i] += b * a[i];
 }
 
-void add_scaled3(double* out, const double* a, const double* c, double b, std::size_t n) {
+void weighted_axpy(double* out, const double* a, const double* c, double b, std::size_t n) {
   std::size_t i = 0;
   for (; i + 2 <= n; i += 2) {
     out[i] += b * a[i] * c[i];
@@ -90,351 +98,848 @@ void add_scaled3(double* out, const double* a, const double* c, double b, std::s
   for (; i < n; ++i) out[i] += b * a[i] * c[i];
 }
 
-double log1pexp(double x) {
+// log(1 + e^x) without overflow on either side.
+double softplus(double x) {
   if (x > 0.0) return x + std::log1p(std::exp(-x));
   return std::log1p(std::exp(x));
 }
 
-// The design the descent runs over: every column centred on its weighted mean and divided by its
-// weighted standard deviation, so a penalty that is one number over every column costs a column
-// the same whatever it was recorded on. A column holding one value has no spread to divide by and
-// is carried through at zero.
+// ---------------------------------------------------------------------------------------------
+// The standardised design.
 //
-// A Gaussian fit's quadratic weight is the case weight, which does not move along the path, so its
-// root is folded into every column and into the intercept's own column: the quadratic then has
-// unit weight, and a coordinate's step reads the column and the residual and nothing beside them.
-// A binomial fit's weight moves with every reweighting, and its columns are the standardised ones
-// with an intercept column of ones.
-struct Design {
+// Every column is centred on its weighted mean and divided by its weighted standard deviation, so
+// a penalty that is one number over every column costs each column the same whatever unit it was
+// recorded in. A column holding one value has no spread and stays at zero throughout.
+//
+// A Gaussian fit's quadratic weight is the case weight, fixed along the whole path, so its square
+// root is multiplied into every column and into the intercept's column: the quadratic then has
+// unit weight and a coordinate update reads only the column and the residual. A binomial fit's
+// weight moves with every reweighting, so its columns stay unweighted and its intercept column is
+// a column of ones.
+struct Standardised {
   std::size_t n = 0;
   std::size_t p = 0;
-  bool folded = false;
-  std::vector<double> xt;            // [n, p] column-major
-  std::vector<double> centre, scale;
-  std::vector<std::uint8_t> usable;
-  std::vector<double> vp;            // penalty factor, rescaled to sum to p
-  std::vector<double> w;             // case weights, summing to one
-  std::vector<double> lead;          // the intercept's column
+  bool weighted_columns = false;
+  std::vector<double> z;                // [n, p] column-major
+  std::vector<double> centre, scale;    // per column, on the scale handed over
+  std::vector<std::uint8_t> live;       // the column has spread
+  std::vector<double> relative_penalty; // per column, summing to p
+  std::vector<double> case_weight;      // summing to one
+  std::vector<double> ones;             // the intercept's column
 
-  const double* column(std::size_t j) const { return xt.data() + j * n; }
+  const double* column(std::size_t j) const { return z.data() + j * n; }
 };
 
-Design build_design(const double* x, const double* w_in, std::size_t n, std::size_t p,
-                    const PenaltySpec& spec, bool folded) {
-  Design d;
-  d.n = n;
-  d.p = p;
-  d.w.assign(n, 0.0);
-  double total = 0.0;
+std::vector<double> normalised_weights(const double* w, std::size_t n) {
+  std::vector<double> out(n, 0.0);
+  double sum = 0.0;
   for (std::size_t i = 0; i < n; ++i) {
-    const double wi = w_in == nullptr ? 1.0 : w_in[i];
+    const double wi = w == nullptr ? 1.0 : w[i];
     if (!(wi >= 0.0) || !std::isfinite(wi)) {
       throw Error("a case weight of a penalised fit is negative or not a number.");
     }
-    d.w[i] = wi;
-    total += wi;
+    out[i] = wi;
+    sum += wi;
   }
-  if (!(total > 0.0)) throw Error("a penalised fit was handed case weights that sum to zero.");
-  for (std::size_t i = 0; i < n; ++i) d.w[i] /= total;
-  d.folded = folded;
-  d.lead.assign(n, 1.0);
-  if (folded) {
-    for (std::size_t i = 0; i < n; ++i) d.lead[i] = std::sqrt(d.w[i]);
-  }
-
-  d.xt.assign(n * p, 0.0);
-  d.centre.assign(p, 0.0);
-  d.scale.assign(p, 1.0);
-  d.usable.assign(p, 1);
-  for (std::size_t j = 0; j < p; ++j) {
-    const double* col = x + j * n;
-    double centre = 0.0;
-    if (spec.intercept) {
-      for (std::size_t i = 0; i < n; ++i) centre += d.w[i] * col[i];
-    }
-    double spread = 0.0;
-    for (std::size_t i = 0; i < n; ++i) {
-      const double z = col[i] - centre;
-      spread += d.w[i] * z * z;
-    }
-    spread = std::sqrt(spread);
-    if (!(spread > 0.0) || !std::isfinite(spread)) {
-      d.usable[j] = 0;
-      d.centre[j] = centre;
-      d.scale[j] = 1.0;
-      continue;
-    }
-    d.centre[j] = centre;
-    d.scale[j] = spec.standardize ? spread : 1.0;
-    double* out = d.xt.data() + j * n;
-    for (std::size_t i = 0; i < n; ++i) out[i] = (col[i] - centre) / d.scale[j];
-    if (folded) {
-      for (std::size_t i = 0; i < n; ++i) out[i] *= d.lead[i];
-    }
-  }
-
-  d.vp.assign(p, 1.0);
-  if (!spec.penalty_factor.empty()) {
-    if (spec.penalty_factor.size() != p) {
-      throw Error("a penalised fit takes one penalty factor per column.");
-    }
-    double sum = 0.0;
-    for (std::size_t j = 0; j < p; ++j) {
-      const double f = spec.penalty_factor[j];
-      if (!(f >= 0.0) || !std::isfinite(f)) {
-        throw Error("a penalty factor is negative or not a number.");
-      }
-      d.vp[j] = f;
-      sum += f;
-    }
-    // glmnet rescales the factors to sum to the column count, so the path a factor of one gives
-    // is the path no factor gives.
-    if (sum > 0.0) {
-      for (std::size_t j = 0; j < p; ++j) d.vp[j] *= static_cast<double>(p) / sum;
-    }
-  }
-  return d;
+  if (!(sum > 0.0)) throw Error("a penalised fit was handed case weights that sum to zero.");
+  for (double& wi : out) wi /= sum;
+  return out;
 }
 
-// The state a warm start carries from one penalty to the next: the coefficients on the
-// standardised scale, which columns the descent has been offered, and which have ever left zero.
-// Both sets only grow along the path, so a column offered at one penalty is offered at every
-// penalty below it.
-struct Coefs {
-  double a0 = 0.0;
-  std::vector<double> b;
-  std::vector<std::uint8_t> ever;
-  std::vector<std::size_t> active;
-  std::vector<std::uint8_t> offered;
-  std::vector<std::size_t> candidates;
+// Penalty factors scaled to sum to the column count, so that factors all equal to one give the
+// path no factors give.
+std::vector<double> relative_penalties(const std::vector<double>& factor, std::size_t p) {
+  std::vector<double> out(p, 1.0);
+  if (factor.empty()) return out;
+  if (factor.size() != p) throw Error("a penalised fit takes one penalty factor per column.");
+  double sum = 0.0;
+  for (std::size_t j = 0; j < p; ++j) {
+    const double f = factor[j];
+    if (!(f >= 0.0) || !std::isfinite(f)) {
+      throw Error("a penalty factor is negative or not a number.");
+    }
+    out[j] = f;
+    sum += f;
+  }
+  if (sum > 0.0) {
+    const double to_p = static_cast<double>(p) / sum;
+    for (double& f : out) f *= to_p;
+  }
+  return out;
+}
+
+Standardised standardise(const double* x, const double* w, std::size_t n, std::size_t p,
+                         const PenaltySpec& spec, bool weighted_columns) {
+  Standardised s;
+  s.n = n;
+  s.p = p;
+  s.case_weight = normalised_weights(w, n);
+  s.weighted_columns = weighted_columns;
+  s.ones.assign(n, 1.0);
+  if (weighted_columns) {
+    for (std::size_t i = 0; i < n; ++i) s.ones[i] = std::sqrt(s.case_weight[i]);
+  }
+  const std::vector<double>& cw = s.case_weight;
+
+  s.z.assign(n * p, 0.0);
+  s.centre.assign(p, 0.0);
+  s.scale.assign(p, 1.0);
+  s.live.assign(p, 1);
+  for (std::size_t j = 0; j < p; ++j) {
+    const double* raw = x + j * n;
+    double mean = 0.0;
+    if (spec.intercept) {
+      for (std::size_t i = 0; i < n; ++i) mean += cw[i] * raw[i];
+    }
+    double sd = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+      const double dev = raw[i] - mean;
+      sd += cw[i] * dev * dev;
+    }
+    sd = std::sqrt(sd);
+    s.centre[j] = mean;
+    if (!(sd > 0.0) || !std::isfinite(sd)) {
+      s.live[j] = 0;
+      continue;
+    }
+    const double unit = spec.standardize ? sd : 1.0;
+    s.scale[j] = unit;
+    double* col = s.z.data() + j * n;
+    if (weighted_columns) {
+      for (std::size_t i = 0; i < n; ++i) col[i] = (raw[i] - mean) / unit * s.ones[i];
+    } else {
+      for (std::size_t i = 0; i < n; ++i) col[i] = (raw[i] - mean) / unit;
+    }
+  }
+  s.relative_penalty = relative_penalties(spec.penalty_factor, p);
+  return s;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The solution carried from one penalty to the next.
+//
+// Coefficients are on the standardised scale. Two index sets grow monotonically along the path:
+// the columns offered to the descent (the strong set, plus any the optimality check took back) and
+// the columns that have ever left zero. The descent iterates over the first; the inner cycles and
+// the extrapolation run over the second.
+struct Solution {
+  double intercept = 0.0;
+  std::vector<double> coef;
+  std::vector<std::uint8_t> is_nonzero_ever;
+  std::vector<std::size_t> nonzero_ever;
+  std::vector<std::uint8_t> is_offered;
+  std::vector<std::size_t> offered;
+
+  explicit Solution(std::size_t p) : coef(p, 0.0), is_nonzero_ever(p, 0), is_offered(p, 0) {}
 
   void offer(std::size_t j) {
-    if (offered[j]) return;
-    offered[j] = 1;
-    candidates.push_back(j);
+    if (is_offered[j]) return;
+    is_offered[j] = 1;
+    offered.push_back(j);
+  }
+
+  void mark_moved(std::size_t j) {
+    if (is_nonzero_ever[j]) return;
+    is_nonzero_ever[j] = 1;
+    nonzero_ever.push_back(j);
   }
 };
 
-// Anderson extrapolation of the cycle over the columns that have left zero (Bertrand and Massias,
-// 2021). A cyclic descent over correlated columns converges along a few slow directions, and the
-// last few iterates of the cycle say what they are: the affine combination of those iterates whose
-// successive moves come closest to cancelling is where the cycle is heading. It is taken only where
-// the penalised quadratic is lower than at the cycle's own iterate, so the objective still only
-// falls, and the descent still stops only on a cycle that moved nothing.
-struct Extrapolation {
-  static constexpr std::size_t depth = 5;
-  std::size_t m = 0;       // the intercept, then the columns that have left zero
-  std::size_t filled = 0;  // iterates held
-  std::vector<double> iterates;  // [depth + 1, m]
-  std::vector<double> target;    // the extrapolated iterate
-  std::vector<double> move;      // the move to it, on the cases
-
-  void reset(std::size_t size) {
-    m = size;
-    filled = 0;
-    iterates.resize((depth + 1) * m);
-  }
-
-  void record(const Coefs& fit) {
-    double* at = iterates.data() + filled * m;
-    at[0] = fit.a0;
-    for (std::size_t k = 0; k < fit.active.size(); ++k) at[k + 1] = fit.b[fit.active[k]];
-    ++filled;
-  }
+// One penalised weighted least squares problem: the quadratic's case weights, the residual already
+// multiplied by them, and each offered column's curvature. A binomial case whose fitted probability
+// is pinned at zero or one carries a gradient and no curvature. On weighted columns the case
+// weights live in the design and `case_curvature` is not read.
+struct Quadratic {
+  std::vector<double> case_curvature;
+  std::vector<double> residual;
+  std::vector<double> column_curvature;
 };
 
-// The extrapolated point from the iterates held, and whether it was taken.
-bool extrapolate(const Design& d, double lambda, double alpha, bool intercept,
-                 const std::vector<double>& v, std::vector<double>& r, Coefs& fit,
-                 Extrapolation& ex) {
-  constexpr std::size_t K = Extrapolation::depth;
-  const std::size_t m = ex.m;
-  const std::size_t n = d.n;
-  auto iterate = [&](std::size_t i) { return ex.iterates.data() + i * m; };
+// ---------------------------------------------------------------------------------------------
+// Anderson acceleration of the cycle over the nonzero columns (Anderson 1965; for coordinate
+// descent, Bertrand and Massias 2021, "Anderson acceleration of coordinate descent", AISTATS).
+//
+// A cyclic descent over correlated columns converges along a few slow directions, and its last few
+// iterates reveal them: the affine combination of those iterates whose successive differences come
+// closest to cancelling estimates the limit. The estimate is accepted only where it lowers the
+// penalised quadratic below the cycle's own iterate, so the objective is still monotone and the
+// descent still stops only on a cycle that moved nothing.
+class Anderson {
+ public:
+  static constexpr std::size_t kDepth = 5;
 
-  // The weights of the combination are the ones minimising the length of the combined move under
-  // weights summing to one: the Gram matrix of the moves against a vector of ones, normalised.
+  void restart(std::size_t width, const Solution& sol) {
+    width_ = width;
+    held_ = 0;
+    history_.resize((kDepth + 1) * width_);
+    push(sol);
+  }
+
+  void push(const Solution& sol) {
+    double* at = history_.data() + held_ * width_;
+    at[0] = sol.intercept;
+    for (std::size_t k = 0; k < sol.nonzero_ever.size(); ++k) at[k + 1] = sol.coef[sol.nonzero_ever[k]];
+    ++held_;
+  }
+
+  bool full() const { return held_ == kDepth + 1; }
+  std::size_t width() const { return width_; }
+
+  // Replaces the solution by the extrapolated point where that lowers the objective.
+  void accelerate(const Standardised& d, double lambda, double alpha, bool fit_intercept,
+                  Quadratic& q, Solution& sol);
+
+ private:
+  const double* iterate(std::size_t t) const { return history_.data() + t * width_; }
+  bool mixing_weights(double* c, double& c_sum) const;
+
+  std::size_t width_ = 0;     // intercept, then the nonzero columns
+  std::size_t held_ = 0;
+  std::vector<double> history_;  // [kDepth + 1, width_]
+  std::vector<double> point_;
+  std::vector<double> shift_;    // the move to the point, on the cases
+};
+
+// The weights, up to their sum, of the combination minimising the length of the combined
+// difference under weights summing to one: the Gram matrix of successive differences solved
+// against a vector of ones, by Cholesky.
+bool Anderson::mixing_weights(double* c, double& c_sum) const {
+  constexpr std::size_t K = kDepth;
   double gram[K][K];
   for (std::size_t a = 0; a < K; ++a) {
+    const double* a_from = iterate(a);
+    const double* a_to = iterate(a + 1);
     for (std::size_t b = 0; b <= a; ++b) {
+      const double* b_from = iterate(b);
+      const double* b_to = iterate(b + 1);
       double s = 0.0;
-      const double* a0 = iterate(a);
-      const double* a1 = iterate(a + 1);
-      const double* b0 = iterate(b);
-      const double* b1 = iterate(b + 1);
-      for (std::size_t k = 0; k < m; ++k) s += (a1[k] - a0[k]) * (b1[k] - b0[k]);
+      for (std::size_t k = 0; k < width_; ++k) s += (a_to[k] - a_from[k]) * (b_to[k] - b_from[k]);
       gram[a][b] = s;
       gram[b][a] = s;
     }
   }
-  double chol[K][K] = {};
+  double lower[K][K] = {};
   for (std::size_t a = 0; a < K; ++a) {
     for (std::size_t b = 0; b <= a; ++b) {
       double s = gram[a][b];
-      for (std::size_t k = 0; k < b; ++k) s -= chol[a][k] * chol[b][k];
-      if (a == b) {
-        if (!(s > 0.0) || !std::isfinite(s)) return false;
-        chol[a][a] = std::sqrt(s);
-      } else {
-        chol[a][b] = s / chol[b][b];
+      for (std::size_t k = 0; k < b; ++k) s -= lower[a][k] * lower[b][k];
+      if (a != b) {
+        lower[a][b] = s / lower[b][b];
+        continue;
       }
+      if (!(s > 0.0) || !std::isfinite(s)) return false;
+      lower[a][a] = std::sqrt(s);
     }
   }
-  double z[K];
   for (std::size_t a = 0; a < K; ++a) {
     double s = 1.0;
-    for (std::size_t k = 0; k < a; ++k) s -= chol[a][k] * z[k];
-    z[a] = s / chol[a][a];
+    for (std::size_t k = 0; k < a; ++k) s -= lower[a][k] * c[k];
+    c[a] = s / lower[a][a];
   }
   for (std::size_t a = K; a-- > 0;) {
-    double s = z[a];
-    for (std::size_t k = a + 1; k < K; ++k) s -= chol[k][a] * z[k];
-    z[a] = s / chol[a][a];
+    double s = c[a];
+    for (std::size_t k = a + 1; k < K; ++k) s -= lower[k][a] * c[k];
+    c[a] = s / lower[a][a];
   }
-  double sum = 0.0;
-  for (std::size_t a = 0; a < K; ++a) sum += z[a];
-  if (!(std::fabs(sum) > 0.0) || !std::isfinite(sum)) return false;
-
-  // The move from the cycle's own iterate to the extrapolated one, on the cases, and what it does to
-  // the penalised quadratic: the smooth part falls by the residual's reading of the move less half
-  // its curvature, and the penalty is read off the coefficients directly.
-  const double* current = iterate(K);
-  std::vector<double>& q = ex.move;
-  q.assign(n, 0.0);
-  double penalty = 0.0;
-  std::vector<double>& target = ex.target;
-  target.resize(m);
-  for (std::size_t k = 0; k < m; ++k) {
-    double s = 0.0;
-    for (std::size_t a = 0; a < K; ++a) s += z[a] * iterate(a + 1)[k];
-    target[k] = s / sum;
-  }
-  const double shift = intercept ? target[0] - current[0] : 0.0;
-  if (shift != 0.0) add_scaled(q.data(), d.lead.data(), shift, n);
-  for (std::size_t k = 0; k + 1 < m; ++k) {
-    const std::size_t j = fit.active[k];
-    const double from = current[k + 1];
-    const double to = target[k + 1];
-    if (to == from) continue;
-    add_scaled(q.data(), d.column(j), to - from, n);
-    const double pen = lambda * d.vp[j];
-    penalty += pen * (alpha * (std::fabs(to) - std::fabs(from)) +
-                      0.5 * (1.0 - alpha) * (to * to - from * from));
-  }
-  const double curve = d.folded ? dot(q.data(), q.data(), n) : dot3(v.data(), q.data(), q.data(), n);
-  const double change = -dot(q.data(), r.data(), n) + 0.5 * curve + penalty;
-  if (!(change < 0.0)) return false;
-
-  if (intercept) fit.a0 = target[0];
-  for (std::size_t k = 0; k + 1 < m; ++k) fit.b[fit.active[k]] = target[k + 1];
-  if (d.folded) {
-    add_scaled(r.data(), q.data(), -1.0, n);
-  } else {
-    add_scaled3(r.data(), v.data(), q.data(), -1.0, n);
-  }
-  return true;
+  c_sum = 0.0;
+  for (std::size_t a = 0; a < K; ++a) c_sum += c[a];
+  return std::fabs(c_sum) > 0.0 && std::isfinite(c_sum);
 }
 
-// One weighted least squares elastic net over the columns the caller has offered, by cyclic
-// coordinate descent. `v` is the weight of the quadratic and `r` its residual already multiplied
-// by that weight, so a case the family has pinned carries a gradient and no curvature, which is
-// what glmnet does with a fitted probability at zero or one. A folded design carries its weight in
-// its columns, and `v` is not read. It returns whether the descent settled before the pass budget
-// ran out.
-bool quadratic_solve(const Design& d, double lambda, double alpha, bool intercept, double thresh,
-                     int& budget, const std::vector<double>& v, const std::vector<double>& xv,
-                     std::vector<double>& r, Coefs& fit, Extrapolation& ex) {
+void Anderson::accelerate(const Standardised& d, double lambda, double alpha, bool fit_intercept,
+                          Quadratic& q, Solution& sol) {
+  constexpr std::size_t K = kDepth;
+  double c[K];
+  double c_sum = 0.0;
+  if (!mixing_weights(c, c_sum)) return;
+
   const std::size_t n = d.n;
-  const double* lead = d.lead.data();
-  const double* lead_v = d.folded ? lead : v.data();
-  const double sv = dot(lead, lead_v, n);
+  point_.resize(width_);
+  for (std::size_t k = 0; k < width_; ++k) {
+    double s = 0.0;
+    for (std::size_t a = 0; a < K; ++a) s += c[a] * iterate(a + 1)[k];
+    point_[k] = s / c_sum;
+  }
 
-  auto step = [&](std::size_t j, double& dlx) {
-    if (!(xv[j] > 0.0)) return;
-    const double* col = d.column(j);
-    const double u = dot(r.data(), col, n) + xv[j] * fit.b[j];
-    const double pen = lambda * d.vp[j];
-    const double l1 = pen * alpha;
-    double bj = 0.0;
-    if (std::fabs(u) > l1) {
-      bj = std::copysign(std::fabs(u) - l1, u) / (xv[j] + pen * (1.0 - alpha));
-    }
-    const double delta = bj - fit.b[j];
-    if (delta == 0.0) return;
-    fit.b[j] = bj;
-    if (d.folded) {
-      add_scaled(r.data(), col, -delta, n);
-    } else {
-      add_scaled3(r.data(), v.data(), col, -delta, n);
-    }
-    dlx = std::max(dlx, xv[j] * delta * delta);
-    if (!fit.ever[j]) {
-      fit.ever[j] = 1;
-      fit.active.push_back(j);
-    }
-  };
+  // The change in the penalised quadratic from the cycle's iterate to the point: the smooth part
+  // changes by minus the residual's projection on the move plus half the move's curvature, and the
+  // penalty is read off the coefficients.
+  const double* now = iterate(K);
+  shift_.assign(n, 0.0);
+  const double intercept_move = fit_intercept ? point_[0] - now[0] : 0.0;
+  if (intercept_move != 0.0) axpy(shift_.data(), d.ones.data(), intercept_move, n);
+  double penalty_change = 0.0;
+  for (std::size_t k = 0; k + 1 < width_; ++k) {
+    const std::size_t j = sol.nonzero_ever[k];
+    const double from = now[k + 1];
+    const double to = point_[k + 1];
+    if (to == from) continue;
+    axpy(shift_.data(), d.column(j), to - from, n);
+    const double pen = lambda * d.relative_penalty[j];
+    penalty_change += pen * (alpha * (std::fabs(to) - std::fabs(from)) +
+                             0.5 * (1.0 - alpha) * (to * to - from * from));
+  }
+  const double curvature = d.weighted_columns
+                               ? dot(shift_.data(), shift_.data(), n)
+                               : weighted_dot(q.case_curvature.data(), shift_.data(), shift_.data(), n);
+  const double change = -dot(shift_.data(), q.residual.data(), n) + 0.5 * curvature + penalty_change;
+  if (!(change < 0.0)) return;
 
-  auto shift = [&](double& dlx) {
-    if (!intercept || !(sv > 0.0)) return;
-    const double delta = dot(lead, r.data(), n) / sv;
-    if (delta == 0.0) return;
-    fit.a0 += delta;
-    add_scaled(r.data(), lead_v, -delta, n);
-    dlx = std::max(dlx, sv * delta * delta);
-  };
+  if (fit_intercept) sol.intercept = point_[0];
+  for (std::size_t k = 0; k + 1 < width_; ++k) sol.coef[sol.nonzero_ever[k]] = point_[k + 1];
+  if (d.weighted_columns) {
+    axpy(q.residual.data(), shift_.data(), -1.0, n);
+  } else {
+    weighted_axpy(q.residual.data(), q.case_curvature.data(), shift_.data(), -1.0, n);
+  }
+}
 
-  for (;;) {
-    double dlx = 0.0;
-    for (std::size_t k = 0; k < fit.candidates.size(); ++k) step(fit.candidates[k], dlx);
-    shift(dlx);
-    if (--budget < 0) return false;
-    if (dlx < thresh) break;
-    // The columns that have left zero are then cycled on their own until they settle, and the
-    // offered set is swept again only to see whether a column outside them has started to move.
-    // The set is fixed inside this cycle, so the iterates the extrapolation reads are over one set.
-    ex.reset(fit.active.size() + 1);
-    ex.record(fit);
+// ---------------------------------------------------------------------------------------------
+// Cyclic coordinate descent on one penalised quadratic.
+//
+// A cycle visits the columns of a set in index order and then the intercept, and reports its
+// largest move, measured as the column's curvature times the squared change. The descent cycles
+// over every offered column; where that moved something, it cycles over the nonzero columns alone
+// until they settle and then sweeps the offered set again, to see whether a column outside them
+// has started to move. The set is fixed inside the inner cycles, so the iterates the acceleration
+// reads all live in one space.
+class Descent {
+ public:
+  Descent(const Standardised& d, double lambda, double alpha, bool fit_intercept, double tolerance,
+          Quadratic& q, Solution& sol, Anderson& acc)
+      : d_(d), lambda_(lambda), alpha_(alpha), tolerance_(tolerance), q_(q), sol_(sol), acc_(acc),
+        n_(d.n), residual_(q.residual.data()), case_curvature_(q.case_curvature.data()),
+        column_curvature_(q.column_curvature.data()), penalty_(d.relative_penalty.data()),
+        coef_(sol.coef.data()),
+        intercept_weights_(d.weighted_columns ? d.ones.data() : q.case_curvature.data()),
+        intercept_curvature_(dot(d.ones.data(), intercept_weights_, d.n)),
+        fit_intercept_(fit_intercept && intercept_curvature_ > 0.0) {}
+
+  // Whether the descent settled before `passes` ran out; every cycle spends one pass.
+  bool run(int& passes) {
     for (;;) {
-      double inner = 0.0;
-      for (std::size_t k = 0; k < fit.active.size(); ++k) step(fit.active[k], inner);
-      shift(inner);
-      if (--budget < 0) return false;
-      if (inner < thresh) break;
-      ex.record(fit);
-      if (ex.filled == Extrapolation::depth + 1) {
-        extrapolate(d, lambda, alpha, intercept && sv > 0.0, v, r, fit, ex);
-        ex.reset(ex.m);
-        ex.record(fit);
+      const double moved = cycle(sol_.offered);
+      if (--passes < 0) return false;
+      if (moved < tolerance_) return true;
+      if (!settle_nonzero(passes)) return false;
+    }
+  }
+
+ private:
+  bool settle_nonzero(int& passes) {
+    acc_.restart(sol_.nonzero_ever.size() + 1, sol_);
+    for (;;) {
+      const double moved = cycle(sol_.nonzero_ever);
+      if (--passes < 0) return false;
+      if (moved < tolerance_) return true;
+      acc_.push(sol_);
+      if (acc_.full()) {
+        acc_.accelerate(d_, lambda_, alpha_, fit_intercept_, q_, sol_);
+        acc_.restart(acc_.width(), sol_);
       }
     }
   }
-  return true;
-}
 
-// The linear predictor over the design's own columns, so on a folded design it is the predictor
-// times the root of each case weight.
-void linear_predictor(const Design& d, const Coefs& fit, std::vector<double>& eta) {
-  const std::size_t n = d.n;
-  eta.resize(n);
-  for (std::size_t i = 0; i < n; ++i) eta[i] = fit.a0 * d.lead[i];
-  for (std::size_t k = 0; k < fit.active.size(); ++k) {
-    const std::size_t j = fit.active[k];
-    const double bj = fit.b[j];
-    if (bj == 0.0) continue;
-    add_scaled(eta.data(), d.column(j), bj, n);
+  double cycle(const std::vector<std::size_t>& set) {
+    double largest = 0.0;
+    for (std::size_t k = 0; k < set.size(); ++k) update_column(set[k], largest);
+    update_intercept(largest);
+    return largest;
+  }
+
+  // The exact minimiser along one coordinate: the soft-thresholded partial residual projection,
+  // shrunk by the ridge part of the penalty.
+  void update_column(std::size_t j, double& largest) {
+    const double curv = column_curvature_[j];
+    if (!(curv > 0.0)) return;
+    const double* col = d_.column(j);
+    const double old = coef_[j];
+    const double projection = dot(residual_, col, n_) + curv * old;
+    const double pen = lambda_ * penalty_[j];
+    const double threshold = pen * alpha_;
+    double updated = 0.0;
+    if (std::fabs(projection) > threshold) {
+      updated = std::copysign(std::fabs(projection) - threshold, projection) /
+                (curv + pen * (1.0 - alpha_));
+    }
+    const double change = updated - old;
+    if (change == 0.0) return;
+    coef_[j] = updated;
+    if (d_.weighted_columns) {
+      axpy(residual_, col, -change, n_);
+    } else {
+      weighted_axpy(residual_, case_curvature_, col, -change, n_);
+    }
+    largest = std::max(largest, curv * change * change);
+    sol_.mark_moved(j);
+  }
+
+  void update_intercept(double& largest) {
+    if (!fit_intercept_) return;
+    const double change = dot(d_.ones.data(), residual_, n_) / intercept_curvature_;
+    if (change == 0.0) return;
+    sol_.intercept += change;
+    axpy(residual_, intercept_weights_, -change, n_);
+    largest = std::max(largest, intercept_curvature_ * change * change);
+  }
+
+  const Standardised& d_;
+  double lambda_, alpha_, tolerance_;
+  Quadratic& q_;
+  Solution& sol_;
+  Anderson& acc_;
+  // The descent resizes none of these, so their storage is read once.
+  std::size_t n_;
+  double* residual_;
+  const double* case_curvature_;
+  const double* column_curvature_;
+  const double* penalty_;
+  double* coef_;
+  const double* intercept_weights_;
+  double intercept_curvature_;
+  bool fit_intercept_;
+};
+
+// ---------------------------------------------------------------------------------------------
+// The path.
+
+void check_response(const double* y, std::size_t n, Family family, double& low, double& high) {
+  // Whether there is anything to fit is read off the response's own values rather than a
+  // weighted mean of them: the weights sum to one only to the last bit, so a constant response
+  // would show a spread of 1e-32 and a single-outcome binomial one a mean just under one.
+  low = y[0];
+  high = y[0];
+  for (std::size_t i = 0; i < n; ++i) {
+    if (!std::isfinite(y[i])) throw Error("a penalised fit was handed a response that is not a number.");
+    low = std::min(low, y[i]);
+    high = std::max(high, y[i]);
+  }
+  if (low == high) {
+    throw Error(family == Family::binomial
+                    ? "a binomial penalised fit was handed a response holding one outcome."
+                    : "a penalised fit was handed a response holding one value, which has "
+                      "nothing to penalise against.");
   }
 }
 
-// The coefficients on the scale the columns were handed over in, from the standardised ones.
-void unstandardise(const Design& d, const Coefs& fit, double y_centre, double y_scale, double& a0,
-                   double* beta) {
-  double shift = y_centre;
-  for (std::size_t j = 0; j < d.p; ++j) {
-    const double bj = fit.b[j] * y_scale / d.scale[j];
-    beta[j] = bj;
-    shift -= bj * d.centre[j];
+class PathFit {
+ public:
+  // `low` and `high` are the response's range, already checked by `check_response`.
+  PathFit(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
+          Family family, const PenaltySpec& spec, double low, double high)
+      : spec_(spec), family_(family), n_(n), p_(p),
+        d_(standardise(x, w, n, p, spec, family == Family::gaussian)), sol_(p),
+        eta_(n, 0.0), gradient_(p, 0.0), step_start_(p, 0.0) {
+    q_.case_curvature.assign(n, 0.0);
+    q_.residual.assign(n, 0.0);
+    q_.column_curvature.assign(p, 0.0);
+    if (family == Family::gaussian) {
+      prepare_gaussian(y);
+    } else {
+      prepare_binomial(y, low, high);
+    }
   }
-  a0 = fit.a0 * y_scale + shift;
+
+  PenaltyPath run();
+
+ private:
+  bool gaussian() const { return family_ == Family::gaussian; }
+
+  // A Gaussian response is centred and scaled the way a column is, which puts the reported
+  // penalties on the response's own scale, and its null deviance is then one.
+  void prepare_gaussian(const double* y) {
+    const std::vector<double>& cw = d_.case_weight;
+    if (spec_.intercept) {
+      for (std::size_t i = 0; i < n_; ++i) y_centre_ += cw[i] * y[i];
+    }
+    double spread = 0.0;
+    for (std::size_t i = 0; i < n_; ++i) {
+      const double dev = y[i] - y_centre_;
+      spread += cw[i] * dev * dev;
+    }
+    y_scale_ = std::sqrt(spread);
+    if (!(y_scale_ > 0.0)) {
+      throw Error("a penalised fit was handed a response holding one value, which has nothing to "
+                  "penalise against.");
+    }
+    response_.resize(n_);
+    target_.resize(n_);
+    for (std::size_t i = 0; i < n_; ++i) {
+      response_[i] = (y[i] - y_centre_) / y_scale_;
+      target_[i] = d_.ones[i] * response_[i];
+      q_.residual[i] = target_[i];
+    }
+    reported_null_deviance_ = spread;
+    null_deviance_ = 1.0;
+    for (std::size_t j = 0; j < p_; ++j) {
+      if (d_.live[j]) q_.column_curvature[j] = dot(d_.column(j), d_.column(j), n_);
+    }
+  }
+
+  // The null model of a binomial response is the weighted share of ones. The quadratic at it is
+  // what the largest penalty is read off.
+  void prepare_binomial(const double* y, double low, double high) {
+    const std::vector<double>& cw = d_.case_weight;
+    response_.resize(n_);
+    double share = 0.0;
+    for (std::size_t i = 0; i < n_; ++i) {
+      if (y[i] != 0.0 && y[i] != 1.0) {
+        throw Error("a binomial penalised fit takes a response holding zero and one.");
+      }
+      response_[i] = y[i];
+      share += cw[i] * y[i];
+    }
+    if (low != 0.0 || high != 1.0 || !(share > 0.0) || !(share < 1.0)) {
+      throw Error("a binomial penalised fit was handed a response holding one outcome.");
+    }
+    const double null_link = std::log(share / (1.0 - share));
+    double loglik = 0.0;
+    for (std::size_t i = 0; i < n_; ++i) {
+      loglik += cw[i] * (response_[i] * null_link - softplus(null_link));
+    }
+    null_deviance_ = loglik * -2.0;
+    reported_null_deviance_ = null_deviance_;
+    if (spec_.intercept) sol_.intercept = std::log(share / (1.0 - share));
+    for (std::size_t i = 0; i < n_; ++i) {
+      q_.case_curvature[i] = cw[i] * share * (1.0 - share);
+      q_.residual[i] = cw[i] * (response_[i] - share);
+    }
+  }
+
+  double largest_penalty() {
+    double top = 0.0;
+    for (std::size_t j = 0; j < p_; ++j) {
+      if (!d_.live[j]) continue;
+      gradient_[j] = dot(q_.residual.data(), d_.column(j), n_);
+      if (!(d_.relative_penalty[j] > 0.0)) continue;
+      top = std::max(top, std::fabs(gradient_[j]) / d_.relative_penalty[j]);
+    }
+    return top / std::max(spec_.alpha, kMixingFloor);
+  }
+
+  // The penalties on the standardised response's scale: geometric from the largest down to its
+  // ratio, or the supplied ones in descending order.
+  std::vector<double> penalties(double top) const {
+    std::vector<double> out;
+    if (!spec_.lambda.empty()) {
+      out = spec_.lambda;
+      std::sort(out.begin(), out.end(), std::greater<double>());
+      for (double& l : out) l /= y_scale_;
+      return out;
+    }
+    if (spec_.n_lambda < 1) throw Error("a penalised path holds at least one penalty.");
+    double ratio = spec_.lambda_min_ratio;
+    if (!(ratio > 0.0)) ratio = n_ > p_ ? 1e-4 : 1e-2;
+    if (!(ratio < 1.0)) throw Error("a penalty path's smallest ratio is below one.");
+    out.resize(static_cast<std::size_t>(spec_.n_lambda));
+    const double factor =
+        spec_.n_lambda > 1 ? std::pow(ratio, 1.0 / static_cast<double>(spec_.n_lambda - 1)) : 1.0;
+    double l = top;
+    for (double& at : out) {
+      at = l;
+      l *= factor;
+    }
+    return out;
+  }
+
+  // The sequential strong rule: a column whose gradient at the penalty just fitted exceeds
+  // alpha * (2 lambda - lambda_previous), times its penalty factor, is offered. The offered set
+  // only grows, so the gradients this reads are exactly the ones the optimality check at the
+  // previous penalty computed, and the path makes one sweep over the columns per penalty.
+  void screen(double lambda, double previous) {
+    const double bound = spec_.alpha * (2.0 * lambda - previous);
+    const std::size_t before = sol_.offered.size();
+    for (std::size_t j = 0; j < p_; ++j) {
+      if (!d_.live[j] || sol_.is_offered[j]) continue;
+      const double f = d_.relative_penalty[j];
+      if (!(f > 0.0) || std::fabs(gradient_[j]) > f * bound) sol_.offer(j);
+    }
+    if (sol_.offered.size() != before) std::sort(sol_.offered.begin(), sol_.offered.end());
+  }
+
+  // The Karush-Kuhn-Tucker check over the columns the screen left out: a column whose gradient
+  // exceeds its threshold is not at zero at the optimum and is offered. Whether any was.
+  bool admit_violators(double lambda) {
+    bool any = false;
+    for (std::size_t j = 0; j < p_; ++j) {
+      if (!d_.live[j] || sol_.is_offered[j]) continue;
+      gradient_[j] = dot(q_.residual.data(), d_.column(j), n_);
+      if (std::fabs(gradient_[j]) > d_.relative_penalty[j] * spec_.alpha * lambda) {
+        sol_.offer(j);
+        any = true;
+      }
+    }
+    if (any) std::sort(sol_.offered.begin(), sol_.offered.end());
+    return any;
+  }
+
+  // The linear predictor on the design's own columns, so on weighted columns it carries the root
+  // of each case weight.
+  void predict_link() {
+    for (std::size_t i = 0; i < n_; ++i) eta_[i] = sol_.intercept * d_.ones[i];
+    for (std::size_t j : sol_.nonzero_ever) {
+      const double b = sol_.coef[j];
+      if (b != 0.0) axpy(eta_.data(), d_.column(j), b, n_);
+    }
+  }
+
+  // A residual updated in place along many warm starts drifts from the one its coefficients imply,
+  // so it is rebuilt from them.
+  void rebuild_gaussian_residual() {
+    predict_link();
+    for (std::size_t i = 0; i < n_; ++i) q_.residual[i] = target_[i] - eta_[i];
+  }
+
+  // The binomial quadratic at the current coefficients: the working weights p(1 - p), and the
+  // residual y - p times the case weight. A probability within `prob_floor` of zero or one is
+  // pinned there and carries no curvature.
+  void reweight() {
+    predict_link();
+    const std::vector<double>& cw = d_.case_weight;
+    for (std::size_t i = 0; i < n_; ++i) {
+      const double link = std::min(std::max(eta_[i], -kLinkBound), kLinkBound);
+      double prob = 1.0 / (1.0 + std::exp(-link));
+      double curv = prob * (1.0 - prob);
+      if (prob < spec_.prob_floor) {
+        prob = 0.0;
+        curv = 0.0;
+      } else if (prob > 1.0 - spec_.prob_floor) {
+        prob = 1.0;
+        curv = 0.0;
+      }
+      q_.case_curvature[i] = cw[i] * curv;
+      q_.residual[i] = cw[i] * (response_[i] - prob);
+    }
+  }
+
+  bool descend(double lambda) {
+    Descent descent(d_, lambda, spec_.alpha, spec_.intercept, tolerance_, q_, sol_, acc_);
+    return descent.run(passes_left_);
+  }
+
+  // Reweighted least squares at one penalty. A step is settled when it moved nothing: the
+  // coefficients it started from against those it reached, over the nonzero columns and the
+  // intercept, each weighted by its curvature, on the scale the descent stops at. The step ends
+  // on the reweighting the next would open with, so the residual is current for the check that
+  // follows.
+  bool fit_binomial(double lambda) {
+    for (int step = 1;; ++step) {
+      const double intercept_from = sol_.intercept;
+      for (std::size_t j : sol_.nonzero_ever) step_start_[j] = sol_.coef[j];
+      for (std::size_t j : sol_.offered) {
+        q_.column_curvature[j] = weighted_dot(q_.case_curvature.data(), d_.column(j), d_.column(j), n_);
+      }
+      if (!descend(lambda)) return false;
+      reweight();
+      const double intercept_move = sol_.intercept - intercept_from;
+      double moved = sum_of(q_.case_curvature.data(), n_) * intercept_move * intercept_move;
+      for (std::size_t j : sol_.nonzero_ever) {
+        const double change = sol_.coef[j] - step_start_[j];
+        moved = std::max(moved, q_.column_curvature[j] * change * change);
+      }
+      if (moved < tolerance_) return true;
+      if (step >= spec_.max_irls) return false;
+    }
+  }
+
+  // The fit at one penalty, repeated while the optimality check finds columns the screen missed.
+  bool fit_at(double lambda) {
+    for (;;) {
+      if (gaussian() ? !descend(lambda) : !fit_binomial(lambda)) return false;
+      if (!admit_violators(lambda)) return true;
+      if (gaussian()) rebuild_gaussian_residual();
+    }
+  }
+
+  double deviance() const {
+    if (gaussian()) return dot(q_.residual.data(), q_.residual.data(), n_);
+    const std::vector<double>& cw = d_.case_weight;
+    double loglik = 0.0;
+    for (std::size_t i = 0; i < n_; ++i) loglik += cw[i] * (response_[i] * eta_[i] - softplus(eta_[i]));
+    return loglik * -2.0;
+  }
+
+  // The coefficients back on the scale the columns were handed over in.
+  void record(PenaltyPath& out, double lambda, std::int32_t nonzero, double explained) {
+    double shift = y_centre_;
+    const std::size_t at = out.beta.size();
+    out.beta.resize(at + p_);
+    double* beta = out.beta.data() + at;
+    for (std::size_t j = 0; j < p_; ++j) {
+      const double b = sol_.coef[j] * y_scale_ / d_.scale[j];
+      beta[j] = b;
+      shift -= b * d_.centre[j];
+    }
+    out.a0.push_back(sol_.intercept * y_scale_ + shift);
+    out.lambda.push_back(lambda * y_scale_);
+    out.df.push_back(nonzero);
+    out.dev_ratio.push_back(explained);
+  }
+
+  const PenaltySpec& spec_;
+  Family family_;
+  std::size_t n_, p_;
+  Standardised d_;
+  Solution sol_;
+  Quadratic q_;
+  Anderson acc_;
+  std::vector<double> response_;    // on the scale the descent reads
+  std::vector<double> target_;      // Gaussian: the response times the root case weight
+  std::vector<double> eta_;
+  std::vector<double> gradient_;
+  std::vector<double> step_start_;  // coefficients a reweighting step started from
+  double y_centre_ = 0.0, y_scale_ = 1.0;
+  double null_deviance_ = 0.0;           // on the scale the fit runs at
+  double reported_null_deviance_ = 0.0;  // on the response's own scale
+  double tolerance_ = 0.0;
+  int passes_left_ = 0;
+};
+
+PenaltyPath PathFit::run() {
+  const std::size_t max_active = spec_.max_active == 0 ? p_ : spec_.max_active;
+  const double top = largest_penalty();
+  const std::vector<double> path = penalties(top);
+  const bool derived = spec_.lambda.empty();
+
+  // The descent stops on a move small against the null deviance it is fitting; the Gaussian
+  // response is scaled to a null deviance of one, so the two families read the threshold alike.
+  tolerance_ = spec_.thresh * null_deviance_;
+  passes_left_ = spec_.max_pass;
+  if (!gaussian()) reweight();
+
+  PenaltyPath out;
+  out.n_column = p_;
+  out.null_deviance = reported_null_deviance_;
+  out.family = family_;
+  double previous_explained = -std::numeric_limits<double>::infinity();
+  double previous_lambda = top;
+
+  for (std::size_t k = 0; k < path.size(); ++k) {
+    const double lambda = path[k];
+    screen(lambda, previous_lambda);
+
+    // A penalty the fit did not settle at ends the path, and the points before it are returned.
+    // With none before it there is nothing to return.
+    if (!fit_at(lambda)) {
+      if (out.lambda.empty()) {
+        throw Error(gaussian()
+                        ? "a penalised fit did not settle at the first penalty of its path inside "
+                          "its pass budget."
+                        : "a binomial penalised fit did not settle at the first penalty of its path.");
+      }
+      out.stalled = static_cast<std::int32_t>(k) + 1;
+      break;
+    }
+    // A binomial fit ends on a reweighting, which rebuilds its residual; a Gaussian one is rebuilt
+    // here, once, for the deviance and for the next penalty to open on.
+    if (gaussian()) rebuild_gaussian_residual();
+
+    std::int32_t nonzero = 0;
+    for (double b : sol_.coef) nonzero += b != 0.0 ? 1 : 0;
+    if (static_cast<std::size_t>(nonzero) > max_active && k > 0) break;
+
+    const double explained = null_deviance_ > 0.0 ? 1.0 - deviance() / null_deviance_ : 0.0;
+    record(out, lambda, nonzero, explained);
+
+    if (derived && static_cast<int>(k) + 1 >= spec_.min_lambda) {
+      if (explained > spec_.dev_max) break;
+      // A step that explains almost nothing more ends the path. The Gaussian family reads the
+      // share gained relative to the deviance explained so far and the binomial one absolutely,
+      // the convention the fixtures pin.
+      const double enough = gaussian() ? spec_.fdev * std::fabs(explained) : spec_.fdev;
+      if (spec_.fdev > 0.0 && explained - previous_explained < enough) break;
+    }
+    previous_explained = explained;
+    previous_lambda = lambda;
+  }
+  if (out.lambda.empty()) throw Error("a penalised path fitted no penalty.");
+  out.passes = spec_.max_pass - std::max(passes_left_, 0);
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Cross-validation.
+
+// The rows `rows` of a column-major matrix with `n` rows and `p` columns.
+std::vector<double> take_rows(const double* x, std::size_t n, std::size_t p,
+                              const std::vector<std::size_t>& rows) {
+  const std::size_t m = rows.size();
+  std::vector<double> out(m * p);
+  for (std::size_t j = 0; j < p; ++j) {
+    for (std::size_t a = 0; a < m; ++a) out[a + j * m] = x[rows[a] + j * n];
+  }
+  return out;
+}
+
+struct HeldOutFold {
+  std::vector<std::size_t> train, test;
+  PenaltyPath fit;
+  std::exception_ptr failure;
+};
+
+std::vector<HeldOutFold> split_folds(const std::int32_t* fold, std::size_t n, std::size_t k) {
+  std::vector<HeldOutFold> folds(k);
+  for (std::size_t i = 0; i < n; ++i) {
+    const std::int32_t f = fold[i];
+    if (f < 0 || static_cast<std::size_t>(f) >= k) {
+      throw Error("a fold index of a cross-validated penalty is outside the folds it declares.");
+    }
+    for (std::size_t g = 0; g < k; ++g) {
+      (static_cast<std::size_t>(f) == g ? folds[g].test : folds[g].train).push_back(i);
+    }
+  }
+  for (const HeldOutFold& one : folds) {
+    if (one.train.empty() || one.test.empty()) {
+      throw Error("a fold of a cross-validated penalty holds every unit or none of them.");
+    }
+  }
+  return folds;
+}
+
+// Runs `lead` on this thread and `task(0 .. count - 1)` shared between it and up to
+// `workers - 1` further threads. A machine that refuses another thread leaves the work to the
+// threads that did start.
+void run_shared(int workers, std::size_t count, const std::function<void()>& lead,
+                const std::function<void(std::size_t)>& task) {
+  if (workers <= 1) {
+    lead();
+    for (std::size_t g = 0; g < count; ++g) task(g);
+    return;
+  }
+  std::atomic<std::size_t> next{0};
+  auto drain = [&]() {
+    for (std::size_t g = next.fetch_add(1); g < count; g = next.fetch_add(1)) task(g);
+  };
+  std::vector<std::thread> pool;
+  const std::size_t extra = std::min<std::size_t>(static_cast<std::size_t>(workers) - 1, count);
+  pool.reserve(extra);
+  for (std::size_t t = 0; t < extra; ++t) {
+    try {
+      pool.emplace_back(drain);
+    } catch (const std::system_error&) {
+      break;
+    }
+  }
+  std::exception_ptr failure;
+  try {
+    lead();
+  } catch (...) {
+    failure = std::current_exception();
+  }
+  drain();
+  for (std::thread& t : pool) t.join();
+  if (failure) std::rethrow_exception(failure);
+}
+
+// The deviance of one held-out case: squared error, or twice the binomial negative log likelihood
+// with the probability kept off zero and one.
+double held_out_deviance(Family family, double y, double predicted) {
+  if (family == Family::gaussian) {
+    const double e = y - predicted;
+    return e * e;
+  }
+  const double q = std::min(std::max(predicted, kHeldOutProbFloor), 1.0 - kHeldOutProbFloor);
+  return -2.0 * (y * std::log(q) + (1.0 - y) * std::log(1.0 - q));
 }
 
 }  // namespace
@@ -455,356 +960,35 @@ PenaltyPath penalised_path(const double* x, const double* y, const double* w, st
   if (!(spec.alpha >= 0.0 && spec.alpha <= 1.0)) {
     throw Error("the elastic net's mixing is between zero and one.");
   }
-  // The response's own values decide whether there is anything to fit, not a weighted mean of
-  // them: the weights sum to one only to the last bit, so a response holding one value has a
-  // spread of 1e-32 rather than of zero and a binomial one holding a single outcome has a mean
-  // just under one. Either would be fitted, on nothing.
-  double low = y[0], high = y[0];
-  for (std::size_t i = 0; i < n; ++i) {
-    if (!std::isfinite(y[i])) {
-      throw Error("a penalised fit was handed a response that is not a number.");
-    }
-    low = std::min(low, y[i]);
-    high = std::max(high, y[i]);
-  }
-  if (low == high) {
-    throw Error(family == Family::binomial
-                    ? "a binomial penalised fit was handed a response holding one outcome."
-                    : "a penalised fit was handed a response holding one value, which has "
-                      "nothing to penalise against.");
-  }
-
-  const Design d = build_design(x, w, n, p, spec, family == Family::gaussian);
-  const std::size_t max_active = spec.max_active == 0 ? p : spec.max_active;
-
-  // The response on the scale the descent reads it. A Gaussian response is centred and scaled the
-  // way a column is, which is what puts the reported penalties on the response's own scale; a
-  // binomial one is the outcome itself.
-  double y_centre = 0.0, y_scale = 1.0;
-  std::vector<double> yt(n);
-  double null_deviance = 0.0;
-  double dev_null = 0.0;
-  double pbar = 0.0;
-  if (family == Family::gaussian) {
-    if (spec.intercept) {
-      for (std::size_t i = 0; i < n; ++i) y_centre += d.w[i] * y[i];
-    }
-    double spread = 0.0;
-    for (std::size_t i = 0; i < n; ++i) {
-      const double z = y[i] - y_centre;
-      spread += d.w[i] * z * z;
-    }
-    y_scale = std::sqrt(spread);
-    if (!(y_scale > 0.0)) {
-      throw Error("a penalised fit was handed a response holding one value, which has nothing to "
-                  "penalise against.");
-    }
-    for (std::size_t i = 0; i < n; ++i) yt[i] = (y[i] - y_centre) / y_scale;
-    null_deviance = spread;
-    dev_null = 1.0;
-  } else {
-    for (std::size_t i = 0; i < n; ++i) {
-      if (y[i] != 0.0 && y[i] != 1.0) {
-        throw Error("a binomial penalised fit takes a response holding zero and one.");
-      }
-      yt[i] = y[i];
-      pbar += d.w[i] * y[i];
-    }
-    if (low != 0.0 || high != 1.0 || !(pbar > 0.0) || !(pbar < 1.0)) {
-      throw Error("a binomial penalised fit was handed a response holding one outcome.");
-    }
-    const double eta0 = std::log(pbar / (1.0 - pbar));
-    for (std::size_t i = 0; i < n; ++i) {
-      dev_null += d.w[i] * (yt[i] * eta0 - log1pexp(eta0));
-    }
-    dev_null *= -2.0;
-    null_deviance = dev_null;
-  }
-
-  std::vector<double> v(n), r(n), xv(p, 0.0), eta(n, 0.0), grad(p, 0.0);
-  // The coefficients a reweighted least squares step started from, which is what it is judged on.
-  // A column outside the active set is at zero and has never been written here, so a column that
-  // leaves zero inside a step is read against the zero it started at.
-  std::vector<double> started(p, 0.0);
-  Coefs fit;
-  Extrapolation ex;
-  fit.b.assign(p, 0.0);
-  fit.ever.assign(p, 0);
-  fit.offered.assign(p, 0);
-  // A Gaussian fit's residual is read on the folded scale, the root of each case weight times the
-  // response less the predictor, which is what the folded columns read against.
-  std::vector<double> yw;
-  if (family == Family::gaussian) {
-    yw.resize(n);
-    for (std::size_t i = 0; i < n; ++i) {
-      yw[i] = d.lead[i] * yt[i];
-      r[i] = yw[i];
-    }
-    // The curvature of a Gaussian fit does not move along the path, so it is read once.
-    for (std::size_t j = 0; j < p; ++j) {
-      if (!d.usable[j]) continue;
-      xv[j] = dot(d.column(j), d.column(j), n);
-    }
-  } else {
-    if (spec.intercept) fit.a0 = std::log(pbar / (1.0 - pbar));
-    for (std::size_t i = 0; i < n; ++i) {
-      v[i] = d.w[i] * pbar * (1.0 - pbar);
-      r[i] = d.w[i] * (yt[i] - pbar);
-    }
-  }
-
-  auto gradient = [&]() {
-    for (std::size_t j = 0; j < p; ++j) {
-      if (!d.usable[j]) continue;
-      grad[j] = dot(r.data(), d.column(j), n);
-    }
-  };
-
-  // The smallest penalty that leaves every coefficient at zero, from the gradient at the null
-  // model. The floor under the mixing is glmnet's, and it is what gives a ridge a finite start.
-  gradient();
-  double lambda_max = 0.0;
-  for (std::size_t j = 0; j < p; ++j) {
-    if (!d.usable[j] || !(d.vp[j] > 0.0)) continue;
-    lambda_max = std::max(lambda_max, std::fabs(grad[j]) / d.vp[j]);
-  }
-  lambda_max /= std::max(spec.alpha, kAlphaFloor);
-
-  std::vector<double> path;
-  const bool derived = spec.lambda.empty();
-  if (derived) {
-    if (spec.n_lambda < 1) throw Error("a penalised path holds at least one penalty.");
-    double ratio = spec.lambda_min_ratio;
-    if (!(ratio > 0.0)) ratio = n > p ? 1e-4 : 1e-2;
-    if (!(ratio < 1.0)) throw Error("a penalty path's smallest ratio is below one.");
-    path.resize(static_cast<std::size_t>(spec.n_lambda));
-    const double step = spec.n_lambda > 1
-                            ? std::pow(ratio, 1.0 / static_cast<double>(spec.n_lambda - 1))
-                            : 1.0;
-    double current = lambda_max;
-    for (std::size_t k = 0; k < path.size(); ++k) {
-      path[k] = current;
-      current *= step;
-    }
-  } else {
-    path = spec.lambda;
-    std::sort(path.begin(), path.end(), std::greater<double>());
-    for (std::size_t k = 0; k < path.size(); ++k) path[k] /= y_scale;
-  }
-
-  PenaltyPath out;
-  out.n_column = p;
-  out.null_deviance = null_deviance;
-  out.family = family;
-  std::vector<double> beta(p, 0.0);
-  double previous_ratio = -std::numeric_limits<double>::infinity();
-  double previous_lambda = lambda_max;
-  int budget = spec.max_pass;
-  // The descent stops on a move small against the deviance it is fitting, which is glmnet's
-  // reading of the same number: a Gaussian response is scaled to a null deviance of one, so the
-  // two families mean the same thing by it.
-  const double tolerance = spec.thresh * dev_null;
-
-  // The curvature of a binomial fit moves with every reweighting, and is read only over the
-  // columns the descent may move: reading it over every column instead is where an unrestricted
-  // descent spends its time.
-  auto curvature = [&]() {
-    for (std::size_t k = 0; k < fit.candidates.size(); ++k) {
-      const std::size_t j = fit.candidates[k];
-      xv[j] = dot3(v.data(), d.column(j), d.column(j), n);
-    }
-  };
-
-  auto reweight = [&]() {
-    linear_predictor(d, fit, eta);
-    for (std::size_t i = 0; i < n; ++i) {
-      const double e = std::min(std::max(eta[i], -kEtaClamp), kEtaClamp);
-      double prob = 1.0 / (1.0 + std::exp(-e));
-      double curve = prob * (1.0 - prob);
-      if (prob < spec.prob_floor) {
-        prob = 0.0;
-        curve = 0.0;
-      } else if (prob > 1.0 - spec.prob_floor) {
-        prob = 1.0;
-        curve = 0.0;
-      }
-      v[i] = d.w[i] * curve;
-      r[i] = d.w[i] * (yt[i] - prob);
-    }
-  };
-
-  if (family == Family::binomial) reweight();
-
-  for (std::size_t k = 0; k < path.size(); ++k) {
-    const double lambda = path[k];
-
-    // Tibshirani's sequential strong rule: a column whose gradient at the penalty just fitted is
-    // further than one step of the path from the threshold is offered to the descent, and the
-    // rest are left out. It is a screen rather than a decision, and whatever it discards is
-    // tested against the optimality condition below and taken back where it was wrong.
-    //
-    // The screen only ever adds, so a column already offered stays offered and is not tested
-    // again. What that buys is the gradient: the only columns the rule reads are the ones the
-    // optimality test at the penalty just fitted read as well, so `grad` is current where it is
-    // needed and the path costs one sweep over the columns rather than two.
-    const double bound = spec.alpha * (2.0 * lambda - previous_lambda);
-    const std::size_t offered_before = fit.candidates.size();
-    for (std::size_t j = 0; j < p; ++j) {
-      if (!d.usable[j] || fit.offered[j]) continue;
-      if (!(d.vp[j] > 0.0) || std::fabs(grad[j]) > d.vp[j] * bound) fit.offer(j);
-    }
-    if (fit.candidates.size() != offered_before) {
-      std::sort(fit.candidates.begin(), fit.candidates.end());
-    }
-
-    bool settled = true;
-    for (;;) {
-      if (family == Family::gaussian) {
-        settled = quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv,
-                                  r, fit, ex);
-      } else {
-        // A reweighted least squares is settled when a step of it moves nothing, and what that is
-        // read on is the step's own move: the coefficients it started from against the ones it
-        // reached, over the columns that have left zero and over the intercept, on the same scale
-        // the descent inside it stops at. That is glmnet's own test, and it ends the step on the
-        // reweighting the next one would have opened with, so the loop leaves `r` where the
-        // optimality test below reads it and needs none of its own afterwards. It takes the same
-        // number of steps as reading the move off the first sweep of a further step does --
-        // measured, the same to two decimals on every shape tried -- and saves the reweighting
-        // that reading needed after the loop, which is two of them at every penalty.
-        for (int it = 0;; ++it) {
-          const double started_at = fit.a0;
-          for (std::size_t k2 = 0; k2 < fit.active.size(); ++k2) {
-            started[fit.active[k2]] = fit.b[fit.active[k2]];
-          }
-          curvature();
-          if (!quadratic_solve(d, lambda, spec.alpha, spec.intercept, tolerance, budget, v, xv, r,
-                               fit, ex)) {
-            settled = false;
-            break;
-          }
-          reweight();
-          const double shift = fit.a0 - started_at;
-          double moved = total(v.data(), n) * shift * shift;
-          for (std::size_t k2 = 0; k2 < fit.active.size(); ++k2) {
-            const std::size_t j = fit.active[k2];
-            const double delta = fit.b[j] - started[j];
-            moved = std::max(moved, xv[j] * delta * delta);
-          }
-          if (moved < tolerance) break;
-          if (it + 1 >= spec.max_irls) {
-            settled = false;
-            break;
-          }
-        }
-      }
-      if (!settled) break;
-
-      // What the screen left out, tested: a column outside the offered set whose gradient is over
-      // the threshold is not at zero at the optimum, so it is taken back and the penalty refitted.
-      bool recovered = false;
-      for (std::size_t j = 0; j < p; ++j) {
-        if (!d.usable[j] || fit.offered[j]) continue;
-        grad[j] = dot(r.data(), d.column(j), n);
-        if (std::fabs(grad[j]) > d.vp[j] * spec.alpha * lambda) {
-          fit.offer(j);
-          recovered = true;
-        }
-      }
-      if (!recovered) break;
-      std::sort(fit.candidates.begin(), fit.candidates.end());
-      if (family == Family::gaussian) {
-        linear_predictor(d, fit, eta);
-        for (std::size_t i = 0; i < n; ++i) r[i] = yw[i] - eta[i];
-      }
-    }
-
-    // A penalty the fit did not settle at ends the path, and the points before it are the path,
-    // which is what glmnet returns for the same event. A fit that does not settle at the first
-    // penalty has nothing to return.
-    if (!settled) {
-      if (out.lambda.empty()) {
-        throw Error(family == Family::binomial
-                        ? "a binomial penalised fit did not settle at the first penalty of its path."
-                        : "a penalised fit did not settle at the first penalty of its path inside "
-                          "its pass budget.");
-      }
-      out.stalled = static_cast<std::int32_t>(k) + 1;
-      break;
-    }
-
-    // The residual is rebuilt from the coefficients at every penalty rather than carried forward,
-    // because a residual updated in place along a hundred warm starts drifts from the one those
-    // coefficients imply. A binomial fit leaves the loop above on a reweighting, which is that
-    // rebuild; a Gaussian one leaves it on a descent and is rebuilt here, once, which is what the
-    // deviance is read off and what the next penalty opens on.
-    if (family == Family::gaussian) {
-      linear_predictor(d, fit, eta);
-      for (std::size_t i = 0; i < n; ++i) r[i] = yw[i] - eta[i];
-    }
-    std::int32_t nonzero = 0;
-    for (std::size_t j = 0; j < p; ++j) {
-      if (fit.b[j] != 0.0) ++nonzero;
-    }
-    if (static_cast<std::size_t>(nonzero) > max_active && k > 0) break;
-
-    double dev = 0.0;
-    if (family == Family::gaussian) {
-      dev = dot(r.data(), r.data(), n);
-    } else {
-      for (std::size_t i = 0; i < n; ++i) dev += d.w[i] * (yt[i] * eta[i] - log1pexp(eta[i]));
-      dev *= -2.0;
-    }
-    const double ratio = dev_null > 0.0 ? 1.0 - dev / dev_null : 0.0;
-
-    double a0 = 0.0;
-    unstandardise(d, fit, y_centre, y_scale, a0, beta.data());
-    out.a0.push_back(a0);
-    out.lambda.push_back(lambda * y_scale);
-    out.beta.insert(out.beta.end(), beta.begin(), beta.end());
-    out.df.push_back(nonzero);
-    out.dev_ratio.push_back(ratio);
-
-    if (derived && static_cast<int>(k) + 1 >= spec.min_lambda) {
-      if (ratio > spec.dev_max) break;
-      // A step that explains almost nothing more ends the path. The Gaussian family reads that
-      // share against the deviance explained so far and the binomial one reads it outright, which
-      // is the difference glmnet's two solvers carry.
-      const double gained = family == Family::gaussian ? spec.fdev * std::fabs(ratio) : spec.fdev;
-      if (spec.fdev > 0.0 && ratio - previous_ratio < gained) break;
-    }
-    previous_ratio = ratio;
-    previous_lambda = lambda;
-  }
-  if (out.lambda.empty()) throw Error("a penalised path fitted no penalty.");
-  out.passes = spec.max_pass - std::max(budget, 0);
-  return out;
+  double low = 0.0, high = 0.0;
+  check_response(y, n, family, low, high);
+  PathFit fit(x, y, w, n, p, family, spec, low, high);
+  return fit.run();
 }
 
 void penalised_coef(const PenaltyPath& path, double lambda, double* a0, double* beta) {
   const std::size_t p = path.n_column;
-  const std::size_t k = path.lambda.size();
-  if (k == 0) throw Error("a penalised path holds no penalty to read a coefficient at.");
-  if (k == 1) {
+  const std::vector<double>& l = path.lambda;
+  const std::size_t points = l.size();
+  if (points == 0) throw Error("a penalised path holds no penalty to read a coefficient at.");
+  if (points == 1) {
     *a0 = path.a0[0];
-    for (std::size_t j = 0; j < p; ++j) beta[j] = path.beta[j];
+    std::copy(path.beta.begin(), path.beta.begin() + static_cast<std::ptrdiff_t>(p), beta);
     return;
   }
-  const double at = std::min(std::max(lambda, path.lambda.back()), path.lambda.front());
-  // The two points of the path the penalty falls between, and how far it sits from the lower one,
-  // which is how glmnet reads a penalty that is not a point of the path it fitted.
-  std::size_t right = 1;
-  while (right < k - 1 && path.lambda[right] > at) ++right;
-  const std::size_t left = right - 1;
-  const double span = path.lambda[left] - path.lambda[right];
-  double frac = 1.0;
-  if (std::fabs(span) > std::numeric_limits<double>::epsilon()) {
-    frac = (at - path.lambda[right]) / span;
-  }
-  *a0 = path.a0[left] * frac + path.a0[right] * (1.0 - frac);
-  for (std::size_t j = 0; j < p; ++j) {
-    beta[j] = path.beta[left * p + j] * frac + path.beta[right * p + j] * (1.0 - frac);
-  }
+  // Linear in the penalty between the two points of the path around it, clamped to the path's
+  // ends; `share` is the weight on the larger penalty.
+  const double at = std::min(std::max(lambda, l.back()), l.front());
+  std::size_t below = 1;
+  while (below < points - 1 && l[below] > at) ++below;
+  const std::size_t above = below - 1;
+  const double gap = l[above] - l[below];
+  const double share =
+      std::fabs(gap) > std::numeric_limits<double>::epsilon() ? (at - l[below]) / gap : 1.0;
+  *a0 = path.a0[above] * share + path.a0[below] * (1.0 - share);
+  const double* hi = path.beta.data() + above * p;
+  const double* lo = path.beta.data() + below * p;
+  for (std::size_t j = 0; j < p; ++j) beta[j] = hi[j] * share + lo[j] * (1.0 - share);
 }
 
 void penalised_predict(const PenaltyPath& path, double lambda, const double* x, std::size_t n,
@@ -813,16 +997,14 @@ void penalised_predict(const PenaltyPath& path, double lambda, const double* x, 
   double a0 = 0.0;
   std::vector<double> beta(p, 0.0);
   penalised_coef(path, lambda, &a0, beta.data());
-  for (std::size_t i = 0; i < n; ++i) out[i] = a0;
+  std::fill(out, out + n, a0);
   for (std::size_t j = 0; j < p; ++j) {
-    if (beta[j] == 0.0) continue;
-    add_scaled(out, x + j * n, beta[j], n);
+    if (beta[j] != 0.0) axpy(out, x + j * n, beta[j], n);
   }
-  if (path.family == Family::binomial) {
-    for (std::size_t i = 0; i < n; ++i) {
-      const double e = std::min(std::max(out[i], -kEtaClamp), kEtaClamp);
-      out[i] = 1.0 / (1.0 + std::exp(-e));
-    }
+  if (path.family != Family::binomial) return;
+  for (std::size_t i = 0; i < n; ++i) {
+    const double link = std::min(std::max(out[i], -kLinkBound), kLinkBound);
+    out[i] = 1.0 / (1.0 + std::exp(-link));
   }
 }
 
@@ -830,162 +1012,88 @@ PenaltyCV penalised_cv(const double* x, const double* y, const double* w, std::s
                        std::size_t p, Family family, const PenaltySpec& spec,
                        const std::int32_t* fold, std::int32_t n_fold) {
   if (n_fold < 2) throw Error("a cross-validated penalty needs at least two folds.");
-  const std::size_t folds = static_cast<std::size_t>(n_fold);
+  const std::size_t k = static_cast<std::size_t>(n_fold);
+  std::vector<HeldOutFold> folds = split_folds(fold, n, k);
+  auto weight_of = [w](std::size_t i) { return w == nullptr ? 1.0 : w[i]; };
 
-  // Which units each fold holds back, settled before anything is fitted so the fits are
-  // independent of each other and of the order they are run in.
-  struct Fold {
-    std::vector<std::size_t> in, held_out;
-    PenaltyPath fit;
-    std::exception_ptr failure;
-  };
-  std::vector<Fold> held(folds);
-  for (std::size_t i = 0; i < n; ++i) {
-    const std::int32_t f = fold[i];
-    if (f < 0 || static_cast<std::size_t>(f) >= folds) {
-      throw Error("a fold index of a cross-validated penalty is outside the folds it declares.");
-    }
-    for (std::size_t g = 0; g < folds; ++g) {
-      (static_cast<std::size_t>(f) == g ? held[g].held_out : held[g].in).push_back(i);
-    }
-  }
-  for (std::size_t g = 0; g < folds; ++g) {
-    if (held[g].in.empty() || held[g].held_out.empty()) {
-      throw Error("a fold of a cross-validated penalty holds every unit or none of them.");
-    }
-  }
-
-  // Each fold is fitted the way the whole-unit path was, along a path of its own, and is then
-  // read at the whole-unit path's penalties. A fold holds different units, so the largest penalty
-  // that leaves every coefficient at zero is a different number there; aligning the folds on the
-  // penalty rather than on the point of the path is what keeps the held-out deviance a function
-  // of the penalty, and it is what glmnet aligns on.
+  // Each fold is fitted along a path of its own and read at the whole-unit path's penalties. The
+  // largest penalty differs between folds, so aligning them on the penalty rather than on the
+  // position along the path keeps the held-out deviance a function of the penalty. The fits are
+  // independent, so a run on many threads returns the numbers a run on one returns.
+  PenaltyCV out;
   auto fit_fold = [&](std::size_t g) {
-    Fold& one = held[g];
+    HeldOutFold& one = folds[g];
     try {
-      const std::size_t nt = one.in.size();
-      std::vector<double> train_x(nt * p), train_y(nt), train_w(nt);
-      for (std::size_t j = 0; j < p; ++j) {
-        for (std::size_t a = 0; a < nt; ++a) train_x[a + j * nt] = x[one.in[a] + j * n];
+      const std::vector<double> train_x = take_rows(x, n, p, one.train);
+      std::vector<double> train_y(one.train.size()), train_w(one.train.size());
+      for (std::size_t a = 0; a < one.train.size(); ++a) {
+        train_y[a] = y[one.train[a]];
+        train_w[a] = weight_of(one.train[a]);
       }
-      for (std::size_t a = 0; a < nt; ++a) {
-        train_y[a] = y[one.in[a]];
-        train_w[a] = w == nullptr ? 1.0 : w[one.in[a]];
-      }
-      one.fit = penalised_path(train_x.data(), train_y.data(), train_w.data(), nt, p, family,
-                               spec);
+      one.fit = penalised_path(train_x.data(), train_y.data(), train_w.data(), one.train.size(), p,
+                               family, spec);
     } catch (...) {
       one.failure = std::current_exception();
     }
   };
-
-  // The whole-unit fit and the folds are one independent fit each, so they run at once where the
-  // caller asked for it. Nothing is shared but the design they read, and what each returns is a
-  // function of its own units alone, so a run on many threads returns the numbers a run on one
-  // returns.
-  PenaltyCV out;
-  const int workers = std::max(1, spec.threads);
-  if (workers <= 1) {
-    out.path = penalised_path(x, y, w, n, p, family, spec);
-    for (std::size_t g = 0; g < folds; ++g) fit_fold(g);
-  } else {
-    std::atomic<std::size_t> next{0};
-    auto take = [&]() {
-      for (;;) {
-        const std::size_t g = next.fetch_add(1);
-        if (g >= folds) return;
-        fit_fold(g);
-      }
-    };
-    std::vector<std::thread> pool;
-    const std::size_t spare = std::min<std::size_t>(static_cast<std::size_t>(workers) - 1, folds);
-    pool.reserve(spare);
-    // A machine that will not give another thread is a reason to run on fewer, not to fail: what
-    // is left goes to the threads that did start and to this one.
-    for (std::size_t t = 0; t < spare; ++t) {
-      try {
-        pool.emplace_back(take);
-      } catch (const std::system_error&) {
-        break;
-      }
-    }
-    std::exception_ptr failure;
-    try {
-      out.path = penalised_path(x, y, w, n, p, family, spec);
-    } catch (...) {
-      failure = std::current_exception();
-    }
-    take();
-    for (std::thread& t : pool) t.join();
-    if (failure) std::rethrow_exception(failure);
+  run_shared(std::max(1, spec.threads), k,
+             [&]() { out.path = penalised_path(x, y, w, n, p, family, spec); }, fit_fold);
+  for (const HeldOutFold& one : folds) {
+    if (one.failure) std::rethrow_exception(one.failure);
   }
-  for (std::size_t g = 0; g < folds; ++g) {
-    if (held[g].failure) std::rethrow_exception(held[g].failure);
-  }
-  out.fold_stalled.resize(folds);
-  for (std::size_t g = 0; g < folds; ++g) out.fold_stalled[g] = held[g].fit.stalled;
-  const std::size_t k = out.path.lambda.size();
+  out.fold_stalled.resize(k);
+  for (std::size_t g = 0; g < k; ++g) out.fold_stalled[g] = folds[g].fit.stalled;
 
-  std::vector<double> fold_sum(folds, 0.0);
-  std::vector<double> fold_mean(folds * k, 0.0);
-  std::vector<double> test_x, predicted;
-  for (std::size_t g = 0; g < folds; ++g) {
-    const Fold& one = held[g];
-    const std::size_t nh = one.held_out.size();
-    test_x.assign(nh * p, 0.0);
-    for (std::size_t j = 0; j < p; ++j) {
-      for (std::size_t a = 0; a < nh; ++a) test_x[a + j * nh] = x[one.held_out[a] + j * n];
-    }
+  // Each fold's weighted mean held-out deviance at every penalty, [fold, penalty] fold fastest.
+  const std::size_t points = out.path.lambda.size();
+  std::vector<double> fold_weight(k, 0.0);
+  std::vector<double> fold_score(k * points, 0.0);
+  std::vector<double> predicted;
+  for (std::size_t g = 0; g < k; ++g) {
+    const HeldOutFold& one = folds[g];
+    const std::size_t m = one.test.size();
+    const std::vector<double> test_x = take_rows(x, n, p, one.test);
     double weight = 0.0;
-    for (std::size_t a = 0; a < nh; ++a) weight += w == nullptr ? 1.0 : w[one.held_out[a]];
-    fold_sum[g] = weight;
-    predicted.resize(nh);
-    for (std::size_t l = 0; l < k; ++l) {
-      penalised_predict(one.fit, out.path.lambda[l], test_x.data(), nh, predicted.data());
+    for (std::size_t i : one.test) weight += weight_of(i);
+    fold_weight[g] = weight;
+    predicted.resize(m);
+    for (std::size_t l = 0; l < points; ++l) {
+      penalised_predict(one.fit, out.path.lambda[l], test_x.data(), m, predicted.data());
       double score = 0.0;
-      for (std::size_t a = 0; a < nh; ++a) {
-        const std::size_t i = one.held_out[a];
-        const double wi = w == nullptr ? 1.0 : w[i];
-        double raw;
-        if (family == Family::gaussian) {
-          const double e = y[i] - predicted[a];
-          raw = e * e;
-        } else {
-          const double q = std::min(std::max(predicted[a], kCVProbFloor), 1.0 - kCVProbFloor);
-          raw = -2.0 * (y[i] * std::log(q) + (1.0 - y[i]) * std::log(1.0 - q));
-        }
-        score += wi * raw;
+      for (std::size_t a = 0; a < m; ++a) {
+        const std::size_t i = one.test[a];
+        score += weight_of(i) * held_out_deviance(family, y[i], predicted[a]);
       }
-      fold_mean[g + l * folds] = weight > 0.0 ? score / weight : 0.0;
+      fold_score[g + l * k] = weight > 0.0 ? score / weight : 0.0;
     }
   }
 
-  // The held-out deviance is summarised over the folds rather than over the units: a fold is one
-  // reading of the penalty, and its spread over the folds is what the standard error is of.
-  double total = 0.0;
-  for (std::size_t g = 0; g < folds; ++g) total += fold_sum[g];
-  out.cv_mean.assign(k, 0.0);
-  out.cv_sd.assign(k, 0.0);
-  for (std::size_t l = 0; l < k; ++l) {
+  // Mean and standard error over the folds, each fold weighted by its held-out weight: a fold is
+  // one reading of the penalty.
+  double all = 0.0;
+  for (double fw : fold_weight) all += fw;
+  out.cv_mean.assign(points, 0.0);
+  out.cv_sd.assign(points, 0.0);
+  for (std::size_t l = 0; l < points; ++l) {
+    const double* score = fold_score.data() + l * k;
     double mean = 0.0;
-    for (std::size_t g = 0; g < folds; ++g) mean += fold_sum[g] * fold_mean[g + l * folds];
-    mean /= total;
+    for (std::size_t g = 0; g < k; ++g) mean += fold_weight[g] * score[g];
+    mean /= all;
     double spread = 0.0;
-    for (std::size_t g = 0; g < folds; ++g) {
-      const double e = fold_mean[g + l * folds] - mean;
-      spread += fold_sum[g] * e * e;
+    for (std::size_t g = 0; g < k; ++g) {
+      const double e = score[g] - mean;
+      spread += fold_weight[g] * e * e;
     }
     out.cv_mean[l] = mean;
-    out.cv_sd[l] = std::sqrt(spread / total / static_cast<double>(folds - 1));
+    out.cv_sd[l] = std::sqrt(spread / all / static_cast<double>(k - 1));
   }
 
-  out.index_min = 0;
-  for (std::size_t l = 1; l < k; ++l) {
-    if (out.cv_mean[l] < out.cv_mean[out.index_min]) out.index_min = l;
-  }
+  // The least held-out deviance, and the largest penalty within one standard error of it.
+  out.index_min = static_cast<std::size_t>(
+      std::min_element(out.cv_mean.begin(), out.cv_mean.end()) - out.cv_mean.begin());
   const double within = out.cv_mean[out.index_min] + out.cv_sd[out.index_min];
   out.index_1se = out.index_min;
-  for (std::size_t l = 0; l < k; ++l) {
+  for (std::size_t l = 0; l < points; ++l) {
     if (out.cv_mean[l] <= within) {
       out.index_1se = l;
       break;
