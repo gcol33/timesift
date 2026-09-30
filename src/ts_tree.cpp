@@ -1,24 +1,23 @@
 #include "ts_tree.h"
 
 #include <algorithm>
-#include <atomic>
 #include <cmath>
-#include <exception>
+#include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
-#include <system_error>
-#include <thread>
 #include <utility>
+#include <vector>
 
 #include "ts_core.h"
 #include "ts_trees_internal.h"
 
-// Every sum, product and quotient here is rpart's, operation for operation, and a fused
-// multiply-add rounds once where rpart rounds twice. The difference is a unit in the last place,
-// and a unit in the last place is enough to turn a tie between two splits, or between a split and
-// the complexity threshold, the other way. Contraction is off so the tree is the same on every
-// machine: clang contracts inside an expression by default, and GCC across expressions wherever the
-// target has the instruction.
+// A split, and every row of the complexity table, is decided by comparing sums, and a fused
+// multiply-add rounds once where a product and a sum written apart round twice. A unit in the last
+// place is enough to turn a tie between two splits, or between a split and the complexity
+// threshold, the other way. Contraction is off so a tree is the same on every machine: clang
+// contracts inside an expression by default, and GCC across expressions wherever the target has
+// the instruction.
 #if defined(__clang__)
 #pragma clang fp contract(off)
 #elif defined(__GNUC__)
@@ -28,630 +27,602 @@
 namespace timesift {
 namespace {
 
-// rpart's two directions a continuous split sends the values below its threshold.
-constexpr int kLeft = -1;
-constexpr int kRight = 1;
+// ---------------------------------------------------------------------------------------------
+// Ordering a column
 
-struct Node {
-  double risk = 0.0;
-  double complexity = 0.0;
-  double sum_wt = 0.0;
-  int num_obs = 0;
-  // The node's estimate: for the Gini rule the class it predicts (1 or 2), the weighted count of
-  // each class and the probability of a 1; for the sum of squares the mean alone.
-  double est[4] = {0.0, 0.0, 0.0, 0.0};
-  bool split = false;
-  int var = -1;
-  double spoint = 0.0;
-  int direction = kLeft;
-  std::unique_ptr<Node> left;
-  std::unique_ptr<Node> right;
+// One value of a column and the row it belongs to.
+struct Keyed {
+  double key;
+  int row;
 };
 
-// rpart's quicksort of one column carrying the observation indices along. Its order among tied
-// values is not a stable one, and the order observations are summed in is the order they sit in
-// here, so the sort is rpart's own rather than std::sort: two sums of the same numbers in two
-// orders can differ in the last place and turn a tie between two columns the other way.
-void rpart_sort(int start, int stop, double* x, int* cvec) {
-  while (start < stop) {
-    if ((stop - start) < 11) {
-      for (int i = start + 1; i <= stop; i++) {
-        const double temp = x[i];
-        const int tempd = cvec[i];
-        int j = i - 1;
-        while (j >= start && x[j] > temp) {
-          x[j + 1] = x[j];
-          cvec[j + 1] = cvec[j];
-          j--;
-        }
-        x[j + 1] = temp;
-        cvec[j + 1] = tempd;
-      }
-      return;
+// Straight insertion over `a[lo..hi]`, which leaves equal keys in the order they came.
+void insert_in_order(Keyed* a, int lo, int hi) {
+  for (int i = lo + 1; i <= hi; ++i) {
+    const Keyed moving = a[i];
+    int at = i;
+    while (at > lo && a[at - 1].key > moving.key) {
+      a[at] = a[at - 1];
+      --at;
     }
-    int i = start;
-    int j = stop;
-    const int k = (start + stop) / 2;
-    double median = x[k];
-    if (x[i] >= x[k]) {
-      if (x[j] > x[k]) {
-        median = (x[i] > x[j]) ? x[j] : x[i];
-      }
-    } else if (x[j] < x[k]) {
-      median = (x[i] > x[j]) ? x[i] : x[j];
-    }
-    while (i < j) {
-      while (x[i] < median) i++;
-      while (x[j] > median) j--;
-      if (i < j) {
-        if (x[i] > x[j]) {
-          const double temp = x[i];
-          x[i] = x[j];
-          x[j] = temp;
-          const int tempd = cvec[i];
-          cvec[i] = cvec[j];
-          cvec[j] = tempd;
-        }
-        i++;
-        j--;
-      }
-    }
-    while (x[i] >= median && i > start) i--;
-    while (x[j] <= median && j < stop) j++;
-    if ((i - start) < (stop - j)) {
-      if ((i - start) > 0) rpart_sort(start, i, x, cvec);
-      start = j;
-    } else {
-      if ((stop - j) > 0) rpart_sort(j, stop, x, cvec);
-      stop = i;
-    }
+    a[at] = moving;
   }
 }
 
-// A node's estimate and its risk from the responses and weights of its observations, in the order
-// given: rpart's `ginidev` with the priors the data's own class shares, which reduces every prior to
-// one, and its `anovass`. For the Gini rule `est` holds the class predicted (1 or 2), the weighted
-// count of each class and their total; for the sum of squares the mean alone.
-void node_estimate(const double* y, const double* wt, int n, bool gini, double* est,
-                   double* risk) {
-  if (gini) {
-    double freq0 = 0.0;
-    double freq1 = 0.0;
-    double temp = 0.0;
+// The middle one of three keys by value.
+double middle_of(double a, double b, double c) {
+  return std::max(std::min(a, b), std::min(std::max(a, b), c));
+}
+
+// Sorts `a[0..n)` by key: a quicksort (Hoare 1962) partitioning about the middle of the first,
+// middle and last keys, with every range of at most eleven finished by insertion. Its order among
+// equal keys is not a stable one and is kept all the same, because the order a node's observations
+// sit in is the order their weights are summed in: two sums of the same numbers in two orders can
+// differ in the last place and turn a tie between two columns the other way. This is the order that
+// reproduces rpart's splits in the fixtures. The ranges a partition leaves never overlap, so the
+// order they are finished in does not matter.
+void sort_keyed(Keyed* a, int n) {
+  std::vector<std::pair<int, int>> ranges;
+  if (n > 1) ranges.emplace_back(0, n - 1);
+  while (!ranges.empty()) {
+    const int lo = ranges.back().first;
+    const int hi = ranges.back().second;
+    ranges.pop_back();
+    if (hi - lo < 11) {
+      insert_in_order(a, lo, hi);
+      continue;
+    }
+    const double pivot = middle_of(a[lo].key, a[(lo + hi) / 2].key, a[hi].key);
+    int up = lo;
+    int down = hi;
+    while (up < down) {
+      while (a[up].key < pivot) ++up;
+      while (a[down].key > pivot) --down;
+      if (up < down) {
+        // Two keys equal to the pivot stay where they are.
+        if (a[up].key > a[down].key) std::swap(a[up], a[down]);
+        ++up;
+        --down;
+      }
+    }
+    while (a[up].key >= pivot && up > lo) --up;
+    while (a[down].key <= pivot && down < hi) ++down;
+    if (lo < up) ranges.emplace_back(lo, up);
+    if (down < hi) ranges.emplace_back(down, hi);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// A node's prediction and the two impurities (Breiman et al. 1984, sections 4.3 and 8.3)
+
+// What a node predicts and its risk on its own observations. Between two classes that is the weight
+// of each, the class of the larger (class 0 on a tie) and the weight the other class puts on it;
+// for a mean it is the weighted mean and the weighted sum of squares about it.
+struct Fit {
+  double risk = 0.0;
+  double mean = 0.0;
+  double weight0 = 0.0;
+  double weight1 = 0.0;
+  int label = 0;
+};
+
+Fit summarise(const double* y, const double* w, int n, bool classify) {
+  Fit fit;
+  if (classify) {
     for (int i = 0; i < n; ++i) {
       if (y[i] == 0.0) {
-        freq0 += wt[i];
+        fit.weight0 += w[i];
       } else {
-        freq1 += wt[i];
+        fit.weight1 += w[i];
       }
-      temp += wt[i];
     }
-    // Predicting class 1 misclassifies the weight of class 2 and the other way round; the first
-    // class wins a tie.
-    int max = 0;
-    double dev = freq1;
-    if (freq0 < dev) {
-      max = 1;
-      dev = freq0;
-    }
-    est[0] = max + 1;
-    est[1] = freq0;
-    est[2] = freq1;
-    est[3] = temp;
-    *risk = dev;
-    return;
+    fit.label = fit.weight0 < fit.weight1 ? 1 : 0;
+    fit.risk = fit.label == 1 ? fit.weight0 : fit.weight1;
+    return fit;
   }
-  double temp = 0.0;
-  double twt = 0.0;
+  double weighted = 0.0;
+  double total = 0.0;
   for (int i = 0; i < n; ++i) {
-    temp += y[i] * wt[i];
-    twt += wt[i];
+    weighted += y[i] * w[i];
+    total += w[i];
   }
-  const double mean = temp / twt;
-  double ss = 0.0;
+  fit.mean = weighted / total;
   for (int i = 0; i < n; ++i) {
-    const double d = y[i] - mean;
-    ss += d * d * wt[i];
+    const double d = y[i] - fit.mean;
+    fit.risk += d * d * w[i];
   }
-  est[0] = mean;
-  *risk = ss;
+  return fit;
 }
 
 // The value a node reports: the weighted share of ones, or the mean.
-double node_value(const double* est, bool gini) {
-  if (!gini) return est[0];
-  const double total = est[1] + est[2];
-  return total > 0 ? est[2] / total : 0.0;
+double reported(const Fit& fit, bool classify) {
+  if (!classify) return fit.mean;
+  const double total = fit.weight0 + fit.weight1;
+  return total > 0 ? fit.weight1 / total : 0.0;
 }
 
-// The best split of one column's observations, `x` sorted and the responses and weights beside
-// it: rpart's `gini` and `anova` on a continuous predictor. `edge` is the fewest observations
-// either side keeps.
-void best_cut(const double* x, const double* y, const double* wt, int n, int edge, bool gini,
-              double my_risk, double* improve, double* split, int* direction) {
-  if (gini) {
-    double left[2] = {0.0, 0.0};
-    double right[2] = {0.0, 0.0};
-    double lwt = 0.0;
-    double rwt = 0.0;
-    int rtot = 0;
-    int ltot = 0;
-    for (int i = 0; i < n; ++i) {
-      const int j = y[i] == 0.0 ? 0 : 1;
-      rwt += wt[i];
-      right[j] += wt[i];
-      rtot++;
-    }
-    double total_ss = 0.0;
-    for (int i = 0; i < 2; ++i) {
-      const double temp = right[i] / rwt;
-      total_ss += rwt * (temp * (1.0 - temp));
-    }
-    double best = total_ss;
-    int where = 0;
-    int dir = kLeft;
-    for (int i = 0; rtot > edge; i++) {
-      const int j = y[i] == 0.0 ? 0 : 1;
-      rwt -= wt[i];
-      lwt += wt[i];
-      rtot--;
-      ltot++;
-      right[j] -= wt[i];
-      left[j] += wt[i];
-      if (ltot >= edge && x[i + 1] != x[i]) {
-        double temp = 0.0;
-        double lmean = 0.0;
-        double rmean = 0.0;
-        for (int c = 0; c < 2; ++c) {
-          double pr = left[c] / lwt;
-          temp += lwt * (pr * (1.0 - pr));
-          lmean += pr * c;
-          pr = right[c] / rwt;
-          temp += rwt * (pr * (1.0 - pr));
-          rmean += pr * c;
-        }
-        if (temp < best) {
-          best = temp;
-          where = i;
-          dir = lmean < rmean ? kLeft : kRight;
-        }
-      }
-    }
-    *improve = total_ss - best;
-    if (*improve > 0) {
-      *direction = dir;
-      *split = (x[where] + x[where + 1]) / 2;
-    }
-    return;
-  }
-  double right_sum = 0.0;
-  double right_wt = 0.0;
-  int right_n = n;
+// The loss of the node's prediction on one observation: a misclassification, or the squared error.
+double loss_at(const Fit& fit, double y, bool classify) {
+  if (classify) return static_cast<int>(y) == fit.label ? 0.0 : 1.0;
+  const double d = y - fit.mean;
+  return d * d;
+}
+
+// A threshold on one column, and which side the values below it go to.
+struct Cut {
+  double gain = 0.0;
+  double threshold = 0.0;
+  bool below_left = true;
+};
+
+// `total` times the Gini index of a class holding `part` of it, `p (1 - p)`.
+double gini_term(double part, double total) {
+  const double p = part / total;
+  return total * (p * (1.0 - p));
+}
+
+// The best cut of `n` observations sorted by `x`, each child keeping at least `edge`, under the Gini
+// index of two classes. Observations move one at a time from the right child to the left, and a
+// cut is tried only between two distinct values. The gain is the parent's weighted impurity less
+// the children's; the side the values below the cut go to is the one of fewer ones.
+Cut scan_gini(const double* x, const double* y, const double* w, int n, int edge) {
+  double left_class[2] = {0.0, 0.0};
+  double right_class[2] = {0.0, 0.0};
+  double left_weight = 0.0;
+  double right_weight = 0.0;
+  int left_count = 0;
+  int right_count = 0;
   for (int i = 0; i < n; ++i) {
-    right_sum += y[i] * wt[i];
-    right_wt += wt[i];
+    right_weight += w[i];
+    right_class[y[i] == 0.0 ? 0 : 1] += w[i];
+    ++right_count;
   }
-  const double grandmean = right_sum / right_wt;
-  double left_sum = 0.0;
-  double left_wt = 0.0;
-  int left_n = 0;
-  right_sum = 0.0;
-  double best = 0.0;
-  int where = 0;
-  int dir = kLeft;
-  for (int i = 0; right_n > edge; i++) {
-    left_wt += wt[i];
-    right_wt -= wt[i];
-    left_n++;
-    right_n--;
-    const double temp = (y[i] - grandmean) * wt[i];
-    left_sum += temp;
-    right_sum -= temp;
-    if (x[i + 1] != x[i] && left_n >= edge) {
-      const double t = left_sum * left_sum / left_wt + right_sum * right_sum / right_wt;
-      if (t > best) {
-        best = t;
-        where = i;
-        dir = left_sum < right_sum ? kLeft : kRight;
-      }
+  double parent = 0.0;
+  for (int c = 0; c < 2; ++c) parent += gini_term(right_class[c], right_weight);
+
+  double lowest = parent;
+  int after = 0;
+  bool below_left = true;
+  for (int i = 0; right_count > edge; ++i) {
+    const int c = y[i] == 0.0 ? 0 : 1;
+    right_weight -= w[i];
+    left_weight += w[i];
+    --right_count;
+    ++left_count;
+    right_class[c] -= w[i];
+    left_class[c] += w[i];
+    if (left_count < edge || x[i + 1] == x[i]) continue;
+    // The children's impurity and the mean class label on each side, summed class by class.
+    double impurity = 0.0;
+    double left_label = 0.0;
+    double right_label = 0.0;
+    for (int k = 0; k < 2; ++k) {
+      const double pl = left_class[k] / left_weight;
+      impurity += left_weight * (pl * (1.0 - pl));
+      left_label += pl * k;
+      const double pr = right_class[k] / right_weight;
+      impurity += right_weight * (pr * (1.0 - pr));
+      right_label += pr * k;
+    }
+    if (impurity < lowest) {
+      lowest = impurity;
+      after = i;
+      below_left = left_label < right_label;
     }
   }
-  *improve = best / my_risk;
-  if (best > 0) {
-    *direction = dir;
-    *split = (x[where] + x[where + 1]) / 2;
+  Cut cut;
+  cut.gain = parent - lowest;
+  if (cut.gain > 0) {
+    cut.below_left = below_left;
+    cut.threshold = (x[after] + x[after + 1]) / 2;
   }
+  return cut;
 }
 
-// rpart's guard against a rounding error posing as an improvement, read against the largest
-// improvement the fit has seen so far, which it raises first.
-bool improves(double improve, double& iscale) {
-  if (improve > iscale) iscale = improve;
-  return improve > iscale * 1e-10;
+// The same scan under the weighted sum of squares. With the responses centred on the parent's
+// mean, the reduction a cut makes is `S_l^2 / W_l + S_r^2 / W_r`, `S` a side's weighted sum and `W`
+// its weight; the gain is that reduction as a share of the parent's risk `risk`, and the values
+// below the cut go to the side of the smaller sum.
+Cut scan_squares(const double* x, const double* y, const double* w, int n, int edge,
+                 double risk) {
+  double right_sum = 0.0;
+  double right_weight = 0.0;
+  for (int i = 0; i < n; ++i) {
+    right_sum += y[i] * w[i];
+    right_weight += w[i];
+  }
+  const double centre = right_sum / right_weight;
+  right_sum = 0.0;
+  double left_sum = 0.0;
+  double left_weight = 0.0;
+  int left_count = 0;
+  int right_count = n;
+
+  double largest = 0.0;
+  int after = 0;
+  bool below_left = true;
+  for (int i = 0; right_count > edge; ++i) {
+    left_weight += w[i];
+    right_weight -= w[i];
+    ++left_count;
+    --right_count;
+    const double moved = (y[i] - centre) * w[i];
+    left_sum += moved;
+    right_sum -= moved;
+    if (x[i + 1] == x[i] || left_count < edge) continue;
+    const double reduction =
+        left_sum * left_sum / left_weight + right_sum * right_sum / right_weight;
+    if (reduction > largest) {
+      largest = reduction;
+      after = i;
+      below_left = left_sum < right_sum;
+    }
+  }
+  Cut cut;
+  cut.gain = largest / risk;
+  if (largest > 0) {
+    cut.below_left = below_left;
+    cut.threshold = (x[after] + x[after + 1]) / 2;
+  }
+  return cut;
 }
 
-// One row of the complexity table, linked the way rpart links them so the table is filled in the
-// same order and with the same sums.
+Cut best_cut(const double* x, const double* y, const double* w, int n, int edge, bool classify,
+             double risk) {
+  return classify ? scan_gini(x, y, w, n, edge) : scan_squares(x, y, w, n, edge, risk);
+}
+
+// Whether a gain is a real one rather than rounding: above 1e-10 of the largest gain seen so far,
+// the gain itself counted first.
+class GainFloor {
+ public:
+  bool admits(double gain) {
+    if (gain > largest_) largest_ = gain;
+    return gain > largest_ * 1e-10;
+  }
+
+ private:
+  double largest_ = 0.0;
+};
+
+// The split a node is given.
+struct Rule {
+  int column = -1;
+  double threshold = 0.0;
+  bool below_left = true;
+
+  bool sends_left(double v) const { return (v < threshold) == below_left; }
+};
+
+// Keeps the first rule of the largest admitted gain among the candidates offered in turn.
+class RuleChoice {
+ public:
+  void offer(GainFloor& floor, int column, const Cut& cut) {
+    if (!floor.admits(cut.gain)) return;
+    if (rule_ && !(cut.gain > gain_)) return;
+    rule_ = Rule{column, cut.threshold, cut.below_left};
+    gain_ = cut.gain;
+  }
+  const std::optional<Rule>& rule() const { return rule_; }
+
+ private:
+  std::optional<Rule> rule_;
+  double gain_ = 0.0;
+};
+
+// ---------------------------------------------------------------------------------------------
+// The tree and its cost-complexity pruning (Breiman et al. 1984, chapter 3)
+
+struct CartNode {
+  Fit fit;
+  // The complexity at which the node's subtree is pruned away: while growing, an upper bound on
+  // it that stops a node whose split could never be kept.
+  double cp = 0.0;
+  double weight = 0.0;
+  int count = 0;
+  Rule rule;
+  std::unique_ptr<CartNode> left;
+  std::unique_ptr<CartNode> right;
+};
+
+// A grown subtree's splits and risk, after the weakest links below it are cut.
+struct Subtree {
+  int splits = 0;
+  double risk = 0.0;
+};
+
+// One row of the complexity table, largest complexity first: the subtree's risk and splits there,
+// and the held-out loss and its sum of squares, the latter turned into a standard error at the end.
 struct CpRow {
   double cp = 0.0;
   double risk = 0.0;
+  int splits = 0;
   double xrisk = 0.0;
   double xstd = 0.0;
-  int nsplit = 0;
-  int forward = -1;
-  int back = -1;
 };
 
-class Grower {
+// Grows the tree on every observation, and on each fold's complement where folds are given. The
+// observations of a node are a stretch of `order_`, which holds for every column the rows sorted by
+// that column; a split rearranges each column's stretch into the left child's rows then the right
+// child's, each in the order it held.
+class CartBuilder {
  public:
-  Grower(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
-         bool gini, const TreeSpec& spec)
-      : x_(x), y_(y), w_(w), n_(static_cast<int>(n)), p_(static_cast<int>(p)), gini_(gini),
-        min_split_(spec.min_split), min_node_(spec.min_leaf),
-        maxnode_(static_cast<long long>(std::pow(2.0, spec.max_depth)) - 1),
-        complexity_(spec.cp), sorts_(n * p), side_(n), tempvec_(n), xtemp_(n), ytemp_(n),
-        wtemp_(n) {
-    std::vector<double> column(n);
+  CartBuilder(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
+              bool classify, const TreeSpec& spec)
+      : x_(x), y_(y), w_(w), n_(static_cast<int>(n)), p_(static_cast<int>(p)),
+        classify_(classify), min_split_(spec.min_split), min_leaf_(spec.min_leaf),
+        deepest_((1LL << spec.max_depth) - 1), cp_share_(spec.cp), order_(n * p), goes_left_(n),
+        spill_(n), column_x_(n), column_y_(n), column_w_(n), node_y_(n), node_w_(n) {
+    std::vector<Keyed> keyed(n);
     for (int v = 0; v < p_; ++v) {
-      int* index = sorts_.data() + static_cast<std::size_t>(v) * n;
-      for (int k = 0; k < n_; ++k) {
-        index[k] = k;
-        column[k] = x_[k + static_cast<std::size_t>(v) * n];
-      }
-      rpart_sort(0, n_ - 1, column.data(), index);
+      const double* col = column(v);
+      for (int r = 0; r < n_; ++r) keyed[r] = {col[r], r};
+      sort_keyed(keyed.data(), n_);
+      int* block = rows_by(v);
+      for (int r = 0; r < n_; ++r) block[r] = keyed[r].row;
     }
   }
 
-  // The tree on every observation, its complexity table, and that table's cross-validated error
-  // where folds are given.
-  std::unique_ptr<Node> grow(std::vector<CpRow>& table, int& tail, const std::int32_t* fold,
-                             int n_fold) {
-    std::vector<int> saved;
-    if (n_fold > 1) saved = sorts_;
-    auto root = std::make_unique<Node>();
-    double twt = 0.0;
-    for (int i = 0; i < n_; ++i) {
-      ytemp_[i] = y_[i];
-      wtemp_[i] = w_[i];
-      twt += w_[i];
-    }
-    root->num_obs = n_;
-    root->sum_wt = twt;
-    evaluate(n_, root.get());
-    root->complexity = root->risk;
-    alpha_ = complexity_ * root->risk;
-    double sumrisk = 0.0;
-    partition(1, root.get(), &sumrisk, 0, n_);
+  // The tree on every observation with its complexity table, and the table's held-out losses
+  // where there are two folds or more.
+  std::unique_ptr<CartNode> build(const std::int32_t* fold, int n_fold,
+                                  std::vector<CpRow>& table) {
+    if (n_fold > 1) initial_order_ = order_;
+    auto root = std::make_unique<CartNode>();
+    double total = 0.0;
+    for (int r = 0; r < n_; ++r) total += w_[r];
+    root->fit = summarise(y_, w_, n_, classify_);
+    root->count = n_;
+    root->weight = total;
+    root->cp = root->fit.risk;
+    alpha_ = cp_share_ * root->fit.risk;
+    grow(*root, 1, 0, n_);
 
-    table.clear();
-    CpRow head;
-    head.cp = root->complexity;
-    head.risk = root->risk;
-    table.push_back(head);
-    tail = 0;
+    CpRow top;
+    top.cp = root->cp;
+    top.risk = root->fit.risk;
+    table.assign(1, top);
     if (root->left) {
-      make_cp_list(root.get(), root->complexity, table, tail);
-      make_cp_table(root.get(), root->complexity, 0, table, tail);
-      if (n_fold > 1) xval(n_fold, table, fold, saved);
+      gather_complexities(*root, root->cp, table);
+      tally(*root, root->cp, 0, table);
+      if (n_fold > 1) cross_validate(fold, n_fold, table);
     }
     return root;
   }
 
+  // The pruning threshold on the scale of the risk.
   double alpha() const { return alpha_; }
 
  private:
-  // The node's estimate and its risk from the observations in `ytemp_` and `wtemp_`.
-  void evaluate(int n, Node* me) {
-    node_estimate(ytemp_.data(), wtemp_.data(), n, gini_, me->est, &me->risk);
+  const double* column(int v) const { return x_ + static_cast<std::size_t>(v) * n_; }
+  int* rows_by(int v) { return order_.data() + static_cast<std::size_t>(v) * n_; }
+
+  Subtree leaf(CartNode& node) const {
+    node.cp = alpha_;
+    return {0, node.fit.risk};
   }
 
-  // The loss of predicting `est` for an observation of response `y`: a misclassification for the
-  // Gini rule, the squared error for the sum of squares.
-  double error(double y, const double* est) const {
-    if (gini_) return (static_cast<int>(y) + 1 == static_cast<int>(est[0])) ? 0.0 : 1.0;
-    const double d = y - est[0];
-    return d * d;
+  // Grows the node holding the stretch `[begin, end)`, numbered `id` (1 at the root, 2k and
+  // 2k + 1 below k), and reports its subtree after the weakest links are cut. A split is kept
+  // where the subtree's complexity `(R(t) - R(T_t)) / (|T_t| - 1)` exceeds `alpha_`.
+  Subtree grow(CartNode& node, long long id, int begin, int end) {
+    double bound = node.fit.risk;
+    if (id > 1) {
+      const int* rows = rows_by(0);
+      double total = 0.0;
+      for (int i = begin; i < end; ++i) {
+        const int r = rows[i];
+        node_y_[i - begin] = y_[r];
+        node_w_[i - begin] = w_[r];
+        total += w_[r];
+      }
+      node.fit = summarise(node_y_.data(), node_w_.data(), end - begin, classify_);
+      node.count = end - begin;
+      node.weight = total;
+      bound = std::min(node.fit.risk, node.cp);
+    }
+    if (node.count < min_split_ || bound <= alpha_ || id > deepest_) return leaf(node);
+
+    const std::optional<Rule> rule = choose_rule(node.fit.risk, begin, end);
+    if (!rule) return leaf(node);
+    node.rule = *rule;
+    const int middle = begin + send(node.rule, begin, end);
+    const double risk = node.fit.risk;
+
+    node.left = std::make_unique<CartNode>();
+    node.left->cp = bound - alpha_;
+    Subtree low = grow(*node.left, 2 * id, begin, middle);
+
+    double right_bound = std::max((risk - low.risk) / (low.splits + 1), risk - node.left->fit.risk);
+    right_bound = std::min(right_bound, node.cp);
+    node.right = std::make_unique<CartNode>();
+    node.right->cp = right_bound - alpha_;
+    Subtree high = grow(*node.right, 2 * id + 1, middle, end);
+
+    // A child whose own complexity lies below the link to it is cut back to a leaf, the weaker
+    // child first, and the link measured again.
+    const auto link = [&] {
+      return (risk - (low.risk + high.risk)) / (low.splits + high.splits + 1);
+    };
+    const bool left_weaker = node.right->cp > node.left->cp;
+    Subtree& weak = left_weaker ? low : high;
+    Subtree& strong = left_weaker ? high : low;
+    const CartNode& weak_node = left_weaker ? *node.left : *node.right;
+    const CartNode& strong_node = left_weaker ? *node.right : *node.left;
+    if (link() > weak_node.cp) {
+      weak = {0, weak_node.fit.risk};
+      if (link() > strong_node.cp) strong = {0, strong_node.fit.risk};
+    }
+    node.cp = link();
+
+    if (node.cp <= alpha_) {
+      node.left.reset();
+      node.right.reset();
+      return {0, risk};
+    }
+    return {low.splits + high.splits + 1, low.risk + high.risk};
   }
 
-  // rpart's `bsplit`: every column in turn, the first to reach the largest improvement kept.
-  void best_split(Node* me, int n1, int n2) {
-    me->split = false;
-    double best = 0.0;
+  // The best rule over every column in turn, among the node's observations of positive weight.
+  std::optional<Rule> choose_rule(double risk, int begin, int end) {
+    RuleChoice choice;
     for (int v = 0; v < p_; ++v) {
-      const int* index = sorts_.data() + static_cast<std::size_t>(v) * n_;
-      const double* column = x_ + static_cast<std::size_t>(v) * n_;
+      const int* rows = rows_by(v);
+      const double* col = column(v);
       int k = 0;
-      for (int j = n1; j < n2; ++j) {
-        const int kk = index[j];
-        if (w_[kk] > 0) {
-          xtemp_[k] = column[kk];
-          ytemp_[k] = y_[kk];
-          wtemp_[k] = w_[kk];
-          k++;
-        }
+      for (int i = begin; i < end; ++i) {
+        const int r = rows[i];
+        if (!(w_[r] > 0)) continue;
+        column_x_[k] = col[r];
+        column_y_[k] = y_[r];
+        column_w_[k] = w_[r];
+        ++k;
       }
-      if (k == 0 || xtemp_[0] == xtemp_[k - 1]) continue;
-      double improve = 0.0;
-      double split = 0.0;
-      int direction = kLeft;
-      best_cut(xtemp_.data(), ytemp_.data(), wtemp_.data(), k, min_node_, gini_, me->risk,
-               &improve, &split, &direction);
-      if (improves(improve, iscale_)) {
-        if (!me->split || improve > best) {
-          me->split = true;
-          best = improve;
-          me->var = v;
-          me->spoint = split;
-          me->direction = direction;
-        }
-      }
+      if (k == 0 || column_x_[0] == column_x_[k - 1]) continue;
+      choice.offer(floor_, v,
+                   best_cut(column_x_.data(), column_y_.data(), column_w_.data(), k, min_leaf_,
+                            classify_, risk));
     }
+    return choice.rule();
   }
 
-  // rpart's `nodesplit` without missing values: each observation sent left or right, and every
-  // column's sorted index reordered to the left child's observations then the right child's, in
-  // the order they held.
-  void split_node(const Node* me, int n1, int n2, int* nleft, int* nright) {
-    const double* column = x_ + static_cast<std::size_t>(me->var) * n_;
-    const int* pindex = sorts_.data() + static_cast<std::size_t>(me->var) * n_;
-    int nl = 0;
-    int nr = 0;
-    for (int i = n1; i < n2; ++i) {
-      const int j = pindex[i];
-      const int k = (column[j] < me->spoint) ? me->direction : -me->direction;
-      if (k == kLeft) {
-        side_[j] = 1;
-        nl++;
-      } else {
-        side_[j] = 2;
-        nr++;
-      }
+  // Sends the stretch's rows to the two sides of `rule`, rearranging every column's stretch, and
+  // returns how many went left.
+  int send(const Rule& rule, int begin, int end) {
+    const double* col = column(rule.column);
+    const int* rows = rows_by(0);
+    int n_left = 0;
+    for (int i = begin; i < end; ++i) {
+      const int r = rows[i];
+      const bool left = rule.sends_left(col[r]);
+      goes_left_[r] = left ? 1 : 0;
+      n_left += left ? 1 : 0;
     }
     for (int v = 0; v < p_; ++v) {
-      int* sindex = sorts_.data() + static_cast<std::size_t>(v) * n_;
-      int i1 = n1;
-      int i2 = n1 + nl;
-      for (int i = n1; i < n2; ++i) {
-        const int j = sindex[i];
-        if (side_[j] == 1) {
-          sindex[i1++] = j;
+      int* block = rows_by(v);
+      int kept = begin;
+      int spilled = 0;
+      for (int i = begin; i < end; ++i) {
+        const int r = block[i];
+        if (goes_left_[r]) {
+          block[kept++] = r;
         } else {
-          tempvec_[i2++] = j;
+          spill_[spilled++] = r;
         }
       }
-      for (int i = n1 + nl; i < n2; ++i) sindex[i] = tempvec_[i];
+      std::copy(spill_.begin(), spill_.begin() + spilled, block + kept);
     }
-    *nleft = nl;
-    *nright = nr;
+    return n_left;
   }
 
-  // rpart's `partition`, returning the splits kept below `me` and the risk of its subtree.
-  int partition(long long nodenum, Node* me, double* sumrisk, int n1, int n2) {
-    const int n = n2 - n1;
-    double tempcp;
-    if (nodenum > 1) {
-      const int* first = sorts_.data();
-      double twt = 0.0;
-      int k = 0;
-      for (int i = n1; i < n2; ++i) {
-        const int j = first[i];
-        wtemp_[k] = w_[j];
-        ytemp_[k] = y_[j];
-        twt += w_[j];
-        k++;
-      }
-      evaluate(n, me);
-      me->num_obs = n;
-      me->sum_wt = twt;
-      tempcp = me->risk;
-      if (tempcp > me->complexity) tempcp = me->complexity;
+  // The distinct complexities of the nested pruned subtrees, each node's complexity first capped at
+  // its parent's so the sequence is nested, largest first.
+  void gather_complexities(CartNode& node, double parent, std::vector<CpRow>& table) const {
+    node.cp = std::min(node.cp, parent);
+    const double own = std::max(node.cp, alpha_);
+    if (node.left) {
+      gather_complexities(*node.left, own, table);
+      gather_complexities(*node.right, own, table);
+    }
+    if (!(own < parent)) return;
+    auto at = table.begin();
+    for (; at != table.end(); ++at) {
+      if (own == at->cp) return;
+      if (own > at->cp) break;
+    }
+    CpRow row;
+    row.cp = own;
+    table.insert(at, row);
+  }
+
+  // Adds each leaf's risk, and each split's count, to every row of the table whose pruned subtree
+  // keeps it. Returns the first row, from the smallest complexity up, the node's parent reaches.
+  static std::ptrdiff_t tally(const CartNode& node, double parent, int splits,
+                              std::vector<CpRow>& table) {
+    std::ptrdiff_t row;
+    if (node.left) {
+      tally(*node.left, node.cp, 0, table);
+      row = tally(*node.right, node.cp, splits + 1, table);
     } else {
-      tempcp = me->risk;
+      row = static_cast<std::ptrdiff_t>(table.size()) - 1;
     }
-
-    if (me->num_obs < min_split_ || tempcp <= alpha_ || nodenum > maxnode_) {
-      me->complexity = alpha_;
-      *sumrisk = me->risk;
-      me->split = false;
-      return 0;
+    for (; row >= 0 && table[row].cp < parent; --row) {
+      table[row].risk += node.fit.risk;
+      table[row].splits += splits;
     }
-
-    best_split(me, n1, n2);
-    if (!me->split) {
-      me->complexity = alpha_;
-      *sumrisk = me->risk;
-      return 0;
-    }
-
-    int nleft = 0;
-    int nright = 0;
-    split_node(me, n1, n2, &nleft, &nright);
-
-    me->left = std::make_unique<Node>();
-    me->left->complexity = tempcp - alpha_;
-    double left_risk = 0.0;
-    int left_split = partition(2 * nodenum, me->left.get(), &left_risk, n1, n1 + nleft);
-
-    tempcp = (me->risk - left_risk) / (left_split + 1);
-    const double tempcp2 = me->risk - me->left->risk;
-    if (tempcp < tempcp2) tempcp = tempcp2;
-    if (tempcp > me->complexity) tempcp = me->complexity;
-
-    me->right = std::make_unique<Node>();
-    me->right->complexity = tempcp - alpha_;
-    double right_risk = 0.0;
-    int right_split = partition(1 + 2 * nodenum, me->right.get(), &right_risk, n1 + nleft,
-                                n1 + nleft + nright);
-
-    tempcp = (me->risk - (left_risk + right_risk)) / (left_split + right_split + 1);
-    if (me->right->complexity > me->left->complexity) {
-      if (tempcp > me->left->complexity) {
-        left_risk = me->left->risk;
-        left_split = 0;
-        tempcp = (me->risk - (left_risk + right_risk)) / (left_split + right_split + 1);
-        if (tempcp > me->right->complexity) {
-          right_risk = me->right->risk;
-          right_split = 0;
-        }
-      }
-    } else if (tempcp > me->right->complexity) {
-      right_split = 0;
-      right_risk = me->right->risk;
-      tempcp = (me->risk - (left_risk + right_risk)) / (left_split + right_split + 1);
-      if (tempcp > me->left->complexity) {
-        left_risk = me->left->risk;
-        left_split = 0;
-      }
-    }
-    me->complexity = (me->risk - (left_risk + right_risk)) / (left_split + right_split + 1);
-
-    if (me->complexity <= alpha_) {
-      me->left.reset();
-      me->right.reset();
-      me->split = false;
-      *sumrisk = me->risk;
-      return 0;
-    }
-    *sumrisk = left_risk + right_risk;
-    return left_split + right_split + 1;
+    return row;
   }
 
-  void make_cp_list(Node* me, double parent, std::vector<CpRow>& table, int& tail) {
-    if (me->complexity > parent) me->complexity = parent;
-    double me_cp = me->complexity;
-    if (me_cp < alpha_) me_cp = alpha_;
-    if (me->left) {
-      make_cp_list(me->left.get(), me_cp, table, tail);
-      make_cp_list(me->right.get(), me_cp, table, tail);
-    }
-    if (me_cp < parent) {
-      int temp = -1;
-      for (int c = 0; c != -1; c = table[c].forward) {
-        if (me_cp == table[c].cp) return;
-        if (me_cp > table[c].cp) break;
-        temp = c;
-      }
-      CpRow row;
-      row.cp = me_cp;
-      row.back = temp;
-      row.forward = table[temp].forward;
-      const int at = static_cast<int>(table.size());
-      table.push_back(row);
-      if (table[at].forward != -1) {
-        table[table[at].forward].back = at;
-      } else {
-        tail = at;
-      }
-      table[temp].forward = at;
-    }
+  static void cap_complexity(CartNode& node, double parent) {
+    if (node.cp > parent) node.cp = parent;
+    if (!node.left) return;
+    cap_complexity(*node.left, node.cp);
+    cap_complexity(*node.right, node.cp);
   }
 
-  int make_cp_table(const Node* me, double parent, int nsplit, std::vector<CpRow>& table,
-                    int tail) {
-    int c;
-    if (me->left) {
-      make_cp_table(me->left.get(), me->complexity, 0, table, tail);
-      c = make_cp_table(me->right.get(), me->complexity, nsplit + 1, table, tail);
-    } else {
-      c = tail;
-    }
-    while (table[c].cp < parent) {
-      table[c].risk += me->risk;
-      table[c].nsplit += nsplit;
-      c = table[c].back;
-    }
-    return c;
-  }
+  // V-fold cross-validation of the complexity table (Breiman et al. 1984, section 3.4.2): a tree
+  // grown on each fold's complement, with every complexity rescaled to the complement's weight,
+  // and each held-out observation's loss read at the geometric midpoint of every row's interval.
+  void cross_validate(const std::int32_t* fold, int n_fold, std::vector<CpRow>& table) {
+    const double alpha_whole = alpha_;
+    const std::size_t rows = table.size();
+    std::vector<double> probe(rows);
+    probe[0] = 10 * table[0].cp;
+    for (std::size_t i = 1; i < rows; ++i) probe[i] = std::sqrt(table[i - 1].cp * table[i].cp);
+    double total = 0.0;
+    for (int r = 0; r < n_; ++r) total += w_[r];
+    double previous = total;
+    std::vector<int> held;
 
-  static void fix_cp(Node* me, double parent_cp) {
-    if (me->complexity > parent_cp) me->complexity = parent_cp;
-    if (me->left) {
-      fix_cp(me->left.get(), me->complexity);
-      fix_cp(me->right.get(), me->complexity);
-    }
-  }
-
-  // The losses of one held-out observation at every complexity of the table: rpart's `rundown`,
-  // descending while the complexity asked for is below the node's.
-  void rundown(const Node* tree, int obs, const std::vector<double>& cp,
-               std::vector<double>& loss) const {
-    for (std::size_t i = 0; i < cp.size(); ++i) {
-      while (cp[i] < tree->complexity && tree->left) {
-        const double v = x_[obs + static_cast<std::size_t>(tree->var) * n_];
-        const int dir = (v < tree->spoint) ? tree->direction : -tree->direction;
-        tree = (dir == kLeft) ? tree->left.get() : tree->right.get();
-      }
-      loss[i] = error(y_[obs], tree->est);
-    }
-  }
-
-  // rpart's `xval`: a tree grown on each fold's complement under the complexity rescaled to its
-  // weight, and each held-out observation's loss read at every row of the table.
-  void xval(int n_xval, std::vector<CpRow>& table, const std::int32_t* fold,
-            const std::vector<int>& saved) {
-    const double alphasave = alpha_;
-    std::vector<int> order;
-    for (int c = 0; c != -1; c = table[c].forward) order.push_back(c);
-    const std::size_t num = order.size();
-    std::vector<double> cp(num);
-    cp[0] = 10 * table[order[0]].cp;
-    for (std::size_t i = 1; i < num; ++i) {
-      cp[i] = std::sqrt(table[order[i - 1]].cp * table[order[i]].cp);
-    }
-    double total_wt = 0.0;
-    for (int i = 0; i < n_; ++i) total_wt += w_[i];
-    double old_wt = total_wt;
-    std::vector<double> loss(num);
-
-    for (int group = 0; group < n_xval; ++group) {
-      int k = 0;
+    for (int g = 0; g < n_fold; ++g) {
       for (int v = 0; v < p_; ++v) {
-        k = 0;
-        const int* from = saved.data() + static_cast<std::size_t>(v) * n_;
-        int* to = sorts_.data() + static_cast<std::size_t>(v) * n_;
+        const int* from = initial_order_.data() + static_cast<std::size_t>(v) * n_;
+        int* to = rows_by(v);
+        int kept = 0;
         for (int i = 0; i < n_; ++i) {
-          if (fold[from[i]] != group) to[k++] = from[i];
+          if (fold[from[i]] != g) to[kept++] = from[i];
         }
       }
-      int last = k;
-      k = 0;
-      double temp = 0.0;
-      for (int i = 0; i < n_; ++i) {
-        if (fold[i] == group) {
-          sorts_[last++] = i;
-        } else {
-          ytemp_[k] = y_[i];
-          wtemp_[k] = w_[i];
-          temp += w_[i];
-          k++;
+      held.clear();
+      int kept = 0;
+      double weight = 0.0;
+      for (int r = 0; r < n_; ++r) {
+        if (fold[r] == g) {
+          held.push_back(r);
+          continue;
         }
+        node_y_[kept] = y_[r];
+        node_w_[kept] = w_[r];
+        weight += w_[r];
+        ++kept;
       }
-      for (std::size_t j = 0; j < num; ++j) cp[j] *= temp / old_wt;
-      alpha_ *= temp / old_wt;
-      old_wt = temp;
+      const double shrink = weight / previous;
+      for (double& c : probe) c *= shrink;
+      alpha_ *= shrink;
+      previous = weight;
 
-      Node xtree;
-      xtree.num_obs = k;
-      evaluate(k, &xtree);
-      xtree.complexity = xtree.risk;
-      double sumrisk = 0.0;
-      partition(1, &xtree, &sumrisk, 0, k);
-      fix_cp(&xtree, xtree.complexity);
+      CartNode root;
+      root.count = kept;
+      root.fit = summarise(node_y_.data(), node_w_.data(), kept, classify_);
+      root.cp = root.fit.risk;
+      grow(root, 1, 0, kept);
+      cap_complexity(root, root.cp);
 
-      for (int i = k; i < n_; ++i) {
-        const int j = sorts_[i];
-        rundown(&xtree, j, cp, loss);
-        for (std::size_t c = 0; c < num; ++c) {
-          table[order[c]].xrisk += loss[c] * w_[j];
-          table[order[c]].xstd += loss[c] * loss[c] * w_[j];
+      for (const int r : held) {
+        const CartNode* at = &root;
+        for (std::size_t c = 0; c < rows; ++c) {
+          while (probe[c] < at->cp && at->left) {
+            const double v = x_[r + static_cast<std::size_t>(at->rule.column) * n_];
+            at = at->rule.sends_left(v) ? at->left.get() : at->right.get();
+          }
+          const double loss = loss_at(at->fit, y_[r], classify_);
+          table[c].xrisk += loss * w_[r];
+          table[c].xstd += loss * loss * w_[r];
         }
       }
     }
-    for (std::size_t c = 0; c < num; ++c) {
-      CpRow& row = table[order[c]];
-      row.xstd = std::sqrt(row.xstd - row.xrisk * row.xrisk / total_wt);
-    }
-    alpha_ = alphasave;
+    for (CpRow& row : table) row.xstd = std::sqrt(row.xstd - row.xrisk * row.xrisk / total);
+    alpha_ = alpha_whole;
   }
 
   const double* x_;
@@ -659,202 +630,223 @@ class Grower {
   const double* w_;
   int n_;
   int p_;
-  bool gini_;
+  bool classify_;
   int min_split_;
-  int min_node_;
-  long long maxnode_;
-  double complexity_;
+  int min_leaf_;
+  long long deepest_;
+  double cp_share_;
   double alpha_ = 0.0;
-  double iscale_ = 0.0;
-  std::vector<int> sorts_;
-  std::vector<std::int8_t> side_;
-  std::vector<int> tempvec_;
-  std::vector<double> xtemp_;
-  std::vector<double> ytemp_;
-  std::vector<double> wtemp_;
+  GainFloor floor_;
+  std::vector<int> order_;
+  std::vector<int> initial_order_;
+  std::vector<std::int8_t> goes_left_;
+  std::vector<int> spill_;
+  std::vector<double> column_x_;
+  std::vector<double> column_y_;
+  std::vector<double> column_w_;
+  std::vector<double> node_y_;
+  std::vector<double> node_w_;
 };
 
-// The fitted nodes in rpart's frame order, a node's children after it where it keeps them.
-void flatten(const Node* me, long long number, double scale, double alpha, bool gini, Tree& out) {
+// Writes the node and, where it keeps its split, its subtree into `out`, depth first and left
+// before right.
+void write_node(const CartNode& node, long long id, double scale, double alpha, bool classify,
+                Tree& out) {
   const std::size_t at = out.number.size();
-  out.number.push_back(static_cast<std::int32_t>(number));
-  out.n.push_back(me->num_obs);
-  out.weight.push_back(me->sum_wt);
-  out.risk.push_back(me->risk);
-  out.complexity.push_back(me->complexity * scale);
-  out.value.push_back(node_value(me->est, gini));
-  const bool kids = me->left && me->complexity > alpha;
-  out.column.push_back(kids ? me->var : -1);
-  out.threshold.push_back(kids ? me->spoint : 0.0);
-  out.less_left.push_back(kids && me->direction == kLeft ? 1 : 0);
+  const bool split = node.left && node.cp > alpha;
+  out.number.push_back(static_cast<std::int32_t>(id));
+  out.n.push_back(node.count);
+  out.weight.push_back(node.weight);
+  out.risk.push_back(node.fit.risk);
+  out.complexity.push_back(node.cp * scale);
+  out.value.push_back(reported(node.fit, classify));
+  out.column.push_back(split ? node.rule.column : -1);
+  out.threshold.push_back(split ? node.rule.threshold : 0.0);
+  out.less_left.push_back(split && node.rule.below_left ? 1 : 0);
   out.left.push_back(-1);
   out.right.push_back(-1);
-  if (!kids) return;
+  if (!split) return;
   out.left[at] = static_cast<std::int32_t>(out.number.size());
-  flatten(me->left.get(), 2 * number, scale, alpha, gini, out);
+  write_node(*node.left, 2 * id, scale, alpha, classify, out);
   out.right[at] = static_cast<std::int32_t>(out.number.size());
-  flatten(me->right.get(), 2 * number + 1, scale, alpha, gini, out);
+  write_node(*node.right, 2 * id + 1, scale, alpha, classify, out);
 }
 
-void copy_node(const Tree& from, std::size_t i, double cp, Tree& out) {
+// Copies node `i` of `from` into `out`, and its subtree where its complexity lies above `cp`.
+void copy_pruned(const Tree& from, std::size_t i, double cp, Tree& out) {
   const std::size_t at = out.number.size();
+  const bool split = from.column[i] >= 0 && !(from.complexity[i] <= cp);
   out.number.push_back(from.number[i]);
   out.n.push_back(from.n[i]);
   out.weight.push_back(from.weight[i]);
   out.risk.push_back(from.risk[i]);
   out.complexity.push_back(from.complexity[i]);
   out.value.push_back(from.value[i]);
-  const bool kids = from.column[i] >= 0 && !(from.complexity[i] <= cp);
-  out.column.push_back(kids ? from.column[i] : -1);
-  out.threshold.push_back(kids ? from.threshold[i] : 0.0);
-  out.less_left.push_back(kids ? from.less_left[i] : 0);
+  out.column.push_back(split ? from.column[i] : -1);
+  out.threshold.push_back(split ? from.threshold[i] : 0.0);
+  out.less_left.push_back(split ? from.less_left[i] : 0);
   out.left.push_back(-1);
   out.right.push_back(-1);
-  if (!kids) return;
+  if (!split) return;
   out.left[at] = static_cast<std::int32_t>(out.number.size());
-  copy_node(from, static_cast<std::size_t>(from.left[i]), cp, out);
+  copy_pruned(from, static_cast<std::size_t>(from.left[i]), cp, out);
   out.right[at] = static_cast<std::int32_t>(out.number.size());
-  copy_node(from, static_cast<std::size_t>(from.right[i]), cp, out);
+  copy_pruned(from, static_cast<std::size_t>(from.right[i]), cp, out);
 }
 
-// The running sum of the weights of some observations, in the order given, and the draw of one of
-// them: the first whose running sum exceeds a uniform times the total. An observation of zero
-// weight is never drawn.
-struct Urn {
-  std::vector<int> row;
-  std::vector<double> cum;
+// ---------------------------------------------------------------------------------------------
+// The random forest (Breiman 2001)
 
-  void add(int i, double w) {
-    row.push_back(i);
-    cum.push_back((cum.empty() ? 0.0 : cum.back()) + w);
+// Rows and their running weight. A draw is the first row whose running weight exceeds a uniform
+// times the total, so a row of zero weight is never drawn.
+struct WeightedPool {
+  std::vector<int> rows;
+  std::vector<double> running;
+
+  void add(int r, double w) {
+    rows.push_back(r);
+    running.push_back((running.empty() ? 0.0 : running.back()) + w);
   }
 
+  double total() const { return running.back(); }
+
   int draw(detail::Stream& stream) const {
-    const double target = stream.uniform() * cum.back();
+    const double target = stream.uniform() * total();
     std::size_t at = static_cast<std::size_t>(
-        std::upper_bound(cum.begin(), cum.end(), target) - cum.begin());
-    if (at >= cum.size()) at = cum.size() - 1;
-    return row[at];
+        std::upper_bound(running.begin(), running.end(), target) - running.begin());
+    if (at >= running.size()) at = running.size() - 1;
+    return rows[at];
   }
 };
 
-// Grows one tree of a forest. The drawn observations are held as row numbers, a row drawn twice
-// held twice, in ascending order; a node is a stretch of them, and its children keep the order it
-// held. For each column tried the node's observations are sorted by it, ties kept in node order.
-class ForestGrower {
+// One bootstrap draw per pool and the number of rows each gives.
+struct Bootstrap {
+  std::vector<WeightedPool> pools;
+  std::vector<int> draws;
+};
+
+// Grows one tree of a forest. The drawn rows are held in ascending order, a row drawn twice held
+// twice; a node is a stretch of them, and its children keep the order it held. Each column tried
+// at a node is sorted afresh, ties kept in the node's order, and every drawn row weighs one.
+class ForestTree {
  public:
-  ForestGrower(const double* x, const double* y, std::size_t n, std::size_t p, bool gini,
-               const ForestSpec& spec)
-      : x_(x), y_(y), n_(n), p_(p), gini_(gini), min_leaf_(spec.min_leaf),
+  ForestTree(const double* x, const double* y, std::size_t n, std::size_t p, bool classify,
+             const ForestSpec& spec)
+      : x_(x), y_(y), n_(n), p_(p), classify_(classify), min_leaf_(spec.min_leaf),
         mtry_(static_cast<std::size_t>(spec.mtry)) {}
 
-  detail::Nodes grow(const std::vector<Urn>& urns, const std::vector<int>& draws,
-                     std::uint32_t seed, std::uint32_t tree) {
+  detail::Nodes grow(const Bootstrap& boot, std::uint32_t seed, std::uint32_t tree) {
     detail::Stream stream(seed, tree);
-    std::vector<int> count(n_, 0);
-    for (std::size_t u = 0; u < urns.size(); ++u) {
-      for (int k = 0; k < draws[u]; ++k) count[static_cast<std::size_t>(urns[u].draw(stream))]++;
-    }
-    std::vector<int> obs;
-    for (std::size_t i = 0; i < n_; ++i) obs.insert(obs.end(), count[i], static_cast<int>(i));
+    std::vector<int> rows = draw_rows(boot, stream);
+    const std::size_t m = rows.size();
 
-    std::vector<int> perm(p_);
-    for (std::size_t j = 0; j < p_; ++j) perm[j] = static_cast<int>(j);
-    const std::size_t m = obs.size();
-    std::vector<double> xs(m), ys(m), ws(m, 1.0);
-    std::vector<int> chosen, spill(m);
-    // A column's values in the node with their position in it: sorted by value and then by
-    // position, which is the node's order among ties.
-    std::vector<std::pair<double, int>> keyed(m);
-    double iscale = 0.0;
+    std::vector<int> columns(p_);
+    for (std::size_t j = 0; j < p_; ++j) columns[j] = static_cast<int>(j);
+    std::vector<int> tried;
+    std::vector<int> spill(m);
+    std::vector<double> ys(m);
+    const std::vector<double> ones(m, 1.0);
+    Sorted sorted(m);
+    GainFloor floor;
 
     struct Pending {
-      std::size_t a, b;
+      std::size_t begin;
+      std::size_t end;
       std::int32_t parent;
-      bool right;
+      bool is_right;
     };
-    std::vector<Pending> stack{{0, m, -1, false}};
+    std::vector<Pending> pending{{0, m, -1, false}};
     detail::Nodes out;
-    while (!stack.empty()) {
-      const Pending node = stack.back();
-      stack.pop_back();
+    while (!pending.empty()) {
+      const Pending node = pending.back();
+      pending.pop_back();
       const auto at = static_cast<std::int32_t>(out.column.size());
-      if (node.parent >= 0) (node.right ? out.right : out.left)[node.parent] = at;
+      if (node.parent >= 0) (node.is_right ? out.right : out.left)[node.parent] = at;
 
-      const int k = static_cast<int>(node.b - node.a);
-      bool equal = true;
+      const int k = static_cast<int>(node.end - node.begin);
+      const int* held = rows.data() + node.begin;
+      bool pure = true;
       for (int i = 0; i < k; ++i) {
-        ys[i] = y_[obs[node.a + i]];
-        equal = equal && ys[i] == ys[0];
+        ys[i] = y_[held[i]];
+        pure = pure && ys[i] == ys[0];
       }
-      double est[4] = {0.0, 0.0, 0.0, 0.0};
-      double risk = 0.0;
-      node_estimate(ys.data(), ws.data(), k, gini_, est, &risk);
-      out.add_leaf(node_value(est, gini_));
-      if (k < 2 * min_leaf_ || equal) continue;
+      const Fit fit = summarise(ys.data(), ones.data(), k, classify_);
+      out.add_leaf(reported(fit, classify_));
+      if (k < 2 * min_leaf_ || pure) continue;
 
       // The node's columns, drawn from an arrangement of the column indices the tree keeps from
       // node to node.
-      detail::draw_columns(stream, perm, mtry_, chosen);
-
-      bool found = false;
-      double best = 0.0;
-      int var = -1;
-      double spoint = 0.0;
-      int dir = kLeft;
-      for (const int v : chosen) {
-        const double* col = x_ + static_cast<std::size_t>(v) * n_;
-        const int* held = obs.data() + node.a;
-        for (int i = 0; i < k; ++i) keyed[i] = {col[held[i]], i};
-        std::sort(keyed.begin(), keyed.begin() + k);
-        for (int i = 0; i < k; ++i) {
-          xs[i] = keyed[i].first;
-          ys[i] = y_[held[keyed[i].second]];
-        }
-        if (xs[0] == xs[k - 1]) continue;
-        double improve = 0.0;
-        double split = 0.0;
-        int direction = kLeft;
-        best_cut(xs.data(), ys.data(), ws.data(), k, min_leaf_, gini_, risk, &improve, &split,
-                 &direction);
-        if (improves(improve, iscale) && (!found || improve > best)) {
-          found = true;
-          best = improve;
-          var = v;
-          spoint = split;
-          dir = direction;
-        }
+      detail::draw_columns(stream, columns, mtry_, tried);
+      RuleChoice choice;
+      for (const int v : tried) {
+        sorted.load(x_ + static_cast<std::size_t>(v) * n_, y_, held, k);
+        if (sorted.x[0] == sorted.x[k - 1]) continue;
+        choice.offer(floor, v,
+                     best_cut(sorted.x.data(), sorted.y.data(), ones.data(), k, min_leaf_,
+                              classify_, fit.risk));
       }
-      if (!found) continue;
+      if (!choice.rule()) continue;
+      const Rule rule = *choice.rule();
 
-      const double* col = x_ + static_cast<std::size_t>(var) * n_;
-      std::size_t nl = 0;
-      std::size_t nr = 0;
-      for (std::size_t i = node.a; i < node.b; ++i) {
-        const int side = (col[obs[i]] < spoint) ? dir : -dir;
-        if (side == kLeft) {
-          obs[node.a + nl++] = obs[i];
+      const double* col = x_ + static_cast<std::size_t>(rule.column) * n_;
+      std::size_t n_left = 0;
+      std::size_t n_right = 0;
+      for (std::size_t i = node.begin; i < node.end; ++i) {
+        const int r = rows[i];
+        if (rule.sends_left(col[r])) {
+          rows[node.begin + n_left++] = r;
         } else {
-          spill[nr++] = obs[i];
+          spill[n_right++] = r;
         }
       }
-      std::copy(spill.begin(), spill.begin() + static_cast<std::ptrdiff_t>(nr),
-                obs.begin() + static_cast<std::ptrdiff_t>(node.a + nl));
-      out.column[at] = var;
-      out.threshold[at] = spoint;
-      out.less_left[at] = dir == kLeft ? 1 : 0;
-      stack.push_back({node.a + nl, node.b, at, true});
-      stack.push_back({node.a, node.a + nl, at, false});
+      std::copy(spill.begin(), spill.begin() + static_cast<std::ptrdiff_t>(n_right),
+                rows.begin() + static_cast<std::ptrdiff_t>(node.begin + n_left));
+      out.column[at] = rule.column;
+      out.threshold[at] = rule.threshold;
+      out.less_left[at] = rule.below_left ? 1 : 0;
+      pending.push_back({node.begin + n_left, node.end, at, true});
+      pending.push_back({node.begin, node.begin + n_left, at, false});
     }
     return out;
   }
 
  private:
+  // One column's values at a node in ascending order with the responses beside them, ties in the
+  // node's order.
+  struct Sorted {
+    explicit Sorted(std::size_t m) : keyed(m), x(m), y(m) {}
+
+    void load(const double* col, const double* response, const int* held, int k) {
+      for (int i = 0; i < k; ++i) keyed[i] = {col[held[i]], i};
+      std::sort(keyed.begin(), keyed.begin() + k);
+      for (int i = 0; i < k; ++i) {
+        x[i] = keyed[i].first;
+        y[i] = response[held[keyed[i].second]];
+      }
+    }
+
+    std::vector<std::pair<double, int>> keyed;
+    std::vector<double> x;
+    std::vector<double> y;
+  };
+
+  std::vector<int> draw_rows(const Bootstrap& boot, detail::Stream& stream) const {
+    std::vector<int> times(n_, 0);
+    for (std::size_t u = 0; u < boot.pools.size(); ++u) {
+      for (int d = 0; d < boot.draws[u]; ++d) {
+        ++times[static_cast<std::size_t>(boot.pools[u].draw(stream))];
+      }
+    }
+    std::vector<int> rows;
+    for (std::size_t r = 0; r < n_; ++r) rows.insert(rows.end(), times[r], static_cast<int>(r));
+    return rows;
+  }
+
   const double* x_;
   const double* y_;
   std::size_t n_;
   std::size_t p_;
-  bool gini_;
+  bool classify_;
   int min_leaf_;
   std::size_t mtry_;
 };
@@ -884,7 +876,8 @@ Tree tree_fit(const double* x, const double* y, const double* w, std::size_t n, 
     }
   }
   if (!(total > 0)) throw Error("a tree's case weights sum to more than zero.");
-  if (fold != nullptr && n_fold > 1) {
+  const bool cross = fold != nullptr && n_fold > 1;
+  if (cross) {
     for (std::size_t i = 0; i < n; ++i) {
       if (fold[i] < 0 || fold[i] >= n_fold) {
         throw Error("a fold index lies between 0 and the number of folds less one.");
@@ -892,26 +885,24 @@ Tree tree_fit(const double* x, const double* y, const double* w, std::size_t n, 
     }
   }
 
-  const bool gini = family == Family::binomial;
-  Grower grower(x, y, w, n, p, gini, spec);
+  const bool classify = family == Family::binomial;
+  CartBuilder builder(x, y, w, n, p, classify, spec);
   std::vector<CpRow> table;
-  int tail = 0;
-  const bool cross = fold != nullptr && n_fold > 1;
-  const std::unique_ptr<Node> root = grower.grow(table, tail, fold, cross ? n_fold : 0);
+  const std::unique_ptr<CartNode> root = builder.build(fold, cross ? n_fold : 0, table);
 
   Tree out;
   out.family = family;
-  out.root_risk = root->risk;
-  const double scale = root->risk > 0 ? 1 / root->risk : 1.0;
-  flatten(root.get(), 1, scale, grower.alpha(), gini, out);
-  const bool split = root->left != nullptr;
-  for (int c = 0; c != -1; c = table[c].forward) {
-    out.cp.push_back(table[c].cp * scale);
-    out.nsplit.push_back(table[c].nsplit);
-    out.rel_error.push_back(table[c].risk * scale);
-    if (cross && split) {
-      out.xerror.push_back(table[c].xrisk * scale);
-      out.xstd.push_back(table[c].xstd * scale);
+  out.root_risk = root->fit.risk;
+  const double scale = root->fit.risk > 0 ? 1 / root->fit.risk : 1.0;
+  write_node(*root, 1, scale, builder.alpha(), classify, out);
+  const bool validated = cross && root->left != nullptr;
+  for (const CpRow& row : table) {
+    out.cp.push_back(row.cp * scale);
+    out.nsplit.push_back(row.splits);
+    out.rel_error.push_back(row.risk * scale);
+    if (validated) {
+      out.xerror.push_back(row.xrisk * scale);
+      out.xstd.push_back(row.xstd * scale);
     }
   }
   return out;
@@ -926,7 +917,7 @@ Tree tree_prune(const Tree& tree, double cp) {
   out.rel_error = tree.rel_error;
   out.xerror = tree.xerror;
   out.xstd = tree.xstd;
-  if (!tree.number.empty()) copy_node(tree, 0, cp, out);
+  if (!tree.number.empty()) copy_pruned(tree, 0, cp, out);
   return out;
 }
 
@@ -951,44 +942,42 @@ Forest forest_fit(const double* x, const double* y, const double* w, std::size_t
   detail::check_finite(x, n * p, "a forest", "design");
   detail::check_finite(y, n, "a forest", "response");
   detail::check_finite(w, n, "a forest", "weights");
-  const bool gini = family == Family::binomial;
-  if (spec.balance && !gini) {
+  const bool classify = family == Family::binomial;
+  if (spec.balance && !classify) {
     throw Error("a balanced forest draws from each class, and reads a binomial response.");
   }
 
-  // The urns each tree draws its bootstrap from, and how many draws each: every observation and
-  // as many draws as there are observations, or each class on its own and the count of the
-  // smaller one from each, counting the observations that weigh anything.
-  std::vector<Urn> urns;
-  std::vector<int> draws;
+  // Every observation, as many draws as there are observations; or, balanced, each class on its
+  // own and from each the count of the smaller one, counting the observations that weigh anything.
+  Bootstrap boot;
   if (spec.balance) {
-    Urn cls[2];
-    int positive[2] = {0, 0};
+    WeightedPool by_class[2];
+    int weighing[2] = {0, 0};
     for (std::size_t i = 0; i < n; ++i) {
       if (w[i] < 0) throw Error("a forest's case weights are zero or more.");
       if (y[i] != 0.0 && y[i] != 1.0) throw Error("a forest on a binomial response reads 0 and 1 alone.");
       const int c = y[i] == 1.0 ? 1 : 0;
-      cls[c].add(static_cast<int>(i), w[i]);
-      if (w[i] > 0) positive[c]++;
+      by_class[c].add(static_cast<int>(i), w[i]);
+      if (w[i] > 0) ++weighing[c];
     }
-    if (positive[0] == 0 || positive[1] == 0) {
+    if (weighing[0] == 0 || weighing[1] == 0) {
       throw Error("a balanced forest draws from each class, and one class weighs nothing.");
     }
-    const int each = std::min(positive[0], positive[1]);
-    urns = {cls[0], cls[1]};
-    draws = {each, each};
+    const int each = std::min(weighing[0], weighing[1]);
+    boot.pools = {by_class[0], by_class[1]};
+    boot.draws = {each, each};
   } else {
-    Urn all;
+    WeightedPool all;
     for (std::size_t i = 0; i < n; ++i) {
       if (w[i] < 0) throw Error("a forest's case weights are zero or more.");
-      if (gini && y[i] != 0.0 && y[i] != 1.0) {
+      if (classify && y[i] != 0.0 && y[i] != 1.0) {
         throw Error("a forest on a binomial response reads 0 and 1 alone.");
       }
       all.add(static_cast<int>(i), w[i]);
     }
-    if (!(all.cum.back() > 0)) throw Error("a forest's case weights sum to more than zero.");
-    urns = {all};
-    draws = {static_cast<int>(n)};
+    if (!(all.total() > 0)) throw Error("a forest's case weights sum to more than zero.");
+    boot.pools = {all};
+    boot.draws = {static_cast<int>(n)};
   }
 
   // Every tree is a function of the seed, its own index and the data alone, so trees run at once
@@ -996,8 +985,8 @@ Forest forest_fit(const double* x, const double* y, const double* w, std::size_t
   const std::size_t trees = static_cast<std::size_t>(spec.trees);
   std::vector<detail::Nodes> grown(trees);
   detail::run_tasks(trees, spec.threads, [&](std::size_t t) {
-    ForestGrower grower(x, y, n, p, gini, spec);
-    grown[t] = grower.grow(urns, draws, spec.seed, static_cast<std::uint32_t>(t));
+    ForestTree builder(x, y, n, p, classify, spec);
+    grown[t] = builder.grow(boot, spec.seed, static_cast<std::uint32_t>(t));
   });
 
   Forest out;

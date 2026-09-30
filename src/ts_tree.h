@@ -9,13 +9,14 @@
 
 // The classification and regression tree, once, for both languages.
 //
-// Recursive partitioning under rpart's rules, so a tree here is the tree rpart grows on the same
-// data: the Gini index on weighted class counts for a binomial family and the weighted sum of
-// squares for a Gaussian one, a split only between two distinct values of a column at their
-// midpoint, `min_split` observations before a node is split and `min_leaf` in each child, and the
-// cost-complexity bookkeeping that collapses a split whose share of the root's risk is below `cp`.
-// The complexity table and its cross-validated error are rpart's too, with the folds dealt by the
-// caller rather than drawn here.
+// Recursive partitioning (Breiman, Friedman, Olshen and Stone 1984): a node is cut at the midpoint
+// between two distinct values of one column, the cut lowering most the Gini index of the weighted
+// class counts under a binomial family or the weighted sum of squares under a Gaussian one. A node
+// is split only where it holds `min_split` observations and each child keeps `min_leaf`, and a
+// split is kept only where cost-complexity pruning finds it lowers the risk by at least `cp` of
+// the root's. The complexity table carries the cross-validated error of every pruned subtree, with
+// the folds dealt by the caller rather than drawn here. On the same data this is the tree rpart
+// grows, which the fixtures pin.
 //
 // The design is column-major, `x[i + j * n]`. A binomial response is 0 or 1.
 namespace timesift {
@@ -28,8 +29,8 @@ struct TreeSpec {
   int max_depth = 30;    // the root is depth 0
 };
 
-// A fitted tree, its nodes in the order rpart's frame lists them: depth first, left before
-// right. A node's number is rpart's, 1 at the root and 2k, 2k + 1 below node k.
+// A fitted tree, its nodes depth first, left before right. A node's number is 1 at the root and
+// 2k, 2k + 1 below node k.
 struct Tree {
   Family family = Family::gaussian;
   std::vector<std::int32_t> number;
@@ -61,14 +62,14 @@ Tree tree_fit(const double* x, const double* y, const double* w, std::size_t n, 
               Family family, const TreeSpec& spec, const std::int32_t* fold,
               std::int32_t n_fold);
 
-// The tree with every split of complexity at or below `cp` collapsed, as rpart's `prune()`.
-// The complexity table is kept whole.
+// The tree with every split of complexity at or below `cp` collapsed. The complexity table is
+// kept whole.
 Tree tree_prune(const Tree& tree, double cp);
 
 // The value of the leaf each row of `x` falls into. `x` is column-major over `p` columns.
 void tree_predict(const Tree& tree, const double* x, std::size_t n, std::size_t p, double* out);
 
-// The random forest. Each tree is grown on a bootstrap draw of the observations, the draw weighted
+// The random forest (Breiman 2001). Each tree is grown on a bootstrap draw of the observations, the draw weighted
 // by the case weights, and each node is split on the best of `mtry` columns drawn for it; the split
 // search is the tree's, run with every drawn observation weighing one. Nothing is pruned: a node is
 // split while it holds at least twice `min_leaf` observations, its responses are not all equal, and
