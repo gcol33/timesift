@@ -11,14 +11,17 @@
 
 // The stepwise generalised linear model, once, for both languages.
 //
-// Each fit is R's `glm.fit`, from `ts_glm.h`.
+// Each model is a generalised linear model fitted by iteratively reweighted least squares, from
+// `ts_glm.h`, and scored by Akaike's information criterion (Akaike 1974).
 //
-// The search is MASS's `stepAIC`. A term is a column's orthogonal polynomial, or one power of a
-// column; a step compares the model as it stands, each term it holds dropped and each term it lacks
-// added, and takes the lowest criterion, the model as it stands first where it ties, then the drops
-// in the model's order, then the additions in column order. A term whose removal leaves the rank
-// unchanged is dropped before anything else is compared, and an addition that does not raise the
-// rank is not offered. A move whose fit does not settle within `max_iter` iterations is refused.
+// The search is stepwise selection by that criterion (Venables & Ripley, Modern Applied Statistics
+// with S, 4th ed., sec. 6.8), under the rules the fixtures pin against MASS's `stepAIC()`. A term is
+// a column's orthogonal polynomial, or one power of a column; a step compares the model as it
+// stands, each term it holds dropped and each term it lacks added, and takes the lowest criterion,
+// the model as it stands first where it ties, then the drops in the model's order, then the
+// additions in column order. A term whose removal leaves the rank unchanged is dropped before
+// anything else is compared, and an addition that does not raise the rank is not offered. A move
+// whose fit does not settle within `max_iter` iterations is refused.
 namespace timesift {
 
 enum class StepDirection { forward, both, backward, none };

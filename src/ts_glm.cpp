@@ -6,9 +6,11 @@
 #include <cfloat>
 #include <cmath>
 #include <limits>
+#include <utility>
 
-// The decomposition and the iteration are R's, operation for operation. Contraction is off for the
-// reason `ts_tree.cpp` gives.
+// Every product and sum below is rounded on its own. Contracting a product into the following sum
+// as one fused multiply-add rounds once where the fixtures' reference rounds twice, which moves the
+// rank decisions and the coefficients in their last bits, so contraction is off for this file.
 #if defined(__clang__)
 #pragma clang fp contract(off)
 #elif defined(__GNUC__)
@@ -19,174 +21,214 @@ namespace timesift {
 
 namespace {
 
-// R's logit link, from `family.c`: the linear predictor is held at 30 either side before the mean
-// and its derivative are read, so neither reaches zero or one.
-constexpr double kThresh = 30.0;
-constexpr double kInvEps = 1.0 / DBL_EPSILON;
-
-double logit_mu_eta(double eta) {
-  const double opexp = 1.0 + std::exp(eta);
-  return (eta > kThresh || eta < -kThresh) ? DBL_EPSILON : std::exp(eta) / (opexp * opexp);
+// The inner product of `a` and `b` over `len` entries, accumulated onto `seed` in index order.
+double dot_onto(double seed, const double* a, const double* b, std::size_t len) {
+  for (std::size_t i = 0; i < len; ++i) seed += a[i] * b[i];
+  return seed;
 }
 
-double y_log_y(double y, double mu) { return y != 0.0 ? y * std::log(y / mu) : 0.0; }
+// `b += t a` over `len` entries.
+void add_multiple(double t, const double* a, double* b, std::size_t len) {
+  for (std::size_t i = 0; i < len; ++i) b[i] += t * a[i];
+}
 
-double deviance(const double* y, const double* mu, const double* w, std::size_t n, Family f) {
-  double d = 0.0;
-  for (std::size_t i = 0; i < n; ++i) {
-    if (f == Family::binomial) {
-      d += 2.0 * w[i] * (y_log_y(y[i], mu[i]) + y_log_y(1.0 - y[i], 1.0 - mu[i]));
-    } else {
-      const double r = y[i] - mu[i];
-      d += w[i] * r * r;
+double euclidean_norm(const double* v, std::size_t len) {
+  return std::sqrt(dot_onto(0.0, v, v, len));
+}
+
+// A column of the matrix being decomposed, as the pivoting sees it.
+struct PivotColumn {
+  double norm;         // the norm of the part of the column below the rows reduced so far
+  double floor;        // the norm under which the column counts as spanned by those before it
+  std::size_t origin;  // the column's index in the matrix as given
+};
+
+// Overwrites `v` [m] with the Householder vector `u` that reflects it onto `-s e_1`, where `s` is
+// its norm carrying the sign of `v[0]`, and returns `s`. The vector is scaled so that `u[0]` is
+// `1 + |v[0]| / |v|`, which keeps it at least one and the reflection `I - u u' / u[0]`. A zero `v`
+// has no reflection and is left as it is, with zero returned.
+double form_reflector(double* v, std::size_t m) {
+  double s = euclidean_norm(v, m);
+  if (s == 0.0) return 0.0;
+  if (v[0] != 0.0) s = std::copysign(s, v[0]);
+  const double scale = 1.0 / s;
+  for (std::size_t i = 0; i < m; ++i) v[i] *= scale;
+  v[0] = 1.0 + v[0];
+  return s;
+}
+
+// The norm of a column below the next row, downdated from its norm below the current one once the
+// reflection has been applied (Golub & Van Loan, sec. 5.4.1): the entry `head` that leaves the
+// active part takes its share of the square with it. Where that share is all but the whole of the
+// square, the downdate has cancelled away its correct digits, and the norm is taken again from the
+// entries `below` the head.
+double downdate_norm(double norm, double head, const double* below, std::size_t len) {
+  const double r = std::abs(head) / norm;
+  const double left = std::max(1.0 - r * r, 0.0);
+  if (left >= 1e-6) return norm * std::sqrt(left);
+  return euclidean_norm(below, len);
+}
+
+// Applies the `j`th stored reflection to `y` [n]. The reflection vector is the part of column `j`
+// below the diagonal, led by `lead` in the diagonal's place.
+void apply_stored_reflection(const double* qr, std::size_t n, std::size_t j, double lead,
+                             double* y) {
+  const double* tail = qr + j * n + j + 1;
+  const std::size_t len = n - j - 1;
+  const double t = -dot_onto(lead * y[j], tail, y + j + 1, len) / lead;
+  y[j] += t * lead;
+  add_multiple(t, tail, y + j + 1, len);
+}
+
+// The inverse logit's derivative, the linear predictor held at the same 30 as the mean.
+constexpr double kLogitBound = 30.0;
+
+double logit_slope(double eta) {
+  if (eta > kLogitBound || eta < -kLogitBound) return DBL_EPSILON;
+  const double one_plus = 1.0 + std::exp(eta);
+  return std::exp(eta) / (one_plus * one_plus);
+}
+
+// `y log(y / mu)`, taken as zero at `y = 0`.
+double y_log_y_over(double y, double mu) { return y != 0.0 ? y * std::log(y / mu) : 0.0; }
+
+// A family under its link: the mean as a function of the linear predictor, the mean's derivative,
+// the link itself, the variance function, and the deviance (McCullagh & Nelder 1989, ch. 2 and 4).
+class Model {
+ public:
+  Model(Family family, Link link)
+      : binomial_(family == Family::binomial), probit_(link == Link::probit) {}
+
+  double mean(double eta) const {
+    if (!binomial_) return eta;
+    return probit_ ? probit_linkinv(eta) : logit_linkinv(eta);
+  }
+
+  double slope(double eta) const {
+    if (!binomial_) return 1.0;
+    return probit_ ? std::max(detail::dnorm(eta), DBL_EPSILON) : logit_slope(eta);
+  }
+
+  double link(double mu) const {
+    if (!binomial_) return mu;
+    return probit_ ? detail::qnorm(mu) : std::log(mu / (1.0 - mu));
+  }
+
+  double variance(double mu) const { return binomial_ ? mu * (1.0 - mu) : 1.0; }
+
+  // The starting means: the response itself for the gaussian family, and for the binomial one the
+  // response pulled half a trial towards one half, so that no start sits at zero or one.
+  void start(const double* y, const double* w, std::size_t n, double* eta, double* mu) const {
+    for (std::size_t i = 0; i < n; ++i) {
+      if (binomial_) {
+        eta[i] = link((w[i] * y[i] + 0.5) / (w[i] + 1.0));
+        mu[i] = mean(eta[i]);
+      } else {
+        eta[i] = y[i];
+        mu[i] = y[i];
+      }
     }
   }
-  return d;
-}
 
-double norm2_of(const double* v, std::size_t n) {
-  double s = 0.0;
-  for (std::size_t i = 0; i < n; ++i) s += v[i] * v[i];
-  return std::sqrt(s);
-}
+  double deviance(const double* y, const double* mu, const double* w, std::size_t n) const {
+    double d = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+      if (binomial_) {
+        d += 2.0 * w[i] * (y_log_y_over(y[i], mu[i]) + y_log_y_over(1.0 - y[i], 1.0 - mu[i]));
+      } else {
+        const double r = y[i] - mu[i];
+        d += w[i] * r * r;
+      }
+    }
+    return d;
+  }
+
+ private:
+  bool binomial_;
+  bool probit_;
+};
 
 }  // namespace
 
 double logit_linkinv(double eta) {
-  const double t = eta < -kThresh ? DBL_EPSILON : (eta > kThresh ? kInvEps : std::exp(eta));
+  const double t = eta < -kLogitBound ? DBL_EPSILON
+                                      : (eta > kLogitBound ? 1.0 / DBL_EPSILON : std::exp(eta));
   return t / (1.0 + t);
 }
 
 double probit_linkinv(double eta) {
-  static const double thresh = -detail::qnorm(DBL_EPSILON);
-  return detail::pnorm(std::min(std::max(eta, -thresh), thresh));
+  static const double bound = -detail::qnorm(DBL_EPSILON);
+  return detail::pnorm(std::min(std::max(eta, -bound), bound));
 }
-
-namespace {
-
-// The link a fit iterates under: its inverse, its derivative, and the link itself, which only the
-// starting means are read through.
-struct LinkFns {
-  bool binomial;
-  Link link;
-  double inv(double eta) const {
-    if (!binomial) return eta;
-    return link == Link::probit ? probit_linkinv(eta) : logit_linkinv(eta);
-  }
-  double mu_eta(double eta) const {
-    if (!binomial) return 1.0;
-    return link == Link::probit ? std::max(detail::dnorm(eta), DBL_EPSILON) : logit_mu_eta(eta);
-  }
-  double fun(double mu) const {
-    if (!binomial) return mu;
-    return link == Link::probit ? detail::qnorm(mu) : std::log(mu / (1.0 - mu));
-  }
-};
-
-}  // namespace
 
 namespace detail {
 
 void dqrdc2(double* x, std::size_t n, std::size_t p, double tol, std::size_t& k,
             std::vector<double>& qraux, std::vector<std::size_t>& jpvt) {
+  std::vector<PivotColumn> cols(p);
+  for (std::size_t j = 0; j < p; ++j) {
+    const double norm = euclidean_norm(x + j * n, n);
+    cols[j] = {norm, (norm == 0.0 ? 1.0 : norm) * tol, j};
+  }
   qraux.assign(p, 0.0);
   jpvt.resize(p);
-  std::vector<double> work1(p), work2(p);
-  for (std::size_t j = 0; j < p; ++j) {
-    qraux[j] = norm2_of(x + j * n, n);
-    work1[j] = qraux[j];
-    work2[j] = qraux[j] == 0.0 ? 1.0 : qraux[j];
-    jpvt[j] = j;
-  }
-  const std::size_t lup = std::min(n, p);
-  std::size_t kk = p + 1;  // 1-based, as the Fortran
-  for (std::size_t l = 0; l < lup; ++l) {
-    while (!(l + 1 >= kk || qraux[l] >= work2[l] * tol)) {
-      for (std::size_t i = 0; i < n; ++i) {
-        const double t = x[i + l * n];
-        for (std::size_t j = l + 1; j < p; ++j) x[i + (j - 1) * n] = x[i + j * n];
-        x[i + (p - 1) * n] = t;
-      }
-      const std::size_t ji = jpvt[l];
-      const double t = qraux[l], tt = work1[l], ttt = work2[l];
-      for (std::size_t j = l + 1; j < p; ++j) {
-        jpvt[j - 1] = jpvt[j];
-        qraux[j - 1] = qraux[j];
-        work1[j - 1] = work1[j];
-        work2[j - 1] = work2[j];
-      }
-      jpvt[p - 1] = ji;
-      qraux[p - 1] = t;
-      work1[p - 1] = tt;
-      work2[p - 1] = ttt;
-      --kk;
+
+  // Columns from `kept` on have been set aside as spanned by the ones before them. A column set
+  // aside moves to the very end, and the columns after it close up behind, so the columns kept
+  // stay in their given order.
+  std::size_t kept = p;
+  const std::size_t steps = std::min(n, p);
+  for (std::size_t l = 0; l < steps; ++l) {
+    while (l < kept && !(cols[l].norm >= cols[l].floor)) {
+      std::rotate(x + l * n, x + (l + 1) * n, x + p * n);
+      std::rotate(cols.begin() + static_cast<std::ptrdiff_t>(l),
+                  cols.begin() + static_cast<std::ptrdiff_t>(l + 1), cols.end());
+      --kept;
     }
-    if (l + 1 == n) continue;
-    double* xl = x + l * n;
-    double nrmxl = norm2_of(xl + l, n - l);
-    if (nrmxl == 0.0) continue;
-    if (xl[l] != 0.0) nrmxl = std::copysign(nrmxl, xl[l]);
-    const double scale = 1.0 / nrmxl;
-    for (std::size_t i = l; i < n; ++i) xl[i] *= scale;
-    xl[l] = 1.0 + xl[l];
+    qraux[l] = cols[l].norm;
+    jpvt[l] = cols[l].origin;
+    if (l + 1 == n) continue;  // the last row has nothing below it to annihilate
+
+    double* u = x + l * n + l;
+    const std::size_t m = n - l;
+    const double s = form_reflector(u, m);
+    if (s == 0.0) continue;
     for (std::size_t j = l + 1; j < p; ++j) {
-      double* xj = x + j * n;
-      double dot = 0.0;
-      for (std::size_t i = l; i < n; ++i) dot += xl[i] * xj[i];
-      const double t = -dot / xl[l];
-      for (std::size_t i = l; i < n; ++i) xj[i] += t * xl[i];
-      if (qraux[j] != 0.0) {
-        const double r = std::abs(xj[l]) / qraux[j];
-        const double tt = std::max(1.0 - r * r, 0.0);
-        if (std::abs(tt) >= 1e-6) {
-          qraux[j] *= std::sqrt(tt);
-        } else {
-          qraux[j] = norm2_of(xj + l + 1, n - l - 1);
-          work1[j] = qraux[j];
-        }
-      }
+      double* xj = x + j * n + l;
+      const double t = -dot_onto(0.0, u, xj, m) / u[0];
+      add_multiple(t, u, xj, m);
+      if (cols[j].norm != 0.0) cols[j].norm = downdate_norm(cols[j].norm, xj[0], xj + 1, m - 1);
     }
-    qraux[l] = xl[l];
-    xl[l] = -nrmxl;
+    qraux[l] = u[0];
+    u[0] = -s;
   }
-  k = std::min(kk - 1, n);
+  for (std::size_t j = steps; j < p; ++j) {
+    qraux[j] = cols[j].norm;
+    jpvt[j] = cols[j].origin;
+  }
+  k = std::min(kept, n);
 }
-
-namespace {
-
-// The `j`th Householder reflection of the decomposition applied to `y`. Its leading entry is
-// `qraux[j]`, where the decomposition keeps R's diagonal.
-void reflect(const double* qr, std::size_t n, std::size_t j, const double* qraux, double* y) {
-  const double* xj = qr + j * n;
-  double dot = qraux[j] * y[j];
-  for (std::size_t i = j + 1; i < n; ++i) dot += xj[i] * y[i];
-  const double t = -dot / qraux[j];
-  y[j] += t * qraux[j];
-  for (std::size_t i = j + 1; i < n; ++i) y[i] += t * xj[i];
-}
-
-}  // namespace
 
 void qr_qty(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y) {
-  const std::size_t ju = std::min(k, n - 1);
-  for (std::size_t j = 0; j < ju; ++j) {
-    if (qraux[j] != 0.0) reflect(qr, n, j, qraux, y);
+  const std::size_t reflections = std::min(k, n - 1);
+  for (std::size_t j = 0; j < reflections; ++j) {
+    if (qraux[j] != 0.0) apply_stored_reflection(qr, n, j, qraux[j], y);
   }
 }
 
 void qr_qy(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y) {
-  const std::size_t ju = std::min(k, n - 1);
-  for (std::size_t j = ju; j-- > 0;) {
-    if (qraux[j] != 0.0) reflect(qr, n, j, qraux, y);
+  const std::size_t reflections = std::min(k, n - 1);
+  for (std::size_t j = reflections; j-- > 0;) {
+    if (qraux[j] != 0.0) apply_stored_reflection(qr, n, j, qraux[j], y);
   }
 }
 
 bool qr_backsolve(const double* qr, std::size_t n, std::size_t k, double* b) {
   for (std::size_t j = k; j-- > 0;) {
-    const double d = qr[j + j * n];
-    if (d == 0.0) return false;
-    b[j] /= d;
-    for (std::size_t i = 0; i < j; ++i) b[i] -= b[j] * qr[i + j * n];
+    const double* col = qr + j * n;
+    if (col[j] == 0.0) return false;
+    b[j] /= col[j];
+    add_multiple(-b[j], col, b, j);
   }
   return true;
 }
@@ -197,14 +239,13 @@ std::vector<double> dqrls(double* x, std::size_t n, std::size_t p, double* b, do
   std::vector<std::size_t> jpvt;
   dqrdc2(x, n, p, tol, rank, qraux, jpvt);
   std::vector<double> coef(p, 0.0);
-  if (rank > 0) {
-    qr_qty(x, n, rank, qraux.data(), b);
-    std::vector<double> s(b, b + rank);
-    if (!qr_backsolve(x, n, rank, s.data())) {
-      s.assign(rank, std::numeric_limits<double>::quiet_NaN());
-    }
-    for (std::size_t j = 0; j < rank; ++j) coef[jpvt[j]] = s[j];
+  if (rank == 0) return coef;
+  qr_qty(x, n, rank, qraux.data(), b);
+  std::vector<double> solved(b, b + rank);
+  if (!qr_backsolve(x, n, rank, solved.data())) {
+    solved.assign(rank, std::numeric_limits<double>::quiet_NaN());
   }
+  for (std::size_t j = 0; j < rank; ++j) coef[jpvt[j]] = solved[j];
   return coef;
 }
 
@@ -212,64 +253,64 @@ std::vector<double> dqrls(double* x, std::size_t n, std::size_t p, double* b, do
 
 Glm glm_fit(const double* x, std::size_t n, std::size_t q, const double* y, const double* w,
             Family family, double epsilon, int max_iter, Link link) {
-  const bool binomial = family == Family::binomial;
-  const LinkFns fns{binomial, link};
-  std::vector<double> eta(n), mu(n), start(q, 0.0);
-  for (std::size_t i = 0; i < n; ++i) {
-    if (binomial) {
-      const double m = (w[i] * y[i] + 0.5) / (w[i] + 1.0);
-      eta[i] = fns.fun(m);
-      mu[i] = fns.inv(eta[i]);
-    } else {
-      eta[i] = y[i];
-      mu[i] = y[i];
-    }
-  }
-  double devold = deviance(y, mu.data(), w, n, family);
+  const Model model(family, link);
+  std::vector<double> eta(n), mu(n), slope(n);
+  model.start(y, w, n, eta.data(), mu.data());
+  double previous = model.deviance(y, mu.data(), w, n);
+
   Glm out;
   out.beta.assign(q, 0.0);
   const double tol = std::min(1e-7, epsilon / 1000.0);
-  std::vector<double> a, z;
-  std::vector<std::size_t> good;
+  std::vector<std::size_t> rows;
+  std::vector<double> root_w, a, z;
   for (int iter = 0; iter < max_iter; ++iter) {
-    good.clear();
+    // The rows that carry weight: a positive prior weight and a mean still moving with the
+    // linear predictor.
+    rows.clear();
     for (std::size_t i = 0; i < n; ++i) {
-      if (w[i] > 0.0 && fns.mu_eta(eta[i]) != 0.0) good.push_back(i);
+      slope[i] = model.slope(eta[i]);
+      if (w[i] > 0.0 && slope[i] != 0.0) rows.push_back(i);
     }
-    if (good.empty()) return out;
-    const std::size_t ng = good.size();
-    a.assign(ng * q, 0.0);
-    z.assign(ng, 0.0);
-    for (std::size_t r = 0; r < ng; ++r) {
-      const std::size_t i = good[r];
-      const double me = fns.mu_eta(eta[i]);
-      const double var = binomial ? mu[i] * (1.0 - mu[i]) : 1.0;
-      const double ws = std::sqrt((w[i] * me * me) / var);
-      z[r] = (eta[i] + (y[i] - mu[i]) / me) * ws;
-      for (std::size_t c = 0; c < q; ++c) a[r + c * ng] = x[i + c * n] * ws;
+    if (rows.empty()) return out;
+
+    // The weighted least-squares problem of this iteration: the working response
+    // `eta + (y - mu) / mu'` and the design, each row scaled by the root of the working weight
+    // `w mu'^2 / V(mu)`.
+    const std::size_t m = rows.size();
+    root_w.resize(m);
+    z.resize(m);
+    for (std::size_t r = 0; r < m; ++r) {
+      const std::size_t i = rows[r];
+      const double s = slope[i];
+      root_w[r] = std::sqrt((w[i] * s * s) / model.variance(mu[i]));
+      z[r] = (eta[i] + (y[i] - mu[i]) / s) * root_w[r];
     }
+    a.resize(m * q);
+    for (std::size_t c = 0; c < q; ++c) {
+      const double* xc = x + c * n;
+      double* ac = a.data() + c * m;
+      for (std::size_t r = 0; r < m; ++r) ac[r] = xc[rows[r]] * root_w[r];
+    }
+
     std::size_t rank = 0;
-    const std::vector<double> coef = detail::dqrls(a.data(), ng, q, z.data(), tol, rank);
-    for (double c : coef) {
-      if (!std::isfinite(c)) return out;
+    std::vector<double> beta = detail::dqrls(a.data(), m, q, z.data(), tol, rank);
+    if (!std::all_of(beta.begin(), beta.end(), [](double v) { return std::isfinite(v); })) {
+      return out;
     }
-    start = coef;
-    for (std::size_t i = 0; i < n; ++i) {
-      double e = 0.0;
-      for (std::size_t c = 0; c < q; ++c) e += x[i + c * n] * start[c];
-      eta[i] = e;
-      mu[i] = fns.inv(e);
-    }
-    const double dev = deviance(y, mu.data(), w, n, family);
-    out.beta = start;
+
+    std::fill(eta.begin(), eta.end(), 0.0);
+    for (std::size_t c = 0; c < q; ++c) add_multiple(beta[c], x + c * n, eta.data(), n);
+    for (std::size_t i = 0; i < n; ++i) mu[i] = model.mean(eta[i]);
+    const double dev = model.deviance(y, mu.data(), w, n);
+    out.beta = std::move(beta);
     out.rank = static_cast<std::int32_t>(rank);
     out.deviance = dev;
     if (!std::isfinite(dev)) return out;
-    if (std::abs(dev - devold) / (0.1 + std::abs(dev)) < epsilon) {
+    if (std::abs(dev - previous) / (0.1 + std::abs(dev)) < epsilon) {
       out.converged = true;
       return out;
     }
-    devold = dev;
+    previous = dev;
   }
   return out;
 }
