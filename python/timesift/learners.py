@@ -23,8 +23,9 @@ from .registry import get_learner
 from .representation import TimesiftMatrix
 from .response import fitting_rows
 
-__all__ = ["Fit", "Learner", "READS", "MULTI", "boosting", "cnn", "elasticnet", "fit_learner",
-           "envelope", "flatten", "mars", "mlp", "rescnn", "forest", "stepwise", "tree"]
+__all__ = ["Fit", "Learner", "READS", "MULTI", "boosting", "cnn", "discriminant", "elasticnet",
+           "fit_learner", "envelope", "flatten", "mars", "mlp", "rescnn", "forest", "stepwise",
+           "tree"]
 
 READS = ("tabular", "sequence")
 MULTI = ("joint", "separate")
@@ -1319,3 +1320,77 @@ def _mars_fit(x, y, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_
 def _mars_predict(model, x):
     from ._mars import mars_predict
     return _predict_columns(model["models"], flatten(x), mars_predict)
+
+
+def discriminant(data=None, degree=1, penalty=None, nk=None, thresh=0.001, prune=True,
+                 calibrate=True, threads=1) -> Learner:
+    """One flexible discriminant per variable over every bin-by-channel column, fitted as mda's
+    ``fda(method = mars)`` fits it and as biomod2 fits ``FDA``. Optimal scoring gives presence and
+    absence one score each and regresses the scored response on a MARS basis of the columns; the
+    fitted score is the one canonical variate, and the prediction is the posterior probability of
+    presence under two normal classes around the class centroids on it, the classes' shares among
+    the fitting units as priors.
+
+    The basis is mda's own MARS, not earth's that ``mars`` ports: each forward step adds a column
+    linearly or a pair of hinges on it, and the pass stops when a step lowers the residuals by less
+    than ``thresh`` of them, when they fall to ``thresh`` of the null model's, when the generalised
+    cross-validation passes ten times the null model's, or at ``nk`` terms. The pruning drops the
+    term of least t statistic, one at a time, and keeps the subset of least generalised
+    cross-validation, which counts each term beyond the intercept as ``1 + penalty / 2`` degrees
+    of freedom. The defaults are mda's, which biomod2 passes
+    unchanged: degree one, ``penalty`` 2 (3 above degree one), ``thresh=0.001`` and
+    ``nk = max(21, 2 p + 1)`` for ``p`` columns.
+
+    The head's case weights set the classes' scores and the variate, and not the basis, whose
+    forward pass mda runs unweighted. ``calibrate=True`` recalibrates the posterior by a probit
+    regression of the response on it under the case weights, on the fitting units, as biomod2
+    always does for ``FDA``; ``False`` predicts the posterior. The passes run on the core the R
+    package calls, so the two keep the same terms and predict the same probabilities; ``threads``
+    searches that many columns at once and does not change what comes back. A variable holding one
+    value, or one the basis does not reach, is predicted its mean and named in ``unfitted``. The
+    learner needs a presence-absence response, under a head whose loss is the binary
+    cross-entropy.
+    """
+    _whole(degree, "degree", 1)
+    if nk is not None:
+        _whole(nk, "nk", 3)
+    _whole(threads, "threads", 1)
+    if penalty is not None and (isinstance(penalty, bool) or np.isnan(penalty) or penalty < 0):
+        raise ValueError(f"`penalty` is one number of zero or more, got {penalty!r}.")
+    if isinstance(thresh, bool) or not 0.0 <= thresh < 1.0:
+        raise ValueError(f"`thresh` is one number in [0, 1), got {thresh!r}.")
+    for name, flag in (("prune", prune), ("calibrate", calibrate)):
+        if not isinstance(flag, (bool, np.bool_)):
+            raise ValueError(f"`{name}` is True or False, got {flag!r}.")
+    return Learner(name="discriminant", fit=_discriminant_fit, predict=_discriminant_predict,
+                   data=data, reads="tabular", multi="separate",
+                   params=dict(degree=int(degree), penalty=penalty,
+                               nk=None if nk is None else int(nk), thresh=float(thresh),
+                               prune=bool(prune), calibrate=bool(calibrate),
+                               threads=int(threads)))
+
+
+def _discriminant_fit(x, y, degree, penalty, nk, thresh, prune, calibrate, threads, head,
+                      variables, **_):
+    from ._fda import fda_fit
+    if _family(head) != "binomial":
+        raise ValueError("a discriminant separates presences from absences, under a head whose "
+                         f"loss is the binary cross-entropy; this head's loss is "
+                         f"{head['loss']!r}.")
+    m = flatten(x)
+
+    def make(design, yj, seed_j, w):
+        return fda_fit(design, yj, w, degree=degree, penalty=penalty, nk=nk, thresh=thresh,
+                       prune=prune, calibrate=calibrate, threads=threads)
+
+    models = _fit_columns(m, y, make, [0] * y.shape[1], _head_weights(head, y))
+    return dict(models=models, n_col=m.shape[1],
+                unfitted=[str(v) for v, f in zip(variables, models)
+                          if isinstance(f, float) or not f["discriminates"]],
+                stopped=[str(v) for v, f in zip(variables, models)
+                         if isinstance(f, dict) and not f["converged"]])
+
+
+def _discriminant_predict(model, x):
+    from ._fda import fda_predict
+    return _predict_columns(model["models"], flatten(x), fda_predict)

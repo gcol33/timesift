@@ -29,38 +29,12 @@ mars_case_fit <- function(fx, row) {
             nprune = if (is.na(row$nprune)) NULL else row$nprune)
 }
 
-# One term's factors as the fixture writes them: `column:direction` in column order, and the cuts
-# apart so they are compared as numbers.
-mars_terms <- function(f) {
-  lapply(seq_len(length(f$factor_start) - 1L), function(t) {
-    idx <- f$factor_start[t] + seq_len(f$factor_start[t + 1L] - f$factor_start[t])
-    list(key = if (length(idx)) paste(sprintf("%d:%d", f$factor_column[idx] + 1L,
-                                              f$factor_dir[idx]), collapse = "*") else "1",
-         cut = f$factor_cut[idx])
-  })
-}
-
-mars_fixture_terms <- function(forward) {
-  lapply(strsplit(forward, " ", fixed = TRUE)[[1L]], function(term) {
-    if (term == "1") return(list(key = "1", cut = numeric()))
-    parts <- strsplit(strsplit(term, "*", fixed = TRUE)[[1L]], ":", fixed = TRUE)
-    list(key = paste(vapply(parts, function(p) paste(p[1:2], collapse = ":"), character(1L)),
-                     collapse = "*"),
-         cut = as.numeric(vapply(parts, `[`, character(1L), 3L)))
-  })
-}
-
 test_that("the core's forward and pruning passes keep the terms earth keeps", {
   fx <- mars_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
     f <- mars_case_fit(fx, row)
-    got <- mars_terms(f)
-    want <- mars_fixture_terms(row$forward)
-    expect_identical(vapply(got, `[[`, character(1L), "key"),
-                     vapply(want, `[[`, character(1L), "key"), info = row$case)
-    expect_equal(unlist(lapply(got, `[[`, "cut")), unlist(lapply(want, `[[`, "cut")),
-                 tolerance = row$cut_tolerance, info = row$case)
+    expect_hinge_terms(f, row$forward, row$cut_tolerance, row$case)
     expect_identical(f$termcond, row$termcond, info = row$case)
     expect_identical(paste(f$selected + 1L, collapse = " "), row$selected, info = row$case)
     expect_equal(f$gcv, row$gcv, tolerance = row$coef_tolerance, info = row$case)

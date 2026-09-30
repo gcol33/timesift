@@ -1590,3 +1590,61 @@ write_fixture(cbind(do.call(rbind, mars_rows), cut_tolerance = 1e-12, coef_toler
 write_fixture(do.call(rbind, mars_coef), "mars_coef.csv")
 write_fixture(do.call(rbind, mars_pred), "mars_predict.csv")
 cat("wrote", nrow(MARS_CASES), "MARS cases\n")
+
+# The discriminant.
+#
+# mda's own fits, `fda(method = mars)`, which is what biomod2's `FDA` calls: the forward terms
+# counted, the kept terms as their factors, their coefficients, and on the design scaled by 1.01 the
+# posterior of the second class and biomod2's recalibration of it, a probit `glm()` of the response
+# on the in-sample posterior under the same weights. The `squares` case reads the design with the
+# square of every column beside it, whose near-collinear hinges are what `marss`'s pivoted QR at a
+# tolerance of 0.01 drops. A term is keyed as the MARS fixtures key one.
+if (!requireNamespace("mda", quietly = TRUE)) {
+  stop("the discriminant fixtures are the fits the mda package gives, so it has to be installed ",
+       "to regenerate them.", call. = FALSE)
+}
+fda_case <- function(case, design = "columns", weighted = TRUE, degree = 1L, prune = TRUE) {
+  data.frame(case = case, design = design, weighted = weighted, degree = degree, prune = prune,
+             stringsAsFactors = FALSE)
+}
+FDA_CASES <- rbind(
+  fda_case("weighted"),
+  fda_case("unweighted", weighted = FALSE),
+  fda_case("degree2", degree = 2L),
+  fda_case("unpruned", prune = FALSE),
+  fda_case("squares", design = "squares"))
+fda_designs <- list(columns = mx_x, squares = pen_x)
+fda_rows <- list()
+fda_coef <- list()
+fda_pred <- list()
+for (i in seq_len(nrow(FDA_CASES))) {
+  row <- FDA_CASES[i, ]
+  x <- unname(fda_designs[[row$design]])
+  colnames(x) <- sprintf("v%02d", seq_len(ncol(x)))
+  w <- if (row$weighted) pen_w else rep(1, PEN_N)
+  df <- data.frame(y = factor(pen_y_binomial), x)
+  f <- mda::fda(y ~ ., data = df, weights = w, method = mda::mars, degree = row$degree,
+                prune = row$prune)
+  kept <- vapply(f$fit$selected.terms, function(t) mars_term_key(f$fit$factor[t, ], f$fit$cuts[t, ]),
+                 character(1L))
+  post_in <- stats::predict(f, data.frame(x), type = "posterior")[, 2L]
+  cal <- suppressWarnings(stats::glm(y ~ post, family = stats::binomial(link = "probit"),
+                                     weights = w, data = data.frame(y = pen_y_binomial,
+                                                                    post = post_in)))
+  post_out <- stats::predict(f, data.frame(x * 1.01), type = "posterior")[, 2L]
+  prob_out <- stats::predict(cal, data.frame(post = post_out), type = "response")
+  fda_rows[[i]] <- data.frame(row, n_forward = length(f$fit$all.terms),
+                              kept = paste(kept, collapse = " "),
+                              gcv = sprintf("%.15g", f$fit$gcv), stringsAsFactors = FALSE)
+  fda_coef[[i]] <- data.frame(case = row$case, term = seq_along(kept),
+                              coefficient = sprintf("%.15g", f$fit$coefficients[, 1L]),
+                              stringsAsFactors = FALSE)
+  fda_pred[[i]] <- data.frame(case = row$case, row = seq_len(PEN_N),
+                              posterior = sprintf("%.15g", post_out),
+                              probability = sprintf("%.15g", prob_out), stringsAsFactors = FALSE)
+}
+write_fixture(cbind(do.call(rbind, fda_rows), cut_tolerance = 1e-12, coef_tolerance = 1e-9,
+                    prediction_tolerance = 1e-10), "fda_cases.csv")
+write_fixture(do.call(rbind, fda_coef), "fda_coef.csv")
+write_fixture(do.call(rbind, fda_pred), "fda_predict.csv")
+cat("wrote", nrow(FDA_CASES), "discriminant cases\n")

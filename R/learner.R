@@ -121,6 +121,13 @@ print.timesift_learner_ref <- function(x, ...) {
   if (is.null(v)) "NULL" else paste(format(v), collapse = "/")
 }
 
+.check_count <- function(v, name, least) {
+  if (!is.numeric(v) || length(v) != 1L || is.na(v) || v != round(v) || v < least) {
+    stop("`", name, "` is one whole number of ", least, " or more, got ", .describe(v), ".",
+         call. = FALSE)
+  }
+}
+
 #' Register a learner
 #'
 #' Makes a learner available by name to [grain_ladder()] and to [learners()]. The learners that

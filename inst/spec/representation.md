@@ -1389,6 +1389,112 @@ earth's QR at every knot.
   predictions to `1e-9`.** Across the ten cases the core and earth agree to `8e-14` or better,
   weighted cases included.
 
+## The discriminant
+
+`discriminant()` is one flexible discriminant analysis per response, over `src/ts_fda.cpp`, which
+both languages compile. A biomod2 user's `FDA` is `mda::fda(y ~ ., weights = w, method = mars)`
+under mda's (0.5-5) defaults, so the basis is mda's own MARS, its Fortran `marss`, and not earth's
+that `mars()` ports; the scoring, the variate and the posterior are `fda()` and `predict.fda()`.
+The least squares are R's `dqrdc2` and `dqrsl` from `src/ts_glm.cpp`, and the recalibration its
+`glm.fit` under a probit link, with the normal distribution R's own (Cody's `pnorm`, Wichura's
+AS 241 `qnorm`, `dnorm` with the argument split above five) in `src/ts_normal.cpp`.
+
+- **The classes.** The response is zero or one with both present; the first class is the zeros.
+  The priors are the classes' unweighted shares, `n_j / n`.
+- **The scores.** The weights are rescaled to `w n / sum(w)` and the classes' weighted shares are
+  `d_j = sum_{i in j} w_i / n`. With `s_j = sqrt(d_j / (d_1 + d_2))`, the 2 by 2 matrix of rows
+  `(s_j, c_j s_j)`, `c = (-1, 1)` the Helmert contrast, is decomposed by `dqrdc2` at `1e-7`; the
+  scores are its Q's second column over `s_j`, `theta_j = (Q e_2)_j / s_j`, and each unit's scored
+  response is its class's score.
+- **The weights do not reach the basis.** `marss` sets them to one before its forward pass, so the
+  basis is the unweighted fit to the scored response. Two scores are an affine map of the response,
+  which leaves every criterion of the pass unchanged, so the terms are the same under any weights;
+  the weights move the scores, the variate and the recalibration.
+- **The settings.** `nk`, the most terms, defaults to `max(21, 2 p + 1)`, an even one taken one
+  lower; `penalty` to 2 at degree one and 3 above; `thresh` to `0.001`. `marss` writes two
+  tolerances as single-precision literals, and they are compared at the single-precision values:
+  `0.01f` (`tolbx`) and `1.01f`.
+- **The order of a column** is its units sorted by value, ties in unit order.
+- **The basis the search reads.** Each term's column orthogonalised against the terms before it by
+  one pass of projections (`orthreg`), then scaled to unit norm; the intercept is `1 / sqrt(n)` and
+  the first hinge is centred on its mean. A column's mean is taken before it is scaled.
+- **A step.** For each term of degree below `degree` as the parent, in term order: its min span is
+  `int(-log2(-log(0.95) / (p m)) / 2.5)`, `m` the units where the parent is positive, and its end
+  span `int(3 - log2(0.05 / p))`. For each column the parent does not use, in column order, the
+  candidate is *of a new form* unless some term held uses the column with the parent's other
+  columns. A new form offers the column itself, the parent times the column orthogonalised against
+  the basis, as a candidate: where its sum of squares is at most `0.01f` it is zero and the form is
+  no longer new, and otherwise its reduction is `sum_k (sum_i y_ik q_i)^2`. The knot search then
+  runs the column's order from `n - 1` down to 1, carrying with each unit that enters above the
+  knot the running sums and the centred covariances of `h(t) = b max(0, x - t)` with each basis
+  column and the candidate (`c_k`), with itself (`c`), and with the centred response (`g`), as
+  `mars()`'s search carries them. At position `k` the hinge adds `r^2 / q` to the new form's
+  reduction, `r = g - sum(g_k c_k)` and `q = c - sum(c_k^2)`, where `c` is positive and `q / c`
+  exceeds `0.01f`; a sum above `1.01f R`, `R` the residual sum of squares, or above twice the last
+  step's reduction is taken as zero. The knot is a candidate where `k` is a multiple of the min
+  span, within `[end span, n - end span]`, the parent is positive at the unit above, and the unit
+  at the knot does not share its value with the one below it. The step takes the greatest reduction, the first in parent,
+  column and knot order where two tie.
+- **A step's terms.** The pair `b max(0, x - t)` and `b max(0, t - x)` at the knot's value, the
+  second held only where the step was of a new form at a knot; the column itself is the first at
+  the column's least value, with no second.
+- **Stopping.** With `D` the terms' count less one and `C = 1 + D + penalty D / 2`, the
+  generalised cross-validation is `(R / n) / (1 - C / n)^2`. The pass takes the step where its
+  reduction is above `thresh` of `R` and the cross-validation after it below ten times the null
+  model's, and stops without it otherwise, when `R` falls to `thresh` of the null's, or at `nk`
+  terms.
+- **After the pass** the terms held are decomposed by `dqrdc2` at `0.01`, and the positions past
+  the rank are dropped. The position is the one among the terms held, which `marss` reads as a term
+  index: it is kept as `marss` keeps it.
+- **The pruning pass.** Over the terms of the last forward step, the least squares at `0.01` and
+  the diagonal of `(R'R)^-1` from R's inverse; then, while terms remain beside the intercept, the
+  term whose `beta_j^2 / v_j` is least (the first where two tie) is dropped, `R` raised by that,
+  and the subset kept where its cross-validation is below the best so far, the least squares
+  redone on what remains. The coefficients and `v_j` are read by the terms' positions in the
+  pivoted decomposition, as `marss` reads them.
+- **The fit.** The kept terms' least squares at `0.01`: coefficients in the decomposition's order,
+  and the fitted scores as the scored response less the residuals.
+- **The variate.** `m = sum(t_i w_i f_i) / n` over the scored response `t`, the rescaled weights
+  and the fitted scores `f`. `lambda = |m|`, held at `1 - eps`, and the variate's sign that of `m`.
+  At `lambda <= eps` nothing discriminates and every unit is predicted the second class's share.
+  Otherwise `alpha = sqrt(lambda)`, and the class centroids are `theta_j sign(m) / (sqrt(1 - lambda)
+  / alpha)`.
+- **The posterior.** A unit's basis is each kept term as the product of its factors over the
+  columns in order, `max(0, dir (x - cut))`, and its fitted score `f` the sum of the terms times
+  the coefficients in order. Its variate is `z = f sign(m) / (sqrt(1 - lambda) alpha)`, and the
+  second class's posterior `pi_2 e_2 / (pi_1 e_1 + pi_2 e_2)`, `e_j = exp(-(d_j - min(d)) / 2)`
+  and `d_j = (z - centroid_j)^2`; mda exponentiates without the shift, which is the same number
+  where either class's term is representable.
+- **The recalibration.** biomod2's `FDA` always predicts through a probit `glm()` of the response
+  on the in-sample posterior, under the case weights. That is `glm.fit` over the intercept and the
+  posterior, the start `mu = (w y + 0.5) / (w + 1)`, the linear predictor held at
+  `-qnorm(eps)` either side, the derivative of the mean held at `eps` from below, and the
+  deviance's relative change below `1e-8` in at most 25 steps. biomod2 rounds the posterior to
+  three decimals first, which is not reproduced. `calibrate = FALSE` predicts the posterior.
+- **What a fit keeps**: the kept terms as their factors, their coefficients, the count of forward
+  terms, the kept subset's generalised cross-validation, the variate's sign and scale, the
+  centroids and priors, and the recalibration's two coefficients and whether it settled.
+- The columns of one parent are independent searches, and `threads` runs them at once; their
+  results are taken in column order afterwards, so what comes back does not depend on it.
+
+### The fixtures
+
+`fda_cases.csv` names five cases on the weekly columns maxnet's fixtures read: mda's own fits under
+the fractional weights and without them, at degree two, unpruned, and on the design with the square
+of every column beside it, whose near-collinear hinges are what the decomposition at `0.01` drops.
+Each case carries the count of forward terms, the kept terms as `column:direction:cut` factors and
+the kept subset's generalised cross-validation. `fda_coef.csv` holds the coefficients, and
+`fda_predict.csv`, on every reading scaled by `1.01`, the posterior and biomod2's probit
+recalibration of it.
+
+### How exactly
+
+- **The count of forward terms and the kept terms are asserted exactly**, the cuts to `1e-12`
+  relative: a cut is a reading.
+- **The coefficients and the generalised cross-validation are asserted to `1e-9` relative and the
+  posteriors and recalibrated probabilities to `1e-10`.** Across the five cases the core and mda
+  agree to `1.4e-14` or better in the coefficients and `4.1e-15` in the predictions.
+
 ## The combiner
 
 `ensemble_fit()` is handed each candidate's out-of-fold predictions, the response, the mask and the
@@ -1493,6 +1599,7 @@ call site.
 | maxnet's MaxEnt | `maxnet()` |
 | the surface range envelope | `envelope()` |
 | multivariate adaptive regression splines | `mars()` |
+| flexible discriminant analysis | `discriminant()` |
 | the encoders | `mlp()`, `cnn()`, `rescnn()` |
 | how an encoder is trained | `train_control()` |
 | fitting one learner on one representation | `fit_learner()` |

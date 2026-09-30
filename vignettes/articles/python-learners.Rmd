@@ -364,6 +364,48 @@ keep the same terms and return the same coefficients; `threads` searches that ma
 at once and does not change what comes back. A variable holding one value is predicted its
 mean.
 
+## `discriminant()`
+
+```python
+discriminant(
+    data=None,
+    degree=1,
+    penalty=None,
+    nk=None,
+    thresh=0.001,
+    prune=True,
+    calibrate=True,
+    threads=1,
+)
+```
+
+One flexible discriminant per variable over every bin-by-channel column, fitted as mda's
+`fda(method = mars)` fits it and as biomod2 fits `FDA`. Optimal scoring gives presence and
+absence one score each and regresses the scored response on a MARS basis of the columns; the
+fitted score is the one canonical variate, and the prediction is the posterior probability of
+presence under two normal classes around the class centroids on it, the classes' shares among
+the fitting units as priors.
+
+The basis is mda's own MARS, not earth's that `mars` ports: each forward step adds a column
+linearly or a pair of hinges on it, and the pass stops when a step lowers the residuals by less
+than `thresh` of them, when they fall to `thresh` of the null model's, when the generalised
+cross-validation passes ten times the null model's, or at `nk` terms. The pruning drops the
+term of least t statistic, one at a time, and keeps the subset of least generalised
+cross-validation, which counts each term beyond the intercept as `1 + penalty / 2` degrees
+of freedom. The defaults are mda's, which biomod2 passes
+unchanged: degree one, `penalty` 2 (3 above degree one), `thresh=0.001` and
+`nk = max(21, 2 p + 1)` for `p` columns.
+
+The head's case weights set the classes' scores and the variate, and not the basis, whose
+forward pass mda runs unweighted. `calibrate=True` recalibrates the posterior by a probit
+regression of the response on it under the case weights, on the fitting units, as biomod2
+always does for `FDA`; `False` predicts the posterior. The passes run on the core the R
+package calls, so the two keep the same terms and predict the same probabilities; `threads`
+searches that many columns at once and does not change what comes back. A variable holding one
+value, or one the basis does not reach, is predicted its mean and named in `unfitted`. The
+learner needs a presence-absence response, under a head whose loss is the binary
+cross-entropy.
+
 ## `mlp()`
 
 ```python

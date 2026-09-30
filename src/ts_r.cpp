@@ -6,6 +6,7 @@
 
 #include "ts_core.h"
 #include "ts_envelope.h"
+#include "ts_fda.h"
 #include "ts_mars.h"
 #include "ts_maxnet.h"
 #include "ts_penalised.h"
@@ -884,5 +885,73 @@ cpp11::doubles ts_mars_predict_(cpp11::list fit, cpp11::doubles newx, int n, int
   std::vector<double> out(static_cast<std::size_t>(n));
   timesift::mars_predict(m, REAL_RO(newx.data()), static_cast<std::size_t>(n),
                          static_cast<std::size_t>(p), out.data());
+  return give(out);
+}
+
+// Flexible discriminant analysis, from the same core the Python side calls. A fit crosses into R as
+// a list of plain vectors: the kept terms as their factors, their coefficients, the variate and the
+// recalibration.
+[[cpp11::register]]
+cpp11::list ts_fda_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                        int degree, double penalty, int nk, double thresh, bool prune,
+                        bool calibrate, int threads) {
+  timesift::FdaSpec spec;
+  spec.degree = degree;
+  spec.penalty = penalty;
+  spec.nk = nk;
+  spec.thresh = thresh;
+  spec.prune = prune;
+  spec.calibrate = calibrate;
+  spec.threads = threads;
+  const timesift::Fda fit =
+      timesift::fda_fit(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()),
+                        static_cast<std::size_t>(n), static_cast<std::size_t>(p), spec);
+  using namespace cpp11::literals;
+  return cpp11::writable::list({
+    "n_column"_nm = cpp11::as_sexp(fit.n_column),
+    "factor_start"_nm = give(fit.factor_start),
+    "factor_column"_nm = give(fit.factor_column),
+    "factor_dir"_nm = give(fit.factor_dir),
+    "factor_cut"_nm = give(fit.factor_cut),
+    "coef"_nm = give(fit.coef),
+    "forward_terms"_nm = cpp11::as_sexp(fit.forward_terms),
+    "gcv"_nm = cpp11::as_sexp(fit.gcv),
+    "discriminates"_nm = cpp11::as_sexp(fit.discriminates),
+    "mean"_nm = cpp11::as_sexp(fit.mean),
+    "direction"_nm = cpp11::as_sexp(fit.direction),
+    "scale"_nm = cpp11::as_sexp(fit.scale),
+    "centroid"_nm = give(std::vector<double>(fit.centroid, fit.centroid + 2)),
+    "prior"_nm = give(std::vector<double>(fit.prior, fit.prior + 2)),
+    "calibrated"_nm = cpp11::as_sexp(fit.calibrated),
+    "calibration"_nm = give(std::vector<double>(fit.calibration, fit.calibration + 2)),
+    "converged"_nm = cpp11::as_sexp(fit.converged)
+  });
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_fda_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p) {
+  timesift::Fda f;
+  f.n_column = cpp11::as_cpp<int>(fit["n_column"]);
+  f.factor_start = take_field<std::int32_t>(fit, "factor_start");
+  f.factor_column = take_field<std::int32_t>(fit, "factor_column");
+  f.factor_dir = take_field<std::int32_t>(fit, "factor_dir");
+  f.factor_cut = take_field<double>(fit, "factor_cut");
+  f.coef = take_field<double>(fit, "coef");
+  f.discriminates = cpp11::as_cpp<bool>(fit["discriminates"]);
+  f.mean = cpp11::as_cpp<double>(fit["mean"]);
+  f.direction = cpp11::as_cpp<double>(fit["direction"]);
+  f.scale = cpp11::as_cpp<double>(fit["scale"]);
+  const std::vector<double> centroid = take_field<double>(fit, "centroid");
+  const std::vector<double> prior = take_field<double>(fit, "prior");
+  const std::vector<double> calibration = take_field<double>(fit, "calibration");
+  for (int j = 0; j < 2; ++j) {
+    f.centroid[j] = centroid[j];
+    f.prior[j] = prior[j];
+    f.calibration[j] = calibration[j];
+  }
+  f.calibrated = cpp11::as_cpp<bool>(fit["calibrated"]);
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::fda_predict(f, REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                        static_cast<std::size_t>(p), out.data());
   return give(out);
 }

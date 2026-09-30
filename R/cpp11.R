@@ -111,3 +111,11 @@ ts_mars_fit_ <- function(x, y, w, n, p, family, degree, penalty, nk, thresh, min
 ts_mars_predict_ <- function(fit, newx, n, p) {
   .Call(`_timesift_ts_mars_predict_`, fit, newx, n, p)
 }
+
+ts_fda_fit_ <- function(x, y, w, n, p, degree, penalty, nk, thresh, prune, calibrate, threads) {
+  .Call(`_timesift_ts_fda_fit_`, x, y, w, n, p, degree, penalty, nk, thresh, prune, calibrate, threads)
+}
+
+ts_fda_predict_ <- function(fit, newx, n, p) {
+  .Call(`_timesift_ts_fda_predict_`, fit, newx, n, p)
+}

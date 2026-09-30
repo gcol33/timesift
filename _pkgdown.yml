@@ -103,6 +103,7 @@ reference:
   - maxnet
   - envelope
   - mars
+  - discriminant
   - torch_learners
   - train_control
   - learner

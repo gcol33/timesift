@@ -2,6 +2,18 @@
 
 ## New
 
+* `discriminant()` fits one flexible discriminant analysis per response, which is what biomod2
+  fits as `FDA`: mda's `fda(method = mars)`, optimal scoring of presence and absence regressed on
+  mda's own MARS basis, and the posterior of two normal classes on the one canonical variate. The
+  basis is mda's Fortran `marss`, not earth's, and like it runs its forward pass unweighted; the
+  head's case weights set the scores and the variate. `calibrate = TRUE` predicts through the
+  probit recalibration biomod2 always applies to `FDA`, fitted on the fitting units. `degree`,
+  `penalty`, `nk`, `thresh` and `prune` are mda's settings under mda's defaults, which biomod2
+  passes unchanged. It runs on a new core, `src/ts_fda.cpp`, compiled into both languages, with
+  R's normal distribution in `src/ts_normal.cpp` and a probit link in the shared `glm.fit`; on the
+  contract's five cases it keeps mda's terms exactly and its coefficients and predictions agree
+  with mda's and with R's `glm()` to `1.4e-14`. On 560 units and 150 columns a fit takes about
+  what mda takes, and `threads` searches the columns at once. Both languages.
 * `mars()` fits one multivariate adaptive regression spline per response, as the earth package
   fits it and biomod2 fits `MARS`: earth's forward pass of hinge pairs with Fast MARS, leaps'
   backward pruning by generalised cross-validation, and the kept terms refitted as a logistic model

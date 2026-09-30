@@ -21,8 +21,8 @@ from .digest import digest_array
 from .fit import Timesift, timesift
 from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
-from .learners import (Fit, Learner, boosting, cnn, elasticnet, envelope, fit_learner, flatten,
-                       forest, mars, maxnet, mlp, rescnn, stepwise, tree)
+from .learners import (Fit, Learner, boosting, cnn, discriminant, elasticnet, envelope,
+                       fit_learner, flatten, forest, mars, maxnet, mlp, rescnn, stepwise, tree)
 from .metrics import (average_precision, cohen_kappa, decision_threshold, kappa_score,
                       model_agreement, roc_auc, tss)
 from .occlusion import feature_matrix
@@ -69,6 +69,7 @@ register_learner("boosting", boosting)
 register_learner("maxnet", maxnet)
 register_learner("envelope", envelope)
 register_learner("mars", mars)
+register_learner("discriminant", discriminant)
 register_learner("mlp", mlp)
 register_learner("cnn", cnn)
 register_learner("rescnn", rescnn)
@@ -82,7 +83,7 @@ __all__ = [
     "TrainControl", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
     "average_precision",
     "bind_channels", "boosting", "build_representation", "calendar_channels", "candidate_table", "cnn",
-    "cohen_kappa", "column_names", "coverage", "cv", "decision_threshold", "digest_array",
+    "cohen_kappa", "column_names", "coverage", "cv", "decision_threshold", "digest_array", "discriminant",
     "elasticnet", "envelope",
     "ensemble", "ensemble_combine", "ensemble_fit", "ensemble_spread", "ensemble_weights",
     "expand_sift", "feature_matrix", "fit_learner", "flatten", "fold_map", "forest",

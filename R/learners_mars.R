@@ -57,12 +57,6 @@
 mars <- function(data = NULL, degree = 1L, penalty = NULL, nk = NULL, thresh = 0.001,
                  minspan = 0L, endspan = 0L, fast_k = 20L, fast_beta = 1, prune = TRUE,
                  nprune = NULL, threads = 1L) {
-  .check_count <- function(v, name, least) {
-    if (!is.numeric(v) || length(v) != 1L || is.na(v) || v != round(v) || v < least) {
-      stop("`", name, "` is one whole number of ", least, " or more, got ", .describe(v), ".",
-           call. = FALSE)
-    }
-  }
   .check_count(degree, "degree", 1)
   if (!is.null(nk)) .check_count(nk, "nk", 1)
   if (!is.null(nprune)) .check_count(nprune, "nprune", 1)

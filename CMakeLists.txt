@@ -26,6 +26,8 @@ nanobind_add_module(_core NB_STATIC
   src/ts_stepwise.cpp
   src/ts_glm.cpp
   src/ts_mars.cpp
+  src/ts_fda.cpp
+  src/ts_normal.cpp
   python/ts_py.cpp)
 
 target_include_directories(_core PRIVATE src)

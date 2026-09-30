@@ -1,5 +1,7 @@
 #include "ts_glm.h"
 
+#include "ts_normal.h"
+
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
@@ -54,6 +56,34 @@ double logit_linkinv(double eta) {
   const double t = eta < -kThresh ? DBL_EPSILON : (eta > kThresh ? kInvEps : std::exp(eta));
   return t / (1.0 + t);
 }
+
+double probit_linkinv(double eta) {
+  static const double thresh = -detail::qnorm(DBL_EPSILON);
+  return detail::pnorm(std::min(std::max(eta, -thresh), thresh));
+}
+
+namespace {
+
+// The link a fit iterates under: its inverse, its derivative, and the link itself, which only the
+// starting means are read through.
+struct LinkFns {
+  bool binomial;
+  Link link;
+  double inv(double eta) const {
+    if (!binomial) return eta;
+    return link == Link::probit ? probit_linkinv(eta) : logit_linkinv(eta);
+  }
+  double mu_eta(double eta) const {
+    if (!binomial) return 1.0;
+    return link == Link::probit ? std::max(detail::dnorm(eta), DBL_EPSILON) : logit_mu_eta(eta);
+  }
+  double fun(double mu) const {
+    if (!binomial) return mu;
+    return link == Link::probit ? detail::qnorm(mu) : std::log(mu / (1.0 - mu));
+  }
+};
+
+}  // namespace
 
 namespace detail {
 
@@ -122,6 +152,45 @@ void dqrdc2(double* x, std::size_t n, std::size_t p, double tol, std::size_t& k,
   k = std::min(kk - 1, n);
 }
 
+namespace {
+
+// The `j`th Householder reflection of the decomposition applied to `y`. Its leading entry is
+// `qraux[j]`, where the decomposition keeps R's diagonal.
+void reflect(const double* qr, std::size_t n, std::size_t j, const double* qraux, double* y) {
+  const double* xj = qr + j * n;
+  double dot = qraux[j] * y[j];
+  for (std::size_t i = j + 1; i < n; ++i) dot += xj[i] * y[i];
+  const double t = -dot / qraux[j];
+  y[j] += t * qraux[j];
+  for (std::size_t i = j + 1; i < n; ++i) y[i] += t * xj[i];
+}
+
+}  // namespace
+
+void qr_qty(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y) {
+  const std::size_t ju = std::min(k, n - 1);
+  for (std::size_t j = 0; j < ju; ++j) {
+    if (qraux[j] != 0.0) reflect(qr, n, j, qraux, y);
+  }
+}
+
+void qr_qy(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y) {
+  const std::size_t ju = std::min(k, n - 1);
+  for (std::size_t j = ju; j-- > 0;) {
+    if (qraux[j] != 0.0) reflect(qr, n, j, qraux, y);
+  }
+}
+
+bool qr_backsolve(const double* qr, std::size_t n, std::size_t k, double* b) {
+  for (std::size_t j = k; j-- > 0;) {
+    const double d = qr[j + j * n];
+    if (d == 0.0) return false;
+    b[j] /= d;
+    for (std::size_t i = 0; i < j; ++i) b[i] -= b[j] * qr[i + j * n];
+  }
+  return true;
+}
+
 std::vector<double> dqrls(double* x, std::size_t n, std::size_t p, double* b, double tol,
                           std::size_t& rank) {
   std::vector<double> qraux;
@@ -129,27 +198,10 @@ std::vector<double> dqrls(double* x, std::size_t n, std::size_t p, double* b, do
   dqrdc2(x, n, p, tol, rank, qraux, jpvt);
   std::vector<double> coef(p, 0.0);
   if (rank > 0) {
-    const std::size_t ju = std::min(rank, n - 1);
-    for (std::size_t j = 0; j < ju; ++j) {
-      if (qraux[j] == 0.0) continue;
-      double* xj = x + j * n;
-      const double diag = xj[j];
-      xj[j] = qraux[j];
-      double dot = 0.0;
-      for (std::size_t i = j; i < n; ++i) dot += xj[i] * b[i];
-      const double t = -dot / xj[j];
-      for (std::size_t i = j; i < n; ++i) b[i] += t * xj[i];
-      xj[j] = diag;
-    }
+    qr_qty(x, n, rank, qraux.data(), b);
     std::vector<double> s(b, b + rank);
-    for (std::size_t jj = rank; jj-- > 0;) {
-      const double d = x[jj + jj * n];
-      if (d == 0.0) {
-        s[jj] = std::numeric_limits<double>::quiet_NaN();
-        continue;
-      }
-      s[jj] /= d;
-      for (std::size_t i = 0; i < jj; ++i) s[i] -= s[jj] * x[i + jj * n];
+    if (!qr_backsolve(x, n, rank, s.data())) {
+      s.assign(rank, std::numeric_limits<double>::quiet_NaN());
     }
     for (std::size_t j = 0; j < rank; ++j) coef[jpvt[j]] = s[j];
   }
@@ -159,14 +211,15 @@ std::vector<double> dqrls(double* x, std::size_t n, std::size_t p, double* b, do
 }  // namespace detail
 
 Glm glm_fit(const double* x, std::size_t n, std::size_t q, const double* y, const double* w,
-            Family family, double epsilon, int max_iter) {
+            Family family, double epsilon, int max_iter, Link link) {
   const bool binomial = family == Family::binomial;
+  const LinkFns fns{binomial, link};
   std::vector<double> eta(n), mu(n), start(q, 0.0);
   for (std::size_t i = 0; i < n; ++i) {
     if (binomial) {
       const double m = (w[i] * y[i] + 0.5) / (w[i] + 1.0);
-      eta[i] = std::log(m / (1.0 - m));
-      mu[i] = logit_linkinv(eta[i]);
+      eta[i] = fns.fun(m);
+      mu[i] = fns.inv(eta[i]);
     } else {
       eta[i] = y[i];
       mu[i] = y[i];
@@ -181,8 +234,7 @@ Glm glm_fit(const double* x, std::size_t n, std::size_t q, const double* y, cons
   for (int iter = 0; iter < max_iter; ++iter) {
     good.clear();
     for (std::size_t i = 0; i < n; ++i) {
-      const double me = binomial ? logit_mu_eta(eta[i]) : 1.0;
-      if (w[i] > 0.0 && me != 0.0) good.push_back(i);
+      if (w[i] > 0.0 && fns.mu_eta(eta[i]) != 0.0) good.push_back(i);
     }
     if (good.empty()) return out;
     const std::size_t ng = good.size();
@@ -190,7 +242,7 @@ Glm glm_fit(const double* x, std::size_t n, std::size_t q, const double* y, cons
     z.assign(ng, 0.0);
     for (std::size_t r = 0; r < ng; ++r) {
       const std::size_t i = good[r];
-      const double me = binomial ? logit_mu_eta(eta[i]) : 1.0;
+      const double me = fns.mu_eta(eta[i]);
       const double var = binomial ? mu[i] * (1.0 - mu[i]) : 1.0;
       const double ws = std::sqrt((w[i] * me * me) / var);
       z[r] = (eta[i] + (y[i] - mu[i]) / me) * ws;
@@ -206,7 +258,7 @@ Glm glm_fit(const double* x, std::size_t n, std::size_t q, const double* y, cons
       double e = 0.0;
       for (std::size_t c = 0; c < q; ++c) e += x[i + c * n] * start[c];
       eta[i] = e;
-      mu[i] = binomial ? logit_linkinv(e) : e;
+      mu[i] = fns.inv(e);
     }
     const double dev = deviance(y, mu.data(), w, n, family);
     out.beta = start;

@@ -19,6 +19,8 @@ import pytest
 from timesift import Response, fit_learner, grain_matrix, mars
 from timesift._mars import mars_fit, mars_predict
 
+from terms import assert_hinge_terms
+
 FIXTURES = Path(__file__).resolve().parents[2] / "inst" / "spec" / "fixtures"
 HELD = ("unit", "y_gaussian", "y_binomial", "w", "fold")
 
@@ -49,36 +51,10 @@ def case_fit(mars_input, row):
                     nprune=None if row["nprune"] == "NA" else int(row["nprune"]))
 
 
-def terms_of(fit):
-    """Each forward term's ``column:direction`` factors, and its cuts apart."""
-    start = fit["factor_start"]
-    out = []
-    for t in range(len(start) - 1):
-        idx = range(start[t], start[t + 1])
-        key = "*".join(f"{fit['factor_column'][i] + 1}:{fit['factor_dir'][i]}" for i in idx)
-        out.append((key or "1", [float(fit["factor_cut"][i]) for i in idx]))
-    return out
-
-
-def fixture_terms(forward):
-    out = []
-    for term in forward.split(" "):
-        if term == "1":
-            out.append(("1", []))
-            continue
-        parts = [p.split(":") for p in term.split("*")]
-        out.append(("*".join(f"{p[0]}:{p[1]}" for p in parts), [float(p[2]) for p in parts]))
-    return out
-
-
 @pytest.mark.parametrize("row", read_rows("mars_cases.csv"), ids=lambda r: r["case"])
 def test_the_cores_passes_keep_the_terms_earth_keeps(mars_input, row):
     fit = case_fit(mars_input, row)
-    got, want = terms_of(fit), fixture_terms(row["forward"])
-    assert [k for k, _ in got] == [k for k, _ in want]
-    tol = float(row["cut_tolerance"])
-    np.testing.assert_allclose([c for _, cs in got for c in cs],
-                               [c for _, cs in want for c in cs], rtol=tol, atol=tol)
+    assert_hinge_terms(fit, row["forward"], float(row["cut_tolerance"]))
     assert fit["termcond"] == int(row["termcond"])
     assert " ".join(str(s + 1) for s in fit["selected"]) == row["selected"]
     ctol = float(row["coef_tolerance"])

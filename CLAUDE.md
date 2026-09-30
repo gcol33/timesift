@@ -59,7 +59,7 @@ timesift/
     ts_penalised.h ts_penalised.cpp
     ts_tree.h ts_tree.cpp ts_boost.cpp ts_maxnet.h ts_maxnet.cpp
     ts_envelope.h ts_envelope.cpp ts_stepwise.h ts_stepwise.cpp ts_glm.h ts_glm.cpp
-    ts_mars.h ts_mars.cpp ts_internal.h
+    ts_mars.h ts_mars.cpp ts_fda.h ts_fda.cpp ts_normal.h ts_normal.cpp ts_internal.h
     ts_r.cpp          the cpp11 wrapper; cpp11.cpp is generated
   R/                  R package source
   tests/testthat/     including helper-oracle.R, the pure-R implementation
@@ -174,8 +174,8 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   and the combiner minimises the loss. A fit that declares a `head` argument is handed the head,
   as one that declares `control` is handed the control; no learner holds a response of its own.
   Same for learners: `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `stepwise()`, `forest()`,
-  `tree()`, `boosting()`, `maxnet()`, `envelope()`, `mars()` and any user-supplied fit/predict
-  pair go through one interface.
+  `tree()`, `boosting()`, `maxnet()`, `envelope()`, `mars()`, `discriminant()` and any
+  user-supplied fit/predict pair go through one interface.
 - **A fitted encoder is a plain object.** Its weights are arrays and its device is the setting,
   not the resolved device; the network is rebuilt at prediction. `saveRDS()` and `pickle` round
   trip a fit, and a fit made on one machine predicts on another.
@@ -208,6 +208,12 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   terms and coefficients in the fixtures. A weighted fit reaches by running updates the residual
   sums earth refits by QR at every candidate knot, which is what makes it affordable at a weekly
   grain.
+- **So is the discriminant.** `src/ts_fda.cpp` is mda's `fda(method = mars)`: its own Fortran MARS
+  (`marss`, not earth's), the optimal scoring and the posterior, ported, and the probit
+  recalibration biomod2 always applies, so `discriminant()` is the `FDA` a biomod2 user fits. It
+  is pinned against mda's terms, coefficients and posteriors and R's probit `glm()` in the
+  fixtures. The probit runs through `glm.fit` in `src/ts_glm.cpp` on R's normal distribution,
+  ported in `src/ts_normal.cpp`.
 - **The pure-R and pure-NumPy implementations are kept as test oracles**, never reachable at
   runtime. The NumPy one was written from the spec rather than from the R source, so it is the
   evidence that the spec is complete; one shared binary would otherwise make the agreement between

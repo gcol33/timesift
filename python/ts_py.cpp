@@ -12,6 +12,7 @@
 
 #include "ts_core.h"
 #include "ts_envelope.h"
+#include "ts_fda.h"
 #include "ts_mars.h"
 #include "ts_maxnet.h"
 #include "ts_penalised.h"
@@ -753,6 +754,74 @@ NB_MODULE(_core, m) {
           s.beta = take_field<double>(fit, "beta");
           std::vector<double> out(newx.shape(0));
           timesift::mars_predict(s, newx.data(), newx.shape(0), newx.shape(1), out.data());
+          return give(std::move(out));
+        },
+        nb::arg("fit"), nb::arg("newx"));
+
+  m.def("fda_fit",
+        [](ConstMat x, ConstF64 y, ConstF64 w, int degree, double penalty, int nk, double thresh,
+           bool prune, bool calibrate, int threads) {
+          timesift::FdaSpec spec;
+          spec.degree = degree;
+          spec.penalty = penalty;
+          spec.nk = nk;
+          spec.thresh = thresh;
+          spec.prune = prune;
+          spec.calibrate = calibrate;
+          spec.threads = threads;
+          timesift::Fda fit;
+          {
+            nb::gil_scoped_release release;
+            fit = timesift::fda_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1), spec);
+          }
+          nb::dict out;
+          out["n_column"] = fit.n_column;
+          out["factor_start"] = give(std::move(fit.factor_start));
+          out["factor_column"] = give(std::move(fit.factor_column));
+          out["factor_dir"] = give(std::move(fit.factor_dir));
+          out["factor_cut"] = give(std::move(fit.factor_cut));
+          out["coef"] = give(std::move(fit.coef));
+          out["forward_terms"] = fit.forward_terms;
+          out["gcv"] = fit.gcv;
+          out["discriminates"] = fit.discriminates;
+          out["mean"] = fit.mean;
+          out["direction"] = fit.direction;
+          out["scale"] = fit.scale;
+          out["centroid"] = give(std::vector<double>(fit.centroid, fit.centroid + 2));
+          out["prior"] = give(std::vector<double>(fit.prior, fit.prior + 2));
+          out["calibrated"] = fit.calibrated;
+          out["calibration"] = give(std::vector<double>(fit.calibration, fit.calibration + 2));
+          out["converged"] = fit.converged;
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("degree"), nb::arg("penalty"),
+        nb::arg("nk"), nb::arg("thresh"), nb::arg("prune"), nb::arg("calibrate"),
+        nb::arg("threads") = 1);
+
+  m.def("fda_predict",
+        [](const nb::dict& fit, ConstMat newx) {
+          timesift::Fda f;
+          f.n_column = nb::cast<std::int32_t>(fit["n_column"]);
+          f.factor_start = take_field<std::int32_t>(fit, "factor_start");
+          f.factor_column = take_field<std::int32_t>(fit, "factor_column");
+          f.factor_dir = take_field<std::int32_t>(fit, "factor_dir");
+          f.factor_cut = take_field<double>(fit, "factor_cut");
+          f.coef = take_field<double>(fit, "coef");
+          f.discriminates = nb::cast<bool>(fit["discriminates"]);
+          f.mean = nb::cast<double>(fit["mean"]);
+          f.direction = nb::cast<double>(fit["direction"]);
+          f.scale = nb::cast<double>(fit["scale"]);
+          const std::vector<double> centroid = take_field<double>(fit, "centroid");
+          const std::vector<double> prior = take_field<double>(fit, "prior");
+          const std::vector<double> calibration = take_field<double>(fit, "calibration");
+          for (int j = 0; j < 2; ++j) {
+            f.centroid[j] = centroid[j];
+            f.prior[j] = prior[j];
+            f.calibration[j] = calibration[j];
+          }
+          f.calibrated = nb::cast<bool>(fit["calibrated"]);
+          std::vector<double> out(newx.shape(0));
+          timesift::fda_predict(f, newx.data(), newx.shape(0), newx.shape(1), out.data());
           return give(std::move(out));
         },
         nb::arg("fit"), nb::arg("newx"));
