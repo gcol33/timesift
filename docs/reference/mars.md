@@ -99,9 +99,10 @@ The defaults are earth's own, which biomod2 uses under its default
 option set and under `"bigboss"` alike: degree one, `penalty = 2`,
 `thresh = 0.001`, `nk = min(200, max(20, 2 p)) + 1` for `p` columns,
 Friedman's rules for the spans between knots, and Fast MARS over the 20
-best parents. The forward pass, the pruning pass and the refit are
-ported from earth and leaps into the core the Python package calls, so
-the two languages keep the same terms and return the same coefficients.
+best parents. The forward pass, the pruning pass and the refit live in
+the core the Python package calls, pinned against earth in the fixtures,
+so the two languages keep the same terms and return the same
+coefficients.
 
 The case weights are the response head's,
 [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)

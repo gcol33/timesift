@@ -74,14 +74,14 @@ A
 
 The basis is mda's own MARS, which biomod2 reaches through `fda()` and
 which differs from earth's that
-[`mars()`](https://gillescolling.com/timesift/reference/mars.md) ports.
-Each forward step adds a column linearly or a pair of hinges on it,
-`max(0, x - t)` and `max(0, t - x)`, choosing by Friedman's running
-updates, and the pass stops when a step lowers the residuals by less
-than `thresh` of them, when they fall to `thresh` of the null model's,
-when the generalised cross-validation passes ten times the null model's,
-or at `nk` terms. The pruning pass drops the term of least t statistic,
-one at a time, and keeps the subset of least generalised
+[`mars()`](https://gillescolling.com/timesift/reference/mars.md)
+reproduces. Each forward step adds a column linearly or a pair of hinges
+on it, `max(0, x - t)` and `max(0, t - x)`, choosing by Friedman's
+running updates, and the pass stops when a step lowers the residuals by
+less than `thresh` of them, when they fall to `thresh` of the null
+model's, when the generalised cross-validation passes ten times the null
+model's, or at `nk` terms. The pruning pass drops the term of least t
+statistic, one at a time, and keeps the subset of least generalised
 cross-validation, which counts each term beyond the intercept as
 `1 + penalty / 2` degrees of freedom. The defaults are mda's, which
 biomod2 passes unchanged under its default option set and under
@@ -101,8 +101,9 @@ discriminant was fitted on; `FALSE` predicts the posterior itself.
 biomod2 rounds the posterior to three decimals before recalibrating it,
 which is not reproduced.
 
-The forward pass, the pruning, the scoring and the recalibration are
-ported from mda and R into the core the Python package calls, so the two
+The forward pass, the pruning, the scoring and the recalibration live in
+the core the Python package calls, pinned against mda and R's
+[`glm()`](https://rdrr.io/r/stats/glm.html) in the fixtures, so the two
 languages keep the same terms and predict the same probabilities. A
 response holding one value is predicted its mean, and so is one whose
 scored response the basis does not reach; both are named in `unfitted`.

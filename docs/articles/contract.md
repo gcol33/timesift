@@ -1765,15 +1765,14 @@ by `1.01`. The weighted cases are earth’s QR at every knot.
 is one flexible discriminant analysis per response, over
 `src/ts_fda.cpp`, which both languages compile. A biomod2 user’s `FDA`
 is `mda::fda(y ~ ., weights = w, method = mars)` under mda’s (0.5-5)
-defaults, so the basis is mda’s own MARS, its Fortran `marss`, and not
-earth’s that
-[`mars()`](https://gillescolling.com/timesift/reference/mars.md) ports;
-the scoring, the variate and the posterior are `fda()` and
-`predict.fda()`. The least squares are R’s `dqrdc2` and `dqrsl` from
-`src/ts_glm.cpp`, and the recalibration its `glm.fit` under a probit
-link, with the normal distribution R’s own (Cody’s `pnorm`, Wichura’s AS
-241 `qnorm`, `dnorm` with the argument split above five) in
-`src/ts_normal.cpp`.
+defaults, so the basis is mda’s own MARS and not earth’s that
+[`mars()`](https://gillescolling.com/timesift/reference/mars.md)
+reproduces; the scoring, the variate and the posterior are those of
+`fda()` and `predict.fda()`. The least squares are the Householder QR
+with limited pivoting of `src/ts_glm.cpp`, under R’s rank rule, and the
+recalibration its IRLS under a probit link, with the normal distribution
+computed as R computes it (Cody’s `pnorm`, Wichura’s AS 241 `qnorm`,
+`dnorm` with the argument split above five) in `src/ts_normal.cpp`.
 
 - **The classes.** The response is zero or one with both present; the
   first class is the zeros. The priors are the classes’ unweighted

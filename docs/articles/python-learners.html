@@ -546,8 +546,8 @@ prediction is the posterior probability of presence under two normal
 classes around the class centroids on it, the classes’ shares among the
 fitting units as priors.</p>
 <p>The basis is mda’s own MARS, not earth’s that <code>mars</code>
-ports: each forward step adds a column linearly or a pair of hinges on
-it, and the pass stops when a step lowers the residuals by less than
+reproduces: each forward step adds a column linearly or a pair of hinges
+on it, and the pass stops when a step lowers the residuals by less than
 <code>thresh</code> of them, when they fall to <code>thresh</code> of
 the null model’s, when the generalised cross-validation passes ten times
 the null model’s, or at <code>nk</code> terms. The pruning drops the

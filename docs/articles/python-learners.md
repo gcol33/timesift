@@ -440,16 +440,16 @@ the one canonical variate, and the prediction is the posterior
 probability of presence under two normal classes around the class
 centroids on it, the classes’ shares among the fitting units as priors.
 
-The basis is mda’s own MARS, not earth’s that `mars` ports: each forward
-step adds a column linearly or a pair of hinges on it, and the pass
-stops when a step lowers the residuals by less than `thresh` of them,
-when they fall to `thresh` of the null model’s, when the generalised
-cross-validation passes ten times the null model’s, or at `nk` terms.
-The pruning drops the term of least t statistic, one at a time, and
-keeps the subset of least generalised cross-validation, which counts
-each term beyond the intercept as `1 + penalty / 2` degrees of freedom.
-The defaults are mda’s, which biomod2 passes unchanged: degree one,
-`penalty` 2 (3 above degree one), `thresh=0.001` and
+The basis is mda’s own MARS, not earth’s that `mars` reproduces: each
+forward step adds a column linearly or a pair of hinges on it, and the
+pass stops when a step lowers the residuals by less than `thresh` of
+them, when they fall to `thresh` of the null model’s, when the
+generalised cross-validation passes ten times the null model’s, or at
+`nk` terms. The pruning drops the term of least t statistic, one at a
+time, and keeps the subset of least generalised cross-validation, which
+counts each term beyond the intercept as `1 + penalty / 2` degrees of
+freedom. The defaults are mda’s, which biomod2 passes unchanged: degree
+one, `penalty` 2 (3 above degree one), `thresh=0.001` and
 `nk = max(21, 2 p + 1)` for `p` columns.
 
 The head’s case weights set the classes’ scores and the variate, and not

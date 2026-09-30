@@ -155,7 +155,7 @@ freedom, taken at half. <code>NULL</code> is mda's, 2 at degree one and 3 above.
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The basis is mda's own MARS, which biomod2 reaches through <code>fda()</code> and which differs from earth's
-that <code><a href="mars.html">mars()</a></code> ports. Each forward step adds a column linearly or a pair of hinges on it,
+that <code><a href="mars.html">mars()</a></code> reproduces. Each forward step adds a column linearly or a pair of hinges on it,
 <code>max(0, x - t)</code> and <code>max(0, t - x)</code>, choosing by Friedman's running updates, and the pass stops
 when a step lowers the residuals by less than <code>thresh</code> of them, when they fall to <code>thresh</code> of
 the null model's, when the generalised cross-validation passes ten times the null model's, or at
@@ -172,8 +172,8 @@ pass sets them to one.</p>
 under the case weights, and predicts through that regression. <code>calibrate = TRUE</code> does the same,
 on the units the discriminant was fitted on; <code>FALSE</code> predicts the posterior itself. biomod2
 rounds the posterior to three decimals before recalibrating it, which is not reproduced.</p>
-<p>The forward pass, the pruning, the scoring and the recalibration are ported from mda and R into
-the core the Python package calls, so the two languages keep the same terms and predict the same
+<p>The forward pass, the pruning, the scoring and the recalibration live in the core the Python
+package calls, pinned against mda and R's <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> in the fixtures, so the two languages keep the same terms and predict the same
 probabilities. A response holding one value is predicted its mean, and so is one whose scored
 response the basis does not reach; both are named in <code>unfitted</code>. The learner needs a
 presence-absence response, and a head whose loss is not the binary cross-entropy is refused.</p>

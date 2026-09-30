@@ -186,8 +186,8 @@ squares.</p>
 <p>The defaults are earth's own, which biomod2 uses under its default option set and under
 <code>"bigboss"</code> alike: degree one, <code>penalty = 2</code>, <code>thresh = 0.001</code>, <code>nk = min(200, max(20, 2 p)) + 1</code>
 for <code>p</code> columns, Friedman's rules for the spans between knots, and Fast MARS over the 20 best
-parents. The forward pass, the pruning pass and the refit are ported from earth and leaps into
-the core the Python package calls, so the two languages keep the same terms and return the same
+parents. The forward pass, the pruning pass and the refit live in the core the Python package
+calls, pinned against earth in the fixtures, so the two languages keep the same terms and return the same
 coefficients.</p>
 <p>The case weights are the response head's, <code><a href="positive_weights.html">positive_weights()</a></code> under presence-absence, and weigh
 both passes and the refit as earth weighs them. earth refits the whole basis by QR at every

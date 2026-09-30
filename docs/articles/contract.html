@@ -2367,14 +2367,14 @@ agree to <code>8e-14</code> or better, weighted cases included.</li>
 response, over <code>src/ts_fda.cpp</code>, which both languages
 compile. A biomod2 user’s <code>FDA</code> is
 <code>mda::fda(y ~ ., weights = w, method = mars)</code> under mda’s
-(0.5-5) defaults, so the basis is mda’s own MARS, its Fortran
-<code>marss</code>, and not earth’s that <code><a href="../reference/mars.html">mars()</a></code> ports; the
-scoring, the variate and the posterior are <code>fda()</code> and
-<code>predict.fda()</code>. The least squares are R’s
-<code>dqrdc2</code> and <code>dqrsl</code> from
-<code>src/ts_glm.cpp</code>, and the recalibration its
-<code>glm.fit</code> under a probit link, with the normal distribution
-R’s own (Cody’s <code>pnorm</code>, Wichura’s AS 241 <code>qnorm</code>,
+(0.5-5) defaults, so the basis is mda’s own MARS and not earth’s that
+<code><a href="../reference/mars.html">mars()</a></code> reproduces; the scoring, the variate and the
+posterior are those of <code>fda()</code> and
+<code>predict.fda()</code>. The least squares are the Householder QR
+with limited pivoting of <code>src/ts_glm.cpp</code>, under R’s rank
+rule, and the recalibration its IRLS under a probit link, with the
+normal distribution computed as R computes it (Cody’s
+<code>pnorm</code>, Wichura’s AS 241 <code>qnorm</code>,
 <code>dnorm</code> with the argument split above five) in
 <code>src/ts_normal.cpp</code>.</p>
 <ul>
