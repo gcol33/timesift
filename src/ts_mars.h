@@ -8,32 +8,33 @@
 
 #include "ts_penalised.h"
 
-// Friedman's multivariate adaptive regression splines, as the earth package fits them, once, for
-// both languages.
+// Multivariate adaptive regression splines (Friedman 1991, Annals of Statistics 19:1-67), once,
+// for both languages.
 //
-// The forward pass is earth's `ForwardPass`: from the intercept, each step multiplies a term
-// already in the model by a pair of hinges on one column at one knot, `max(0, x - t)` and
-// `max(0, t - x)`, choosing the parent, the column and the knot that most reduce the residual sum
-// of squares of the least-squares fit to the scaled response. The knots are searched from the top
-// of each column down with Friedman's running updates against an orthonormal basis of the terms,
+// The forward pass starts from the intercept, and each step multiplies a term already in the model
+// by a pair of hinges on one column at one knot, `max(0, x - t)` and `max(0, t - x)`, choosing the
+// parent, the column and the knot that most reduce the residual sum of squares of the
+// least-squares fit to the scaled response. A column's knots are swept from its top down with
+// Friedman's running updates of the hinge's covariances against an orthonormal basis of the terms,
 // at most one knot in every `minspan` units and none among the `endspan` at either end, and a knot
-// at the column's least value enters the column linearly. Fast MARS keeps the parents in a queue
-// by their last reduction, aged by `fast_beta`, and tries the first `fast_k` of it. The pass stops
-// at `nk` terms, when a step raises the R-squared by less than `thresh`, when the R-squared
-// reaches `1 - thresh`, or when no term reduces the residuals.
+// at the column's least value enters the column linearly. Fast MARS (Friedman 1993, Stanford
+// technical report 110) ranks the parents by the reduction they last offered, aged by `fast_beta`
+// for every step since, and searches the first `fast_k`. The pass stops at `nk` terms, when a step
+// raises the R-squared by less than `thresh`, when the R-squared reaches `1 - thresh`, or when no
+// term reduces the residuals.
 //
-// Case weights enter as earth takes them: every term is scaled by the square root of its unit's
-// weight, and a knot is kept where it lowers the weighted residual sum of squares by more than
-// `1e-10`. earth refits the whole basis by QR at every candidate knot of a weighted fit; the
-// running updates reach the same sums at the cost of one pass per column, and a hinge whose
-// residual is below `1e-10` of its squared norm is taken as a combination of the terms, as the QR
-// would drop it.
+// Case weights scale every term by the square root of its unit's weight, and a knot is kept where
+// it lowers the weighted residual sum of squares by more than `1e-10`. The same running updates,
+// against an orthonormal basis of every weighted column, give the residual sums a least-squares
+// refit at each candidate knot would, at the cost of one pass per column; a hinge whose residual
+// is below `1e-10` of its squared norm is taken as a combination of the terms. The terms, knots
+// and coefficients are pinned against earth's in the fixtures, weighted and unweighted.
 //
-// The pruning pass is leaps' backward elimination over Miller's orthogonal reduction (AS 274), the
-// intercept held in, and keeps the subset of least generalised cross-validation, `penalty` charged
-// per knot. The kept terms are then refitted: by least squares under a squared-error head, and by
-// the generalised linear model under the binomial one, which is earth's `glm = list(family =
-// binomial)` and biomod2's `MARS`.
+// The pruning pass eliminates terms backwards over an orthogonal reduction updated by plane
+// rotations (Miller 1992, Algorithm AS 274, Applied Statistics 41:458-478), the intercept held
+// in, and keeps the subset of least generalised cross-validation, `penalty` charged per knot. The
+// kept terms are then refitted: by least squares under a squared-error head, and by the
+// generalised linear model under the binomial one.
 namespace timesift {
 
 struct MarsSpec {
@@ -68,7 +69,10 @@ struct Mars {
   std::vector<double> factor_cut;
   std::vector<std::int32_t> selected;  // the terms kept by the pruning pass, ascending
   std::vector<double> beta;            // one per kept term: the refit's coefficient
-  std::int32_t termcond = 0;           // why the forward pass stopped, as earth numbers it
+  // Why the forward pass stopped: 1 `nk` below three; 2 and 3 the generalised R-squared below
+  // -1000 and below -10; 4 a step raising the R-squared by less than `thresh`; 5 the R-squared at
+  // `1 - thresh`; 6 no term reducing the residuals; 7 `nk` reached.
+  std::int32_t termcond = 0;
   double gcv = 0.0;                    // of the kept subset, on the weighted response
   bool converged = true;               // the binomial refit's
 };
