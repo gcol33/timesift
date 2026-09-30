@@ -441,17 +441,17 @@ Refit HingeBasis::refit(const std::vector<bool>& in, bool variances) {
   for (std::size_t c = 0; c < m; ++c) std::copy(raw(cols[c]), raw(cols[c]) + n_, qr.data() + c * n_);
   Refit out;
   std::vector<double> qraux;
-  detail::dqrdc2(qr.data(), n_, m, kAliasTol, out.rank, qraux, out.pivot);
+  detail::householder_qr(qr.data(), n_, m, kAliasTol, out.rank, qraux, out.pivot);
   const std::size_t r = out.rank;
 
   std::vector<double> qty(y_, y_ + n_);
-  detail::qr_qty(qr.data(), n_, r, qraux.data(), qty.data());
+  detail::apply_qt(qr.data(), n_, r, qraux.data(), qty.data());
   std::vector<double> beta(qty.begin(), qty.begin() + r);
-  detail::qr_backsolve(qr.data(), n_, r, beta.data());
+  detail::back_substitute(qr.data(), n_, r, beta.data());
   std::copy(beta.begin(), beta.end(), coef_.begin());
   std::vector<double> fit(n_, 0.0);
   std::copy(qty.begin(), qty.begin() + r, fit.begin());
-  detail::qr_qy(qr.data(), n_, r, qraux.data(), fit.data());
+  detail::apply_q(qr.data(), n_, r, qraux.data(), fit.data());
   for (std::size_t i = 0; i < n_; ++i) {
     residual_[i] = y_[i] - fit[i];
     out.rss = out.rss + residual_[i] * residual_[i];
@@ -463,7 +463,7 @@ Refit HingeBasis::refit(const std::vector<bool>& in, bool variances) {
   for (std::size_t j = 0; j < r; ++j) {
     double* col = rinv.data() + j * r;
     col[j] = 1.0;
-    detail::qr_backsolve(qr.data(), n_, j + 1, col);
+    detail::back_substitute(qr.data(), n_, j + 1, col);
   }
   for (std::size_t i = 0; i < r; ++i) {
     double s = 0.0;
@@ -542,10 +542,10 @@ bool two_class_scores(const double* y, const std::vector<double>& ww, std::size_
   std::size_t rank = 0;
   std::vector<double> qraux;
   std::vector<std::size_t> pivot;
-  detail::dqrdc2(basis, 2, 2, 1e-7, rank, qraux, pivot);
+  detail::householder_qr(basis, 2, 2, 1e-7, rank, qraux, pivot);
   if (rank < 2) return false;
   double e2[2] = {0.0, 1.0};
-  detail::qr_qy(basis, 2, rank, qraux.data(), e2);
+  detail::apply_q(basis, 2, rank, qraux.data(), e2);
   theta[0] = e2[0] / root[0];
   theta[1] = e2[1] / root[1];
   return true;

@@ -163,8 +163,8 @@ double probit_linkinv(double eta) {
 
 namespace detail {
 
-void dqrdc2(double* x, std::size_t n, std::size_t p, double tol, std::size_t& k,
-            std::vector<double>& qraux, std::vector<std::size_t>& jpvt) {
+void householder_qr(double* x, std::size_t n, std::size_t p, double tol, std::size_t& k,
+                    std::vector<double>& qraux, std::vector<std::size_t>& jpvt) {
   std::vector<PivotColumn> cols(p);
   for (std::size_t j = 0; j < p; ++j) {
     const double norm = euclidean_norm(x + j * n, n);
@@ -209,21 +209,21 @@ void dqrdc2(double* x, std::size_t n, std::size_t p, double tol, std::size_t& k,
   k = std::min(kept, n);
 }
 
-void qr_qty(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y) {
+void apply_qt(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y) {
   const std::size_t reflections = std::min(k, n - 1);
   for (std::size_t j = 0; j < reflections; ++j) {
     if (qraux[j] != 0.0) apply_stored_reflection(qr, n, j, qraux[j], y);
   }
 }
 
-void qr_qy(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y) {
+void apply_q(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y) {
   const std::size_t reflections = std::min(k, n - 1);
   for (std::size_t j = reflections; j-- > 0;) {
     if (qraux[j] != 0.0) apply_stored_reflection(qr, n, j, qraux[j], y);
   }
 }
 
-bool qr_backsolve(const double* qr, std::size_t n, std::size_t k, double* b) {
+bool back_substitute(const double* qr, std::size_t n, std::size_t k, double* b) {
   for (std::size_t j = k; j-- > 0;) {
     const double* col = qr + j * n;
     if (col[j] == 0.0) return false;
@@ -233,16 +233,16 @@ bool qr_backsolve(const double* qr, std::size_t n, std::size_t k, double* b) {
   return true;
 }
 
-std::vector<double> dqrls(double* x, std::size_t n, std::size_t p, double* b, double tol,
-                          std::size_t& rank) {
+std::vector<double> least_squares(double* x, std::size_t n, std::size_t p, double* b, double tol,
+                                  std::size_t& rank) {
   std::vector<double> qraux;
   std::vector<std::size_t> jpvt;
-  dqrdc2(x, n, p, tol, rank, qraux, jpvt);
+  householder_qr(x, n, p, tol, rank, qraux, jpvt);
   std::vector<double> coef(p, 0.0);
   if (rank == 0) return coef;
-  qr_qty(x, n, rank, qraux.data(), b);
+  apply_qt(x, n, rank, qraux.data(), b);
   std::vector<double> solved(b, b + rank);
-  if (!qr_backsolve(x, n, rank, solved.data())) {
+  if (!back_substitute(x, n, rank, solved.data())) {
     solved.assign(rank, std::numeric_limits<double>::quiet_NaN());
   }
   for (std::size_t j = 0; j < rank; ++j) coef[jpvt[j]] = solved[j];
@@ -293,7 +293,7 @@ Glm glm_fit(const double* x, std::size_t n, std::size_t q, const double* y, cons
     }
 
     std::size_t rank = 0;
-    std::vector<double> beta = detail::dqrls(a.data(), m, q, z.data(), tol, rank);
+    std::vector<double> beta = detail::least_squares(a.data(), m, q, z.data(), tol, rank);
     if (!std::all_of(beta.begin(), beta.end(), [](double v) { return std::isfinite(v); })) {
       return out;
     }

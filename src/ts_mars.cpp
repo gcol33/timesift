@@ -1211,7 +1211,7 @@ std::vector<int> independent_terms(const ForwardPass& fwd, std::size_t n, int n_
   std::size_t rank = 0;
   std::vector<double> qraux;
   std::vector<std::size_t> jpvt;
-  detail::dqrdc2(a.data(), n, kept.size(), kRankTol, rank, qraux, jpvt);
+  detail::householder_qr(a.data(), n, kept.size(), kRankTol, rank, qraux, jpvt);
   if (rank == kept.size()) return kept;
   std::vector<char> drop(kept.size(), 0);
   for (std::size_t c = rank; c < kept.size(); ++c) drop[jpvt[c]] = 1;
@@ -1360,7 +1360,7 @@ Mars mars_fit(const double* x, const double* y, const double* w, std::size_t n, 
       for (std::size_t c = 0; c < k; ++c) a[i + c * n] = basis[i + c * n] * r;
     }
     std::size_t rank = 0;
-    fit.beta = detail::dqrls(a.data(), n, k, b.data(), 1e-7, rank);
+    fit.beta = detail::least_squares(a.data(), n, k, b.data(), 1e-7, rank);
     if (rank < k) {
       throw Error("the MARS terms kept are linearly dependent, so their least-squares refit is "
                   "not unique.");

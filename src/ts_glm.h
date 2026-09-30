@@ -54,22 +54,22 @@ namespace detail {
 // leading entry of the `j`th reflection vector is `qraux[j]`, since R's diagonal occupies its
 // place), `k` is the rank, and `jpvt[j]` the original index of the column now at position `j`; the
 // columns from `k` on are the ones set aside as aliased.
-void dqrdc2(double* x, std::size_t n, std::size_t p, double tol, std::size_t& k,
-            std::vector<double>& qraux, std::vector<std::size_t>& jpvt);
+void householder_qr(double* x, std::size_t n, std::size_t p, double tol, std::size_t& k,
+                    std::vector<double>& qraux, std::vector<std::size_t>& jpvt);
 
 // The first `k` reflections of a decomposition left in `qr` [n, ...] and `qraux` applied to `y`
-// [n] in place: `qr_qty` forms Q'y, `qr_qy` forms Qy.
-void qr_qty(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y);
-void qr_qy(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y);
+// [n] in place: `apply_qt` forms Q'y, `apply_q` forms Qy.
+void apply_qt(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y);
+void apply_q(const double* qr, std::size_t n, std::size_t k, const double* qraux, double* y);
 
 // The leading `k` by `k` upper triangle of the decomposition solved against the first `k` entries of
 // `b`, in place. False, with `b` partly solved, where a diagonal entry is zero.
-bool qr_backsolve(const double* qr, std::size_t n, std::size_t k, double* b);
+bool back_substitute(const double* qr, std::size_t n, std::size_t k, double* b);
 
 // The least-squares coefficients of `b` on `x` [n, p], both overwritten, returned in the original
 // column order with an aliased column's set to zero.
-std::vector<double> dqrls(double* x, std::size_t n, std::size_t p, double* b, double tol,
-                          std::size_t& rank);
+std::vector<double> least_squares(double* x, std::size_t n, std::size_t p, double* b, double tol,
+                                  std::size_t& rank);
 
 }  // namespace detail
 }  // namespace timesift
