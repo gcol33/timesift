@@ -1,10 +1,11 @@
 #ifndef TIMESIFT_TS_NORMAL_H
 #define TIMESIFT_TS_NORMAL_H
 
-// The standard normal distribution as R's nmath evaluates it, once, for every fit that reads it:
-// the lower tail by Cody's rational approximations (`pnorm_both`), the quantile by Wichura's AS 241
-// (`qnorm5`), and the density with R's split of the argument above five (`dnorm4`). A probit link is
-// only as reproducible as these three, which is why they are R's rather than the platform's `erf`.
+// The standard normal distribution, evaluated once for every fit that reads it: the lower tail by
+// Cody's (1969) rational Chebyshev approximations, the quantile by Wichura's (1988) Algorithm
+// AS 241, and the density with the argument split above five so the square in the exponent stays
+// exact. A probit link is only as reproducible as these three, which is why they are fixed
+// published approximations rather than the platform's `erf`.
 namespace timesift {
 namespace detail {
 
