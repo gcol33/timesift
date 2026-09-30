@@ -4,6 +4,32 @@
 
 ### New
 
+- [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
+  fits one generalised additive model per response, which is what
+  biomod2 fits as `GAM`: mgcv’s
+  `gam(y ~ s(x1) + s(x2) + ..., method = "GCV.Cp")`, a thin plate
+  regression spline of `k = 10` basis functions per column with its
+  smoothing parameters chosen by the unbiased risk estimator under
+  presence-absence and generalised cross-validation under a
+  squared-error head. Past 2000 distinct values a column’s knots are the
+  subsample mgcv draws, R’s
+  [`sample()`](https://rdrr.io/r/base/sample.html) after `set.seed(1)`.
+  A column of fewer distinct values than `k` takes as many basis
+  functions as it holds, and one of two enters linearly, where mgcv
+  refuses both. It runs on a new core, `src/ts_additive.cpp`, compiled
+  into both languages: the basis from a Lanczos eigensolver, penalised
+  IRLS over the Householder QR of `src/ts_glm.cpp`, and Newton’s method
+  on the smoothing parameters with the exact gradient and Hessian. On
+  the contract’s seven cases it settles where mgcv does to `5e-10` in
+  the criterion and `1e-8` in the fitted means. Those cases are ones
+  where the criterion has a single minimum. On the fixtures’ 80 units of
+  weekly columns, mgcv restarted from four smoothing parameters settled
+  in more than one minimum on 15 of 20 binomial designs and 1 of 7
+  Gaussian ones; mgcv’s own start reads its own parametrisation, so
+  where there are several the two searches can settle in different ones.
+  On 894 units and 20 columns a fit takes 5.2 s against mgcv’s 3.1 s,
+  and 2.6 s on four threads, which run the responses at once or, for one
+  response, the pieces of its derivatives. Both languages.
 - [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
   fits one flexible discriminant analysis per response, which is what
   biomod2 fits as `FDA`: mda’s `fda(method = mars)`, optimal scoring of

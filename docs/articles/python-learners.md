@@ -464,6 +464,47 @@ does not reach, is predicted its mean and named in `unfitted`. The
 learner needs a presence-absence response, under a head whose loss is
 the binary cross-entropy.
 
+## `additive()`
+
+``` python
+additive(data=None, k=10, gamma=1.0, max_knots=2000, threads=1)
+```
+
+One additive model per variable, a smooth function of every
+bin-by-channel column, fitted as mgcv’s
+`gam(y ~ s(x1) + s(x2) + ..., method = "GCV.Cp")` fits it and as biomod2
+fits `GAM`. Each column enters as a thin plate regression spline of `k`
+basis functions (Wood 2003): a cubic radial function centred on each of
+the column’s distinct values, reduced to its `k - 2` directions of
+greatest eigenvalue, together with the linear function, which the
+penalty on the spline’s squared second derivative leaves free. Each
+smooth sums to zero over the units, beside one intercept.
+
+The coefficients maximise the penalised likelihood and the smoothing
+parameters, one per column, minimise the unbiased risk estimator under a
+binary cross-entropy head and the generalised cross-validation score
+under a squared-error one, by Newton’s method with the exact derivatives
+(Wood 2008). `gamma` multiplies the charge each effective degree of
+freedom adds to that criterion. Over columns as alike as neighbouring
+weeks the criterion can have more than one local minimum; the one the
+search settles in then depends on where it starts, and mgcv, starting
+from a rule of its own parametrisation, can settle in another. The
+defaults are mgcv’s, which biomod2 passes unchanged. Above `max_knots`
+distinct values the radial functions are centred on that many of them,
+drawn as mgcv draws them. A column of fewer than `k` distinct values
+takes as many basis functions as it holds values, a column of two enters
+linearly and a column of one is left out; a column whose linear part the
+columns before it span keeps only its penalised part.
+
+The head’s case weights enter the likelihood as mgcv’s prior weights.
+The model holds at most as many coefficients as there are units, one for
+the intercept and `k - 1` per column. The fit runs on the core the R
+package calls, so the two languages fit the same model; `threads` works
+that many columns and variables at once and does not change what comes
+back. A variable holding one value is predicted its mean and named in
+`unfitted`, and one whose smoothing parameter search stopped short of
+its tolerance is named in `stopped`.
+
 ## `mlp()`
 
 ``` python

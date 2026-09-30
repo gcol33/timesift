@@ -62,6 +62,8 @@ your own goes through.
   representation
 - [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
   : Flexible discriminant analysis on the flattened representation
+- [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
+  : Generalised additive model on the flattened representation
 - [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)

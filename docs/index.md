@@ -126,7 +126,9 @@ draws biomod2’s surface range envelope around the presences in one,
 [`mars()`](https://gillescolling.com/timesift/reference/mars.md) fits
 earth’s multivariate adaptive regression splines over one,
 [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
-fits mda’s flexible discriminant analysis over one, and the `torch`
+fits mda’s flexible discriminant analysis over one,
+[`additive()`](https://gillescolling.com/timesift/reference/additive.md)
+fits mgcv’s generalised additive model over one, and the `torch`
 encoders
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md),
 [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
