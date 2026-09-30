@@ -7,15 +7,14 @@
 
 // The surface range envelope, once, for both languages.
 //
-// biomod2's SRE: over the units marked present, the `quantile` and `1 - quantile` quantiles of
-// every column, and a unit inside the envelope where every column lies between its two, the ends
-// included. The quantile is R's default (type 7), the one `quantile()` gives biomod2's `bm_SRE`.
+// The climatic envelope of BIOCLIM (Busby 1991, in Margules & Austin, Nature Conservation: Cost
+// Effective Biological Surveys and Data Analysis, CSIRO, 64-68): every column is bounded by two
+// quantiles of its readings over the presences, `quantile` from below and `quantile` from above,
+// and a unit is inside the envelope, predicted one, where every column lies within its bounds, the
+// bounds included. The quantile is Hyndman & Fan's (1996, The American Statistician 50:361-365)
+// seventh definition, the default of R's `quantile()`, which is what reproduces biomod2's SRE in
+// the fixtures.
 namespace timesift {
-
-// The type 7 quantile of `sorted` (ascending, `n > 0`) at `prob`: the value at the 1-based position
-// `1 + (n - 1) * prob`, interpolated between its two neighbours where it falls between them and
-// they differ.
-double quantile_type7(const double* sorted, std::size_t n, double prob);
 
 struct Envelope {
   std::int32_t n_column = 0;

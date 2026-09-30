@@ -3,90 +3,66 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <iterator>
 
 namespace timesift {
 namespace {
 
-// maxnet's own constants: the weight of a background unit against a presence's, the probability
-// glmnet pins a fitted case at under maxnet's `glmnet.control(pmin = 1e-8)`, and the length of its
-// penalty path, which runs down four decades and is read at its last point.
+// The presence-background likelihood: a background row weighs this much against a presence, the
+// fitted probability of a row is held at least this far from zero and one, and the penalty path
+// runs this many points over this many decades down to the Phillips-Dudik tolerance.
 constexpr double kBackgroundWeight = 100.0;
-constexpr double kMaxnetProbFloor = 1e-8;
-constexpr int kMaxnetPath = 200;
+constexpr double kProbabilityFloor = 1e-8;
+constexpr int kPathPoints = 200;
+constexpr double kPathDecades = 4.0;
 
-// R's `seq(from, to, length.out = m)`: the ends exactly, and the interior as `from` plus a whole
-// number of steps.
-std::vector<double> r_seq(double from, double to, int m) {
-  std::vector<double> out(static_cast<std::size_t>(m));
-  if (m == 1) {
-    out[0] = from;
-    return out;
-  }
-  if (from == to) {
-    std::fill(out.begin(), out.end(), from);
-    return out;
-  }
-  const double step = (to - from) / static_cast<double>(m - 1);
-  out[0] = from;
-  for (int i = 1; i < m - 1; ++i) out[static_cast<std::size_t>(i)] = from + i * step;
-  out[static_cast<std::size_t>(m - 1)] = to;
-  return out;
+// ---------------------------------------------------------------------------------------------
+// Numerical helpers
+
+// `count` points from `from` to `to`: the two ends exactly, and each interior point as `from` plus
+// a whole number of equal steps, so no rounding accumulates along the grid.
+std::vector<double> evenly_spaced(double from, double to, int count) {
+  std::vector<double> grid(static_cast<std::size_t>(count), from);
+  if (count == 1 || from == to) return grid;
+  const double step = (to - from) / static_cast<double>(count - 1);
+  for (int i = 1; i + 1 < count; ++i) grid[static_cast<std::size_t>(i)] = from + i * step;
+  grid.back() = to;
+  return grid;
 }
 
-// R's `approx(x, y, v, rule = 2)`: linear between the two knots around `v`, the end value outside
-// them, and a knot's own value where `v` is one.
-double r_approx(const double* x, const double* y, int m, double v) {
-  if (v < x[0]) return y[0];
-  if (v > x[m - 1]) return y[m - 1];
-  int i = 0, j = m - 1;
-  while (i < j - 1) {
-    const int ij = (i + j) / 2;
-    if (v < x[ij]) j = ij; else i = ij;
-  }
-  if (v == x[j]) return y[j];
-  if (v == x[i]) return y[i];
-  return y[i] + (y[j] - y[i]) * ((v - x[i]) / (x[j] - x[i]));
-}
+// A piecewise linear curve through strictly increasing breakpoints, held flat beyond the ends.
+struct Curve {
+  const double* at;
+  const double* value;
+  int count;
 
-// The standard deviation R's `sd()` reads, over the rows `rows` of one column: the mean refined by
-// a second pass, then the squared deviations over one less than the count.
-double r_sd(const double* col, const std::vector<std::size_t>& rows) {
-  const double m = static_cast<double>(rows.size());
-  double s = 0.0;
-  for (std::size_t i : rows) s += col[i];
-  double mean = s / m;
-  double t = 0.0;
-  for (std::size_t i : rows) t += col[i] - mean;
-  mean += t / m;
-  double ss = 0.0;
+  double operator()(double v) const {
+    if (v < at[0]) return value[0];
+    if (v > at[count - 1]) return value[count - 1];
+    const int right = static_cast<int>(std::upper_bound(at, at + count, v) - at);
+    const int left = right - 1;
+    if (v == at[left]) return value[left];
+    return value[left] +
+           (value[right] - value[left]) * ((v - at[left]) / (at[right] - at[left]));
+  }
+};
+
+// The sample standard deviation of `col` over `rows`, its mean corrected by a second pass over the
+// residuals before the squares are summed.
+double spread_over(const double* col, const std::vector<std::size_t>& rows) {
+  const double count = static_cast<double>(rows.size());
+  double total = 0.0;
+  for (std::size_t i : rows) total += col[i];
+  double centre = total / count;
+  double drift = 0.0;
+  for (std::size_t i : rows) drift += col[i] - centre;
+  centre += drift / count;
+  double squares = 0.0;
   for (std::size_t i : rows) {
-    const double z = col[i] - mean;
-    ss += z * z;
+    const double d = col[i] - centre;
+    squares += d * d;
   }
-  return std::sqrt(ss / (m - 1.0));
-}
-
-bool has_class(const std::string& classes, char c) {
-  return classes.find(c) != std::string::npos;
-}
-
-void check_classes(const std::string& classes) {
-  if (classes.empty()) throw Error("maxnet's feature classes name at least one class.");
-  for (char c : classes) {
-    if (std::string("lqpht").find(c) == std::string::npos) {
-      throw Error(std::string("maxnet's feature classes are the letters l, q, p, h and t, not '") +
-                  c + "'.");
-    }
-  }
-}
-
-void push(MaxnetFeatures& f, MaxnetKind kind, std::int32_t a, std::int32_t b, double lo,
-          double hi) {
-  f.kind.push_back(static_cast<std::int8_t>(kind));
-  f.a.push_back(a);
-  f.b.push_back(b);
-  f.lo.push_back(lo);
-  f.hi.push_back(hi);
+  return std::sqrt(squares / (count - 1.0));
 }
 
 std::string two_digits(double v) {
@@ -95,8 +71,398 @@ std::string two_digits(double v) {
   return buffer;
 }
 
-double hinge_value(double x, double lo, double hi) {
-  return std::min(1.0, std::max(0.0, (x - lo) / (hi - lo)));
+// ---------------------------------------------------------------------------------------------
+// Features
+
+MaxnetKind kind_of(const MaxnetFeatures& f, std::size_t k) {
+  return static_cast<MaxnetKind>(f.kind[k]);
+}
+
+void append(MaxnetFeatures& f, MaxnetKind kind, std::int32_t a, std::int32_t b, double lo,
+            double hi) {
+  f.kind.push_back(static_cast<std::int8_t>(kind));
+  f.a.push_back(a);
+  f.b.push_back(b);
+  f.lo.push_back(lo);
+  f.hi.push_back(hi);
+}
+
+void append_copy(MaxnetFeatures& to, const MaxnetFeatures& from, std::size_t k) {
+  append(to, kind_of(from, k), from.a[k], from.b[k], from.lo[k], from.hi[k]);
+}
+
+// A feature's value from the readings of its first column and, for a product, its second.
+double evaluate(MaxnetKind kind, double lo, double hi, double first, double second) {
+  switch (kind) {
+    case MaxnetKind::linear:
+      return first;
+    case MaxnetKind::quadratic:
+      return first * first;
+    case MaxnetKind::hinge:
+      return std::min(1.0, std::max(0.0, (first - lo) / (hi - lo)));
+    case MaxnetKind::threshold:
+      return first >= lo ? 1.0 : 0.0;
+    case MaxnetKind::product:
+      return first * second;
+  }
+  throw Error("a maxnet feature of a kind the core does not know.");
+}
+
+// Feature `k` at row `i` of the column-major block `x` with `n` rows.
+double evaluate_at(const MaxnetFeatures& f, std::size_t k, const double* x, std::size_t n,
+                   std::size_t i) {
+  const double first = x[i + static_cast<std::size_t>(f.a[k]) * n];
+  const double second = f.b[k] >= 0 ? x[i + static_cast<std::size_t>(f.b[k]) * n] : 0.0;
+  return evaluate(kind_of(f, k), f.lo[k], f.hi[k], first, second);
+}
+
+// The range of every column, and the columns whose range is not a single point.
+struct ColumnRanges {
+  std::vector<double> low, high;
+  std::vector<std::int32_t> varying;
+};
+
+ColumnRanges column_ranges(const double* x, std::size_t n, std::size_t p) {
+  ColumnRanges r;
+  r.low.resize(p);
+  r.high.resize(p);
+  for (std::size_t j = 0; j < p; ++j) {
+    const double* col = x + j * n;
+    double lo = col[0], hi = col[0];
+    for (std::size_t i = 0; i < n; ++i) {
+      if (!std::isfinite(col[i])) throw Error("maxnet takes finite values alone.");
+      lo = std::min(lo, col[i]);
+      hi = std::max(hi, col[i]);
+    }
+    r.low[j] = lo;
+    r.high[j] = hi;
+    if (hi > lo) r.varying.push_back(static_cast<std::int32_t>(j));
+  }
+  return r;
+}
+
+using ClassBuilder = void (*)(MaxnetFeatures&, const ColumnRanges&, int knots);
+
+void build_linear(MaxnetFeatures& f, const ColumnRanges& r, int) {
+  for (std::int32_t j : r.varying) append(f, MaxnetKind::linear, j, -1, 0.0, 0.0);
+}
+
+void build_quadratic(MaxnetFeatures& f, const ColumnRanges& r, int) {
+  for (std::int32_t j : r.varying) append(f, MaxnetKind::quadratic, j, -1, 0.0, 0.0);
+}
+
+// A forward hinge rises from each knot but the last to the column's maximum, a reverse hinge from
+// the column's minimum to each knot but the first.
+void build_hinges(MaxnetFeatures& f, const ColumnRanges& r, int knots) {
+  for (std::int32_t j : r.varying) {
+    const std::vector<double> knot = evenly_spaced(r.low[j], r.high[j], knots);
+    for (std::size_t i = 0; i + 1 < knot.size(); ++i) {
+      append(f, MaxnetKind::hinge, j, -1, knot[i], r.high[j]);
+    }
+    for (std::size_t i = 1; i < knot.size(); ++i) {
+      append(f, MaxnetKind::hinge, j, -1, r.low[j], knot[i]);
+    }
+  }
+}
+
+// Thresholds at the points of a `knots + 2` grid over the range that lie strictly inside it, less
+// the first of those.
+void build_thresholds(MaxnetFeatures& f, const ColumnRanges& r, int knots) {
+  for (std::int32_t j : r.varying) {
+    const std::vector<double> knot = evenly_spaced(r.low[j], r.high[j], knots + 2);
+    for (std::size_t i = 2; i + 1 < knot.size(); ++i) {
+      append(f, MaxnetKind::threshold, j, -1, knot[i], 0.0);
+    }
+  }
+}
+
+void build_products(MaxnetFeatures& f, const ColumnRanges& r, int) {
+  for (std::size_t s = 0; s < r.varying.size(); ++s) {
+    for (std::size_t t = s + 1; t < r.varying.size(); ++t) {
+      append(f, MaxnetKind::product, r.varying[s], r.varying[t], 0.0, 0.0);
+    }
+  }
+}
+
+// The classes in the order their features are laid out in the design, whatever order the caller
+// names them in.
+struct FeatureClass {
+  char letter;
+  ClassBuilder build;
+};
+
+constexpr FeatureClass kFeatureClasses[] = {
+    {'l', build_linear},     {'q', build_quadratic}, {'h', build_hinges},
+    {'t', build_thresholds}, {'p', build_products},
+};
+
+bool names_class(const std::string& classes, char letter) {
+  return classes.find(letter) != std::string::npos;
+}
+
+void check_classes(const std::string& classes) {
+  if (classes.empty()) throw Error("maxnet's feature classes name at least one class.");
+  for (char c : classes) {
+    const bool known = std::any_of(std::begin(kFeatureClasses), std::end(kFeatureClasses),
+                                   [c](const FeatureClass& fc) { return fc.letter == c; });
+    if (!known) {
+      throw Error(std::string("maxnet's feature classes are the letters l, q, p, h and t, not '") +
+                  c + "'.");
+    }
+  }
+}
+
+MaxnetFeatures build_features(const double* x, std::size_t n, std::size_t p,
+                              const std::string& classes, int knots) {
+  check_classes(classes);
+  if (knots < 2) throw Error("maxnet places at least two knots over a column's range.");
+  const ColumnRanges ranges = column_ranges(x, n, p);
+  MaxnetFeatures f;
+  for (const FeatureClass& fc : kFeatureClasses) {
+    if (names_class(classes, fc.letter)) fc.build(f, ranges, knots);
+  }
+  return f;
+}
+
+// The column-major design [n, features] over the rows of `x`.
+std::vector<double> expand(const MaxnetFeatures& f, const double* x, std::size_t n) {
+  std::vector<double> design(n * f.size());
+  for (std::size_t k = 0; k < f.size(); ++k) {
+    double* col = design.data() + k * n;
+    for (std::size_t i = 0; i < n; ++i) col[i] = evaluate_at(f, k, x, n, i);
+  }
+  return design;
+}
+
+// The richer the model, the more flexible its fitted responses and the larger a presence count
+// must be before they can be trusted: the classes a presence count supports by default.
+std::string default_classes(std::size_t n_presence) {
+  if (n_presence < 10) return "l";
+  if (n_presence < 15) return "lq";
+  if (n_presence < 80) return "lqh";
+  return "lqph";
+}
+
+// ---------------------------------------------------------------------------------------------
+// Regularisation (Phillips & Dudik 2008)
+
+// Each class's multiplier as a function of the presence count. Linear, quadratic and product
+// features share one curve, the one belonging to the richest of those classes the model holds;
+// hinges and thresholds carry their own.
+constexpr double kLinearAt[] = {0, 10, 30, 100}, kLinearBeta[] = {1, 1, 0.2, 0.05};
+constexpr double kQuadraticAt[] = {0, 10, 17, 30, 100},
+                 kQuadraticBeta[] = {1.3, 0.8, 0.5, 0.25, 0.05};
+constexpr double kProductAt[] = {0, 10, 17, 30, 100},
+                 kProductBeta[] = {2.6, 1.6, 0.9, 0.55, 0.05};
+constexpr double kHingeAt[] = {0, 1}, kHingeBeta[] = {0.5, 0.5};
+constexpr double kThresholdAt[] = {0, 100}, kThresholdBeta[] = {2, 1};
+
+Curve shared_curve(const MaxnetFeatures& f) {
+  bool quadratic = false, product = false;
+  for (std::size_t k = 0; k < f.size(); ++k) {
+    quadratic = quadratic || kind_of(f, k) == MaxnetKind::quadratic;
+    product = product || kind_of(f, k) == MaxnetKind::product;
+  }
+  if (product) return {kProductAt, kProductBeta, 5};
+  if (quadratic) return {kQuadraticAt, kQuadraticBeta, 5};
+  return {kLinearAt, kLinearBeta, 4};
+}
+
+// Each feature's tolerance: its spread over the presences times the class multiplier over the
+// square root of the presence count, held above a thousandth of its range and, for hinges and for
+// thresholds every presence falls on one side of, above a floor of its own; all times `regmult`.
+std::vector<double> tolerances(const MaxnetFeatures& f, const double* design, std::size_t n,
+                               const double* presence, double regmult) {
+  std::vector<std::size_t> present;
+  for (std::size_t i = 0; i < n; ++i) {
+    if (presence[i] == 1.0) present.push_back(i);
+  }
+  const double count = static_cast<double>(present.size());
+  const double root = std::sqrt(count);
+  const double shared = shared_curve(f)(count) / root;
+  const double hinge = Curve{kHingeAt, kHingeBeta, 2}(count) / root;
+  const double threshold = Curve{kThresholdAt, kThresholdBeta, 2}(count) / root;
+
+  std::vector<double> reg(f.size());
+  for (std::size_t k = 0; k < f.size(); ++k) {
+    const double* col = design + k * n;
+    const auto range = std::minmax_element(col, col + n);
+    const double width = *range.second - *range.first;
+    const double sd = spread_over(col, present);
+    double multiplier = shared;
+    double floor = 0.0;
+    switch (kind_of(f, k)) {
+      case MaxnetKind::hinge:
+        multiplier = hinge;
+        floor = std::max(sd, 1.0 / root) * 0.5 / root;
+        break;
+      case MaxnetKind::threshold: {
+        multiplier = threshold;
+        double on = 0.0;
+        for (std::size_t i : present) on += col[i];
+        if (on == 0.0 || on == count) floor = 1.0;
+        break;
+      }
+      default:
+        break;
+    }
+    reg[k] = std::max(std::max(0.001 * width, floor), sd * multiplier) * regmult;
+  }
+  return reg;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Rows fitted
+
+// Whether some absence of `x` [n, p] reads exactly what unit `i` reads in every column.
+bool absence_shares_readings(const double* x, const double* y, std::size_t n, std::size_t p,
+                             std::size_t i) {
+  for (std::size_t k = 0; k < n; ++k) {
+    if (y[k] != 0.0) continue;
+    std::size_t j = 0;
+    while (j < p && x[i + j * n] == x[k + j * n]) ++j;
+    if (j == p) return true;
+  }
+  return false;
+}
+
+// The units in order, then, in the presence-background model, each presence again as background
+// where no absence already stands for it.
+void choose_rows(const double* x, const double* y, std::size_t n, std::size_t p,
+                 const MaxnetSpec& spec, MaxnetDesign& d) {
+  d.rows.resize(n);
+  for (std::size_t i = 0; i < n; ++i) d.rows[i] = i;
+  d.y.assign(y, y + n);
+  if (spec.formulation != MaxnetFormulation::background || !spec.add_samples) return;
+  for (std::size_t i = 0; i < n; ++i) {
+    if (y[i] != 1.0 || absence_shares_readings(x, y, n, p, i)) continue;
+    d.rows.push_back(i);
+    d.y.push_back(0.0);
+  }
+}
+
+std::size_t count_presences(const double* y, std::size_t n) {
+  std::size_t np = 0;
+  for (std::size_t i = 0; i < n; ++i) {
+    if (y[i] != 0.0 && y[i] != 1.0) throw Error("maxnet takes a response holding zero and one.");
+    if (y[i] == 1.0) ++np;
+  }
+  return np;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The lasso
+
+struct Selected {
+  double lambda = 0.0;
+  double intercept = 0.0;
+  const double* beta = nullptr;   // one per feature, into the path that produced it
+  std::int32_t stalled = 0;
+  std::int32_t fold_stalled = 0;
+};
+
+PenaltySpec lasso_spec(const MaxnetSpec& spec, const std::vector<double>& reg) {
+  PenaltySpec pen;
+  pen.alpha = 1.0;
+  pen.standardize = false;
+  pen.intercept = true;
+  pen.penalty_factor = reg;
+  pen.thresh = spec.thresh;
+  pen.max_pass = spec.max_pass;
+  return pen;
+}
+
+// The presence-background path. With the case weights normalised to sum to one, the Phillips-Dudik
+// tolerances enter the penalised likelihood as their mean times the presences' share of the total
+// weight; the path descends to that value from four decades above it and is read at its end.
+Selected select_background(const MaxnetDesign& d, PenaltySpec pen, PenaltyPath& path) {
+  const std::size_t m = d.m;
+  const std::size_t nf = d.features.size();
+  std::vector<double> weight(m);
+  double weight_total = 0.0, presence_total = 0.0, tolerance_total = 0.0;
+  for (std::size_t r = 0; r < m; ++r) {
+    weight[r] = d.y[r] + (1.0 - d.y[r]) * kBackgroundWeight;
+    weight_total += weight[r];
+    presence_total += d.y[r];
+  }
+  for (double v : d.reg) tolerance_total += v;
+  const double base = tolerance_total / static_cast<double>(nf) * presence_total / weight_total;
+
+  pen.prob_floor = kProbabilityFloor;
+  const std::vector<double> decade = evenly_spaced(kPathDecades, 0.0, kPathPoints);
+  pen.lambda.resize(decade.size());
+  for (std::size_t k = 0; k < decade.size(); ++k) pen.lambda[k] = std::pow(10.0, decade[k]) * base;
+
+  path = penalised_path(d.design.data(), d.y.data(), weight.data(), m, nf, Family::binomial, pen);
+  const std::size_t end = path.lambda.size() - 1;
+  Selected s;
+  s.lambda = path.lambda[end];
+  s.intercept = path.a0[end];
+  s.beta = path.beta.data() + end * nf;
+  s.stalled = path.stalled;
+  return s;
+}
+
+// The presence-absence path, its penalty chosen by cross-validated deviance.
+Selected select_absence(const MaxnetDesign& d, const MaxnetSpec& spec, PenaltySpec pen,
+                        const double* w, const std::int32_t* fold, std::int32_t n_fold,
+                        PenaltyCV& cv) {
+  if (fold == nullptr || n_fold < 2) {
+    throw Error("maxnet's absence formulation chooses its penalty on at least two folds.");
+  }
+  const std::size_t nf = d.features.size();
+  pen.n_lambda = spec.n_lambda;
+  pen.threads = spec.threads;
+  cv = penalised_cv(d.design.data(), d.y.data(), w, d.m, nf, Family::binomial, pen, fold, n_fold);
+  const std::size_t at = spec.one_se ? cv.index_1se : cv.index_min;
+  Selected s;
+  s.lambda = cv.path.lambda[at];
+  s.intercept = cv.path.a0[at];
+  s.beta = cv.path.beta.data() + at * nf;
+  s.stalled = cv.path.stalled;
+  for (std::int32_t f : cv.fold_stalled) s.fold_stalled += f > 0 ? 1 : 0;
+  return s;
+}
+
+// The Gibbs distribution over the background rows: its log normaliser, taken about the largest
+// link so that no exponential overflows, and its entropy.
+void normalise_over_background(const MaxnetDesign& d, Maxnet& fit) {
+  std::vector<double> link;
+  for (std::size_t r = 0; r < d.m; ++r) {
+    if (d.y[r] != 0.0) continue;
+    double s = 0.0;
+    for (std::size_t k = 0; k < fit.beta.size(); ++k) {
+      s += fit.beta[k] * evaluate_at(fit.features, k, d.x.data(), d.m, r);
+    }
+    link.push_back(s);
+  }
+  const double top = *std::max_element(link.begin(), link.end());
+  double mass = 0.0;
+  for (double v : link) mass += std::exp(v - top);
+  const double log_normaliser = top + std::log(mass);
+  double entropy = 0.0;
+  for (double v : link) {
+    const double log_density = v - log_normaliser;
+    entropy -= std::exp(log_density) * log_density;
+  }
+  fit.intercept = -log_normaliser;
+  fit.entropy = entropy;
+}
+
+double respond(const Maxnet& fit, MaxnetOutput type, double link) {
+  switch (type) {
+    case MaxnetOutput::link:
+      return link;
+    case MaxnetOutput::exponential:
+      return std::exp(link);
+    case MaxnetOutput::cloglog:
+      return 1.0 - std::exp(-std::exp(fit.entropy + link));
+    case MaxnetOutput::logistic:
+      return fit.formulation == MaxnetFormulation::background
+                 ? 1.0 / (1.0 + std::exp(-fit.entropy - link))
+                 : 1.0 / (1.0 + std::exp(-link));
+  }
+  return link;
 }
 
 }  // namespace
@@ -120,207 +486,28 @@ MaxnetOutput maxnet_output_from_name(const std::string& name) {
               "'.");
 }
 
-std::string maxnet_default_classes(std::size_t n_presence) {
-  if (n_presence < 10) return "l";
-  if (n_presence < 15) return "lq";
-  if (n_presence < 80) return "lqh";
-  return "lqph";
-}
-
-MaxnetFeatures maxnet_features(const double* x, std::size_t n, std::size_t p,
-                               const std::string& classes, int knots) {
-  check_classes(classes);
-  if (knots < 2) throw Error("maxnet places at least two knots over a column's range.");
-  std::vector<std::int32_t> used;
-  std::vector<double> low(p), high(p);
-  for (std::size_t j = 0; j < p; ++j) {
-    const double* col = x + j * n;
-    double lo = col[0], hi = col[0];
-    for (std::size_t i = 0; i < n; ++i) {
-      if (!std::isfinite(col[i])) throw Error("maxnet takes finite values alone.");
-      lo = std::min(lo, col[i]);
-      hi = std::max(hi, col[i]);
-    }
-    low[j] = lo;
-    high[j] = hi;
-    if (hi > lo) used.push_back(static_cast<std::int32_t>(j));
-  }
-
-  MaxnetFeatures f;
-  if (has_class(classes, 'l')) {
-    for (std::int32_t j : used) push(f, MaxnetKind::linear, j, -1, 0.0, 0.0);
-  }
-  if (has_class(classes, 'q')) {
-    for (std::int32_t j : used) push(f, MaxnetKind::quadratic, j, -1, 0.0, 0.0);
-  }
-  if (has_class(classes, 'h')) {
-    for (std::int32_t j : used) {
-      const std::vector<double> k = r_seq(low[j], high[j], knots);
-      for (int i = 0; i + 1 < knots; ++i) {
-        push(f, MaxnetKind::hinge, j, -1, k[static_cast<std::size_t>(i)], high[j]);
-      }
-      for (int i = 1; i < knots; ++i) {
-        push(f, MaxnetKind::hinge, j, -1, low[j], k[static_cast<std::size_t>(i)]);
-      }
-    }
-  }
-  if (has_class(classes, 't')) {
-    // maxnet cuts `knots + 2` points and keeps its third to its second last, which is
-    // `seq(min, max, length = knots + 2)[2:knots + 1]` read as R reads it.
-    for (std::int32_t j : used) {
-      const std::vector<double> k = r_seq(low[j], high[j], knots + 2);
-      for (int i = 2; i <= knots; ++i) {
-        push(f, MaxnetKind::threshold, j, -1, k[static_cast<std::size_t>(i)], 0.0);
-      }
-    }
-  }
-  if (has_class(classes, 'p')) {
-    for (std::size_t s = 0; s < used.size(); ++s) {
-      for (std::size_t t = s + 1; t < used.size(); ++t) {
-        push(f, MaxnetKind::product, used[s], used[t], 0.0, 0.0);
-      }
-    }
-  }
-  return f;
-}
-
-double maxnet_feature_value(const MaxnetFeatures& f, std::size_t k, const double* x,
-                            std::size_t n, std::size_t i) {
-  const double v = x[i + static_cast<std::size_t>(f.a[k]) * n];
-  switch (static_cast<MaxnetKind>(f.kind[k])) {
-    case MaxnetKind::linear:
-      return v;
-    case MaxnetKind::quadratic:
-      return v * v;
-    case MaxnetKind::hinge:
-      return hinge_value(v, f.lo[k], f.hi[k]);
-    case MaxnetKind::threshold:
-      return v >= f.lo[k] ? 1.0 : 0.0;
-    case MaxnetKind::product:
-      return v * x[i + static_cast<std::size_t>(f.b[k]) * n];
-  }
-  throw Error("a maxnet feature of a kind the core does not know.");
-}
-
-void maxnet_expand(const MaxnetFeatures& f, const double* x, std::size_t n, double* out) {
-  for (std::size_t k = 0; k < f.size(); ++k) {
-    double* col = out + k * n;
-    for (std::size_t i = 0; i < n; ++i) col[i] = maxnet_feature_value(f, k, x, n, i);
-  }
-}
-
-std::vector<double> maxnet_regularization(const MaxnetFeatures& f, const double* design,
-                                          std::size_t n, const double* presence, double regmult) {
-  std::vector<std::size_t> present;
-  for (std::size_t i = 0; i < n; ++i) {
-    if (presence[i] == 1.0) present.push_back(i);
-  }
-  const std::size_t np = present.size();
-  if (np < 2) throw Error("maxnet's regularisation reads at least two presences.");
-  const double npd = static_cast<double>(np);
-
-  // The linear, quadratic and product classes share one table, and which one follows the richest
-  // class the model holds; hinges and thresholds carry their own.
-  static const double l_x[] = {0, 10, 30, 100}, l_y[] = {1, 1, 0.2, 0.05};
-  static const double q_x[] = {0, 10, 17, 30, 100}, q_y[] = {1.3, 0.8, 0.5, 0.25, 0.05};
-  static const double p_x[] = {0, 10, 17, 30, 100}, p_y[] = {2.6, 1.6, 0.9, 0.55, 0.05};
-  static const double h_x[] = {0, 1}, h_y[] = {0.5, 0.5};
-  static const double t_x[] = {0, 100}, t_y[] = {2, 1};
-  bool any_quadratic = false, any_product = false;
-  for (std::size_t k = 0; k < f.size(); ++k) {
-    any_quadratic = any_quadratic || f.kind[k] == static_cast<std::int8_t>(MaxnetKind::quadratic);
-    any_product = any_product || f.kind[k] == static_cast<std::int8_t>(MaxnetKind::product);
-  }
-  const double* shared_x = l_x;
-  const double* shared_y = l_y;
-  int shared_m = 4;
-  if (any_quadratic) {
-    shared_x = q_x;
-    shared_y = q_y;
-    shared_m = 5;
-  }
-  if (any_product) {
-    shared_x = p_x;
-    shared_y = p_y;
-    shared_m = 5;
-  }
-  const double shared = r_approx(shared_x, shared_y, shared_m, npd) / std::sqrt(npd);
-  const double hinge = r_approx(h_x, h_y, 2, npd) / std::sqrt(npd);
-  const double threshold = r_approx(t_x, t_y, 2, npd) / std::sqrt(npd);
-
-  std::vector<double> reg(f.size());
-  for (std::size_t k = 0; k < f.size(); ++k) {
-    const double* col = design + k * n;
-    const MaxnetKind kind = static_cast<MaxnetKind>(f.kind[k]);
-    double lo = col[0], hi = col[0];
-    for (std::size_t i = 0; i < n; ++i) {
-      lo = std::min(lo, col[i]);
-      hi = std::max(hi, col[i]);
-    }
-    const double sd = r_sd(col, present);
-    double mindev = 0.0;
-    double scale = shared;
-    if (kind == MaxnetKind::hinge) {
-      scale = hinge;
-      mindev = std::max(sd, 1.0 / std::sqrt(npd)) * 0.5 / std::sqrt(npd);
-    } else if (kind == MaxnetKind::threshold) {
-      scale = threshold;
-      double s = 0.0;
-      for (std::size_t i : present) s += col[i];
-      if (s == 0.0 || s == npd) mindev = 1.0;
-    }
-    reg[k] = std::max(std::max(0.001 * (hi - lo), mindev), sd * scale) * regmult;
-  }
-  return reg;
-}
-
 MaxnetDesign maxnet_design(const double* x, const double* y, std::size_t n, std::size_t p,
                            const MaxnetSpec& spec) {
   if (n == 0 || p == 0) throw Error("maxnet needs at least one unit and one column.");
   if (!(spec.regmult > 0.0) || !std::isfinite(spec.regmult)) {
     throw Error("maxnet's regularisation multiplier is a positive number.");
   }
-  std::size_t np = 0;
-  for (std::size_t i = 0; i < n; ++i) {
-    if (y[i] != 0.0 && y[i] != 1.0) throw Error("maxnet takes a response holding zero and one.");
-    if (y[i] == 1.0) ++np;
-  }
+  const std::size_t np = count_presences(y, n);
   if (np < 2) throw Error("maxnet fits at least two presences.");
   if (spec.formulation == MaxnetFormulation::absence && np == n) {
     throw Error("maxnet's absence formulation fits at least one absence.");
   }
 
   MaxnetDesign d;
-  d.classes = spec.classes.empty() ? maxnet_default_classes(np) : spec.classes;
-
-  // The rows fitted. maxnet adds each presence to the background where no absence already carries
-  // the same readings in every column, after every unit, in the order the presences come.
-  d.rows.resize(n);
-  for (std::size_t i = 0; i < n; ++i) d.rows[i] = i;
-  d.y.assign(y, y + n);
-  if (spec.formulation == MaxnetFormulation::background && spec.add_samples) {
-    for (std::size_t i = 0; i < n; ++i) {
-      if (y[i] != 1.0) continue;
-      bool matched = false;
-      for (std::size_t k = 0; k < n && !matched; ++k) {
-        if (y[k] != 0.0) continue;
-        bool same = true;
-        for (std::size_t j = 0; j < p && same; ++j) same = x[i + j * n] == x[k + j * n];
-        matched = same;
-      }
-      if (!matched) {
-        d.rows.push_back(i);
-        d.y.push_back(0.0);
-      }
-    }
-  }
+  d.classes = spec.classes.empty() ? default_classes(np) : spec.classes;
+  choose_rows(x, y, n, p, spec, d);
   d.m = d.rows.size();
   const std::size_t m = d.m;
   d.x.resize(m * p);
   for (std::size_t j = 0; j < p; ++j) {
     for (std::size_t r = 0; r < m; ++r) d.x[r + j * m] = x[d.rows[r] + j * n];
   }
-  d.features = maxnet_features(d.x.data(), m, p, d.classes, spec.knots);
+  d.features = build_features(d.x.data(), m, p, d.classes, spec.knots);
   if (d.features.size() == 0) {
     throw Error("maxnet found no column holding more than one value to build on.");
   }
@@ -334,9 +521,8 @@ MaxnetDesign maxnet_design(const double* x, const double* y, std::size_t n, std:
                 two_digits(spec.max_design) +
                 " GB. Fit a coarser representation, fewer classes, or raise the limit.");
   }
-  d.design.resize(m * d.features.size());
-  maxnet_expand(d.features, d.x.data(), m, d.design.data());
-  d.reg = maxnet_regularization(d.features, d.design.data(), m, d.y.data(), spec.regmult);
+  d.design = expand(d.features, d.x.data(), m);
+  d.reg = tolerances(d.features, d.design.data(), m, d.y.data(), spec.regmult);
   return d;
 }
 
@@ -344,115 +530,45 @@ Maxnet maxnet_fit(const double* x, const double* y, const double* w, std::size_t
                   const MaxnetSpec& spec, const std::int32_t* fold, std::int32_t n_fold) {
   const MaxnetDesign d = maxnet_design(x, y, n, p, spec);
   const std::size_t m = d.m;
-  const std::size_t nf = d.features.size();
-  const std::vector<double>& yr = d.y;
-  const std::vector<double>& reg = d.reg;
-  const std::vector<double>& design = d.design;
-  const MaxnetFeatures& all = d.features;
 
-  Maxnet out;
-  out.formulation = spec.formulation;
-  out.classes = d.classes;
-  out.n_column = static_cast<std::int32_t>(p);
-  for (std::size_t i = 0; i < n; ++i) out.n_presence += y[i] == 1.0 ? 1 : 0;
-  out.n_feature = static_cast<std::int32_t>(nf);
-  out.var_min.assign(p, 0.0);
-  out.var_max.assign(p, 0.0);
+  Maxnet fit;
+  fit.formulation = spec.formulation;
+  fit.classes = d.classes;
+  fit.n_column = static_cast<std::int32_t>(p);
+  for (std::size_t i = 0; i < n; ++i) fit.n_presence += y[i] == 1.0 ? 1 : 0;
+  fit.n_feature = static_cast<std::int32_t>(d.features.size());
+  fit.var_min.resize(p);
+  fit.var_max.resize(p);
   for (std::size_t j = 0; j < p; ++j) {
     const double* col = d.x.data() + j * m;
-    out.var_min[j] = *std::min_element(col, col + m);
-    out.var_max[j] = *std::max_element(col, col + m);
+    fit.var_min[j] = *std::min_element(col, col + m);
+    fit.var_max[j] = *std::max_element(col, col + m);
   }
 
-  PenaltySpec pen;
-  pen.alpha = 1.0;
-  pen.standardize = false;
-  pen.intercept = true;
-  pen.penalty_factor = reg;
-  pen.thresh = spec.thresh;
-  pen.max_pass = spec.max_pass;
+  const PenaltySpec pen = lasso_spec(spec, d.reg);
+  PenaltyPath path;
+  PenaltyCV cv;
+  const Selected chosen = spec.formulation == MaxnetFormulation::background
+                              ? select_background(d, pen, path)
+                              : select_absence(d, spec, pen, w, fold, n_fold, cv);
+  fit.lambda = chosen.lambda;
+  fit.intercept = chosen.intercept;
+  fit.lasso_intercept = chosen.intercept;
+  fit.stalled = chosen.stalled;
+  fit.fold_stalled = chosen.fold_stalled;
 
-  std::vector<double> beta(nf, 0.0);
-  if (spec.formulation == MaxnetFormulation::background) {
-    // maxnet's path: four decades down to the mean factor times the presences' share of the total
-    // weight, which is the regularisation MaxEnt's own objective carries once glmnet's weights are
-    // normalised to sum to one.
-    std::vector<double> wr(m);
-    double wsum = 0.0, psum = 0.0, rsum = 0.0;
-    for (std::size_t r = 0; r < m; ++r) {
-      wr[r] = yr[r] + (1.0 - yr[r]) * kBackgroundWeight;
-      wsum += wr[r];
-      psum += yr[r];
-    }
-    for (double v : reg) rsum += v;
-    const double scale = rsum / static_cast<double>(nf) * psum / wsum;
-    pen.prob_floor = kMaxnetProbFloor;
-    const std::vector<double> exponent = r_seq(4.0, 0.0, kMaxnetPath);
-    pen.lambda.resize(exponent.size());
-    for (std::size_t k = 0; k < exponent.size(); ++k) {
-      pen.lambda[k] = std::pow(10.0, exponent[k]) * scale;
-    }
-    const PenaltyPath path = penalised_path(design.data(), yr.data(), wr.data(), m, nf,
-                                            Family::binomial, pen);
-    const std::size_t last = path.lambda.size() - 1;
-    out.stalled = path.stalled;
-    out.lambda = path.lambda[last];
-    out.lasso_intercept = path.a0[last];
-    for (std::size_t k = 0; k < nf; ++k) beta[k] = path.beta[last * nf + k];
-  } else {
-    if (fold == nullptr || n_fold < 2) {
-      throw Error("maxnet's absence formulation chooses its penalty on at least two folds.");
-    }
-    pen.n_lambda = spec.n_lambda;
-    pen.threads = spec.threads;
-    const PenaltyCV cv = penalised_cv(design.data(), yr.data(), w, m, nf, Family::binomial, pen,
-                                      fold, n_fold);
-    const std::size_t at = spec.one_se ? cv.index_1se : cv.index_min;
-    out.stalled = cv.path.stalled;
-    for (std::int32_t s : cv.fold_stalled) out.fold_stalled += s > 0 ? 1 : 0;
-    out.lambda = cv.path.lambda[at];
-    out.intercept = cv.path.a0[at];
-    out.lasso_intercept = out.intercept;
-    for (std::size_t k = 0; k < nf; ++k) beta[k] = cv.path.beta[at * nf + k];
+  for (std::size_t k = 0; k < d.features.size(); ++k) {
+    if (chosen.beta[k] == 0.0) continue;
+    append_copy(fit.features, d.features, k);
+    const double* col = d.design.data() + k * m;
+    const auto range = std::minmax_element(col, col + m);
+    fit.feature_min.push_back(*range.first);
+    fit.feature_max.push_back(*range.second);
+    fit.beta.push_back(chosen.beta[k]);
   }
 
-  for (std::size_t k = 0; k < nf; ++k) {
-    if (beta[k] == 0.0) continue;
-    push(out.features, static_cast<MaxnetKind>(all.kind[k]), all.a[k], all.b[k], all.lo[k],
-         all.hi[k]);
-    const double* col = design.data() + k * m;
-    out.feature_min.push_back(*std::min_element(col, col + m));
-    out.feature_max.push_back(*std::max_element(col, col + m));
-    out.beta.push_back(beta[k]);
-  }
-
-  if (spec.formulation == MaxnetFormulation::background) {
-    // The intercept is not glmnet's. It is the normaliser that makes the exponential output sum to
-    // one over the background, and the entropy of that distribution is what the cloglog and
-    // logistic outputs are read against. Both are taken through the largest link, which is the same
-    // number maxnet's `-log(sum(exp(link)))` is wherever that one does not overflow.
-    std::vector<double> link;
-    for (std::size_t r = 0; r < m; ++r) {
-      if (yr[r] != 0.0) continue;
-      double s = 0.0;
-      for (std::size_t k = 0; k < out.beta.size(); ++k) {
-        s += out.beta[k] * maxnet_feature_value(out.features, k, d.x.data(), m, r);
-      }
-      link.push_back(s);
-    }
-    const double top = *std::max_element(link.begin(), link.end());
-    double total = 0.0;
-    for (double v : link) total += std::exp(v - top);
-    const double log_sum = top + std::log(total);
-    double entropy = 0.0;
-    for (double v : link) {
-      const double lr = v - log_sum;
-      entropy -= std::exp(lr) * lr;
-    }
-    out.intercept = -log_sum;
-    out.entropy = entropy;
-  }
-  return out;
+  if (spec.formulation == MaxnetFormulation::background) normalise_over_background(d, fit);
+  return fit;
 }
 
 void maxnet_predict(const Maxnet& fit, const double* x, std::size_t n, std::size_t p, bool clamp,
@@ -466,42 +582,22 @@ void maxnet_predict(const Maxnet& fit, const double* x, std::size_t n, std::size
                 "'logistic'; the exponential and cloglog outputs are the background "
                 "formulation's.");
   }
-  std::vector<double> held;
-  const double* xs = x;
-  if (clamp) {
-    held.assign(x, x + n * p);
-    for (std::size_t j = 0; j < p; ++j) {
-      double* col = held.data() + j * n;
-      for (std::size_t i = 0; i < n; ++i) {
-        col[i] = std::min(std::max(col[i], fit.var_min[j]), fit.var_max[j]);
-      }
-    }
-    xs = held.data();
-  }
+  const MaxnetFeatures& f = fit.features;
+  auto reading = [&](std::int32_t column, std::size_t i) {
+    const double v = x[i + static_cast<std::size_t>(column) * n];
+    if (!clamp) return v;
+    return std::min(std::max(v, fit.var_min[column]), fit.var_max[column]);
+  };
   for (std::size_t i = 0; i < n; ++i) {
     double link = fit.intercept;
     for (std::size_t k = 0; k < fit.beta.size(); ++k) {
-      double v = maxnet_feature_value(fit.features, k, xs, n, i);
+      const double second = f.b[k] >= 0 ? reading(f.b[k], i) : 0.0;
+      double v = evaluate(kind_of(f, k), f.lo[k], f.hi[k], reading(f.a[k], i), second);
       if (clamp) v = std::min(std::max(v, fit.feature_min[k]), fit.feature_max[k]);
       link += fit.beta[k] * v;
     }
     if (!std::isfinite(link)) throw Error("maxnet takes finite values alone.");
-    switch (type) {
-      case MaxnetOutput::link:
-        out[i] = link;
-        break;
-      case MaxnetOutput::exponential:
-        out[i] = std::exp(link);
-        break;
-      case MaxnetOutput::cloglog:
-        out[i] = 1.0 - std::exp(-std::exp(fit.entropy + link));
-        break;
-      case MaxnetOutput::logistic:
-        out[i] = fit.formulation == MaxnetFormulation::background
-                     ? 1.0 / (1.0 + std::exp(-fit.entropy - link))
-                     : 1.0 / (1.0 + std::exp(-link));
-        break;
-    }
+    out[i] = respond(fit, type, link);
   }
 }
 

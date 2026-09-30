@@ -8,21 +8,30 @@
 
 #include "ts_penalised.h"
 
-// maxnet, once, for both languages.
+// Maximum entropy species distribution modelling, once, for both languages.
 //
-// maxnet's feature classes over every column of a block, its regularisation of each feature, and a
-// lasso over them on the penalised core. Two formulations share the features and the penalty
-// factors. `background` is maxnet's own: every unit is background, each presence is added to the
-// background again unless an absence carries the same readings, the background is weighted 100
-// against a presence's 1, and the fit is read at the last of maxnet's 200 penalties, with the
-// intercept replaced by the normaliser over the background. `absence` reads the absences as
-// absences: a logistic lasso under the caller's case weights over the same features and factors,
-// its penalty chosen by cross-validated deviance.
+// MaxEnt (Phillips, Anderson & Schapire 2006, Ecological Modelling 190:231-259) fits a Gibbs
+// distribution over the background whose feature expectations match those of the presences to
+// within a per-feature tolerance. That is an L1-penalised inhomogeneous Poisson process, which in
+// turn is a logistic regression of presences against a heavily weighted background (Fithian &
+// Hastie 2013, Annals of Applied Statistics 7:1917-1939; Phillips et al. 2017, Ecography
+// 40:887-893). The features expand each column into linear, quadratic, product, hinge and
+// threshold terms, and each feature's tolerance follows the default regularisation of Phillips &
+// Dudik (2008, Ecography 31:161-175): a multiplier read off the presence count and scaled by the
+// feature's spread over the presences.
+//
+// Two formulations share the features and their penalty factors. `background` is the
+// presence-background model: every unit is background, each presence joins the background as well
+// unless an absence carries the same readings, background rows weigh 100 against a presence's 1,
+// the lasso is read at the smallest of 200 penalties four decades apart at the top, and the
+// intercept is replaced by the normaliser of the Gibbs distribution over the background.
+// `absence` reads the absences as absences: a logistic lasso under the caller's case weights over
+// the same features and factors, its penalty chosen by cross-validated deviance.
 //
 // A column holding one value over the units carries nothing and would divide a hinge by zero, so it
-// takes no feature. Everything else is maxnet's own arithmetic, including its knots: forward and
-// reverse hinges at the interior of `knots` equally spaced points of a column's range, and
-// thresholds at the 49 interior points maxnet cuts from `knots + 2` points of it.
+// takes no feature. Hinges sit at the interior of `knots` equally spaced points over a column's
+// range, forward and reverse, and thresholds at the `knots - 1` interior points of `knots + 2`
+// such points; with those knots every number matches the maxnet package in the fixtures.
 namespace timesift {
 
 enum class MaxnetKind : std::int8_t {
@@ -38,13 +47,9 @@ enum class MaxnetFormulation { background, absence };
 MaxnetFormulation maxnet_formulation_from_name(const std::string& name);
 const char* maxnet_formulation_name(MaxnetFormulation f);
 
-// The feature classes maxnet fits at a presence count: fewer than 10 linear, fewer than 15 linear
-// and quadratic, fewer than 80 those and hinges, and products beside them from 80 on.
-std::string maxnet_default_classes(std::size_t n_presence);
-
-// Features over the columns of a block, in the order maxnet's model matrix holds them: every linear
-// term, every quadratic, each column's hinges (forward, then reverse), each column's thresholds,
-// and the products of each pair of columns.
+// Features over the columns of a block, grouped by class in a fixed order: every linear term, every
+// quadratic, each column's hinges (forward, then reverse), each column's thresholds, and the
+// products of each pair of columns.
 struct MaxnetFeatures {
   std::vector<std::int8_t> kind;
   std::vector<std::int32_t> a, b;   // the columns read; `b` is -1 but for a product
@@ -52,29 +57,12 @@ struct MaxnetFeatures {
   std::size_t size() const { return kind.size(); }
 };
 
-// The features of `classes` over the columns of `x` [n, p] that hold more than one value, with
-// knots from each column's range over the rows given.
-MaxnetFeatures maxnet_features(const double* x, std::size_t n, std::size_t p,
-                               const std::string& classes, int knots);
-
-// The value of one feature at one row of a column-major block.
-double maxnet_feature_value(const MaxnetFeatures& f, std::size_t k, const double* x,
-                            std::size_t n, std::size_t i);
-
-// The features over every row, column-major [n, features].
-void maxnet_expand(const MaxnetFeatures& f, const double* x, std::size_t n, double* out);
-
-// maxnet's default regularisation of each feature (`maxnet.default.regularization`) times
-// `regmult`, from the design and the rows marked present.
-std::vector<double> maxnet_regularization(const MaxnetFeatures& f, const double* design,
-                                          std::size_t n, const double* presence, double regmult);
-
 struct MaxnetSpec {
-  std::string classes;       // letters of "lqpht"; empty for maxnet's choice at the presence count
+  std::string classes;       // letters of "lqpht"; empty for the default at the presence count
   int knots = 50;
   double regmult = 1.0;
   MaxnetFormulation formulation = MaxnetFormulation::background;
-  bool add_samples = true;   // background: presences join the background, as maxnet's default
+  bool add_samples = true;   // background: presences join the background
   double thresh = 1e-8;
   int max_pass = 1000000;
   int n_lambda = 100;        // absence: points of the derived path
@@ -110,7 +98,7 @@ struct Maxnet {
   std::vector<double> var_min, var_max;  // each column's range over the rows fitted
   MaxnetFeatures features;          // those with a coefficient
   std::vector<double> feature_min, feature_max, beta;
-  double intercept = 0.0;           // background: maxnet's alpha; absence: the lasso's own
+  double intercept = 0.0;           // background: the normaliser; absence: the lasso's own
   double lasso_intercept = 0.0;     // the lasso's own either way, which the background discards
   double entropy = 0.0;             // background: the entropy of the fitted background
   double lambda = 0.0;              // the penalty read
@@ -127,10 +115,12 @@ enum class MaxnetOutput { link, exponential, cloglog, logistic };
 
 MaxnetOutput maxnet_output_from_name(const std::string& name);
 
-// The prediction at every row of `x` [n, p]. With `clamp`, each column is first held inside the
-// range it was fitted on and each feature inside its own, as maxnet's `predict(clamp = TRUE)`.
-// The background formulation gives each output maxnet's; the absence formulation gives its link
-// and its probability, which is `logistic`.
+// The prediction at every row of `x` [n, p]. With `clamp`, each reading is first held inside the
+// range its column was fitted on and each feature inside its own. The background formulation gives
+// the link, the Gibbs density (`exponential`), and the two transforms of it that read the entropy
+// as the log of the expected abundance at a typical site (`cloglog`, Phillips et al. 2017) or as
+// the log odds there (`logistic`); the absence formulation gives its link and its probability,
+// which is `logistic`.
 void maxnet_predict(const Maxnet& fit, const double* x, std::size_t n, std::size_t p, bool clamp,
                     MaxnetOutput type, double* out);
 
