@@ -48,7 +48,7 @@ classes' shares among the fitting units as priors.
 }
 \details{
 The basis is mda's own MARS, which biomod2 reaches through \code{fda()} and which differs from earth's
-that \code{\link[=mars]{mars()}} ports. Each forward step adds a column linearly or a pair of hinges on it,
+that \code{\link[=mars]{mars()}} reproduces. Each forward step adds a column linearly or a pair of hinges on it,
 \code{max(0, x - t)} and \code{max(0, t - x)}, choosing by Friedman's running updates, and the pass stops
 when a step lowers the residuals by less than \code{thresh} of them, when they fall to \code{thresh} of
 the null model's, when the generalised cross-validation passes ten times the null model's, or at
@@ -68,8 +68,8 @@ under the case weights, and predicts through that regression. \code{calibrate = 
 on the units the discriminant was fitted on; \code{FALSE} predicts the posterior itself. biomod2
 rounds the posterior to three decimals before recalibrating it, which is not reproduced.
 
-The forward pass, the pruning, the scoring and the recalibration are ported from mda and R into
-the core the Python package calls, so the two languages keep the same terms and predict the same
+The forward pass, the pruning, the scoring and the recalibration live in the core the Python
+package calls, pinned against mda and R's \code{glm()} in the fixtures, so the two languages keep the same terms and predict the same
 probabilities. A response holding one value is predicted its mean, and so is one whose scored
 response the basis does not reach; both are named in \code{unfitted}. The learner needs a
 presence-absence response, and a head whose loss is not the binary cross-entropy is refused.

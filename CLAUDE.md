@@ -193,27 +193,33 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   started path, under glmnet's conventions. It is the arm the networks are measured against, so a
   baseline that moved between the languages would make the tool the confound in the other
   direction. The folds are dealt above it and handed over; nothing inside it draws.
-- **So is the tree.** `src/ts_tree.cpp` is rpart's recursive partitioning, ported: its sort, its
-  split search, its cost-complexity bookkeeping and its cross-validated table, so `tree()` is the
-  classification tree a biomod2 user already fits. It is pinned against rpart's own output in the
+- **So is the tree.** `src/ts_tree.cpp` is CART (Breiman et al. 1984) giving rpart's numbers: its
+  sort order, its split search, its cost-complexity pruning and its cross-validated table, so
+  `tree()` is the classification tree a biomod2 user already fits. It is pinned against rpart's own output in the
   fixtures, and differs from rpart only where rpart's class priors, computed with R's
   extended-precision sums, break an exact tie at `cp` under fractional weights.
-- **So is the stepwise search.** `src/ts_stepwise.cpp` is `glm.fit`'s iteration over LINPACK's
-  `dqrdc2` and MASS's `stepAIC()` rules, so `stepwise()` over column terms is the published
+- **So is the stepwise search.** `src/ts_stepwise.cpp` is IRLS over a pivoted Householder QR under R's
+  rank rule, searched by MASS's `stepAIC()` rules, so `stepwise()` over column terms is the published
   forward arm and over power terms a biomod2 user's `GLM`. It is pinned against MASS, `glm()` and
   the old R search (`tests/testthat/helper-oracle-stepwise.R`) in the fixtures. Its least squares
   and `glm.fit` live in `src/ts_glm.cpp`, which MARS refits through too.
-- **So is MARS.** `src/ts_mars.cpp` is earth's forward pass, leaps' backward pruning and earth's
-  refit, ported, so `mars()` is the `MARS` a biomod2 user fits. It is pinned against earth's own
+- **So is MARS.** `src/ts_mars.cpp` is Friedman's MARS with Fast MARS and AS 274 backward
+  pruning, giving earth's numbers, so `mars()` is the `MARS` a biomod2 user fits. It is pinned against earth's own
   terms and coefficients in the fixtures. A weighted fit reaches by running updates the residual
   sums earth refits by QR at every candidate knot, which is what makes it affordable at a weekly
   grain.
-- **So is the discriminant.** `src/ts_fda.cpp` is mda's `fda(method = mars)`: its own Fortran MARS
-  (`marss`, not earth's), the optimal scoring and the posterior, ported, and the probit
+- **So is the discriminant.** `src/ts_fda.cpp` is optimal scoring (Hastie, Tibshirani & Buja 1994) over
+  mda's own MARS basis, not earth's, giving mda's `fda(method = mars)`, and the probit
   recalibration biomod2 always applies, so `discriminant()` is the `FDA` a biomod2 user fits. It
   is pinned against mda's terms, coefficients and posteriors and R's probit `glm()` in the
-  fixtures. The probit runs through `glm.fit` in `src/ts_glm.cpp` on R's normal distribution,
-  ported in `src/ts_normal.cpp`.
+  fixtures. The probit runs through the IRLS in `src/ts_glm.cpp` on the normal distribution
+  of `src/ts_normal.cpp` (Cody 1969, Wichura's AS 241).
+- **Every core is timesift's own code, written from the published method.** A reference package
+  fixes the numbers a core must give, never its code: the structure, the decomposition and the
+  names are ours, comments cite the paper, and the reference is named only where a comment states
+  a behaviour the fixtures pin (an order of summation, a tie-break, a single-precision constant).
+  The package is MIT and the reference packages are mostly GPL, so a new core is written from the
+  paper and the fixtures, never translated from the reference's source.
 - **The pure-R and pure-NumPy implementations are kept as test oracles**, never reachable at
   runtime. The NumPy one was written from the spec rather than from the R source, so it is the
   evidence that the spec is complete; one shared binary would otherwise make the agreement between

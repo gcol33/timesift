@@ -1331,7 +1331,7 @@ def discriminant(data=None, degree=1, penalty=None, nk=None, thresh=0.001, prune
     presence under two normal classes around the class centroids on it, the classes' shares among
     the fitting units as priors.
 
-    The basis is mda's own MARS, not earth's that ``mars`` ports: each forward step adds a column
+    The basis is mda's own MARS, not earth's that ``mars`` reproduces: each forward step adds a column
     linearly or a pair of hinges on it, and the pass stops when a step lowers the residuals by less
     than ``thresh`` of them, when they fall to ``thresh`` of the null model's, when the generalised
     cross-validation passes ten times the null model's, or at ``nk`` terms. The pruning drops the
