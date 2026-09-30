@@ -6,26 +6,25 @@
 #include <limits>
 #include <vector>
 
-// Flexible discriminant analysis of two classes, as mda's `fda(method = mars)` fits it and as biomod2
-// fits `FDA`, once, for both languages.
+// Flexible discriminant analysis of two classes by optimal scoring (Hastie, Tibshirani & Buja
+// 1994, JASA 89:1255-1270), over a basis of multivariate adaptive regression splines (Friedman
+// 1991, Annals of Statistics 19:1-67), once, for both languages. The fixtures pin it against mda's
+// `fda(method = mars)` and biomod2's `FDA`.
 //
-// Optimal scoring turns the two classes into one score each, the scores `contr.fda` derives from the
-// classes' weighted shares, and regresses the scored response on a basis of the columns. The basis
-// is mda's own MARS (`mars()`, its Fortran `marss`), which is not earth's: every term the forward
-// pass adds is a pair of hinges or a column entering linearly, searched with Friedman's running
-// updates against an orthogonal basis of the terms in, at every `minspan`th knot outside `endspan`
-// units at either end, both spans Friedman's rule for the parent in hand. It stops when a step
-// lowers the residuals by less than `thresh` of them, when the residuals reach `thresh` of the null,
-// when the generalised cross-validation passes ten times the null model's, or at `nk` terms. Its
-// pruning drops, one at a time, the term whose t statistic is least and keeps the subset of least
-// generalised cross-validation. The case weights do not reach the basis: mda's forward pass sets
-// them to one.
+// Optimal scoring gives each class one score, from the classes' weighted shares, and regresses the
+// scored response on the basis. Every term the forward pass adds is a pair of hinges, a single
+// hinge, or a column entering linearly, found by Friedman's running updates against an orthonormal
+// basis of the terms in, at every knot his spacing rules admit for the parent in hand. It stops
+// when a step lowers the residuals by less than `thresh` of them, when the residuals reach `thresh`
+// of the null, when the generalised cross-validation passes ten times the null model's, or at `nk`
+// terms. The backward pass drops, one at a time, the term whose t statistic is least and keeps the
+// subset of least generalised cross-validation. The case weights reach the scores and the
+// recalibration, not the basis, which is fitted unweighted.
 //
 // The fitted score is the one canonical variate. A unit's posterior is that of two normal classes of
 // unit variance around the class centroids on the variate, under the classes' unweighted shares as
-// priors, which is mda's `predict(type = "posterior")`. biomod2 then recalibrates the posterior by a
-// probit regression of the response on it, under the case weights, and predicts through that; so
-// does this, on the fitting units, unless `calibrate` is false.
+// priors. The posterior is then recalibrated by a probit regression of the response on it, under
+// the case weights, on the fitting units, unless `calibrate` is false.
 namespace timesift {
 
 struct FdaSpec {
@@ -49,7 +48,7 @@ struct Fda {
   std::vector<std::int32_t> factor_column;
   std::vector<std::int32_t> factor_dir;
   std::vector<double> factor_cut;
-  // One per kept term, read against the terms in their order as mda's `predict.mars` reads them.
+  // One per kept term, by position among the kept terms.
   std::vector<double> coef;
   std::int32_t forward_terms = 0;  // terms the forward pass added, the intercept included
   double gcv = 0.0;                // of the kept subset
