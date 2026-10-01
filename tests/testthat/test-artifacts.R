@@ -154,6 +154,36 @@ test_that("every threshold metric matches the value the fixtures pin", {
                     "all_presence", "all_absence", "perfect", "reversed") %in% expected$case))
 })
 
+test_that("the pseudo-absence strategies admit the units the fixtures pin", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures are not in the built package")
+
+  num <- function(d) {
+    d[] <- lapply(d, as.numeric)
+    d
+  }
+  pool <- num(read_fixture(dir, "pa_pool.csv"))
+  presences <- num(read_fixture(dir, "pa_presences.csv"))
+  expected <- read_fixture(dir, "pa_candidates.csv")
+  cases <- list(
+    random = list(strategy = "random"),
+    sre = list(strategy = "sre", env = c("e1", "e2"), quantile = 0.1),
+    disk_planar = list(strategy = "disk", coords = c("lon", "lat"), dist_min = 0.5, dist_max = 1),
+    disk_lonlat = list(strategy = "disk", coords = c("lon", "lat"), dist_min = 30000,
+                       dist_max = 70000, lonlat = TRUE))
+  expect_setequal(unique(expected$case), names(cases))
+  for (nm in names(cases)) {
+    a <- cases[[nm]]
+    got <- timesift:::.pa_candidates(pool, presences, a$strategy, "id", a$env, a$quantile %||% 0.025,
+                                     a$coords, a$dist_min %||% 0, a$dist_max %||% Inf,
+                                     isTRUE(a$lonlat))
+    want <- expected$candidate[expected$case == nm]
+    expect_identical(as.integer(got), as.integer(want), info = nm)
+    # The fixture is only a test if a strategy admits some units and leaves some out.
+    expect_true(any(got) && !all(got), info = nm)
+  }
+})
+
 test_that("the metrics of a numeric response match the values the fixtures pin", {
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")

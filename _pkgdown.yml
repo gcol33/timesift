@@ -87,6 +87,7 @@ reference:
   - predict.timesift
   - project
   - range_change
+  - pseudo_absences
   - plot.timesift
 - title: Representations
   desc: |

@@ -28,6 +28,7 @@ from .metrics import (ORDINAL_METRICS, TABLE_METRICS, average_precision, boyce_i
                       cohen_kappa, decision_threshold, kappa_score, model_agreement,
                       ordinal_metric, regression_metric, roc_auc, table_metric, tss)
 from .occlusion import feature_matrix
+from .pseudo import pseudo_absences
 from .raster import RangeChange, project, range_change
 from .registry import (get_learner, learners, metrics, register_learner, register_metric,
                        register_response, register_tuning, resolve_metric, responses, tunings)
@@ -111,7 +112,7 @@ __all__ = [
     "grain_ladder", "grain_matrix", "grains", "grouped_cv", "implied_skill", "kappa_score",
     "learners", "lookback", "lookback_matrix", "lookbacks", "mars", "maxnet", "metrics", "mlp",
     "model_agreement",
-    "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "plot", "positive_weights", "project",
+    "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "plot", "positive_weights", "project", "pseudo_absences",
     "procedure_table",
     "range_change", "read_cells",
     "read_folds", "read_response", "register_learner", "register_metric", "register_response", "register_tuning",

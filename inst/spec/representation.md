@@ -721,6 +721,16 @@ the column sums, `precision` the sum of `m[i, i]` over the row sums, each over c
 nonzero sum and divided by `k`, and `f1` is `2 P R / (P + R)` of the last two. The cells of a
 numeric head hold a cell scorable where each side of the split holds two distinct values.
 
+`pa_pool.csv`, `pa_presences.csv` and `pa_candidates.csv` hold a pool of 36 units on a six-by-six
+grid of longitude and latitude, five presences of which four are in the pool, and for each of four
+strategies which units of the pool it admits: `random` every unit whose `id` is not a presence's;
+`sre` those outside the band between the 0.1 and 0.9 quantiles (Hyndman and Fan's seventh
+definition) of each of two columns over the presences, outside where a unit leaves the band in at
+least one column and inside where it lies on a bound; `disk_planar` those whose Euclidean
+distance to the nearest presence in the coordinates' units lies in `[0.5, 1]`; and `disk_lonlat`
+those whose haversine distance on a sphere of radius 6371008.8 m lies in `[30000, 70000]`. Which
+of the admitted units a draw picks is not pinned: it is the language's generator.
+
 `contrast_cells.csv` and `contrast.csv` hold a fixed table of per-cell scores for two arms, with
 cells one arm scored and the other did not, and the paired contrast read off it. No model is
 involved: the pairing, the per-variable mean, the interval on Student's t with one degree of

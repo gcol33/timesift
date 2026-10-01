@@ -597,6 +597,33 @@ write_fixture(
   "metrics.csv"
 )
 
+# The units a pseudo-absence strategy admits. Which of them are drawn depends on the generator, so
+# what is pinned is the admitted set: a pool on a six-by-six grid of longitude and latitude, four
+# presences of which three are in the pool, and the four ways to admit a unit.
+PA_POOL <- data.frame(id = 1:36, lon = 10 + 0.5 * ((0:35) %% 6), lat = 45 + 0.5 * ((0:35) %/% 6),
+                      e1 = (7 * (1:36)) %% 11, e2 = (5 * (1:36)) %% 13)
+PA_PRESENCES <- rbind(PA_POOL[c(8, 15, 22, 29), ], data.frame(id = 99, lon = 10.25, lat = 45.25,
+                                                                e1 = 5, e2 = 6))
+write_fixture(PA_POOL, "pa_pool.csv")
+write_fixture(PA_PRESENCES, "pa_presences.csv")
+PA_CASES <- list(
+  random = list(strategy = "random"),
+  sre = list(strategy = "sre", env = c("e1", "e2"), quantile = 0.1),
+  disk_planar = list(strategy = "disk", coords = c("lon", "lat"), dist_min = 0.5, dist_max = 1),
+  disk_lonlat = list(strategy = "disk", coords = c("lon", "lat"), dist_min = 30000,
+                     dist_max = 70000, lonlat = TRUE)
+)
+write_fixture(
+  do.call(rbind, lapply(names(PA_CASES), function(nm) {
+    a <- PA_CASES[[nm]]
+    open <- timesift:::.pa_candidates(PA_POOL, PA_PRESENCES, a$strategy, "id", a$env,
+                                      a$quantile %||% 0.025, a$coords, a$dist_min %||% 0,
+                                      a$dist_max %||% Inf, isTRUE(a$lonlat))
+    data.frame(case = nm, id = PA_POOL$id, candidate = as.integer(open), stringsAsFactors = FALSE)
+  })),
+  "pa_candidates.csv"
+)
+
 # The metrics of a numeric response and of ordinal classes. The cases are ones a value can be
 # written out for by hand: a perfect prediction, one off by a constant, a response that is
 # constant, and ordinal classes with a tie between two classes, a class never predicted and a

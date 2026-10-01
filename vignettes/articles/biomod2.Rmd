@@ -324,8 +324,11 @@ plot(rc)
 
 ## What differs from a biomod2 run
 
-- **Absences.** The learners read the absences they are given. `timesift` draws no pseudo-absences.
-  `maxnet()` offers both formulations: the default treats every unit as background, as biomod2's
+- **Absences.** The learners read the absences they are given, and `pseudo_absences()` draws them
+  from a pool of background units by biomod2's `random`, `sre` and `disk` strategies, with
+  repeated draws, before the fit. A drawn unit is a row of the targets like any other: it is not
+  flagged in the score, and a set of one's own is the rows of the pool it names. `maxnet()` offers
+  both formulations: the default treats every unit as background, as biomod2's
   `MAXNET` does, and `formulation = "absence"` reads the absences as absences under the response
   head's case weights.
 - **Folds.** One fold map is dealt once and read by every candidate and the ensemble. `cv()` deals

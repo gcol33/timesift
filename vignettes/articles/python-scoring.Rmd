@@ -395,6 +395,45 @@ Attributes:
 - `map` - np.ndarray
 - `variables` - tuple
 
+## `pseudo_absences()`
+
+```python
+pseudo_absences(
+    pool,
+    presences,
+    n: int,
+    strategy: str = 'random',
+    id=None,
+    env=None,
+    quantile: float = 0.025,
+    coords=None,
+    dist_min: float = 0.0,
+    dist_max: float = np.inf,
+    lonlat: bool = False,
+    repeats: int = 1,
+    seed: int = 1,
+)
+```
+
+Draw pseudo-absences from a pool of background units.
+
+Presence-only records give a response of ones. A model needs units where the response is
+zero, and these are drawn from `pool`, a mapping of column to array of background units that
+carry the same columns as the targets. The strategies are `bm_PseudoAbsences()`'s:
+`"random"` admits any unit of the pool that is not a presence; `"sre"` a unit outside the
+envelope of the presences, the band between the `quantile` and `1 - quantile` quantiles of
+each of the `env` columns over the presences, a unit being outside where it leaves the band
+in at least one column; `"disk"` a unit whose distance to the nearest presence lies between
+`dist_min` and `dist_max`, both included, on the two `coords` columns, planar in the
+units of the coordinates or in metres from longitude and latitude in degrees where `lonlat`
+is true, on a sphere of radius 6371008.8 m.
+
+A presence is never its own absence: a unit of the pool whose `id` is one of the presences'
+is not a candidate. The units a strategy admits are the same in both languages; which `n` of
+them are drawn depends on the language's generator, as the folds of `fold_map` do. The result
+is a mapping of column to array holding the drawn rows of the pool, with `set` (the draw,
+from 1) and `pseudo` (true) added; draw `r` uses `seed + r - 1`.
+
 ## `simulate_records()`
 
 ```python

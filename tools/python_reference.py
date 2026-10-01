@@ -78,7 +78,7 @@ SECTIONS = (
                "cohen_kappa", "decision_threshold",
                "model_agreement", "score_predictions", "paired_contrast", "grain_contrasts",
                "tss_inflation", "implied_skill", "occlusion", "response_curve", "ResponseCurve", "project", "range_change",
-               "RangeChange", "simulate_records", "Simulation"),
+               "RangeChange", "pseudo_absences", "simulate_records", "Simulation"),
     ),
     dict(
         slug="python-extending",

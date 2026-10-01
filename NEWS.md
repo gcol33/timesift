@@ -2,6 +2,12 @@
 
 ## New
 
+* `pseudo_absences()` draws units where a response is zero from a pool of background units, by
+  `bm_PseudoAbsences()`'s strategies: `"random"`, `"sre"` (outside the envelope of the presences)
+  and `"disk"` (a distance band from the nearest presence, planar or on the sphere), with
+  repeated draws. The units a strategy admits are the same in both languages and pinned in
+  `pa_candidates.csv`; which are drawn depends on the language's generator.
+
 * Three response heads for a numeric response: `"continuous"`, `"abundance"` (not negative) and
   `"ordinal"` (whole-number classes), fitted under squared error through an identity output by
   every learner but `maxnet()`, `envelope()` and `discriminant()`. `regression_metric()` carries

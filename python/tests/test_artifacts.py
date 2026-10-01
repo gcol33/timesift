@@ -163,6 +163,32 @@ def test_the_metric_cases_cover_where_the_tie_rule_is_the_whole_answer():
             "all_presence", "all_absence", "perfect", "reversed"} <= cases
 
 
+def test_the_pseudo_absence_strategies_admit_the_units_the_fixtures_pin():
+    from timesift.pseudo import pa_candidates
+
+    def columns(name):
+        rows = read_fixture(name)
+        return {k: np.asarray([float(r[k]) for r in rows]) for k in rows[0]}
+
+    pool, presences = columns("pa_pool.csv"), columns("pa_presences.csv")
+    expected = read_fixture("pa_candidates.csv")
+    cases = {
+        "random": dict(strategy="random"),
+        "sre": dict(strategy="sre", env=["e1", "e2"], quantile=0.1),
+        "disk_planar": dict(strategy="disk", coords=["lon", "lat"], dist_min=0.5, dist_max=1),
+        "disk_lonlat": dict(strategy="disk", coords=["lon", "lat"], dist_min=30000,
+                            dist_max=70000, lonlat=True),
+    }
+    assert {r["case"] for r in expected} == set(cases)
+    for name, a in cases.items():
+        got = pa_candidates(pool, presences, a["strategy"], "id", a.get("env"),
+                            a.get("quantile", 0.025), a.get("coords"), a.get("dist_min", 0),
+                            a.get("dist_max", np.inf), a.get("lonlat", False))
+        want = [int(r["candidate"]) for r in expected if r["case"] == name]
+        assert got.astype(int).tolist() == want, name
+        assert got.any() and not got.all(), name
+
+
 def test_the_metrics_of_a_numeric_response_match_the_values_the_fixtures_pin():
     from timesift.metrics import ORDINAL_METRICS, REGRESSION_METRICS, ordinal_metric, regression_metric
 
