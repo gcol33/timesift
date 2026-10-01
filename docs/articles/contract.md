@@ -2008,13 +2008,20 @@ are the Householder QR of `src/ts_glm.cpp`.
   has more than one minimum the two searches can settle in different
   ones. Each is a minimum of the same criterion over the same model.
 - **What a fit keeps**: every term’s column, basis dimension, columns,
-  penalised columns and shift, its knots, `UZ` and the map from its raw
-  basis to its columns; the coefficients held at zero; and per response
-  the coefficients, the smoothing parameters, each term’s effective
-  degrees of freedom, the criterion, the Newton steps taken and whether
-  the search settled. The prediction is the terms’ columns at each value
-  times the coefficients, through the inverse logit under the binomial
-  family.
+  penalised columns and shift, its knots, `UZ`, the map from its raw
+  basis to its columns and the diagonal of its penalty; the coefficients
+  held at zero; and per response the coefficients, the smoothing
+  parameters, each term’s effective degrees of freedom, the criterion,
+  the Newton steps taken and whether the search settled. The prediction
+  is the terms’ columns at each value times the coefficients, through
+  the inverse logit under the binomial family.
+- **A fit at given smoothing parameters.** `sp`, one value per smooth in
+  column order and shared by the responses, replaces the search: the fit
+  is the penalised likelihood’s maximum at those parameters, held as
+  given with no bound, and the criterion is its value there. It is
+  positive and finite, and as many as the model has smooths. The inner
+  fit is the one the search runs at each of its steps, so what a search
+  settles on is a fit at its `sp`.
 - The terms are built one column at a time and the responses fitted one
   at a time, and `threads` runs either at once; each writes its own
   slot, so what comes back does not depend on it. The responses share
@@ -2035,11 +2042,29 @@ tolerance (`epsilon = 1e-13`, `mgcv.tol = 1e-15`, Newton’s
 default tolerances from smoothing parameters of `1e-2`, `1`, `1e2` and
 `1e4`, settles at the same criterion to `1e-6` from each, and, under the
 Gaussian response, unless a direct penalised least-squares solve at the
-smoothing parameters mgcv reports gives its coefficients: past about
-`1e9` mgcv’s `magic` loses directions of the design to its rank
-tolerance. Each case carries the criterion and every column’s effective
-degrees of freedom, and `additive_predict.csv` the fitted mean on the
-design scaled by `1.01`, at every tenth unit of the subsample’s input.
+smoothing parameters mgcv reports gives its coefficients: `magic` takes
+the square root of the summed penalty by a pivoted Cholesky, which drops
+the penalty directions of the moderately smoothed columns as numerically
+null where another column’s smoothing parameter is many orders of
+magnitude larger. Each case carries the criterion and every column’s
+effective degrees of freedom, and `additive_predict.csv` the fitted mean
+on the design scaled by `1.01`, at every tenth unit of the subsample’s
+input.
+
+A fit at given smoothing parameters is asserted against the penalised
+problem solved outright. Both suites read the design and the penalty off
+the fit, solve the weighted design stacked on the root of the penalty by
+a singular value decomposition, which takes no rank decision, and under
+the binomial family repeat that at the working weights with step halving
+until the coefficients stop moving. The fitted means, each term’s
+effective degrees of freedom and the criterion are asserted to `1e-7`,
+`1e-6` and `1e-7` at seven patterns of smoothing parameters spanning
+`1e-4` to `1e12`, among them one column at `1e12` beside the rest at
+`1e-4`, on the binomial weekly columns, the Gaussian eleven columns at
+`k = 5` and `gamma = 1.4`, and the binomial `few` input. The same
+reference at smoothing parameters off by a relative `1e-6` differs by
+`4e-8` in the fitted means, so the tolerance holds a parameter to about
+`1e-5`.
 
 ### How exactly
 

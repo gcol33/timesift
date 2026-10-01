@@ -88,8 +88,8 @@
 <circle cx='419.24' cy='134.14' r='6.93' style='stroke-width: 1.50; stroke: #E16A86;' />
 <line x1='81.48' y1='204.72' x2='106.68' y2='204.72' style='stroke-width: 1.50; stroke: #E16A86;' />
 <line x1='81.48' y1='221.52' x2='106.68' y2='221.52' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
-<text x='119.28' y='209.82' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>elasticnet</text>
-<text x='119.28' y='226.62' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>ensemble</text>
+<text x='119.28' y='209.73' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>elasticnet</text>
+<text x='119.28' y='226.53' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>ensemble</text>
 </g>
 </g>
 </svg>

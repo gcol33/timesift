@@ -2,6 +2,10 @@
 
 ## New
 
+* The article "Coming from biomod2" maps every biomod2 algorithm and ensemble to a learner or an
+  option of `ensemble()` and fits the whole set across weekly, monthly and seasonal grains on one
+  simulated record.
+
 * `additive()` fits one generalised additive model per response, which is what biomod2 fits as
   `GAM`: mgcv's `gam(y ~ s(x1) + s(x2) + ..., method = "GCV.Cp")`, a thin plate regression spline
   of `k = 10` basis functions per column with its smoothing parameters chosen by the unbiased risk

@@ -4,6 +4,12 @@
 
 ### New
 
+- The article “Coming from biomod2” maps every biomod2 algorithm and
+  ensemble to a learner or an option of
+  [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md)
+  and fits the whole set across weekly, monthly and seasonal grains on
+  one simulated record.
+
 - [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
   fits one generalised additive model per response, which is what
   biomod2 fits as `GAM`: mgcv’s
@@ -30,6 +36,7 @@
   On 894 units and 20 columns a fit takes 5.2 s against mgcv’s 3.1 s,
   and 2.6 s on four threads, which run the responses at once or, for one
   response, the pieces of its derivatives. Both languages.
+
 - [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
   fits one flexible discriminant analysis per response, which is what
   biomod2 fits as `FDA`: mda’s `fda(method = mars)`, optimal scoring of
@@ -48,6 +55,7 @@
   and with R’s [`glm()`](https://rdrr.io/r/stats/glm.html) to `1.4e-14`.
   On 560 units and 150 columns a fit takes about what mda takes, and
   `threads` searches the columns at once. Both languages.
+
 - [`mars()`](https://gillescolling.com/timesift/reference/mars.md) fits
   one multivariate adaptive regression spline per response, as the earth
   package fits it and biomod2 fits `MARS`: earth’s forward pass of hinge
@@ -65,6 +73,7 @@
   sums earth refits by QR at every candidate knot with Friedman’s
   running updates: on 715 units and 471 columns under presence weights
   it takes 0.1 s against earth’s 17 s. Both languages.
+
 - [`tree()`](https://gillescolling.com/timesift/reference/tree.md) grows
   one classification or regression tree per response under rpart’s
   rules: the Gini index under a presence-absence head and the sum of
@@ -79,6 +88,7 @@
   twelve cases it reproduces rpart’s node table, complexity table,
   cross-validated error and pruned predictions to `1.1e-16`. Both
   languages.
+
 - [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md)
   fits one gradient boosted model per response, gbm’s trees by default
   and xgboost’s exact greedy second-order trees under `newton = TRUE`,
@@ -94,6 +104,7 @@
   biomod2’s tuned gbm fit (2500 trees of seven splits) takes 56 s
   against gbm’s 68 s, and xgboost’s defaults 1.2 s against xgboost’s
   exact method’s 2.6 s. Both languages.
+
 - [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md)
   fits one maxnet model per response, which is what biomod2 fits as
   `MAXNET`: maxnet’s linear, quadratic, product, hinge and threshold
@@ -112,12 +123,14 @@
   three-channel representation, 47,100 features under maxnet’s `"lqh"`,
   fits in 8 s; a design above `max_design` gigabytes is refused with its
   size. Both languages.
+
 - `forest(balance = TRUE)` is the down-sampled forest biomod2 fits as
   `RFd`: each tree draws as many units from each class as the smaller
   class holds.
   [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
   also takes `preset` (`"package"`, randomForest’s defaults, or
   `"bigboss"`, biomod2’s tuned set) and `threads`. Both languages.
+
 - [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md)
   takes biomod2’s ensemble set. `ensemble("committee", rule =)` is
   committee averaging: each member cuts each response at its own
@@ -130,11 +143,13 @@
   scores. `min_score` leaves out the candidates scoring below it before
   `scope` picks, and `ensemble("weighted", decay = d)` weighs each rank
   `1 / d` of the one above it, as `EMwmean.decay` does. Both languages.
+
 - [`ensemble_spread()`](https://gillescolling.com/timesift/reference/ensemble_spread.md)
   and `predict(type = "spread")` read how far an ensemble’s members
   disagree: their weighted mean, standard deviation, coefficient of
   variation and t interval at `alpha`, biomod2’s `EMcv` and `EMci`. On
   one target per map cell it is an uncertainty map. Both languages.
+
 - [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
   draws biomod2’s surface range envelope, `SRE`, around each response’s
   presences: every column’s `quantile` and `1 - quantile` quantiles over
@@ -142,6 +157,7 @@
   of one where every column lies inside its band. On the contract’s six
   cases its bounds and projections are `bm_SRE()`’s to the last bit. The
   core is `src/ts_envelope.cpp`. Both languages.
+
 - [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
   takes `direction = c("forward", "both", "backward", "none")` and
   `terms = c("column", "power")`. `"both"` and `"backward"` are MASS’s

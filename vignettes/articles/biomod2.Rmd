@@ -1,0 +1,269 @@
+---
+title: "Coming from biomod2"
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5, fig.height = 4.5,
+                      dev.args = list(pointsize = 14))
+library(timesift)
+```
+
+biomod2 fits a set of species distribution algorithms on one table of predictors and combines them.
+`timesift` fits the same algorithms, and the representation of the predictors becomes a second axis of
+the comparison. When the predictors are a sensor record (hourly soil temperature, daily air
+temperature), the table biomod2 starts from is already a reduction of it, to monthly means or
+growing-degree-days. Here the algorithms run at every temporal grain the record supports, are scored
+on one set of held-out folds, and are combined afterwards.
+
+Each algorithm is one implementation in the compiled core that R and Python both call, so a model
+fitted from either language returns the same numbers. The cores reproduce the reference packages
+biomod2 itself calls (rpart, randomForest, gbm, xgboost, maxnet, MASS, earth, mda, mgcv), and each is
+pinned against the reference's own output in the test fixtures. Nothing is fitted through biomod2 or
+through those packages.
+
+## The mapping
+
+Every biomod2 algorithm is a learner constructor. A variant of an algorithm is an argument of its
+constructor.
+
+| biomod2 | `timesift` | notes |
+|---|---|---|
+| `CTA` | `tree()` | rpart's rules; `prune = "se_sum"` is biomod2's pruning |
+| `RF` | `forest()` | randomForest's defaults |
+| `RFd` | `forest(balance = TRUE)` | each tree draws as many units from each class as the smaller class holds |
+| `GBM` | `boosting()` | gbm's trees and Newton step |
+| `XGBOOST` | `boosting(newton = TRUE)` | xgboost's exact greedy trees; `lambda` and `gamma` are its penalties |
+| `MAXNET`, `MAXENT` | `maxnet()` | `classes`, `regmult` and `knots` are maxnet's; the model is the background formulation by default |
+| `GLM` | `stepwise(direction = "both", terms = "power", max_terms = Inf)` | `y ~ x + I(x^2)` over every column, searched by AIC as `MASS::stepAIC()` does |
+| `GAM` | `additive()` | mgcv's `gam(method = "GCV.Cp")`, `k = 10` |
+| `MARS` | `mars()` | earth's forward and pruning passes, refitted as a logistic model |
+| `FDA` | `discriminant()` | mda's `fda(method = mars)` with the probit recalibration biomod2 applies |
+| `SRE` | `envelope()` | `quantile = 0.025`, as `bm_SRE()` |
+| `ANN`, `DNN` | `mlp()` | a torch encoder with a joint head over all responses |
+
+`ANN` and `DNN` map to a learner, and not to numbers: `mlp()` is a different network from the one
+biomod2 fits, `hidden` sets the layer widths and `dropout` the regularisation, and the training
+settings live in `train_control()`.
+
+biomod2 ships two option sets, its defaults and a tuned set called `"bigboss"`. Where the two
+differ, the learners carry both as `preset = "package"` (the fitting package's own defaults, which
+biomod2's default set uses) and `preset = "bigboss"`, so `tree(preset = "bigboss")` is `min_split =
+5`, `min_leaf = 5`, `cp = 0.001`, `max_depth = 10` and five inner folds. A setting given explicitly
+overrides either preset. `mars()`, `discriminant()` and `additive()` have one set, which both of
+biomod2's share.
+
+## One run
+
+The record is simulated: 200 units, a year of readings every six hours, three responses that read
+the record through a lagged, weekly-grain mechanism. The true grain is known to be the week, which
+makes the comparison below checkable.
+
+```{r data}
+sim <- simulate_records(n = 200L, mechanism = "lag", variables = 3L, days = 365L,
+                        step_hours = 6, prevalence = 0.25, auc = 0.85, seed = 4L)
+targets <- data.frame(unit = rownames(sim$y), sim$y)
+str(sim$readings)
+```
+
+`models` is a named list, so each candidate reports under the biomod2 name. A learner left open runs
+at every grain of `sift`; one given `data =` runs at that representation alone.
+
+```{r models}
+models <- list(
+  CTA = tree(),
+  RF = forest(),
+  RFd = forest(balance = TRUE),
+  GBM = boosting(),
+  XGBOOST = boosting(newton = TRUE),
+  MAXNET = maxnet(),
+  GLM = stepwise(direction = "both", terms = "power", max_terms = Inf),
+  GAM = additive(data = grain("season"), k = 5L),
+  MARS = mars(),
+  FDA = discriminant(),
+  SRE = envelope(data = grain("season"))
+)
+```
+
+Two of them are pinned to the seasonal grain. An additive model holds `k - 1` coefficients per
+column, and the 53 weekly columns of this record would need 478 coefficients for 160 training
+units, which `additive()` refuses; four seasonal columns need 17. The envelope shuts out one
+presence in twenty at each end of every column, so the more columns, the fewer units fall inside
+every band, and a coarse grain is what it is meant for.
+
+```{r fit}
+fit <- timesift(
+  targets, sim$readings,
+  y = starts_with("v"), id = unit, time = time,
+  models = models,
+  sift = grains("week", "month", "season"),
+  ensemble = ensemble("weighted", decay = 1.6, min_score = 0.5),
+  resampling = cv(v = 5),
+  verbose = FALSE
+)
+fit$candidates[c("candidate", "grain", "bins", "status")][1:6, ]
+```
+
+29 candidates were fitted: nine learners at three grains and the two pinned ones at one. All of them
+were cross-validated on the same five outer folds and scored on the same cells, so their means share
+a denominator.
+
+```{r scores}
+fit
+```
+
+The AUC of each candidate, the number of responses it scored highest on, and the held-out score of
+the procedure that chose among them and of the weighted combination are in the report above. The
+four highest means belong to weekly candidates, the grain the simulation puts the signal at. Where
+a biomod2 run reads off which algorithm wins on one table, this run also reads off the grain at
+which each algorithm does best, and the ordering across grains for one algorithm does not have to
+follow the ordering across algorithms.
+
+```{r plot-fit, fig.alt = "Mean AUC of each candidate against the representation it read."}
+plot(fit)
+```
+
+## Side by side
+
+A biomod2 run formats the data, fits the algorithms under a cross-validation strategy and then
+builds the ensembles. The calls below are the same run in each package, over one table of
+predictors for biomod2 and over a record for `timesift`. The biomod2 chunk is not evaluated.
+
+```{r biomod2-side, eval = FALSE}
+fmt <- BIOMOD_FormatingData(resp.var = y, expl.var = predictors,
+                            resp.xy = xy, resp.name = "sp1")
+mod <- BIOMOD_Modeling(fmt, modeling.id = "all",
+                       models = c("CTA", "RF", "GBM", "XGBOOST", "MAXNET", "GLM",
+                                  "GAM", "MARS", "FDA", "SRE"),
+                       CV.strategy = "kfold", CV.nb.rep = 1, CV.k = 5,
+                       metric.eval = c("TSS", "ROC"))
+ens <- BIOMOD_EnsembleModeling(mod, models.chosen = "all",
+                               em.algo = c("EMmean", "EMwmean", "EMca"),
+                               metric.select = "TSS", metric.select.thresh = 0.5,
+                               metric.eval = c("TSS", "ROC"))
+```
+
+```{r timesift-side, eval = FALSE}
+fit <- timesift(targets, series, y = starts_with("sp"), id = plot_id, time = datetime,
+                models = list(CTA = tree(), RF = forest(), GBM = boosting(),
+                              XGBOOST = boosting(newton = TRUE), MAXNET = maxnet(),
+                              GLM = stepwise(direction = "both", terms = "power",
+                                             max_terms = Inf),
+                              MARS = mars(), FDA = discriminant()),
+                sift = grains("week", "month", "season"),
+                ensemble = ensemble("weighted", min_score = 0.5),
+                resampling = cv(v = 5))
+```
+
+The Python call takes the same constructors and the same arguments:
+
+```python
+import timesift as ts
+
+fit = ts.timesift(targets, series, y="sp_*", id="plot_id", time="datetime",
+                  models=[ts.tree(), ts.forest(), ts.boosting(newton=True), ts.maxnet(),
+                          ts.mars(), ts.discriminant()],
+                  sift=ts.grains("week", "month", "season"),
+                  ensemble=ts.ensemble("weighted", min_score=0.5),
+                  resampling=ts.cv(v=5))
+```
+
+`y` takes every response column at once. biomod2 fits one species per call; here the responses share
+one fold map, one set of scorable cells and one set of candidates, and a response is a column of the
+result.
+
+## Ensembling
+
+biomod2's ensemble algorithms are options of `ensemble()`:
+
+| biomod2 | `timesift` |
+|---|---|
+| `EMmean` | `ensemble("mean")` |
+| `EMmedian` | `ensemble("median")` |
+| `EMwmean` | `ensemble("weighted")`; `decay =` is `EMwmean.decay` |
+| `EMca` | `ensemble("committee")`; `rule =` picks how each member's cut is learned |
+| `EMcv`, `EMci` | `predict(type = "spread")` |
+| `metric.select`, `metric.select.thresh` | `metric =`, `min_score =` |
+| none | `ensemble("stack")` |
+
+The stack, `timesift`'s default, fits non-negative weights summing to one on the out-of-fold
+predictions alone, minimising the response head's loss over the scorable cells. The weights are
+therefore never fitted on a prediction the member made for a unit it had been trained on.
+
+`min_score = 0.5` made a candidate ineligible when its mean AUC was below 0.5, which is the
+role `metric.select.thresh` plays. The weights the run settled on:
+
+```{r weights}
+round(sort(fit$weights, decreasing = TRUE)[1:6], 3)
+```
+
+Committee averaging binarises each member at its own threshold, learned from that member's
+out-of-fold predictions, and averages the votes. A smaller run on one grain shows it:
+
+```{r committee}
+fit_ca <- timesift(
+  targets, sim$readings,
+  y = starts_with("v"), id = unit, time = time,
+  models = models[c("RF", "GBM", "MAXNET", "MARS", "FDA")],
+  sift = grains("week"),
+  ensemble = ensemble("committee", rule = "kappa"),
+  resampling = cv(v = 5),
+  verbose = FALSE
+)
+subset(fit_ca$estimate, metric %in% c("roc_auc", "tss"), c(arm, metric, score, se))
+```
+
+`EMcv` and `EMci` read the members of the ensemble side by side. `type = "spread"` returns the
+weighted mean, the standard deviation, the coefficient of variation and an interval for every target
+and response:
+
+```{r spread}
+sp <- predict(fit, targets[1:5, ], sim$readings, type = "spread")
+dimnames(sp)[[3]]
+round(sp[1:3, 1, ], 3)
+```
+
+On one target per map cell this is an uncertainty map in the way `EMcv` is.
+
+## Scores and thresholds
+
+biomod2 reports TSS at a threshold chosen on the same predictions it scores, and so does most
+species distribution code. Where presences are thin that choice inflates TSS. `timesift` reads the
+threshold of a candidate from its out-of-fold predictions and reports the expected inflation for a
+user's own presence counts with `tss_inflation()`. For the three responses above and five folds the
+inflation at two population skills reads:
+
+```{r inflation}
+tss_inflation(sim$y, fold_map(sim$y, v = 5), skill = c(0.6, 0.9), replicates = 40)
+```
+
+`decision_threshold()` returns the cuts a binary prediction uses, and `rule` picks the criterion:
+`"youden"` for TSS, `"kappa"`, or `"prevalence"`.
+
+## What differs from a biomod2 run
+
+- **Absences.** The learners read the absences they are given. `timesift` draws no pseudo-absences.
+  `maxnet()` offers both formulations: the default treats every unit as background, as biomod2's
+  `MAXNET` does, and `formulation = "absence"` reads the absences as absences under the response
+  head's case weights.
+- **Folds.** One fold map is dealt once and read by every candidate and the ensemble. `cv()` deals
+  units balanced on a stratifying value and `grouped_cv()` keeps units that share a group on one
+  side of each split.
+- **Scorable cells.** A response is scored only on folds whose held-out units hold both classes, and
+  only fitted on training units that hold both. The mask follows from the response and the fold map
+  and involves no model, so every paired comparison runs on matched cells.
+- **Case weights.** The response head sets them, and `positive_weights()` gives the presence-absence
+  head's. A learner that cannot use them (the background `maxnet()`, `envelope()`) says so in its
+  documentation.
+- **Presence-absence only for four algorithms.** `maxnet()`, `envelope()`, `discriminant()` and the
+  logistic refit of `mars()` need a binary response. The other learners follow the head's loss.
+- **Predictors.** The columns of a representation are the predictors, one per bin and channel, and
+  a column of `targets` such as elevation reaches the model where `static` names it.
+
+## When biomod2 is the better tool
+
+A study whose predictors are a stack of environmental rasters, with no record behind them, has
+nothing for the representation axis to vary, and biomod2's projection onto rasters, its pseudo-absence
+sampling strategies and its response curves are built for that setting. `timesift` predicts rows of
+a target table, so a map is a prediction with one target per cell and each cell carrying its own
+series at the grain the fit reads. Which grain a record should be read at is the question the
+package answers, and a study that does not ask it gains little from switching.

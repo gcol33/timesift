@@ -174,7 +174,7 @@ as were observed.
 
 decision_threshold(fit, rule = "prevalence")
 #>       sp1       sp2       sp3       sp4       sp5       sp6 
-#> 0.5643007 0.4907931 0.5252334 0.5132033 0.6334853 0.5234278
+#> 0.5643002 0.4907909 0.5252335 0.5131875 0.6334832 0.5234282
 predict(fit, targets, series, type = "binary", rule = "prevalence")[1:3, 1:4]
 #>      sp1 sp2 sp3 sp4
 #> p001   0   1   0   1
@@ -411,7 +411,7 @@ summary(both)
 #> selected elasticnet / month in 5 of 5 folds
 #> 
 #> choice on every target  elasticnet / month
-#> weights on every target  elasticnet / week 0.34   elasticnet / month 0.34   weighted_glm / month 0.28   1nn / month 0.03
+#> weights on every target  elasticnet / week 0.35   elasticnet / month 0.34   weighted_glm / month 0.28   1nn / month 0.03
 ```
 
 ## The combination
@@ -432,7 +432,7 @@ weights are in `fit$fold_weights`.
 
 ensemble_weights(fit)
 #>   elasticnet / day  elasticnet / week elasticnet / month 
-#>         0.01546353         0.30141328         0.68312318
+#>         0.01546323         0.30141036         0.68312641
 ```
 
 The weights say how much of the combination each candidate carries, and
@@ -589,9 +589,9 @@ kept <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
 weight <- occlusion(kept, "elasticnet / month", permutations = 5)
 head(aggregate(weight ~ part, weight, mean), 4)
 #>                   part     weight
-#> 1 2021-09-01T00:00:00Z 0.09502425
-#> 2 2021-10-01T00:00:00Z 0.11467438
-#> 3 2021-11-01T00:00:00Z 0.07147178
+#> 1 2021-09-01T00:00:00Z 0.09523258
+#> 2 2021-10-01T00:00:00Z 0.11486486
+#> 3 2021-11-01T00:00:00Z 0.07128131
 #> 4 2021-12-01T00:00:00Z 0.05093959
 ```
 

@@ -57,6 +57,7 @@
     <li><a class="dropdown-item" href="../reference/index.html">Reference</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/reproducing-schrankogel.html">Reproducing the study</a></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
   </ul>
 </li>
 <li class="nav-item dropdown">
@@ -2687,12 +2688,22 @@ the same model.</li>
 <li>
 <strong>What a fit keeps</strong>: every term’s column, basis
 dimension, columns, penalised columns and shift, its knots,
-<code>UZ</code> and the map from its raw basis to its columns; the
-coefficients held at zero; and per response the coefficients, the
-smoothing parameters, each term’s effective degrees of freedom, the
-criterion, the Newton steps taken and whether the search settled. The
-prediction is the terms’ columns at each value times the coefficients,
-through the inverse logit under the binomial family.</li>
+<code>UZ</code>, the map from its raw basis to its columns and the
+diagonal of its penalty; the coefficients held at zero; and per response
+the coefficients, the smoothing parameters, each term’s effective
+degrees of freedom, the criterion, the Newton steps taken and whether
+the search settled. The prediction is the terms’ columns at each value
+times the coefficients, through the inverse logit under the binomial
+family.</li>
+<li>
+<strong>A fit at given smoothing parameters.</strong>
+<code>sp</code>, one value per smooth in column order and shared by the
+responses, replaces the search: the fit is the penalised likelihood’s
+maximum at those parameters, held as given with no bound, and the
+criterion is its value there. It is positive and finite, and as many as
+the model has smooths. The inner fit is the one the search runs at each
+of its steps, so what a search settles on is a fit at its
+<code>sp</code>.</li>
 <li>The terms are built one column at a time and the responses fitted
 one at a time, and <code>threads</code> runs either at once; each writes
 its own slot, so what comes back does not depend on it. The responses
@@ -2717,12 +2728,30 @@ its default tolerances from smoothing parameters of <code>1e-2</code>,
 <code>1</code>, <code>1e2</code> and <code>1e4</code>, settles at the
 same criterion to <code>1e-6</code> from each, and, under the Gaussian
 response, unless a direct penalised least-squares solve at the smoothing
-parameters mgcv reports gives its coefficients: past about
-<code>1e9</code> mgcv’s <code>magic</code> loses directions of the
-design to its rank tolerance. Each case carries the criterion and every
-column’s effective degrees of freedom, and
-<code>additive_predict.csv</code> the fitted mean on the design scaled
-by <code>1.01</code>, at every tenth unit of the subsample’s input.</p>
+parameters mgcv reports gives its coefficients: <code>magic</code> takes
+the square root of the summed penalty by a pivoted Cholesky, which drops
+the penalty directions of the moderately smoothed columns as numerically
+null where another column’s smoothing parameter is many orders of
+magnitude larger. Each case carries the criterion and every column’s
+effective degrees of freedom, and <code>additive_predict.csv</code> the
+fitted mean on the design scaled by <code>1.01</code>, at every tenth
+unit of the subsample’s input.</p>
+<p>A fit at given smoothing parameters is asserted against the penalised
+problem solved outright. Both suites read the design and the penalty off
+the fit, solve the weighted design stacked on the root of the penalty by
+a singular value decomposition, which takes no rank decision, and under
+the binomial family repeat that at the working weights with step halving
+until the coefficients stop moving. The fitted means, each term’s
+effective degrees of freedom and the criterion are asserted to
+<code>1e-7</code>, <code>1e-6</code> and <code>1e-7</code> at seven
+patterns of smoothing parameters spanning <code>1e-4</code> to
+<code>1e12</code>, among them one column at <code>1e12</code> beside the
+rest at <code>1e-4</code>, on the binomial weekly columns, the Gaussian
+eleven columns at <code>k = 5</code> and <code>gamma = 1.4</code>, and
+the binomial <code>few</code> input. The same reference at smoothing
+parameters off by a relative <code>1e-6</code> differs by
+<code>4e-8</code> in the fitted means, so the tolerance holds a
+parameter to about <code>1e-5</code>.</p>
 </div>
 <div class="section level3">
 <h3 id="how-exactly-10">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-10"></a>

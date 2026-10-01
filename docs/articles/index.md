@@ -5,6 +5,15 @@
 - [Reproducing the Schrankogel
   grid](https://gillescolling.com/timesift/articles/reproducing-schrankogel.md):
 
+### Coming from biomod2
+
+The biomod2 algorithms and ensembles as learners and options of
+[`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md),
+fitted across grains.
+
+- [Coming from
+  biomod2](https://gillescolling.com/timesift/articles/biomod2.md):
+
 ### The contract
 
 What both implementations answer to, and what each language carries.
