@@ -59,6 +59,17 @@ test_that("standardisation is per channel and computed on the units the learner 
   expect_false(isTRUE(all.equal(fit$model$scaler$centre[[1L]], mean(f$x[, , 1L]))))
 })
 
+test_that("an mlp reads its activation, and predicts under each", {
+  skip_if_no_torch()
+  expect_equal(mlp()$params$activation, "relu")
+  expect_error(mlp(activation = "tanh"), "should be one of")
+  f <- torch_fixture(n_unit = 24L, days = 60L)
+  for (a in c("relu", "gelu", "selu")) {
+    fit <- fit_learner(mlp(hidden = 8L, activation = a, epochs = 2L), f$x, f$y)
+    expect_true(all(is.finite(stats::predict(fit, f$x))))
+  }
+})
+
 test_that("the calendar channels reach an encoder at their own amplitude", {
   skip_if_no_torch()
   f <- torch_fixture(n_unit = 24L, days = 60L)

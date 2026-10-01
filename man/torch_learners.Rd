@@ -7,7 +7,13 @@
 \alias{rescnn}
 \title{Sequence encoders with a joint multi-label head}
 \usage{
-mlp(data = NULL, hidden = c(512L, 256L), dropout = 0.3, ...)
+mlp(
+  data = NULL,
+  hidden = c(512L, 256L),
+  dropout = 0.3,
+  activation = c("relu", "gelu", "selu"),
+  ...
+)
 
 cnn(
   data = NULL,
@@ -34,6 +40,9 @@ representation of the run.}
 \item{hidden}{Hidden layer widths, for the fully connected encoder.}
 
 \item{dropout}{Dropout rate.}
+
+\item{activation}{Nonlinearity between the hidden layers of the fully connected encoder: \code{"relu"},
+\code{"gelu"} or \code{"selu"}.}
 
 \item{...}{Training settings for this learner, named as in \code{\link[=train_control]{train_control()}}.}
 

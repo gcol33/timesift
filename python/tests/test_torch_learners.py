@@ -32,6 +32,7 @@ def fixture(n_unit=40, days=90, noise=0.5, level=3.0, seed=81):
 
 @pytest.mark.parametrize("build", [
     lambda: mlp(epochs=3),
+    lambda: mlp(activation="selu", epochs=3),
     lambda: cnn(epochs=3),
     lambda: rescnn(epochs=3, channels=(16, 32)),
 ])

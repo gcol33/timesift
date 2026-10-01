@@ -46,6 +46,8 @@
 #' @param dilations Dilation of each stage, cycled if shorter than `channels`.
 #' @param blocks_per_stage Residual blocks in each stage.
 #' @param dropout Dropout rate.
+#' @param activation Nonlinearity between the hidden layers of the fully connected encoder: `"relu"`,
+#'   `"gelu"` or `"selu"`.
 #' @param ... Training settings for this learner, named as in [train_control()].
 #'
 #' @return A [learner()].
@@ -58,9 +60,11 @@ NULL
 
 #' @rdname torch_learners
 #' @export
-mlp <- function(data = NULL, hidden = c(512L, 256L), dropout = 0.3, ...) {
+mlp <- function(data = NULL, hidden = c(512L, 256L), dropout = 0.3,
+                activation = c("relu", "gelu", "selu"), ...) {
   .torch_learner("mlp", data, "tabular",
-                 list(hidden = as.integer(hidden), dropout = dropout),
+                 list(hidden = as.integer(hidden), dropout = dropout,
+                      activation = match.arg(activation)),
                  .given_control(list(...), "the mlp learner"))
 }
 
@@ -463,10 +467,12 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   torch$nn_module(
     "timesift_mlp",
     initialize = function() {
+      activation <- switch(arch$activation %||% "relu", relu = torch$nn_relu, gelu = torch$nn_gelu,
+                           selu = torch$nn_selu)
       layers <- list(torch$nn_flatten())
       prev <- in_ch * in_len
       for (k in seq_along(arch$hidden)) {
-        layers <- c(layers, list(torch$nn_linear(prev, arch$hidden[k]), torch$nn_relu()))
+        layers <- c(layers, list(torch$nn_linear(prev, arch$hidden[k]), activation()))
         if (k < length(arch$hidden)) {
           layers <- c(layers, list(torch$nn_dropout(arch$dropout)))
         }

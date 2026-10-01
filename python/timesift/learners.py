@@ -235,12 +235,16 @@ class _LenSafePool:
         return Pool()
 
 
-def _mlp_module(in_ch, in_len, n_out, hidden, dropout):
+def _mlp_module(in_ch, in_len, n_out, hidden, dropout, activation="relu"):
     nn = _torch().nn
+    activations = {"relu": nn.ReLU, "gelu": nn.GELU, "selu": nn.SELU}
+    if activation not in activations:
+        raise ValueError(f"activation must be one of {sorted(activations)}, not {activation!r}.")
+    act = activations[activation]
     layers = [nn.Flatten()]
     prev = in_ch * in_len
     for k, h in enumerate(hidden):
-        layers += [nn.Linear(prev, h), nn.ReLU()]
+        layers += [nn.Linear(prev, h), act()]
         if k < len(hidden) - 1:
             layers.append(nn.Dropout(dropout))
         prev = h
@@ -601,13 +605,14 @@ def _torch_module(name):
     return TORCH_MODULES[name]
 
 
-def mlp(data=None, hidden=(512, 256), dropout=0.3, **settings) -> Learner:
+def mlp(data=None, hidden=(512, 256), dropout=0.3, activation="relu", **settings) -> Learner:
     """Flattens the channels and builds in no temporal geometry.
 
-    ``hidden`` and ``dropout`` are the architecture; anything else named is a training setting
-    applied on top of the ``train_control()`` the learner is fitted under.
+    ``hidden``, ``dropout`` and ``activation`` (``"relu"``, ``"gelu"`` or ``"selu"``) are the
+    architecture; anything else named is a training setting applied on top of the
+    ``train_control()`` the learner is fitted under.
     """
-    return _torch_learner("mlp", dict(hidden=tuple(hidden), dropout=dropout),
+    return _torch_learner("mlp", dict(hidden=tuple(hidden), dropout=dropout, activation=activation),
                           settings, data=data, reads="tabular")
 
 

@@ -41,9 +41,15 @@ constructor.
 | `SRE` | `envelope()` | `quantile = 0.025`, as `bm_SRE()` |
 | `ANN`, `DNN` | `mlp()` | a torch encoder with a joint head over all responses |
 
-`ANN` and `DNN` map to a learner, and not to numbers: `mlp()` is a different network from the one
-biomod2 fits, `hidden` sets the layer widths and `dropout` the regularisation, and the training
-settings live in `train_control()`.
+`ANN` and `DNN` map to a learner by architecture, and not to numbers: `mlp()` is a different
+network from the one biomod2 fits, `hidden` sets the layer widths, `activation` the nonlinearity
+and `dropout` the regularisation, and the training settings live in `train_control()`. nnet
+minimises an L2-penalised loss by BFGS and cito by a stochastic optimiser, where `mlp()` uses
+AdamW, whose weight decay acts differently, so a fit under the same architecture is a comparable
+network and not the same one. biomod2's tuned `ANN` (`size = 5`, `decay = 0.1`, `maxit = 200`) is
+`mlp(hidden = 5, epochs = 200, weight_decay = 0.1)`, and its tuned `DNN` (`hidden = c(100, 100)`,
+`activation = "selu"`, 150 epochs, batch size 100) is `mlp(hidden = c(100, 100), activation =
+"selu", epochs = 150, batch_size = 100)`.
 
 biomod2 ships two option sets, its defaults and a tuned set called `"bigboss"`. Where the two
 differ, the learners carry both as `preset = "package"` (the fitting package's own defaults, which
