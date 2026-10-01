@@ -36,12 +36,22 @@ algorithm is an argument of its constructor.
 | `SRE` | [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md) | `quantile = 0.025`, as `bm_SRE()` |
 | `ANN`, `DNN` | [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md) | a torch encoder with a joint head over all responses |
 
-`ANN` and `DNN` map to a learner, and not to numbers:
+`ANN` and `DNN` map to a learner by architecture, and not to numbers:
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
 is a different network from the one biomod2 fits, `hidden` sets the
-layer widths and `dropout` the regularisation, and the training settings
-live in
+layer widths, `activation` the nonlinearity and `dropout` the
+regularisation, and the training settings live in
 [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md).
+nnet minimises an L2-penalised loss by BFGS and cito by a stochastic
+optimiser, where
+[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
+uses AdamW, whose weight decay acts differently, so a fit under the same
+architecture is a comparable network and not the same one. biomod2’s
+tuned `ANN` (`size = 5`, `decay = 0.1`, `maxit = 200`) is
+`mlp(hidden = 5, epochs = 200, weight_decay = 0.1)`, and its tuned `DNN`
+(`hidden = c(100, 100)`, `activation = "selu"`, 150 epochs, batch size
+100) is
+`mlp(hidden = c(100, 100), activation = "selu", epochs = 150, batch_size = 100)`.
 
 biomod2 ships two option sets, its defaults and a tuned set called
 `"bigboss"`. Where the two differ, the learners carry both as
@@ -170,7 +180,7 @@ fit
 #> 
 #> procedure, chosen and weighted inside each outer training fold
 #> selected                  0.780  se 0.012
-#> ensemble                  0.759  se 0.014
+#> ensemble                  0.758  se 0.014
 #> selected MAXNET / week in 5 of 5 folds
 #> 
 #> choice on every target  MAXNET / week
@@ -297,8 +307,8 @@ fit_ca <- timesift(
 )
 subset(fit_ca$estimate, metric %in% c("roc_auc", "tss"), c(arm, metric, score, se))
 #>         arm  metric     score         se
-#> 4  selected roc_auc 0.7804232 0.01208863
-#> 5  selected     tss 0.5599815 0.01711471
+#> 4  selected roc_auc 0.7800964 0.01178032
+#> 5  selected     tss 0.5580208 0.01515674
 #> 9  ensemble roc_auc 0.7236305 0.03402524
 #> 10 ensemble     tss 0.4526556 0.05909692
 ```

@@ -508,13 +508,14 @@ its tolerance is named in `stopped`.
 ## `mlp()`
 
 ``` python
-mlp(data=None, hidden=(512, 256), dropout=0.3, **settings)
+mlp(data=None, hidden=(512, 256), dropout=0.3, activation='relu', **settings)
 ```
 
 Flattens the channels and builds in no temporal geometry.
 
-`hidden` and `dropout` are the architecture; anything else named is a
-training setting applied on top of the
+`hidden`, `dropout` and `activation` (`"relu"`, `"gelu"` or `"selu"`)
+are the architecture; anything else named is a training setting applied
+on top of the
 [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md)
 the learner is fitted under.
 

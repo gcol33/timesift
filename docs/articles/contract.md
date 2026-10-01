@@ -2549,6 +2549,15 @@ it has none.
 |----|----|
 | [`starts_with()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`ends_with()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`contains()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`matches()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`all_of()`](https://tidyselect.r-lib.org/reference/all_of.html), [`any_of()`](https://tidyselect.r-lib.org/reference/all_of.html), [`everything()`](https://tidyselect.r-lib.org/reference/everything.html) and [`where()`](https://tidyselect.r-lib.org/reference/where.html) | tidyselect’s verbs, re-exported so that `y = starts_with("sp_")` is written the way R writes a selection. Python has no non-standard evaluation, so a selection there is a name, a list of names, a glob such as `"sp_*"` or a predicate on the name, resolved by `select_columns()`. |
 
+[`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
+and`timesift(coords = )` \| tulpa’s Bayesian logistic model withan
+optional Gaussian-process field over the targets’ coordinates. tulpais
+an R package, so the learner is R’s alone; the coordinates ride onthe
+array as an attribute, a placement a learner may read and not achannel.
+Both reach a prediction
+through[`predict.timesift()`](https://gillescolling.com/timesift/reference/predict.timesift.md),
+which rebuilds them from the newtargets. \|
+
 | in Python only | what it is |
 |----|----|
 | `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |

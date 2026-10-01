@@ -222,11 +222,21 @@ biomod2 applies</td>
 </tr>
 </tbody>
 </table>
-<p><code>ANN</code> and <code>DNN</code> map to a learner, and not to
-numbers: <code><a href="../reference/torch_learners.html">mlp()</a></code> is a different network from the one biomod2
-fits, <code>hidden</code> sets the layer widths and <code>dropout</code>
-the regularisation, and the training settings live in
-<code><a href="../reference/train_control.html">train_control()</a></code>.</p>
+<p><code>ANN</code> and <code>DNN</code> map to a learner by
+architecture, and not to numbers: <code><a href="../reference/torch_learners.html">mlp()</a></code> is a different
+network from the one biomod2 fits, <code>hidden</code> sets the layer
+widths, <code>activation</code> the nonlinearity and
+<code>dropout</code> the regularisation, and the training settings live
+in <code><a href="../reference/train_control.html">train_control()</a></code>. nnet minimises an L2-penalised loss by
+BFGS and cito by a stochastic optimiser, where <code><a href="../reference/torch_learners.html">mlp()</a></code> uses
+AdamW, whose weight decay acts differently, so a fit under the same
+architecture is a comparable network and not the same one. biomod2’s
+tuned <code>ANN</code> (<code>size = 5</code>, <code>decay = 0.1</code>,
+<code>maxit = 200</code>) is
+<code>mlp(hidden = 5, epochs = 200, weight_decay = 0.1)</code>, and its
+tuned <code>DNN</code> (<code>hidden = c(100, 100)</code>,
+<code>activation = "selu"</code>, 150 epochs, batch size 100) is
+<code>mlp(hidden = c(100, 100), activation = "selu", epochs = 150, batch_size = 100)</code>.</p>
 <p>biomod2 ships two option sets, its defaults and a tuned set called
 <code>"bigboss"</code>. Where the two differ, the learners carry both as
 <code>preset = "package"</code> (the fitting package’s own defaults,
@@ -339,7 +349,7 @@ denominator.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; procedure, chosen and weighted inside each outer training fold</span></span>
 <span><span class="co">#&gt; selected                  0.780  se 0.012</span></span>
-<span><span class="co">#&gt; ensemble                  0.759  se 0.014</span></span>
+<span><span class="co">#&gt; ensemble                  0.758  se 0.014</span></span>
 <span><span class="co">#&gt; selected MAXNET / week in 5 of 5 folds</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; choice on every target  MAXNET / week</span></span>
@@ -421,7 +431,7 @@ ordering across algorithms.</p>
 <line x1='68.88' y1='163.01' x2='432.72' y2='163.01' style='stroke-width: 0.75; stroke: #E5E5E5;' />
 <line x1='68.88' y1='121.38' x2='432.72' y2='121.38' style='stroke-width: 0.75; stroke: #E5E5E5;' />
 <line x1='68.88' y1='79.76' x2='432.72' y2='79.76' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='129.99' x2='432.72' y2='129.99' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
+<line x1='68.88' y1='130.22' x2='432.72' y2='130.22' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
 <line x1='82.36' y1='189.93' x2='82.36' y2='121.04' style='stroke-width: 0.75; stroke: #E16A86;' />
 <polyline points='80.20,189.93 82.36,189.93 84.52,189.93 ' style='stroke-width: 0.75; stroke: #E16A86;' />
 <polyline points='84.52,121.04 82.36,121.04 80.20,121.04 ' style='stroke-width: 0.75; stroke: #E16A86;' />
@@ -492,20 +502,20 @@ ordering across algorithms.</p>
 <circle cx='250.80' cy='169.36' r='3.15' style='stroke-width: 0.75; stroke: #20A73C; fill: #20A73C;' />
 <circle cx='419.24' cy='171.23' r='3.15' style='stroke-width: 0.75; stroke: #20A73C; fill: #20A73C;' />
 <circle cx='82.36' cy='145.75' r='6.93' style='stroke-width: 1.50; stroke: #20A73C;' />
-<line x1='82.36' y1='136.28' x2='82.36' y2='114.63' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='80.20,136.28 82.36,136.28 84.52,136.28 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='84.52,114.63 82.36,114.63 80.20,114.63 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<line x1='82.36' y1='136.08' x2='82.36' y2='114.98' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='80.20,136.08 82.36,136.08 84.52,136.08 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='84.52,114.98 82.36,114.98 80.20,114.98 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
 <line x1='250.80' y1='173.89' x2='250.80' y2='112.13' style='stroke-width: 0.75; stroke: #00AD7F;' />
 <polyline points='248.64,173.89 250.80,173.89 252.96,173.89 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
 <polyline points='252.96,112.13 250.80,112.13 248.64,112.13 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<line x1='419.24' y1='221.80' x2='419.24' y2='93.41' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='417.08,221.80 419.24,221.80 421.40,221.80 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='421.40,93.41 419.24,93.41 417.08,93.41 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='82.36,125.46 250.80,143.01 419.24,157.61 ' style='stroke-width: 1.50; stroke: #00AD7F;' />
-<circle cx='82.36' cy='125.46' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
+<line x1='419.24' y1='221.71' x2='419.24' y2='93.58' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='417.08,221.71 419.24,221.71 421.40,221.71 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='421.40,93.58 419.24,93.58 417.08,93.58 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='82.36,125.53 250.80,143.01 419.24,157.64 ' style='stroke-width: 1.50; stroke: #00AD7F;' />
+<circle cx='82.36' cy='125.53' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
 <circle cx='250.80' cy='143.01' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
-<circle cx='419.24' cy='157.61' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
-<circle cx='82.36' cy='125.46' r='6.93' style='stroke-width: 1.50; stroke: #00AD7F;' />
+<circle cx='419.24' cy='157.64' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
+<circle cx='82.36' cy='125.53' r='6.93' style='stroke-width: 1.50; stroke: #00AD7F;' />
 <line x1='82.36' y1='182.54' x2='82.36' y2='120.69' style='stroke-width: 0.75; stroke: #00ABB2;' />
 <polyline points='80.20,182.54 82.36,182.54 84.52,182.54 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
 <polyline points='84.52,120.69 82.36,120.69 80.20,120.69 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
@@ -570,18 +580,18 @@ ordering across algorithms.</p>
 <line x1='81.48' y1='187.92' x2='106.68' y2='187.92' style='stroke-width: 1.50; stroke: #C071DC;' />
 <line x1='81.48' y1='204.72' x2='106.68' y2='204.72' style='stroke-width: 1.50; stroke: #DE63B9;' />
 <line x1='81.48' y1='221.52' x2='106.68' y2='221.52' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
-<text x='119.28' y='41.73' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>CTA</text>
-<text x='119.28' y='58.53' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>RF</text>
-<text x='119.28' y='75.33' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>RFd</text>
-<text x='119.28' y='92.13' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>GBM</text>
-<text x='119.28' y='108.93' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>XGBOOST</text>
-<text x='119.28' y='125.73' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>MAXNET</text>
-<text x='119.28' y='142.53' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>GLM</text>
-<text x='119.28' y='159.33' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>GAM</text>
-<text x='119.28' y='176.13' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>MARS</text>
-<text x='119.28' y='192.93' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>FDA</text>
-<text x='119.28' y='209.73' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>SRE</text>
-<text x='119.28' y='226.53' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>ensemble</text>
+<text x='119.28' y='41.82' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>CTA</text>
+<text x='119.28' y='58.62' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>RF</text>
+<text x='119.28' y='75.42' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>RFd</text>
+<text x='119.28' y='92.22' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>GBM</text>
+<text x='119.28' y='109.02' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>XGBOOST</text>
+<text x='119.28' y='125.82' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>MAXNET</text>
+<text x='119.28' y='142.62' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>GLM</text>
+<text x='119.28' y='159.42' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>GAM</text>
+<text x='119.28' y='176.22' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>MARS</text>
+<text x='119.28' y='193.02' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>FDA</text>
+<text x='119.28' y='209.82' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>SRE</text>
+<text x='119.28' y='226.62' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>ensemble</text>
 </g>
 </g>
 </svg></div></p>
@@ -717,8 +727,8 @@ votes. A smaller run on one grain shows it:</p>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">fit_ca</span><span class="op">$</span><span class="va">estimate</span>, <span class="va">metric</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"roc_auc"</span>, <span class="st">"tss"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">arm</span>, <span class="va">metric</span>, <span class="va">score</span>, <span class="va">se</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;         arm  metric     score         se</span></span>
-<span><span class="co">#&gt; 4  selected roc_auc 0.7804232 0.01208863</span></span>
-<span><span class="co">#&gt; 5  selected     tss 0.5599815 0.01711471</span></span>
+<span><span class="co">#&gt; 4  selected roc_auc 0.7800964 0.01178032</span></span>
+<span><span class="co">#&gt; 5  selected     tss 0.5580208 0.01515674</span></span>
 <span><span class="co">#&gt; 9  ensemble roc_auc 0.7236305 0.03402524</span></span>
 <span><span class="co">#&gt; 10 ensemble     tss 0.4526556 0.05909692</span></span></code></pre></div>
 <p><code>EMcv</code> and <code>EMci</code> read the members of the

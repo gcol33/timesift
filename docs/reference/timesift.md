@@ -18,6 +18,7 @@ timesift(
   time = NULL,
   target_time = NULL,
   static = NULL,
+  coords = NULL,
   models = NULL,
   sift = NULL,
   ensemble = TRUE,
@@ -71,6 +72,15 @@ timesift(
 
   Columns of `targets` carried alongside the representation, as a
   tidyselect expression. None by default.
+
+- coords:
+
+  The two columns of `targets` holding each target's coordinates, as a
+  tidyselect expression, for a learner that places a unit in space, such
+  as
+  [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md).
+  They travel with every representation and are not predictors. None by
+  default.
 
 - models:
 

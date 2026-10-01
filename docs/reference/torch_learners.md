@@ -10,7 +10,13 @@ sample sizes.
 ## Usage
 
 ``` r
-mlp(data = NULL, hidden = c(512L, 256L), dropout = 0.3, ...)
+mlp(
+  data = NULL,
+  hidden = c(512L, 256L),
+  dropout = 0.3,
+  activation = c("relu", "gelu", "selu"),
+  ...
+)
 
 cnn(
   data = NULL,
@@ -45,6 +51,11 @@ rescnn(
 - dropout:
 
   Dropout rate.
+
+- activation:
+
+  Nonlinearity between the hidden layers of the fully connected encoder:
+  `"relu"`, `"gelu"` or `"selu"`.
 
 - ...:
 

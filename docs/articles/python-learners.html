@@ -616,11 +616,12 @@ smoothing parameter search stopped short of its tolerance is named in
 <h2 id="mlp">
 <code>mlp()</code><a class="anchor" aria-label="anchor" href="#mlp"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>mlp(data<span class="op">=</span><span class="va">None</span>, hidden<span class="op">=</span>(<span class="dv">512</span>, <span class="dv">256</span>), dropout<span class="op">=</span><span class="fl">0.3</span>, <span class="op">**</span>settings)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>mlp(data<span class="op">=</span><span class="va">None</span>, hidden<span class="op">=</span>(<span class="dv">512</span>, <span class="dv">256</span>), dropout<span class="op">=</span><span class="fl">0.3</span>, activation<span class="op">=</span><span class="st">'relu'</span>, <span class="op">**</span>settings)</span></code></pre></div>
 <p>Flattens the channels and builds in no temporal geometry.</p>
-<p><code>hidden</code> and <code>dropout</code> are the architecture;
-anything else named is a training setting applied on top of the
-<code><a href="../reference/train_control.html">train_control()</a></code> the learner is fitted under.</p>
+<p><code>hidden</code>, <code>dropout</code> and <code>activation</code>
+(<code>"relu"</code>, <code>"gelu"</code> or <code>"selu"</code>) are
+the architecture; anything else named is a training setting applied on
+top of the <code><a href="../reference/train_control.html">train_control()</a></code> the learner is fitted under.</p>
 </div>
 <div class="section level2">
 <h2 id="cnn">

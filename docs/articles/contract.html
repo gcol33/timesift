@@ -3578,6 +3578,15 @@ is a name, a list of names, a glob such as <code>"sp_*"</code> or a
 predicate on the name, resolved by <code>select_columns()</code>.</td>
 </tr></tbody>
 </table>
+<div class="line-block">
+<code><a href="../reference/hierarchical.html">hierarchical()</a></code> and
+<code>timesift(coords = )</code> | tulpa’s Bayesian logistic model with
+an optional Gaussian-process field over the targets’ coordinates. tulpa
+is an R package, so the learner is R’s alone; the coordinates ride on
+the array as an attribute, a placement a learner may read and not a
+channel. Both reach a prediction through
+<code><a href="../reference/predict.timesift.html">predict.timesift()</a></code>, which rebuilds them from the new
+targets. |</div>
 <table class="table">
 <colgroup>
 <col width="50%">
