@@ -963,13 +963,14 @@ cpp11::doubles ts_fda_predict_(cpp11::list fit, cpp11::doubles newx, int n, int 
 [[cpp11::register]]
 cpp11::list ts_additive_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
                              int r, std::string family, int k, double gamma, int max_knots,
-                             int threads) {
+                             int threads, cpp11::doubles sp) {
   timesift::AdditiveSpec spec;
   spec.family = timesift::family_from_name(family);
   spec.k = k;
   spec.gamma = gamma;
   spec.max_knots = max_knots;
   spec.threads = threads;
+  spec.sp.assign(sp.begin(), sp.end());
   const timesift::Additive fit = timesift::additive_fit(
       REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
       REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec);
@@ -989,6 +990,7 @@ cpp11::list ts_additive_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles 
     "radial"_nm = give(fit.radial),
     "map_start"_nm = give(fit.map_start),
     "map"_nm = give(fit.map),
+    "penalty"_nm = give(fit.penalty),
     "aliased"_nm = give(fit.aliased),
     "n_response"_nm = cpp11::as_sexp(fit.n_response),
     "beta"_nm = give(fit.beta),

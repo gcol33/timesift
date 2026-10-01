@@ -162,3 +162,145 @@ def test_a_constant_response_is_predicted_its_mean():
     fit = fit_learner(additive(), x, flat)
     assert fit.model["unfitted"] == ["sp2"]
     np.testing.assert_array_equal(np.unique(fit.predict(x)[:, 1]), [0.0])
+
+
+# A fit at given smoothing parameters, against the penalised problem solved outright. The design
+# and the penalty are read off the fit, each term's columns being its raw basis times its map and
+# its penalty a diagonal, and the problem is solved by a singular value decomposition of the
+# weighted design stacked on the root of the penalty, which takes no rank decision on the way.
+# Under the binomial family the solve is repeated at the working weights until the coefficients
+# stop moving. The R suite asserts the same.
+
+
+def model_columns(fit, x):
+    cols = [np.ones((x.shape[0], 1))]
+    for t, column in enumerate(fit["term_column"]):
+        xv = x[:, column]
+        basis = int(fit["term_basis"][t])
+        if basis > 2:
+            knots = np.asarray(fit["knots"][fit["knot_start"][t]:fit["knot_start"][t + 1]])
+            rad = np.asarray(fit["radial"][fit["radial_start"][t]:fit["radial_start"][t + 1]])
+            rad = rad.reshape((len(knots), basis - 2), order="F")
+            raw = np.column_stack([(np.abs(xv[:, None] - knots[None, :]) ** 3 / 12) @ rad,
+                                   np.ones_like(xv), xv - fit["term_shift"][t]])
+        else:
+            raw = np.column_stack([np.ones_like(xv), xv - fit["term_shift"][t]])
+        mp = np.asarray(fit["map"][fit["map_start"][t]:fit["map_start"][t + 1]])
+        cols.append(raw @ mp.reshape((basis, int(fit["term_size"][t])), order="F"))
+    return np.column_stack(cols)
+
+
+def model_penalty(fit, sp):
+    pen = np.zeros(int(fit["n_coef"]))
+    at, taken, smooth = 1, 0, -1
+    for t in range(len(fit["term_column"])):
+        m = int(fit["term_penalised"][t])
+        if m > 0:
+            smooth += 1
+            pen[at:at + m] = sp[smooth] * np.asarray(fit["penalty"][taken:taken + m])
+            taken += m
+        at += int(fit["term_size"][t])
+    return pen
+
+
+def exact_fit(fit, x, y, w, sp, gamma=1.0):
+    xm = model_columns(fit, x)
+    pen = model_penalty(fit, sp)
+    keep = np.setdiff1d(np.arange(int(fit["n_coef"])), np.asarray(fit["aliased"], dtype=int))
+    xm, pen = xm[:, keep], pen[keep]
+    binomial = fit["family"] == "binomial"
+    n = xm.shape[0]
+
+    def solve_at(root, z):
+        a = np.vstack([root[:, None] * xm, np.diag(np.sqrt(pen))])
+        u, d, vt = np.linalg.svd(a, full_matrices=False)
+        beta = vt.T @ ((u.T @ np.r_[root * z, np.zeros(len(pen))]) / d)
+        influence = vt.T @ ((u[:n].T / d[:, None]) @ (root[:, None] * xm))
+        return beta, influence
+
+    def deviance(mu):
+        if not binomial:
+            return float(np.sum(w * (y - mu) ** 2))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            a = np.where(y > 0, y * np.log(y / mu), 0.0)
+            b = np.where(y < 1, (1 - y) * np.log((1 - y) / (1 - mu)), 0.0)
+        return float(2 * np.sum(w * (a + b)))
+
+    mu = (w * y + 0.5) / (w + 1) if binomial else y.copy()
+    eta = np.log(mu / (1 - mu)) if binomial else mu
+    beta = None
+    for _ in range(500 if binomial else 1):
+        wt = w * mu * (1 - mu) if binomial else w
+        z = eta + (y - mu) / (mu * (1 - mu)) if binomial else y
+        nxt, influence = solve_at(np.sqrt(wt), z)
+        if beta is not None:
+            before = deviance(mu) + np.sum(pen * beta ** 2)
+            for _ in range(40):
+                nmu = 1 / (1 + np.exp(-(xm @ nxt)))
+                if deviance(nmu) + np.sum(pen * nxt ** 2) <= before:
+                    break
+                nxt = (nxt + beta) / 2
+        moved = np.inf if beta is None else np.max(np.abs(nxt - beta))
+        beta = nxt
+        eta = xm @ beta
+        mu = 1 / (1 + np.exp(-eta)) if binomial else eta
+        if not binomial or moved < 1e-11 * (1 + np.max(np.abs(beta))):
+            break
+    if binomial:
+        assert moved < 1e-8 * (1 + np.max(np.abs(beta))), "the reference's iteration did not settle"
+        _, influence = solve_at(np.sqrt(w * mu * (1 - mu)), eta + (y - mu) / (mu * (1 - mu)))
+    per_coef = np.zeros(int(fit["n_coef"]))
+    per_coef[keep] = np.diag(influence)
+    edf, first = [], 1
+    for size in fit["term_size"]:
+        edf.append(per_coef[first:first + int(size)].sum())
+        first += int(size)
+    tau = float(np.trace(influence))
+    dev = deviance(mu)
+    score = (dev / n + 2 * gamma * tau / n - 1 if binomial else n * dev / (n - gamma * tau) ** 2)
+    return mu, np.array(edf), score
+
+
+def sp_patterns(m):
+    return {
+        "flat": np.ones(m),
+        "ramp": 10.0 ** np.linspace(-4, 12, m),
+        "reversed": 10.0 ** np.linspace(12, -4, m),
+        "alternating": 10.0 ** np.resize([-4.0, 12.0], m),
+        "one_large": np.r_[1e12, np.full(m - 1, 1e-4)],
+        "one_small": np.r_[1e-4, np.full(m - 1, 1e3)],
+        "all_large": np.full(m, 1e10),
+    }
+
+
+@pytest.mark.parametrize("design,response,family,k,gamma", [
+    ("weekly", "y_binomial", "binomial", 10, 1.0),
+    ("all", "y_gaussian", "gaussian", 5, 1.4),
+    ("few", "y_binomial", "binomial", 5, 1.0)])
+def test_a_fit_at_given_smoothing_parameters_is_the_exact_penalised_solve(
+        additive_input, design, response, family, k, gamma):
+    x, y, w = additive_input["designs"][design], additive_input["y"][response], additive_input["w"]
+    start = additive_fit(x, y, w, family, k=k, gamma=gamma)
+    # The stacked system's condition number is the root of the smoothing parameters' spread, about
+    # 1e8 here, and an inner fit under the binomial family stops where the penalised deviance moves
+    # by 1e-13, which in a nearly flat direction is a coefficient error of 1e-8 or so.
+    tol = dict(mu=1e-7, edf=1e-6, score=1e-7)
+    for name, sp in sp_patterns(len(start["sp"])).items():
+        fit = additive_fit(x, y, w, family, k=k, gamma=gamma, sp=sp)
+        mu, edf, score = exact_fit(fit, x, y, w, sp, gamma)
+        assert list(fit["converged"]) == [1], name
+        assert list(fit["outer"]) == [0], name
+        np.testing.assert_array_equal(fit["sp"], sp, err_msg=name)
+        np.testing.assert_allclose(additive_predict(fit, x)[:, 0], mu, rtol=0, atol=tol["mu"],
+                                   err_msg=name)
+        np.testing.assert_allclose(fit["edf"], edf, rtol=tol["edf"], err_msg=name)
+        np.testing.assert_allclose(fit["score"][0], score, rtol=tol["score"], err_msg=name)
+
+
+def test_smoothing_parameters_given_to_a_fit_are_counted_and_positive(additive_input):
+    x, y, w = additive_input["designs"]["weekly"], additive_input["y"]["y_binomial"], additive_input["w"]
+    m = len(additive_fit(x, y, w, "binomial")["sp"])
+    with pytest.raises(Exception, match="smoothing parameters"):
+        additive_fit(x, y, w, "binomial", sp=np.ones(m + 1))
+    with pytest.raises(Exception, match="positive and finite"):
+        additive_fit(x, y, w, "binomial", sp=np.r_[0.0, np.ones(m - 1)])

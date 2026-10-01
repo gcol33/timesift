@@ -120,8 +120,8 @@ ts_fda_predict_ <- function(fit, newx, n, p) {
   .Call(`_timesift_ts_fda_predict_`, fit, newx, n, p)
 }
 
-ts_additive_fit_ <- function(x, y, w, n, p, r, family, k, gamma, max_knots, threads) {
-  .Call(`_timesift_ts_additive_fit_`, x, y, w, n, p, r, family, k, gamma, max_knots, threads)
+ts_additive_fit_ <- function(x, y, w, n, p, r, family, k, gamma, max_knots, threads, sp) {
+  .Call(`_timesift_ts_additive_fit_`, x, y, w, n, p, r, family, k, gamma, max_knots, threads, sp)
 }
 
 ts_additive_predict_ <- function(fit, newx, n, p) {

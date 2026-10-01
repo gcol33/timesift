@@ -45,6 +45,10 @@ struct AdditiveSpec {
                                // the search
   int max_outer = 200;         // Newton steps of the smoothing parameters
   int threads = 1;             // columns and responses worked at once; the fit is the same on any
+  // Smoothing parameters to fit at, one per penalised term in column order and shared by the
+  // responses, in place of the search. The fit is then the penalised likelihood's maximum at
+  // those parameters and `score` the criterion there.
+  std::vector<double> sp;
 };
 
 // Every column's smooth, shared by the responses, and one set of coefficients per response.
@@ -69,6 +73,9 @@ struct Additive {
   std::vector<double> radial;
   std::vector<std::int32_t> map_start;     // [terms + 1] into `map`
   std::vector<double> map;
+  // Each term's penalty on its `size` columns, the diagonal of its first `penalised` of them, term
+  // after term.
+  std::vector<double> penalty;
   // The free columns spanned by those before them, held at zero, in coefficient order.
   std::vector<std::int32_t> aliased;
   std::int32_t n_response = 0;

@@ -1063,14 +1063,15 @@ struct ResponseFit {
 // halving of it does, the steepest descent step of at most `kMaxDescentStep` is tried the same way.
 // The search has settled once every gradient is below the tolerance or the Newton step's predicted
 // fall in the criterion is below `kResolution` of its scale, and stops unsettled where no step
-// lowers the criterion.
+// lowers the criterion. Where `spec.sp` is given there is no search: the fit is the one at those
+// parameters, held as given with no bound.
 ResponseFit fit_response(const Design& design, const double* y, const double* w,
                          const AdditiveSpec& spec, int workers) {
   const Response resp(design, y, w, spec.family, spec.gamma, spec, workers);
   const std::size_t m = design.smooths, n = design.n;
   const bool binomial = spec.family == Family::binomial;
   std::vector<double> rho(m, 0.0);
-  for (std::size_t j = 0; j < m; ++j) {
+  for (std::size_t j = 0; j < m && spec.sp.empty(); ++j) {
     double kd = 0.0, sd = 0.0;
     for (std::size_t c : design.columns[j]) {
       const double* xc = design.x.data() + c * n;
@@ -1091,9 +1092,11 @@ ResponseFit fit_response(const Design& design, const double* y, const double* w,
 
   ResponseFit out;
   std::vector<double> lambda = lambdas(rho);
+  const bool fixed = !spec.sp.empty();
+  if (fixed) lambda = spec.sp;
   Response::State st = resp.fit(lambda, {});
   int it = 0;
-  bool converged = m == 0;
+  bool converged = m == 0 || fixed;
   for (; it < spec.max_outer && !converged; ++it) {
     std::vector<double> g;
     Matrix h;
@@ -1265,6 +1268,17 @@ Additive additive_fit(const double* x, std::size_t n, std::size_t p, const doubl
     if (terms[t].penalised > 0) smooth_of_term[t] = static_cast<int>(design.smooths++);
   }
   design.columns.resize(design.smooths);
+  if (!spec.sp.empty()) {
+    if (spec.sp.size() != design.smooths) {
+      throw Error("an additive model has " + std::to_string(design.smooths) + " smoothing " +
+                  "parameters and is given " + std::to_string(spec.sp.size()) + ".");
+    }
+    for (double v : spec.sp) {
+      if (!(v > 0.0) || !std::isfinite(v)) {
+        throw Error("an additive model's smoothing parameters are positive and finite.");
+      }
+    }
+  }
   for (std::size_t c = 0; c < total; ++c) {
     if (aliased[c]) continue;
     const std::size_t col = design.q++;
@@ -1311,6 +1325,8 @@ Additive additive_fit(const double* x, std::size_t n, std::size_t p, const doubl
     out.knots.insert(out.knots.end(), t.knots.begin(), t.knots.end());
     out.radial.insert(out.radial.end(), t.radial.begin(), t.radial.end());
     out.map.insert(out.map.end(), t.map.begin(), t.map.end());
+    out.penalty.insert(out.penalty.end(), t.penalty.begin(),
+                       t.penalty.begin() + static_cast<std::ptrdiff_t>(t.penalised));
     out.knot_start.push_back(static_cast<std::int32_t>(out.knots.size()));
     out.radial_start.push_back(static_cast<std::int32_t>(out.radial.size()));
     out.map_start.push_back(static_cast<std::int32_t>(out.map.size()));

@@ -89,13 +89,15 @@ additive <- function(data = NULL, k = 10L, gamma = 1, max_knots = 2000L, threads
 
 # The additive model, over the core `src/ts_additive.cpp` compiles into both languages. A fit is a
 # plain list of numbers, every column's basis and every response's coefficients, so it round trips
-# through `saveRDS()` and predicts on another machine.
-.additive_fit <- function(x, y, w, family, k = 10L, gamma = 1, max_knots = 2000L, threads = 1L) {
+# through `saveRDS()` and predicts on another machine. `sp`, one smoothing parameter per penalised
+# column in order, fits at those parameters in place of the search.
+.additive_fit <- function(x, y, w, family, k = 10L, gamma = 1, max_knots = 2000L, threads = 1L,
+                          sp = NULL) {
   y <- as.matrix(y)
   w <- as.matrix(w)
   ts_additive_fit_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x), ncol(y),
                    family, as.integer(k), as.numeric(gamma), as.integer(max_knots),
-                   as.integer(threads))
+                   as.integer(threads), as.numeric(sp))
 }
 
 .additive_predict <- function(fit, newx) {

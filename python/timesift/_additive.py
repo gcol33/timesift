@@ -17,9 +17,11 @@ from . import _core
 __all__ = ["additive_fit", "additive_predict"]
 
 
-def additive_fit(x, y, w, family, k=10, gamma=1.0, max_knots=2000, threads=1) -> dict:
+def additive_fit(x, y, w, family, k=10, gamma=1.0, max_knots=2000, threads=1,
+                 sp=None) -> dict:
     """One additive model per column of ``y``, over the columns of ``x``, under the case weights
-    ``w`` of the same shape as ``y``."""
+    ``w`` of the same shape as ``y``. ``sp``, one smoothing parameter per penalised column in
+    order, fits at those parameters in place of the search."""
     y = np.asarray(y, dtype=np.float64)
     w = np.asarray(w, dtype=np.float64)
     if y.ndim == 1:
@@ -27,7 +29,8 @@ def additive_fit(x, y, w, family, k=10, gamma=1.0, max_knots=2000, threads=1) ->
         w = w[:, None]
     return _core.additive_fit(np.asfortranarray(np.asarray(x, dtype=np.float64)),
                               np.asfortranarray(y), np.asfortranarray(w), family, int(k),
-                              float(gamma), int(max_knots), int(threads))
+                              float(gamma), int(max_knots), int(threads),
+                              None if sp is None else [float(v) for v in sp])
 
 
 def additive_predict(fit: dict, newx) -> np.ndarray:

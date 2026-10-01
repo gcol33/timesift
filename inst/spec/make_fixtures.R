@@ -1655,9 +1655,10 @@ cat("wrote", nrow(FDA_CASES), "discriminant cases\n")
 # basis, which is what biomod2's `GAM` calls. Each is run to a tight tolerance, so that the
 # reference sits at the criterion's minimum rather than where mgcv's default tolerance stops it,
 # and the Gaussian ones are refused unless a direct penalised least-squares solve at the smoothing
-# parameters mgcv reports gives its coefficients: past a smoothing parameter of about 1e9 mgcv's
-# `magic` loses directions of the design to its rank tolerance, and a reference taken there would
-# pin that. Each case carries the criterion, every column's effective degrees of freedom and, in
+# parameters mgcv reports gives its coefficients: `magic` takes the square root of the summed
+# penalty by a pivoted Cholesky, and where one smoothing parameter sits many orders of magnitude
+# above the others it drops their penalty directions as numerically null, so a reference taken there
+# would pin a fit with those directions unpenalised. Each case carries the criterion, every column's effective degrees of freedom and, in
 # `additive_predict.csv`, the fitted mean on the design scaled by 1.01.
 #
 # `weekly` is the first four weekly columns, `first` the first three, `late` the fifth to the

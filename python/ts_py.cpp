@@ -762,7 +762,7 @@ NB_MODULE(_core, m) {
 
   m.def("additive_fit",
         [](ConstMat x, ConstMat y, ConstMat w, const std::string& family, int k, double gamma,
-           int max_knots, int threads) {
+           int max_knots, int threads, std::optional<std::vector<double>> sp) {
           if (y.shape(0) != x.shape(0) || w.shape(0) != x.shape(0) || w.shape(1) != y.shape(1)) {
             throw timesift::Error("an additive model's response and weights have a row per unit "
                                   "and the same columns.");
@@ -773,6 +773,7 @@ NB_MODULE(_core, m) {
           spec.gamma = gamma;
           spec.max_knots = max_knots;
           spec.threads = threads;
+          if (sp) spec.sp = *sp;
           timesift::Additive fit;
           {
             nb::gil_scoped_release release;
@@ -794,6 +795,7 @@ NB_MODULE(_core, m) {
           out["radial"] = give(std::move(fit.radial));
           out["map_start"] = give(std::move(fit.map_start));
           out["map"] = give(std::move(fit.map));
+          out["penalty"] = give(std::move(fit.penalty));
           out["aliased"] = give(std::move(fit.aliased));
           out["n_response"] = fit.n_response;
           out["beta"] = give(std::move(fit.beta));
@@ -805,7 +807,8 @@ NB_MODULE(_core, m) {
           return out;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("k"),
-        nb::arg("gamma"), nb::arg("max_knots"), nb::arg("threads") = 1);
+        nb::arg("gamma"), nb::arg("max_knots"), nb::arg("threads") = 1,
+        nb::arg("sp") = nb::none());
 
   m.def("additive_predict",
         [](const nb::dict& fit, ConstMat newx) {
