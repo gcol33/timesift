@@ -297,6 +297,10 @@ the published 0.687, the same 0.686 as before and inside the 0.002 the driver co
 0.68606 once the inner cycle was Anderson-extrapolated (`197fd5a`, 21 minutes on six threads
 where it had taken 94).
 
+Both baseline arms were read again on 2026-10-01 at `14cd1d7`, after the penalised fit, the GLM and the
+stepwise search were rewritten as timesift's own code: elastic net 0.68606, stepwise 0.66185 TSS and
+0.84372 AUC, bit-for-bit the values read before the rewrite (LiSC job 6988418, 32 minutes).
+
 The stepwise arm and the network grid were run on 2026-09-22 on LiSC at `7f03a3e` (#80, #81), the
 networks on L40S cards, and are in `inst/reproduce/README.md`. The stepwise arm is fitted
 unweighted, as the study's was, and reproduces to the rounding. Every one of the 42 grid levels in
