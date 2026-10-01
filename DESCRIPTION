@@ -49,6 +49,7 @@ Suggests:
     knitr,
     rmarkdown,
     spelling,
+    terra,
     withr
 VignetteBuilder: knitr
 Config/testthat/edition: 3

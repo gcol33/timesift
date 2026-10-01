@@ -85,6 +85,8 @@ reference:
   - combine
   - timesift_report
   - predict.timesift
+  - project
+  - range_change
   - plot.timesift
 - title: Representations
   desc: |

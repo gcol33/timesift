@@ -2,6 +2,13 @@
 
 ## New
 
+* `project()` applies a fit to one target per cell of a raster and returns the prediction as a
+  raster with a layer per response: `type = "binary"` the binary map at the fit's own cuts and
+  `type = "spread"` the ensemble's disagreement, which is `BIOMOD_Projection()` and
+  `BIOMOD_EnsembleForecasting()`. Rasters are `terra` in R (in Suggests) and `xarray` in Python
+  (the `grid` extra). `range_change()` counts the cells lost, kept and gained between two such
+  maps, as `BIOMOD_RangeSize()` does, and returns the map of codes.
+
 * `tune()` wraps a learner so that, whenever it is fitted, it searches a grid of its settings by
   cross-validation inside the units it is handed and fits the best one. Inside a run each outer
   fold chooses from its own training units. What was chosen is on the fitted model and in the new

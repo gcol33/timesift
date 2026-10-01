@@ -27,6 +27,7 @@ from .learners import (Fit, Learner, additive, boosting, cnn, discriminant, elas
 from .metrics import (TABLE_METRICS, average_precision, boyce_index, cohen_kappa,
                       decision_threshold, kappa_score, model_agreement, roc_auc, table_metric, tss)
 from .occlusion import feature_matrix
+from .raster import RangeChange, project, range_change
 from .registry import (get_learner, learners, metrics, register_learner, register_metric,
                        register_response, register_tuning, resolve_metric, responses, tunings)
 from .report import (candidate_table, ensemble_weights, occlusion, procedure_table,
@@ -86,7 +87,7 @@ register_learner("rescnn", rescnn)
 __all__ = [
     "Cells", "Coverage", "DAY_LEVEL_STATS", "EnsembleSpec", "Fit", "Folds",
     "GRAINS",
-    "Ladder", "Learner", "PRESENCE_ABSENCE", "ResponseCurve", "Representation", "Resampling", "Response",
+    "Ladder", "Learner", "PRESENCE_ABSENCE", "RangeChange", "ResponseCurve", "Representation", "Resampling", "Response",
     "SPREAD_STATISTICS", "STATS",
     "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "Tuned", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "additive", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
@@ -100,9 +101,9 @@ __all__ = [
     "grain_ladder", "grain_matrix", "grains", "grouped_cv", "implied_skill", "kappa_score",
     "learners", "lookback", "lookback_matrix", "lookbacks", "mars", "maxnet", "metrics", "mlp",
     "model_agreement",
-    "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "plot", "positive_weights",
+    "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "plot", "positive_weights", "project",
     "procedure_table",
-    "read_cells",
+    "range_change", "read_cells",
     "read_folds", "read_response", "register_learner", "register_metric", "register_response", "register_tuning",
     "rescnn", "resolve_folds", "response_curve", "resolve_metric", "responses", "roc_auc", "scorable_cells",
     "score_predictions", "select_columns", "table_metric",

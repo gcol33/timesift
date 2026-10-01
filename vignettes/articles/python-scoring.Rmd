@@ -304,6 +304,66 @@ Attributes:
 - `lower` - np.ndarray | None
 - `upper` - np.ndarray | None
 
+## `project()`
+
+```python
+project(
+    fit,
+    series=None,
+    static=None,
+    candidate: str = 'ensemble',
+    type: str = 'response',
+    chunk: int = 5000,
+    **kwargs,
+)
+```
+
+Predict one target per cell of a grid, each carrying the record of its own cell.
+
+This is `BIOMOD_Projection()` and `BIOMOD_EnsembleForecasting()`: a map is the fit applied
+to one target per cell, at the grain the fit reads. `series` is an `xarray.DataArray` with
+a `time` dimension and two spatial ones, or a mapping of the fit's `x` column names to
+such; `static` is an `xarray.Dataset`, or a mapping of the fit's `static` column names to
+`DataArray` over the two spatial dimensions. Every input shares one grid, and one set of
+instants. Cells are predicted in chunks of `chunk`, and a cell is predicted where every
+input holds a value at that cell: a cell with a missing reading anywhere is NaN in every
+layer. `candidate`, `type` and the other keywords are those of `Timesift.predict`.
+
+Returns an `xarray.DataArray` over `response` and the two spatial dimensions of the
+inputs; for `type="spread"` a `statistic` dimension as well.
+
+## `range_change()`
+
+```python
+range_change(now, later, threshold=None)
+```
+
+How the range of each response changes between two maps.
+
+Counts the cells a response is lost from, kept in and gained, as `BIOMOD_RangeSize()` does,
+a cell being in the range where the response is predicted present. With `L` the cells lost,
+`K` kept, `G` gained and `A` absent in both: the current range is `L + K`, the later
+one `K + G`, `percent_loss` is `100 L / (L + K)`, `percent_gain` is `100 G / (L + K)`
+and `change` is `percent_gain - percent_loss`. A cell that is NaN in either map is left out
+of every count. `now` and `later` are `xarray.DataArray` with a `response` dimension,
+such as `project()` returns, or arrays of cells by responses. `threshold` is None where the
+maps are already 0 and 1, and otherwise one cut per response, or one for all.
+
+## `RangeChange`
+
+```python
+RangeChange(table, map, variables)
+```
+
+The change in range of each response: a `table` of counts, and the `map` of codes
+(-2 lost, -1 kept, 0 absent in both, 1 gained) of the shape of the inputs.
+
+Attributes:
+
+- `table` - list
+- `map` - np.ndarray
+- `variables` - tuple
+
 ## `simulate_records()`
 
 ```python

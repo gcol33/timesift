@@ -261,6 +261,19 @@ grid of 100 cuts. `table_metric()` reads it at the cut of the `rule` given, `"yo
 so the statistics are comparable at one operating point. Every name is a registered metric, so
 `grain_ladder(metric = "csi")` reads it.
 
+## Maps
+
+`BIOMOD_Projection()` and `BIOMOD_EnsembleForecasting()` apply the fit to a stack of rasters.
+`project()` applies it to one target per cell, each carrying the record of its own cell, and
+returns a raster with a layer per response. A map for a later period is the same call with the
+later record, and `BIOMOD_RangeSize()` is `range_change()` on the two binary maps.
+
+```{r project, eval = FALSE}
+now <- project(fit, series = temperature_now, static = terrain, type = "binary")
+later <- project(fit, series = temperature_2050, static = terrain, type = "binary")
+range_change(now, later)$table
+```
+
 ## Tuning
 
 `BIOMOD_Tuning()` searches a grid per algorithm. `tune()` wraps a learner so that it searches a grid

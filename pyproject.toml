@@ -23,9 +23,11 @@ torch = ["torch>=2.0"]
 contrasts = ["scipy>=1.15"]
 # What `plot()` draws with.
 plot = ["matplotlib>=3.5"]
+# The grids `project()` reads and `range_change()` compares.
+grid = ["xarray>=2024.1"]
 # pandas is what a user's table is, so the suite reads one through `timesift()`; the package
 # itself never imports it.
-test = ["pytest>=8.0", "pandas>=2.0"]
+test = ["pytest>=8.0", "pandas>=2.0", "xarray>=2024.1"]
 
 [project.urls]
 Homepage = "https://gillescolling.com/timesift/"
