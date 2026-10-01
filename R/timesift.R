@@ -707,7 +707,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 #' @export
 predict.timesift <- function(object, targets, series = NULL, candidate = "ensemble",
                              type = c("response", "binary", "spread"),
-                             rule = c("youden", "kappa", "prevalence"), alpha = 0.05, ...) {
+                             rule = c("youden", "kappa", "prevalence", "mpa"), alpha = 0.05, ...) {
   type <- match.arg(type)
   rule <- match.arg(rule)
   spec <- object$spec

@@ -551,7 +551,10 @@ METRIC_CASES <- list(
   all_presence = list(y = c(1, 1, 1, 1), p = c(0.1, 0.4, 0.6, 0.9)),
   all_absence = list(y = c(0, 0, 0, 0), p = c(0.1, 0.4, 0.6, 0.9)),
   perfect = list(y = c(0, 0, 1, 1), p = c(0.1, 0.2, 0.8, 0.9)),
-  reversed = list(y = c(1, 1, 0, 0), p = c(0.1, 0.2, 0.8, 0.9))
+  reversed = list(y = c(1, 1, 0, 0), p = c(0.1, 0.2, 0.8, 0.9)),
+  # Enough units for the Boyce index's windows to hold units, with presences thickening upward.
+  graded = list(y = c(0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1),
+                p = round(seq(0.02, 0.98, length.out = 25), 4))
 )
 write_fixture(
   do.call(rbind, lapply(names(METRIC_CASES), function(nm) {
@@ -567,8 +570,18 @@ METRIC_FNS <- list(
   kappa_youden = function(y, p) kappa_score(y, p, "youden"),
   threshold_youden = function(y, p) decision_threshold(y, p, "youden"),
   threshold_kappa = function(y, p) decision_threshold(y, p, "kappa"),
-  threshold_prevalence = function(y, p) decision_threshold(y, p, "prevalence")
+  threshold_prevalence = function(y, p) decision_threshold(y, p, "prevalence"),
+  threshold_mpa = function(y, p) decision_threshold(y, p, "mpa"),
+  threshold_mpa_half = function(y, p) decision_threshold(y, p, "mpa", perc = 0.5),
+  boyce = boyce_index
 )
+for (m in names(timesift:::.table_metrics)) {
+  METRIC_FNS[[m]] <- local({
+    metric <- m
+    function(y, p) table_metric(y, p, metric)
+  })
+}
+METRIC_FNS$or_kappa <- function(y, p) table_metric(y, p, "or", rule = "kappa")
 # A case a metric defines no value on is written NA rather than left out, so a suite that quietly
 # skipped it would fail rather than pass.
 write_fixture(

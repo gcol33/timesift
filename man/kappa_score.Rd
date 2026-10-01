@@ -8,20 +8,26 @@
 \alias{model_agreement}
 \title{Cohen's kappa, and where two models disagree}
 \usage{
-kappa_score(y, p, rule = c("youden", "kappa", "prevalence"))
+kappa_score(y, p, rule = c("youden", "kappa", "prevalence", "mpa"))
 
 decision_threshold(y, ...)
 
-\method{decision_threshold}{default}(y, p, rule = c("youden", "kappa", "prevalence"), ...)
+\method{decision_threshold}{default}(
+  y,
+  p,
+  rule = c("youden", "kappa", "prevalence", "mpa"),
+  perc = 0.9,
+  ...
+)
 
 \method{decision_threshold}{timesift}(
   y,
   candidate = "ensemble",
-  rule = c("youden", "kappa", "prevalence"),
+  rule = c("youden", "kappa", "prevalence", "mpa"),
   ...
 )
 
-model_agreement(y, p_a, p_b, rule = c("youden", "kappa", "prevalence"))
+model_agreement(y, p_a, p_b, rule = c("youden", "kappa", "prevalence", "mpa"))
 }
 \arguments{
 \item{y}{Observed presence-absence, \code{0}/\code{1} or logical; for \code{decision_threshold()}, also a
@@ -29,9 +35,12 @@ model_agreement(y, p_a, p_b, rule = c("youden", "kappa", "prevalence"))
 
 \item{p}{Predicted scores for the same units, in the same order. Higher means presence.}
 
-\item{rule}{Threshold rule: \code{"youden"}, \code{"kappa"} or \code{"prevalence"}.}
+\item{rule}{Threshold rule: \code{"youden"}, \code{"kappa"}, \code{"prevalence"} or \code{"mpa"}.}
 
 \item{...}{Ignored.}
+
+\item{perc}{For \code{rule = "mpa"}, the share of presences the cut must keep, \code{0.9} by default.
+Where a rule is named without a call to \code{decision_threshold()} it takes that default.}
 
 \item{candidate}{For a \code{\link[=timesift]{timesift()}} fit, the candidate whose cut is learned: \code{"ensemble"},
 \code{"selected"} or the name of one, as \code{\link[=predict]{predict()}} takes it.}
@@ -55,7 +64,9 @@ Kappa is read at a threshold rather than maximised over one, so the rule that pi
 threshold is part of the statistic. \code{"youden"} is the operating point \code{\link[=tss]{tss()}} is defined at and
 inherits its selection bias; \code{"kappa"} maximises kappa itself and inherits the analogous bias;
 \code{"prevalence"} cuts at the observed presence rate, which selects nothing from the labels and is
-the rule to read an absolute level at.
+the rule to read an absolute level at. \code{"mpa"} is the minimum predicted area rule: the highest cut
+that still predicts presence at a share \code{perc} of the observed presences, so the labels enter
+through the presences alone.
 
 Given a \code{\link[=timesift]{timesift()}} fit, \code{decision_threshold()} learns one cut per response from a candidate's
 out-of-fold predictions of the fit's own targets, which is the cut \code{predict(type = "binary")}

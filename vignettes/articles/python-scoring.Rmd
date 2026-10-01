@@ -46,6 +46,36 @@ kappa_score(y, p, rule: str = 'youden')
 
 Cohen's kappa of a model's decisions against the observed response.
 
+## `table_metric()`
+
+```python
+table_metric(y, p, metric: str, rule: str = 'youden', threshold=None, perc: float = 0.9)
+```
+
+A metric of the two-by-two table of decisions against observations.
+
+`metric` is one of `pod`, `pofd`, `far`, `sr`, `accuracy`, `bias`, `or`,
+`orss`, `csi` and `ets`, biomod2's evaluation statistics. The cut is the one `rule` of
+`decision_threshold` selects, or a `threshold` learned elsewhere, presence being predicted
+at `p >= cut`. A value the table does not define, a zero denominator, is NaN, as is a cell
+of one class.
+
+## `boyce_index()`
+
+```python
+boyce_index(y, p, resolution: int = 100, width: float = 0.1)
+```
+
+The continuous Boyce index (Hirzel et al. 2006).
+
+A window of `width` times the range of the predictions slides over that range in
+`resolution + 1` equal steps. In each, the share of presences inside divided by the share of
+all units inside is the predicted-to-expected ratio, undefined where no unit falls inside, and
+the index is the Spearman correlation of that ratio with the window's midpoint. The units of
+`p` are the background. The windows are closed at both ends and the ratio is not thinned of
+repeated values. NaN where the cell defines none, the predictions are all equal, the ratio is
+defined in fewer than three windows or takes one value.
+
 ## `cohen_kappa()`
 
 ```python
@@ -57,10 +87,19 @@ Chance-corrected agreement of two labellings of the same units, in either order.
 ## `decision_threshold()`
 
 ```python
-decision_threshold(y, p=None, rule: str = 'youden', candidate: str = 'ensemble')
+decision_threshold(
+    y,
+    p=None,
+    rule: str = 'youden',
+    candidate: str = 'ensemble',
+    perc: float = 0.9,
+)
 ```
 
 The probability cut a rule selects. Presence is predicted at `p >= threshold`.
+
+`"mpa"` is the minimum predicted area rule: the highest cut that still predicts presence at a
+share `perc` of the observed presences.
 
 Given a `timesift()` fit in place of `y` and no `p`, one cut per response, learned from
 `candidate`'s out-of-fold predictions of the fit's own targets, as a dict keyed by the

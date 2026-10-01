@@ -23,8 +23,8 @@ from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
 from .learners import (Fit, Learner, additive, boosting, cnn, discriminant, elasticnet, envelope,
                        fit_learner, flatten, forest, mars, maxnet, mlp, rescnn, stepwise, tree)
-from .metrics import (average_precision, cohen_kappa, decision_threshold, kappa_score,
-                      model_agreement, roc_auc, tss)
+from .metrics import (TABLE_METRICS, average_precision, boyce_index, cohen_kappa,
+                      decision_threshold, kappa_score, model_agreement, roc_auc, table_metric, tss)
 from .occlusion import feature_matrix
 from .registry import (get_learner, learners, metrics, register_learner, register_metric,
                        register_response, resolve_metric, responses)
@@ -58,6 +58,9 @@ register_metric("roc_auc", roc_auc)
 register_metric("average_precision", average_precision)
 register_metric("kappa", lambda y, p: kappa_score(y, p, "prevalence"))
 register_metric("kappa_youden", lambda y, p: kappa_score(y, p, "youden"))
+register_metric("boyce", boyce_index)
+for _name in TABLE_METRICS:
+    register_metric(_name, lambda y, p, _name=_name: table_metric(y, p, _name))
 
 register_response("presence_absence", PRESENCE_ABSENCE)
 
@@ -82,7 +85,7 @@ __all__ = [
     "SPREAD_STATISTICS", "STATS",
     "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "additive", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
-    "average_precision",
+    "average_precision", "boyce_index",
     "bind_channels", "boosting", "build_representation", "calendar_channels", "candidate_table", "cnn",
     "cohen_kappa", "column_names", "coverage", "cv", "decision_threshold", "digest_array", "discriminant",
     "elasticnet", "envelope",
@@ -97,7 +100,7 @@ __all__ = [
     "read_cells",
     "read_folds", "read_response", "register_learner", "register_metric", "register_response",
     "rescnn", "resolve_folds", "resolve_metric", "responses", "roc_auc", "scorable_cells",
-    "score_predictions", "select_columns",
+    "score_predictions", "select_columns", "table_metric",
     "select_grain", "simulate_records", "stepwise", "summary", "target_labels", "timesift", "timesift_set",
     "train_control", "tree", "tss", "tss_inflation", "write_cells", "write_folds", "write_response",
 ]

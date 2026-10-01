@@ -183,7 +183,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
   rule <- match.arg(rule)
   interval <- .check_interval(interval[1L])
   if (!is.null(threshold)) {
-    threshold <- match.arg(threshold, c("youden", "kappa", "prevalence"))
+    threshold <- match.arg(threshold, .threshold_rules)
   }
   set <- .as_set(x)
   units <- dimnames(set[[1L]])[[1L]]

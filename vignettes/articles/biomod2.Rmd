@@ -243,7 +243,23 @@ tss_inflation(sim$y, fold_map(sim$y, v = 5), skill = c(0.6, 0.9), replicates = 4
 ```
 
 `decision_threshold()` returns the cuts a binary prediction uses, and `rule` picks the criterion:
-`"youden"` for TSS, `"kappa"`, or `"prevalence"`.
+`"youden"` for TSS, `"kappa"`, `"prevalence"` or `"mpa"`, the minimum predicted area cut that keeps
+`perc` of the presences.
+
+biomod2's other evaluation statistics come from `table_metric()`, which cuts the predictions by a
+rule and reads the table of decisions against observations:
+
+| biomod2 | `timesift` |
+|---|---|
+| `TSS`, `ROC`, `KAPPA` | `tss()`, `roc_auc()`, `kappa_score()` |
+| `POD`, `POFD`, `FAR`, `SR`, `ACCURACY`, `BIAS`, `OR`, `ORSS`, `CSI`, `ETS` | `table_metric(y, p, "pod")` and the same lower-case names |
+| `BOYCE` | `boyce_index()` |
+| `MPA` | `decision_threshold(rule = "mpa")` |
+
+biomod2 reads each statistic at the cut that brings that statistic closest to its own optimum on a
+grid of 100 cuts. `table_metric()` reads it at the cut of the `rule` given, `"youden"` by default,
+so the statistics are comparable at one operating point. Every name is a registered metric, so
+`grain_ladder(metric = "csi")` reads it.
 
 ## What differs from a biomod2 run
 

@@ -7,9 +7,11 @@ threshold metric off the same rule.
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
-THRESHOLD_RULES = ("youden", "kappa", "prevalence")
+THRESHOLD_RULES = ("youden", "kappa", "prevalence", "mpa")
 
 
 def _labels(y) -> np.ndarray:
@@ -82,21 +84,115 @@ def roc_auc(y, p) -> float:
     n_pos, n_neg = int(y.sum()), int((1 - y).sum())
     if n_pos == 0 or n_neg == 0 or not np.isfinite(p).all():
         return float("nan")
-    order = np.argsort(p, kind="stable")
-    ranks = np.empty(len(p), dtype=np.float64)
-    ranks[order] = np.arange(1, len(p) + 1)
-    # average rank within each run of tied predictions
-    ps = p[order]
-    start = 0
-    for i in range(1, len(ps) + 1):
-        if i == len(ps) or ps[i] != ps[start]:
-            ranks[order[start:i]] = (start + i + 1) / 2
-            start = i
+    ranks = _average_ranks(p)
     return float((ranks[y == 1].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
 
 
-def decision_threshold(y, p=None, rule: str = "youden", candidate: str = "ensemble"):
+def _average_ranks(x) -> np.ndarray:
+    """Ranks from 1, each run of tied values taking the average of the ranks it spans."""
+    x = np.asarray(x, dtype=np.float64)
+    order = np.argsort(x, kind="stable")
+    ranks = np.empty(len(x), dtype=np.float64)
+    ranks[order] = np.arange(1, len(x) + 1)
+    xs = x[order]
+    start = 0
+    for i in range(1, len(xs) + 1):
+        if i == len(xs) or xs[i] != xs[start]:
+            ranks[order[start:i]] = (start + i + 1) / 2
+            start = i
+    return ranks
+
+
+# Each metric of a two-by-two table of decisions against observations, as a function of its four
+# cells: hits `tp`, false alarms `fp`, misses `fn` and correct negatives `tn`.
+TABLE_METRICS = {
+    "pod": lambda tp, fp, fn, tn: tp / (tp + fn),
+    "pofd": lambda tp, fp, fn, tn: fp / (fp + tn),
+    "far": lambda tp, fp, fn, tn: fp / (tp + fp),
+    "sr": lambda tp, fp, fn, tn: tp / (tp + fp),
+    "accuracy": lambda tp, fp, fn, tn: (tp + tn) / (tp + fp + fn + tn),
+    "bias": lambda tp, fp, fn, tn: (tp + fp) / (tp + fn),
+    "or": lambda tp, fp, fn, tn: tp * tn / (fn * fp),
+    "orss": lambda tp, fp, fn, tn: (tp * tn - fn * fp) / (tp * tn + fn * fp),
+    "csi": lambda tp, fp, fn, tn: tp / (tp + fn + fp),
+    "ets": lambda tp, fp, fn, tn: (
+        (tp - (tp + fn) * (tp + fp) / (tp + fp + fn + tn))
+        / (tp + fn + fp - (tp + fn) * (tp + fp) / (tp + fp + fn + tn))),
+}
+
+
+def table_metric(y, p, metric: str, rule: str = "youden", threshold=None,
+                 perc: float = 0.9) -> float:
+    """A metric of the two-by-two table of decisions against observations.
+
+    ``metric`` is one of ``pod``, ``pofd``, ``far``, ``sr``, ``accuracy``, ``bias``, ``or``,
+    ``orss``, ``csi`` and ``ets``, biomod2's evaluation statistics. The cut is the one ``rule`` of
+    ``decision_threshold`` selects, or a ``threshold`` learned elsewhere, presence being predicted
+    at ``p >= cut``. A value the table does not define, a zero denominator, is NaN, as is a cell
+    of one class.
+    """
+    if metric not in TABLE_METRICS:
+        raise ValueError(f"metric must be one of {tuple(TABLE_METRICS)}, got {metric!r}")
+    if rule not in THRESHOLD_RULES:
+        raise ValueError(f"rule must be one of {THRESHOLD_RULES}, got {rule!r}")
+    cut = decision_threshold(y, p, rule, perc=perc) if threshold is None else threshold
+    if _sweep(y, p) is None or not np.isfinite(cut):
+        return float("nan")
+    y = _labels(y)
+    hit = np.asarray(p, dtype=np.float64) >= cut
+    cells = dict(tp=float(np.sum(hit & (y == 1))), fp=float(np.sum(hit & (y == 0))),
+                 fn=float(np.sum(~hit & (y == 1))), tn=float(np.sum(~hit & (y == 0))))
+    try:
+        value = TABLE_METRICS[metric](**cells)
+    except ZeroDivisionError:
+        return float("nan")
+    return float(value) if np.isfinite(value) else float("nan")
+
+
+def boyce_index(y, p, resolution: int = 100, width: float = 0.1) -> float:
+    """The continuous Boyce index (Hirzel et al. 2006).
+
+    A window of ``width`` times the range of the predictions slides over that range in
+    ``resolution + 1`` equal steps. In each, the share of presences inside divided by the share of
+    all units inside is the predicted-to-expected ratio, undefined where no unit falls inside, and
+    the index is the Spearman correlation of that ratio with the window's midpoint. The units of
+    ``p`` are the background. The windows are closed at both ends and the ratio is not thinned of
+    repeated values. NaN where the cell defines none, the predictions are all equal, the ratio is
+    defined in fewer than three windows or takes one value.
+    """
+    s = _sweep(y, p)
+    if s is None:
+        return float("nan")
+    y = _labels(y)
+    p = np.asarray(p, dtype=np.float64)
+    lo, hi = float(p.min()), float(p.max())
+    if hi == lo:
+        return float("nan")
+    w = (hi - lo) * width
+    steps = np.arange(resolution + 1, dtype=np.float64)
+    start = lo + (hi - w - lo) * steps / resolution
+    end = start + w
+    end[-1] = hi
+
+    def inside(x):
+        return ((x[None, :] >= start[:, None]) & (x[None, :] <= end[:, None])).sum(axis=1).astype(float)
+
+    with np.errstate(invalid="ignore", divide="ignore"):
+        ratio = (inside(p[y == 1]) / np.sum(y == 1)) / (inside(p) / len(p))
+    keep = np.isfinite(ratio)
+    if keep.sum() < 3 or len(np.unique(ratio[keep])) < 2:
+        return float("nan")
+    a = _average_ranks(((start + end) / 2)[keep])
+    b = _average_ranks(ratio[keep])
+    return float(np.corrcoef(a, b)[0, 1])
+
+
+def decision_threshold(y, p=None, rule: str = "youden", candidate: str = "ensemble",
+                       perc: float = 0.9):
     """The probability cut a rule selects. Presence is predicted at ``p >= threshold``.
+
+    ``"mpa"`` is the minimum predicted area rule: the highest cut that still predicts presence at a
+    share ``perc`` of the observed presences.
 
     Given a ``timesift()`` fit in place of ``y`` and no ``p``, one cut per response, learned from
     ``candidate``'s out-of-fold predictions of the fit's own targets, as a dict keyed by the
@@ -120,6 +216,11 @@ def decision_threshold(y, p=None, rule: str = "youden", candidate: str = "ensemb
     s = _sweep(y, p)
     if s is None:
         return float("nan")
+    if rule == "mpa":
+        if not (np.isfinite(perc) and 0 < perc <= 1):
+            raise ValueError("`perc` is a share of the presences, in (0, 1].")
+        held = np.sort(np.asarray(p, dtype=np.float64)[_labels(y) == 1])[::-1]
+        return float(held[max(1, math.ceil(perc * len(held) - 1e-9)) - 1])
     if rule == "prevalence":
         return float(np.quantile(np.asarray(p, dtype=np.float64),
                                  1 - s["n_pos"] / (s["n_pos"] + s["n_neg"])))

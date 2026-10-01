@@ -74,7 +74,8 @@ SECTIONS = (
         desc="The metrics, the paired contrast between two arms on matched cells, every grain "
              "against a learner's best, the inflation of a score read at its own best threshold, "
              "what a fitted model read, and a record with a planted grain to test all of it on.",
-        names=("tss", "roc_auc", "average_precision", "kappa_score", "cohen_kappa", "decision_threshold",
+        names=("tss", "roc_auc", "average_precision", "kappa_score", "table_metric", "boyce_index",
+               "cohen_kappa", "decision_threshold",
                "model_agreement", "score_predictions", "paired_contrast", "grain_contrasts",
                "tss_inflation", "implied_skill", "occlusion", "simulate_records", "Simulation"),
     ),

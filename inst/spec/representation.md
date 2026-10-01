@@ -670,12 +670,33 @@ and a rare one is scorable in some folds and not others. Both suites read the re
 fold map, recompute the mask, and assert it cell by cell. Both also write all three back and
 assert the bytes, which is what makes the file format a contract rather than a convention.
 
-`metric_cases.csv` and `metrics.csv` hold ten `(y, p)` cases and the value of every threshold
-metric on each: `tss`, `roc_auc`, `average_precision`, `kappa` under both rules, and
-`decision_threshold` under all three. The cases are where the tie rule is the whole answer -- every prediction tied, ties within
+`metric_cases.csv` and `metrics.csv` hold eleven `(y, p)` cases and the value of every threshold
+metric on each: `tss`, `roc_auc`, `average_precision`, `kappa` under both rules,
+`decision_threshold` under all four rules and the ten table metrics at the Youden cut and `boyce`. The cases are where the tie rule is the whole answer -- every prediction tied, ties within
 a class, ties across the classes, one presence, one absence, all presences, all absences, a
 perfect separation and a reversed one. A metric a case defines no value on is written `NA` rather
 than left out, so a suite that quietly skipped it fails rather than passes.
+
+`table_metric()` reads a two-by-two table of decisions against observations, with `H` the hits,
+`F` the false alarms, `M` the misses, `C` the correct negatives and `n` their sum: `pod` is
+`H / (H + M)`, `pofd` `F / (F + C)`, `far` `F / (H + F)`, `sr` `H / (H + F)`, `accuracy`
+`(H + C) / n`, `bias` `(H + F) / (H + M)`, `or` `H C / (M F)`, `orss` `(H C - M F) / (H C + M F)`,
+`csi` `H / (H + M + F)` and `ets` `(H - h) / (H + M + F - h)` with `h = (H + M)(H + F) / n`. The
+cut is the one a rule of `decision_threshold()` selects, or a `threshold` given, and presence is
+predicted at `p >= cut`. A zero denominator is `NA`, so the odds ratio of a table with no miss or
+no false alarm is `NA` rather than infinite, and so is a cell of one class. The cut rule
+`"mpa"` is the highest cut that predicts presence at a share `perc` of the presences: the
+presences' predictions sorted in decreasing order, the `ceiling(perc * k - 1e-9)`-th of the `k`.
+
+`boyce_index()` is the Spearman correlation, over the windows where it is defined, of the
+predicted-to-expected ratio with the window midpoint. With `lo` and `hi` the least and greatest
+prediction, the window width is `w = width (hi - lo)` and window `i = 0, ..., resolution` spans
+`[from_i, from_i + w]` with `from_i = lo + (hi - w - lo) i / resolution`, the last one closed at
+`hi`. The ratio is the share of presences inside divided by the share of all units inside, undefined
+where no unit is inside, and the result is `NA` where fewer than three windows define it or it
+takes one value. Both languages evaluate `from_i` in that order of operations, which is what
+makes their windows agree to the last place. `metric_cases.csv` carries a case of 25 units for it,
+the other cases being too small to hold a unit in most windows.
 
 `contrast_cells.csv` and `contrast.csv` hold a fixed table of per-cell scores for two arms, with
 cells one arm scored and the other did not, and the paired contrast read off it. No model is
@@ -1737,7 +1758,7 @@ call site.
 | the combiner | `ensemble()`, `ensemble_fit()`, `ensemble_combine()` and `ensemble_weights()` |
 | how far an ensemble's members disagree | `ensemble_spread()`, and `predict(type = "spread")` on a run |
 | scoring held-out predictions | `score_predictions()`, on the cells the mask allows |
-| the metrics | `tss()`, `roc_auc()`, `average_precision()` and `kappa_score()`, with `decision_threshold()` and `model_agreement()` beside them |
+| the metrics | `tss()`, `roc_auc()`, `average_precision()`, `kappa_score()`, `table_metric()` and `boyce_index()`, with `decision_threshold()` and `model_agreement()` beside them |
 | the cut a fit applies | `decision_threshold()` given a fit in place of the response, one cut per response learned from a candidate's out-of-fold predictions |
 | two arms on matched cells | `paired_contrast()` |
 | every grain against a learner's best | `grain_contrasts()`, the mixed model of the per-cell scores and Dunnett's many-to-one comparisons off it |

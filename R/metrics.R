@@ -110,7 +110,9 @@ average_precision <- function(y, p) {
 #' threshold is part of the statistic. `"youden"` is the operating point [tss()] is defined at and
 #' inherits its selection bias; `"kappa"` maximises kappa itself and inherits the analogous bias;
 #' `"prevalence"` cuts at the observed presence rate, which selects nothing from the labels and is
-#' the rule to read an absolute level at.
+#' the rule to read an absolute level at. `"mpa"` is the minimum predicted area rule: the highest cut
+#' that still predicts presence at a share `perc` of the observed presences, so the labels enter
+#' through the presences alone.
 #'
 #' Given a [timesift()] fit, `decision_threshold()` learns one cut per response from a candidate's
 #' out-of-fold predictions of the fit's own targets, which is the cut `predict(type = "binary")`
@@ -119,7 +121,9 @@ average_precision <- function(y, p) {
 #' @inheritParams tss
 #' @param y Observed presence-absence, `0`/`1` or logical; for `decision_threshold()`, also a
 #'   [timesift()] fit, which carries its own response and held-out predictions.
-#' @param rule Threshold rule: `"youden"`, `"kappa"` or `"prevalence"`.
+#' @param rule Threshold rule: `"youden"`, `"kappa"`, `"prevalence"` or `"mpa"`.
+#' @param perc For `rule = "mpa"`, the share of presences the cut must keep, `0.9` by default.
+#'   Where a rule is named without a call to `decision_threshold()` it takes that default.
 #' @param ... Ignored.
 #'
 #' @return For `kappa_score()`, one number. For `decision_threshold()`, the cut itself, applied as
@@ -134,7 +138,7 @@ average_precision <- function(y, p) {
 #' model_agreement(y, c(0.1, 0.2, 0.6, 0.4, 0.8, 0.9), c(0.2, 0.1, 0.3, 0.7, 0.9, 0.8))
 #'
 #' @export
-kappa_score <- function(y, p, rule = c("youden", "kappa", "prevalence")) {
+kappa_score <- function(y, p, rule = c("youden", "kappa", "prevalence", "mpa")) {
   thr <- decision_threshold(y, p, rule)
   if (!is.finite(thr)) {
     return(NA_real_)
@@ -150,11 +154,19 @@ decision_threshold <- function(y, ...) {
 
 #' @rdname kappa_score
 #' @export
-decision_threshold.default <- function(y, p, rule = c("youden", "kappa", "prevalence"), ...) {
+decision_threshold.default <- function(y, p, rule = c("youden", "kappa", "prevalence", "mpa"),
+                                       perc = 0.9, ...) {
   rule <- match.arg(rule)
   s <- .sweep(y, p)
   if (is.null(s)) {
     return(NA_real_)
+  }
+  if (rule == "mpa") {
+    if (length(perc) != 1L || !is.finite(perc) || perc <= 0 || perc > 1) {
+      stop("`perc` is a share of the presences, in (0, 1].", call. = FALSE)
+    }
+    held <- sort(as.numeric(p)[.labels(y) == 1L], decreasing = TRUE)
+    return(held[max(1L, ceiling(perc * length(held) - 1e-9))])
   }
   if (rule == "prevalence") {
     return(unname(stats::quantile(as.numeric(p), 1 - s$n_pos / (s$n_pos + s$n_neg), type = 7)))
@@ -176,7 +188,7 @@ decision_threshold.default <- function(y, p, rule = c("youden", "kappa", "preval
 #'   `"selected"` or the name of one, as [predict()] takes it.
 #' @export
 decision_threshold.timesift <- function(y, candidate = "ensemble",
-                                        rule = c("youden", "kappa", "prevalence"), ...) {
+                                        rule = c("youden", "kappa", "prevalence", "mpa"), ...) {
   rule <- match.arg(rule)
   observed <- y$y
   if (!all(observed %in% c(0, 1))) {
@@ -192,7 +204,7 @@ decision_threshold.timesift <- function(y, candidate = "ensemble",
 #' @rdname kappa_score
 #' @param p_a,p_b Two models' predictions for the same units.
 #' @export
-model_agreement <- function(y, p_a, p_b, rule = c("youden", "kappa", "prevalence")) {
+model_agreement <- function(y, p_a, p_b, rule = c("youden", "kappa", "prevalence", "mpa")) {
   rule <- match.arg(rule)
   y <- .labels(y)
   ta <- decision_threshold(y, p_a, rule)

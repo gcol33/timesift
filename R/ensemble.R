@@ -88,7 +88,7 @@ ensemble <- function(method = c("stack", "mean", "median", "weighted", "committe
       stop("`rule` sets where each member of a committee cuts its prediction, and the method ",
            "here is \"", method, "\".", call. = FALSE)
     }
-    rule <- match.arg(rule, c("youden", "kappa", "prevalence"))
+    rule <- match.arg(rule, .threshold_rules)
   }
   structure(list(method = method, scope = scope, metric = metric, response = response,
                  min_score = min_score,

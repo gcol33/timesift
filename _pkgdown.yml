@@ -134,6 +134,8 @@ reference:
   - roc_auc
   - average_precision
   - kappa_score
+  - table_metric
+  - boyce_index
   - score_predictions
   - paired_contrast
   - grain_contrasts

@@ -123,7 +123,17 @@ test_that("every threshold metric matches the value the fixtures pin", {
               kappa_youden = function(y, p) kappa_score(y, p, "youden"),
               threshold_youden = function(y, p) decision_threshold(y, p, "youden"),
               threshold_kappa = function(y, p) decision_threshold(y, p, "kappa"),
-              threshold_prevalence = function(y, p) decision_threshold(y, p, "prevalence"))
+              threshold_prevalence = function(y, p) decision_threshold(y, p, "prevalence"),
+              threshold_mpa = function(y, p) decision_threshold(y, p, "mpa"),
+              threshold_mpa_half = function(y, p) decision_threshold(y, p, "mpa", perc = 0.5),
+              boyce = boyce_index,
+              or_kappa = function(y, p) table_metric(y, p, "or", rule = "kappa"))
+  for (m in names(timesift:::.table_metrics)) {
+    fns[[m]] <- local({
+      metric <- m
+      function(y, p) table_metric(y, p, metric)
+    })
+  }
 
   expect_setequal(unique(expected$metric), names(fns))
   for (i in seq_len(nrow(expected))) {

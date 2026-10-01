@@ -16,7 +16,8 @@ import pytest
 from timesift import (Ladder, Response, fold_map, paired_contrast, read_cells, read_folds,
                        read_response, scorable_cells, tss_inflation, write_cells, write_folds,
                        write_response)
-from timesift.metrics import average_precision, decision_threshold, kappa_score, roc_auc, tss
+from timesift.metrics import (TABLE_METRICS, average_precision, boyce_index, decision_threshold,
+                               kappa_score, roc_auc, table_metric, tss)
 
 FIXTURES = Path(__file__).resolve().parents[2] / "inst" / "spec" / "fixtures"
 
@@ -29,6 +30,11 @@ METRIC_FNS = {
     "threshold_youden": lambda y, p: decision_threshold(y, p, "youden"),
     "threshold_kappa": lambda y, p: decision_threshold(y, p, "kappa"),
     "threshold_prevalence": lambda y, p: decision_threshold(y, p, "prevalence"),
+    "threshold_mpa": lambda y, p: decision_threshold(y, p, "mpa"),
+    "threshold_mpa_half": lambda y, p: decision_threshold(y, p, "mpa", perc=0.5),
+    "boyce": boyce_index,
+    "or_kappa": lambda y, p: table_metric(y, p, "or", rule="kappa"),
+    **{m: (lambda y, p, m=m: table_metric(y, p, m)) for m in TABLE_METRICS},
 }
 
 

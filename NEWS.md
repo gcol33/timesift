@@ -2,6 +2,13 @@
 
 ## New
 
+* `table_metric()` reads biomod2's evaluation statistics off the table of decisions against
+  observations: `pod`, `pofd`, `far`, `sr`, `accuracy`, `bias`, `or`, `orss`, `csi` and `ets`, at
+  the cut of any rule of `decision_threshold()` or at one given. Each is registered by name, so
+  `grain_ladder(metric = "csi")` reads it. `boyce_index()` is the continuous Boyce index, registered
+  as `"boyce"`, and `decision_threshold(rule = "mpa", perc = )` is the minimum predicted area cut.
+  Both languages, pinned in `metrics.csv`.
+
 * `hierarchical()` fits a Bayesian logistic model through tulpa, with an optional nearest-neighbour
   or Hilbert-space Gaussian-process field over the targets' coordinates, named in the new
   `timesift(coords = )`, and an optional random intercept for each unit. The coordinates and the

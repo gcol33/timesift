@@ -11,6 +11,13 @@ utils::globalVariables("self")
   register_metric("average_precision", average_precision)
   register_metric("kappa", function(y, p) kappa_score(y, p, "prevalence"))
   register_metric("kappa_youden", function(y, p) kappa_score(y, p, "youden"))
+  register_metric("boyce", boyce_index)
+  for (name in names(.table_metrics)) {
+    register_metric(name, local({
+      metric <- name
+      function(y, p) table_metric(y, p, metric)
+    }))
+  }
 
   register_response("presence_absence", .presence_absence)
 

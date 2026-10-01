@@ -13,6 +13,7 @@ import numpy as np
 
 from ._stats import t_ppf
 from .ladder import score_arm, scored_cells, variable_means
+from .metrics import THRESHOLD_RULES
 from .registry import METRICS, RESPONSES
 from .response import align_folds, as_response
 
@@ -23,7 +24,7 @@ __all__ = ["CLAMP", "EnsembleSpec", "METHODS", "SCOPES", "SPREAD_STATISTICS", "S
 
 METHODS = ("stack", "mean", "median", "weighted", "committee")
 SCOPES = ("all", "learners", "representations")
-RULES = ("youden", "kappa", "prevalence")
+RULES = THRESHOLD_RULES
 SPREAD_STATISTICS = ("mean", "sd", "cv", "lower", "upper")
 
 # A candidate is named for the learner and the representation it pairs, and the ensemble reads the

@@ -175,3 +175,54 @@ test_that("a response that is not 0/1 is refused rather than truncated to it", {
   expect_error(model_agreement(c(0.4, 0.6, 1, 1), p, rev(p)), "presence-absence")
   expect_equal(tss(c(FALSE, FALSE, TRUE, TRUE), p), 1)
 })
+
+# y has four presences and four absences; at the Youden cut 0.6 the table is H = 3, F = 0, M = 1,
+# C = 4, written out by hand below.
+table_y <- c(0, 0, 0, 1, 1, 1, 0, 1)
+table_p <- c(0.10, 0.20, 0.35, 0.40, 0.60, 0.90, 0.55, 0.70)
+
+test_that("each table metric reads the cells of the table", {
+  expect_equal(decision_threshold(table_y, table_p, "youden"), 0.6)
+  by_hand <- c(pod = 3 / 4, pofd = 0, far = 0, sr = 1, accuracy = 7 / 8, bias = 3 / 4,
+               orss = 1, csi = 3 / 4, ets = (3 - 1.5) / (4 - 1.5))
+  for (m in names(by_hand)) {
+    expect_equal(table_metric(table_y, table_p, m), unname(by_hand[m]), info = m)
+  }
+  # M F = 0, so the odds ratio is undefined rather than infinite.
+  expect_true(is.na(table_metric(table_y, table_p, "or")))
+  # A cut of 0.5 calls the 0.55 absence too: H = 3, F = 1, M = 1, C = 3.
+  expect_equal(table_metric(table_y, table_p, "or", threshold = 0.5), 9 / 1)
+  expect_equal(table_metric(table_y, table_p, "far", threshold = 0.5), 1 / 4)
+})
+
+test_that("a table metric is NA where its denominator or its cell is empty", {
+  expect_true(is.na(table_metric(c(0, 0, 0), c(0.1, 0.2, 0.3), "pod")))
+  # No unit is called a presence at a cut above every prediction.
+  expect_true(is.na(table_metric(table_y, table_p, "sr", threshold = 2)))
+  expect_error(table_metric(table_y, table_p, "nope"), "should be one of")
+})
+
+test_that("every table metric is registered and read by name", {
+  for (m in names(timesift:::.table_metrics)) {
+    expect_true(m %in% metrics(), info = m)
+  }
+  expect_true("boyce" %in% metrics())
+  expect_equal(timesift:::.as_metric("csi")$fn(table_y, table_p), 3 / 4)
+})
+
+test_that("the minimum predicted area cut keeps the share of presences asked for", {
+  # The presences are predicted 0.9, 0.7, 0.6 and 0.4.
+  expect_equal(decision_threshold(table_y, table_p, "mpa"), 0.4)
+  expect_equal(decision_threshold(table_y, table_p, "mpa", perc = 0.5), 0.7)
+  expect_equal(decision_threshold(table_y, table_p, "mpa", perc = 0.25), 0.9)
+  expect_error(decision_threshold(table_y, table_p, "mpa", perc = 0), "share of the presences")
+  expect_true(is.na(decision_threshold(c(0, 0), c(0.1, 0.2), "mpa")))
+})
+
+test_that("the Boyce index is high where presences thicken with the prediction", {
+  rising <- boyce_index(table_y, table_p)
+  expect_gt(rising, 0.5)
+  expect_lt(boyce_index(table_y, 1 - table_p), 0)
+  expect_true(is.na(boyce_index(table_y, rep(0.5, 8))))
+  expect_true(is.na(boyce_index(c(0, 0, 0), c(0.1, 0.2, 0.3))))
+})

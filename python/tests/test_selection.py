@@ -108,7 +108,9 @@ def test_the_estimate_is_reported_under_every_metric_on_one_set_of_predictions()
     x, y, folds = fixture()
     sel = select_grain(x, y, linear_learner(), folds=folds, inner=3, verbose=False)
     assert {r["metric"] for r in sel.estimate} == set(metrics())
-    assert all(np.isfinite(r["score"]) for r in sel.estimate)
+    # A metric a cell does not define, such as the odds ratio of a cell with no miss or no false
+    # alarm, leaves no variable to average.
+    assert all(np.isfinite(r["score"]) or r["n_variable"] == 0 for r in sel.estimate)
     assert all(r["n_variable"] <= len(y.variables) for r in sel.estimate)
     # The selection metric's estimate is the mean of the same per-cell scores the object carries.
     own = next(r["score"] for r in sel.estimate if r["metric"] == sel.metric)
