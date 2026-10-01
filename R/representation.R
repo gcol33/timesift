@@ -291,7 +291,8 @@ build_representation <- function(rep, series, targets, spec) {
   tf <- .target_frame(targets, spec)
   ordered <- targets[tf$order, , drop = FALSE]
   if (identical(rep$kind, "static")) {
-    return(feature_matrix(.static_matrix(ordered, tf, spec), label = rep$label))
+    return(.carry_coords(feature_matrix(.static_matrix(ordered, tf, spec), label = rep$label),
+                         ordered, spec))
   }
   if (is.null(series)) {
     stop("`", rep$label, "` reads the series, and none was given.", call. = FALSE)
@@ -301,7 +302,40 @@ build_representation <- function(rep, series, targets, spec) {
     multigrain = .multigrain_block(rep, series, tf, spec),
     lookback = .lookback_block(rep, series, tf, spec),
     stop("unknown representation kind \"", rep$kind, "\".", call. = FALSE))
-  .append_static(x, .static_matrix(ordered, tf, spec))
+  .carry_coords(.append_static(x, .static_matrix(ordered, tf, spec)), ordered, spec)
+}
+
+# The coordinates of the targets and the unit each belongs to, in the order of the array's rows, as
+# attributes: they place a target and are not channels, so no learner reads them as a predictor and
+# a split of the targets splits them with it.
+.carry_coords <- function(x, ordered, spec) {
+  if (!is.null(spec$id)) {
+    attr(x, "units") <- as.character(ordered[[spec$id]])
+  }
+  if (length(spec$coords)) {
+    attr(x, "coords") <- matrix(unlist(lapply(ordered[spec$coords], as.numeric), use.names = FALSE),
+                                nrow(ordered), length(spec$coords),
+                                dimnames = list(dimnames(x)[[1L]], spec$coords))
+  }
+  x
+}
+
+.check_coords <- function(targets, cols) {
+  if (!length(cols)) {
+    return(invisible())
+  }
+  if (length(cols) != 2L) {
+    stop("`coords` names the two columns of a target's coordinates, got ", length(cols), ": ",
+         .listing(cols), ".", call. = FALSE)
+  }
+  for (col in cols) {
+    v <- targets[[col]]
+    if (!is.numeric(v) || anyNA(v) || any(!is.finite(v))) {
+      stop("the coordinate column `", col, "` must be numeric with no missing or infinite value.",
+           call. = FALSE)
+    }
+  }
+  invisible()
 }
 
 # The predictor block a targets-only fit is made of. It is a representation like any other so that

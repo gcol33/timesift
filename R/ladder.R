@@ -277,6 +277,12 @@ score_predictions <- function(y, p, folds, cells = NULL, metric = "roc_auc") {
   if (!is.null(attr(x, "bin_n"))) {
     attr(out, "bin_n") <- attr(x, "bin_n")[idx, , drop = FALSE]
   }
+  if (!is.null(attr(x, "units"))) {
+    attr(out, "units") <- attr(x, "units")[idx]
+  }
+  if (!is.null(attr(x, "coords"))) {
+    attr(out, "coords") <- attr(x, "coords")[idx, , drop = FALSE]
+  }
   class(out) <- c("timesift_matrix", "array")
   out
 }

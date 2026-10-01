@@ -36,6 +36,9 @@
 #'   what a unit carrying several targets through time needs.
 #' @param static Columns of `targets` carried alongside the representation, as a tidyselect
 #'   expression. None by default.
+#' @param coords The two columns of `targets` holding each target's coordinates, as a tidyselect
+#'   expression, for a learner that places a unit in space, such as [hierarchical()]. They travel
+#'   with every representation and are not predictors. None by default.
 #' @param models A learner, a set of them from [c()], or a list. Defaults to [elasticnet()].
 #' @param sift The representations a learner without a `data =` of its own is run across.
 #'   A [grains()] or [lookbacks()] set, a set from [c()], a bare vector of grain names, a single
@@ -123,7 +126,7 @@
 #'
 #' @export
 timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL,
-                     target_time = NULL, static = NULL,
+                     target_time = NULL, static = NULL, coords = NULL,
                      models = NULL, sift = NULL, ensemble = TRUE,
                      resampling = cv(), inner = 5L, rule = c("argmax", "coarsest_adequate"),
                      response = "presence_absence", metric = NULL,
@@ -145,6 +148,8 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
   time_col <- if (is.null(series)) NULL else .optional_column(substitute(time), series, env)
   y_cols <- .select_columns(rlang::enquo(y), targets, "y")
   static_cols <- .select_columns(rlang::enquo(static), targets, "static")
+  coord_cols <- .select_columns(rlang::enquo(coords), targets, "coords")
+  .check_coords(targets, coord_cols)
 
   if (!length(y_cols)) {
     stop("`y` must name the response column", if (ncol(targets) > 1L) "(s)" else "",
@@ -178,7 +183,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 
   value_cols <- .series_values(rlang::enquo(x), series, id_col, time_col)
   spec <- list(id = id_col, time = time_col, value = value_cols, target_time = target_time_col,
-               static = static_cols, y = y_cols, partial = "keep", response = response,
+               static = static_cols, coords = coord_cols, y = y_cols, partial = "keep", response = response,
                control = control, sift = NULL)
   tf <- .target_frame(targets, spec)
   targets <- targets[tf$order, , drop = FALSE]

@@ -152,7 +152,8 @@ apart on one sensor read two different stretches of the same series, anchored by
 over one, `maxnet()` fits maxnet's MaxEnt over one, `envelope()` draws biomod2's surface range
 envelope around the presences in one, `mars()` fits earth's multivariate adaptive regression
 splines over one, `discriminant()` fits mda's flexible discriminant analysis over one,
-`additive()` fits mgcv's generalised additive model over one, and the
+`additive()` fits mgcv's generalised additive model over one, `hierarchical()` fits a Bayesian
+logistic model with a spatial field through tulpa, and the
 `torch` encoders `mlp()`, `cnn()` and
 `rescnn()` read a sequence with a joint multi-label head. `learner()` takes a fit and a predict pair of your own, which then
 goes through the same folds, the same cells and the same scoring.

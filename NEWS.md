@@ -2,6 +2,11 @@
 
 ## New
 
+* `hierarchical()` fits a Bayesian logistic model through tulpa, with an optional nearest-neighbour
+  or Hilbert-space Gaussian-process field over the targets' coordinates, named in the new
+  `timesift(coords = )`, and an optional random intercept for each unit. The coordinates and the
+  unit names travel with every representation and are split with its units. tulpa is in Suggests, and the learner is in R only.
+
 * `mlp(activation = )` sets the nonlinearity between the hidden layers: `"relu"` (the default),
   `"gelu"` or `"selu"`, in both languages.
 

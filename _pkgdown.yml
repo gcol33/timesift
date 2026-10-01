@@ -107,6 +107,7 @@ reference:
   - mars
   - discriminant
   - additive
+  - hierarchical
   - torch_learners
   - train_control
   - learner

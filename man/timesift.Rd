@@ -13,6 +13,7 @@ timesift(
   time = NULL,
   target_time = NULL,
   static = NULL,
+  coords = NULL,
   models = NULL,
   sift = NULL,
   ensemble = TRUE,
@@ -47,6 +48,10 @@ what a unit carrying several targets through time needs.}
 
 \item{static}{Columns of \code{targets} carried alongside the representation, as a tidyselect
 expression. None by default.}
+
+\item{coords}{The two columns of \code{targets} holding each target's coordinates, as a tidyselect
+expression, for a learner that places a unit in space, such as \code{\link[=hierarchical]{hierarchical()}}. They travel
+with every representation and are not predictors. None by default.}
 
 \item{models}{A learner, a set of them from \code{\link[=c]{c()}}, or a list. Defaults to \code{\link[=elasticnet]{elasticnet()}}.}
 
