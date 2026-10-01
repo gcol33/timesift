@@ -154,6 +154,29 @@ test_that("every threshold metric matches the value the fixtures pin", {
                     "all_presence", "all_absence", "perfect", "reversed") %in% expected$case))
 })
 
+test_that("the blocks match the labels the fixtures pin", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures are not in the built package")
+
+  input <- read_fixture(dir, "blocks_input.csv")
+  expected <- read_fixture(dir, "blocks.csv")
+  columns <- list(block_xy_4 = c("x", "y"), block_xy_3 = c("x", "y"), block_xy_5 = c("x", "y"),
+                  block_x_2 = "x", env_xye_4 = c("x", "y", "e"))
+  expect_setequal(unique(expected$case), names(columns))
+  for (case in names(columns)) {
+    rows <- expected[expected$case == case, ]
+    x <- as.matrix(input[, columns[[case]], drop = FALSE])
+    storage.mode(x) <- "numeric"
+    v <- max(as.integer(rows$block))
+    got <- if (startsWith(case, "env")) {
+      as.integer(unclass(.block_folds(x, v, TRUE, input$id)))
+    } else {
+      .kd_blocks(x, v)
+    }
+    expect_identical(got, as.integer(rows$block), info = case)
+  }
+})
+
 test_that("the paired contrast matches the value the fixtures pin", {
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")

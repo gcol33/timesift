@@ -597,6 +597,31 @@ write_fixture(
   "metrics.csv"
 )
 
+# Blocks of units held out whole. Nothing is drawn, so the labels are a function of the columns
+# alone and both languages read the same ones: columns with ties, so the order of arrival decides,
+# cut into a number of blocks that is not a power of two, and once on scaled columns.
+BLOCK_INPUT <- data.frame(id = sprintf("u%02d", 1:23), x = (7 * (1:23)) %% 10,
+                          y = (11 * (1:23)) %% 17, e = round(sin(1:23) * 100) / 10,
+                          stringsAsFactors = FALSE)
+write_fixture(BLOCK_INPUT, "blocks_input.csv")
+BLOCK_CASES <- list(
+  block_xy_4 = list(cols = c("x", "y"), v = 4L, scale = FALSE),
+  block_xy_3 = list(cols = c("x", "y"), v = 3L, scale = FALSE),
+  block_xy_5 = list(cols = c("x", "y"), v = 5L, scale = FALSE),
+  block_x_2 = list(cols = "x", v = 2L, scale = FALSE),
+  env_xye_4 = list(cols = c("x", "y", "e"), v = 4L, scale = TRUE)
+)
+write_fixture(
+  do.call(rbind, lapply(names(BLOCK_CASES), function(nm) {
+    d <- BLOCK_CASES[[nm]]
+    folds <- timesift:::.block_folds(as.matrix(BLOCK_INPUT[, d$cols, drop = FALSE]), d$v, d$scale,
+                                     BLOCK_INPUT$id)
+    data.frame(case = nm, id = BLOCK_INPUT$id, block = as.integer(unclass(folds)),
+               stringsAsFactors = FALSE)
+  })),
+  "blocks.csv"
+)
+
 # The paired contrast, from a fixed table of per-cell scores rather than from a fit: the pairing,
 # the per-variable mean and the signed-rank p-value are the part both languages own, and a fitted
 # model is the part they are not required to share. Cells one arm scored and the other did not are

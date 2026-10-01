@@ -74,7 +74,16 @@ fold_map <- function(y, v = 10L, seed = 1L, strata = 5L, by = NULL, group = NULL
 #'
 #' The resampling [timesift()] scores on. `cv()` deals units into folds balanced on the
 #' stratifying value; `grouped_cv()` deals whole groups, keeping every target sharing a group
-#' value on one side of each split.
+#' value on one side of each split. `block_cv()` and `env_cv()` hold out a block of units whole:
+#' a region of space for the first, a region of predictor space for the second.
+#'
+#' The blocks are cut by halving. The units are split at the median of the column with the widest
+#' range (the first on a tie), the lower share going to the left and the units tied on that column
+#' ordered as they arrived, and each part is cut again until there are `v` of them, so a block
+#' holds as many units as another to within one and a map of `v` blocks has `v` folds. Nothing is
+#' drawn, so both languages return the same map. `env_cv()` centres and scales every column first,
+#' which a coordinate system does not need. Under the nested selection the inner folds keep blocks
+#' whole as well, so `inner` is at most `v - 1`.
 #'
 #' `resampling` also accepts a fold vector or a [fold_map()] result directly, which is how a split
 #' the package has no constructor for -- a spatial block, a season held out whole -- reaches the
@@ -83,6 +92,10 @@ fold_map <- function(y, v = 10L, seed = 1L, strata = 5L, by = NULL, group = NULL
 #' @param v Number of folds.
 #' @param seed Random seed, fixed so the map is reproducible.
 #' @param strata Number of strata, or `1` for no stratification.
+#' @param by What `cv()` stratifies on instead of the richness of the response: the name of a
+#'   numeric column of `targets`, or a vector with one value per target. For `block_cv()` and
+#'   `env_cv()`, the columns the blocks are cut on: names of columns of `targets`, or a numeric
+#'   matrix with one row per target.
 #' @param group The grouping: the name of a column of `targets`, or a vector with one value per
 #'   target.
 #'
@@ -90,11 +103,34 @@ fold_map <- function(y, v = 10L, seed = 1L, strata = 5L, by = NULL, group = NULL
 #'
 #' @examples
 #' cv(v = 5L)
+#' cv(v = 5L, by = "elevation")
 #' grouped_cv("site")
+#' block_cv(c("x", "y"), v = 4L)
+#' env_cv(c("elevation", "slope"), v = 5L)
 #'
 #' @export
-cv <- function(v = 10L, seed = 1L, strata = 5L) {
-  .resampling("cv", v = v, seed = seed, strata = strata, group = NULL)
+cv <- function(v = 10L, seed = 1L, strata = 5L, by = NULL) {
+  .resampling("cv", v = v, seed = seed, strata = strata, group = NULL, by = by)
+}
+
+#' @rdname cv
+#' @export
+block_cv <- function(by, v = 4L) {
+  .block_resampling("block_cv", by, v, scale = FALSE)
+}
+
+#' @rdname cv
+#' @export
+env_cv <- function(by, v = 4L) {
+  .block_resampling("env_cv", by, v, scale = TRUE)
+}
+
+.block_resampling <- function(method, by, v, scale) {
+  if (missing(by) || is.null(by)) {
+    stop("`", method, "()` needs the columns the blocks are cut on: names of columns of ",
+         "`targets`, or a numeric matrix with one row per target.", call. = FALSE)
+  }
+  .resampling(method, v = v, seed = NA, strata = 1L, group = NULL, by = by, scale = scale)
 }
 
 #' @rdname cv
@@ -107,12 +143,12 @@ grouped_cv <- function(group, v = 10L, seed = 1L) {
   .resampling("grouped_cv", v = v, seed = seed, strata = 1L, group = group)
 }
 
-.resampling <- function(method, v, seed, strata, group) {
+.resampling <- function(method, v, seed, strata, group, by = NULL, scale = FALSE) {
   if (!is.numeric(v) || length(v) != 1L || v < 2L) {
     stop("`v` must be a fold count of 2 or more, got ", .describe(v), ".", call. = FALSE)
   }
   structure(list(method = method, v = as.integer(v), seed = seed, strata = as.integer(strata),
-                 group = group),
+                 group = group, by = by, scale = scale),
             class = "timesift_resampling")
 }
 
@@ -122,6 +158,9 @@ print.timesift_resampling <- function(x, ...) {
   if (identical(x$method, "grouped_cv")) {
     cat("grouped by:", if (is.character(x$group) && length(x$group) == 1L) x$group else
       paste(.plural(length(unique(x$group)), "group"), "given as a vector"), "\n")
+  } else if (x$method %in% c("block_cv", "env_cv")) {
+    cat("cut on    :", if (is.character(x$by)) paste(x$by, collapse = ", ") else
+      paste(ncol(as.matrix(x$by)), "columns given as a matrix"), "\n")
   } else {
     cat("strata    :", x$strata, "\n")
   }
@@ -132,7 +171,12 @@ print.timesift_resampling <- function(x, ...) {
 # the caller brought, which reaches the same named integer vector everything downstream reads.
 .as_fold_map <- function(resampling, y, targets, tf) {
   if (inherits(resampling, "timesift_resampling")) {
+    if (resampling$method %in% c("block_cv", "env_cv")) {
+      return(.block_folds(.resampling_columns(resampling, targets, tf), resampling$v,
+                          resampling$scale, tf$label))
+    }
     return(fold_map(y, v = resampling$v, seed = resampling$seed, strata = resampling$strata,
+                    by = if (!is.null(resampling$by)) .resampling_by(resampling, targets, tf),
                     group = .resampling_group(resampling, targets, tf)))
   }
   f <- .as_folds(.against_targets(resampling, tf), tf$label)
@@ -180,6 +224,87 @@ print.timesift_resampling <- function(x, ...) {
          if (is.character(group)) group[1L] else class(group)[1L], "\".", call. = FALSE)
   }
   as.character(group)[tf$order]
+}
+
+# What `cv(by = )` stratifies on, in the row order of the response.
+.resampling_by <- function(resampling, targets, tf) {
+  by <- resampling$by
+  if (is.character(by) && length(by) == 1L && by %in% names(targets)) {
+    return(as.numeric(targets[[by]]))
+  }
+  if (length(by) != nrow(targets) || !is.numeric(by)) {
+    stop("`by` of `cv()` is the name of a numeric column of `targets`, or one number per target, ",
+         "and no column is called \"", if (is.character(by)) by[1L] else class(by)[1L], "\".",
+         call. = FALSE)
+  }
+  as.numeric(by)[tf$order]
+}
+
+# The columns a block is cut on, as a numeric matrix in the row order of the response.
+.resampling_columns <- function(resampling, targets, tf) {
+  by <- resampling$by
+  if (is.character(by)) {
+    absent <- setdiff(by, names(targets))
+    if (length(absent)) {
+      stop("`", resampling$method, "()` cuts on ", paste0("\"", absent, "\"", collapse = ", "),
+           ", which ", if (length(absent) > 1L) "are" else "is", " not a column of `targets`.",
+           call. = FALSE)
+    }
+    x <- as.matrix(targets[, by, drop = FALSE])
+  } else {
+    x <- as.matrix(by)
+    if (nrow(x) != nrow(targets)) {
+      stop("`", resampling$method, "()` was given ", nrow(x), " rows for ", nrow(targets),
+           " targets.", call. = FALSE)
+    }
+    x <- x[tf$order, , drop = FALSE]
+  }
+  if (!is.numeric(x) || !all(is.finite(x))) {
+    stop("`", resampling$method, "()` cuts on numeric columns without missing values.",
+         call. = FALSE)
+  }
+  x
+}
+
+# A fold map whose folds are blocks of `x`: the grouping is the block, so every split drawn inside
+# a fold keeps a block whole as the outer folds do.
+.block_folds <- function(x, v, scale, units) {
+  if (v > nrow(x)) {
+    stop("`v` must be between 2 and the ", nrow(x), " units, got ", v, ".", call. = FALSE)
+  }
+  if (scale) {
+    x <- matrix(vapply(seq_len(ncol(x)), function(j) {
+      s <- stats::sd(x[, j])
+      if (is.finite(s) && s > 0) (x[, j] - mean(x[, j])) / s else rep(0, nrow(x))
+    }, numeric(nrow(x))), nrow = nrow(x))
+  }
+  block <- .kd_blocks(x, v)
+  structure(stats::setNames(block, units), v = as.integer(v), seed = NA, strata = NA_integer_,
+            grouped = TRUE, group = as.character(block), class = "timesift_folds")
+}
+
+# `v` blocks of equal count to within one, by halving at the median of the widest column. The
+# integer split point rounds half up, and units tied on a column keep their order of arrival.
+.kd_blocks <- function(x, v) {
+  x <- as.matrix(x)
+  label <- integer(nrow(x))
+  made <- 0L
+  cut_block <- function(idx, k) {
+    if (k == 1L) {
+      made <<- made + 1L
+      label[idx] <<- made
+      return(invisible(NULL))
+    }
+    k_left <- k %/% 2L
+    widest <- which.max(apply(x[idx, , drop = FALSE], 2L, function(col) max(col) - min(col)))
+    ordered <- idx[order(x[idx, widest], idx, method = "radix")]
+    n_left <- (2L * length(idx) * k_left + k) %/% (2L * k)
+    n_left <- min(max(n_left, k_left), length(idx) - (k - k_left))
+    cut_block(ordered[seq_len(n_left)], k_left)
+    cut_block(ordered[-seq_len(n_left)], k - k_left)
+  }
+  cut_block(seq_len(nrow(x)), as.integer(v))
+  label
 }
 
 #' @export

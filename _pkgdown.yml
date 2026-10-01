@@ -117,6 +117,8 @@ reference:
     One fold map read by everything that scores, and the cells a score is defined on, computed with no model involved.
   contents:
   - cv
+  - block_cv
+  - env_cv
   - fold_map
   - scorable_cells
 - title: Combining the candidates

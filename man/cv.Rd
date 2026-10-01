@@ -2,10 +2,16 @@
 % Please edit documentation in R/folds.R
 \name{cv}
 \alias{cv}
+\alias{block_cv}
+\alias{env_cv}
 \alias{grouped_cv}
 \title{How the folds are drawn}
 \usage{
-cv(v = 10L, seed = 1L, strata = 5L)
+cv(v = 10L, seed = 1L, strata = 5L, by = NULL)
+
+block_cv(by, v = 4L)
+
+env_cv(by, v = 4L)
 
 grouped_cv(group, v = 10L, seed = 1L)
 }
@@ -16,6 +22,11 @@ grouped_cv(group, v = 10L, seed = 1L)
 
 \item{strata}{Number of strata, or \code{1} for no stratification.}
 
+\item{by}{What \code{cv()} stratifies on instead of the richness of the response: the name of a
+numeric column of \code{targets}, or a vector with one value per target. For \code{block_cv()} and
+\code{env_cv()}, the columns the blocks are cut on: names of columns of \code{targets}, or a numeric
+matrix with one row per target.}
+
 \item{group}{The grouping: the name of a column of \code{targets}, or a vector with one value per
 target.}
 }
@@ -25,15 +36,27 @@ A \code{timesift_resampling}.
 \description{
 The resampling \code{\link[=timesift]{timesift()}} scores on. \code{cv()} deals units into folds balanced on the
 stratifying value; \code{grouped_cv()} deals whole groups, keeping every target sharing a group
-value on one side of each split.
+value on one side of each split. \code{block_cv()} and \code{env_cv()} hold out a block of units whole:
+a region of space for the first, a region of predictor space for the second.
 }
 \details{
+The blocks are cut by halving. The units are split at the median of the column with the widest
+range (the first on a tie), the lower share going to the left and the units tied on that column
+ordered as they arrived, and each part is cut again until there are \code{v} of them, so a block
+holds as many units as another to within one and a map of \code{v} blocks has \code{v} folds. Nothing is
+drawn, so both languages return the same map. \code{env_cv()} centres and scales every column first,
+which a coordinate system does not need. Under the nested selection the inner folds keep blocks
+whole as well, so \code{inner} is at most \code{v - 1}.
+
 \code{resampling} also accepts a fold vector or a \code{\link[=fold_map]{fold_map()}} result directly, which is how a split
 the package has no constructor for -- a spatial block, a season held out whole -- reaches the
 same fitting path.
 }
 \examples{
 cv(v = 5L)
+cv(v = 5L, by = "elevation")
 grouped_cv("site")
+block_cv(c("x", "y"), v = 4L)
+env_cv(c("elevation", "slope"), v = 5L)
 
 }

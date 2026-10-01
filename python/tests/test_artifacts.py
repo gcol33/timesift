@@ -163,6 +163,25 @@ def test_the_metric_cases_cover_where_the_tie_rule_is_the_whole_answer():
             "all_presence", "all_absence", "perfect", "reversed"} <= cases
 
 
+def test_the_blocks_match_the_labels_the_fixtures_pin():
+    from timesift.response import block_folds, kd_blocks
+
+    inputs = read_fixture("blocks_input.csv")
+    expected = read_fixture("blocks.csv")
+    columns = {"block_xy_4": ["x", "y"], "block_xy_3": ["x", "y"], "block_xy_5": ["x", "y"],
+               "block_x_2": ["x"], "env_xye_4": ["x", "y", "e"]}
+    assert {r["case"] for r in expected} == set(columns)
+    ids = [r["id"] for r in inputs]
+    for case, cols in columns.items():
+        want = [int(r["block"]) for r in expected if r["case"] == case]
+        x = np.asarray([[float(r[c]) for c in cols] for r in inputs])
+        if case.startswith("env"):
+            got = block_folds(x, max(want), ids, scale=True).fold.tolist()
+        else:
+            got = kd_blocks(x, max(want)).tolist()
+        assert got == want, case
+
+
 def test_the_paired_contrast_matches_the_value_the_fixtures_pin():
     cells = read_fixture("contrast_cells.csv")
     expected = {r["quantity"]: r["value"] for r in read_fixture("contrast.csv")}

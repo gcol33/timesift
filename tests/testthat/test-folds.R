@@ -244,3 +244,69 @@ test_that("a fold map carries its grouping, and the inner folds a fit draws keep
   expect_true(all(tapply(as.integer(inner_map), group[train],
                          function(v) length(unique(v))) == 1L))
 })
+
+# Sixteen units on a four-by-four grid, in the order x runs slowest. Cut in four, the first split
+# is on x (it ties y in range, and the first column wins), the second on y inside each half.
+grid_xy <- cbind(x = rep(1:4, each = 4L), y = rep(1:4, 4L))
+
+test_that("blocks are cut by halving at the median of the widest column", {
+  quadrant <- .kd_blocks(grid_xy, 4L)
+  expect_equal(quadrant, c(rep(c(1L, 1L, 2L, 2L), 2L), rep(c(3L, 3L, 4L, 4L), 2L)))
+  expect_equal(.kd_blocks(grid_xy, 2L), rep(1:2, each = 8L))
+  # Three blocks split five and eleven units into the share each part is to cut again, half up.
+  expect_equal(sort(as.integer(table(.kd_blocks(grid_xy, 3L)))), c(5L, 5L, 6L))
+  # A column that is the widest by a long way takes every cut.
+  tall <- cbind(x = rep(1:2, 8L), y = (1:16) * 100)
+  expect_equal(.kd_blocks(tall, 4L), rep(1:4, each = 4L))
+  # Units tied on the column keep their order of arrival.
+  expect_equal(.kd_blocks(matrix(1, nrow = 6L, ncol = 1L), 3L), rep(1:3, each = 2L))
+  # Block sizes differ by at most one whatever v is.
+  for (v in 2:9) {
+    sizes <- as.integer(table(.kd_blocks(grid_xy, v)))
+    expect_lte(max(sizes) - min(sizes), 1L)
+    expect_length(sizes, v)
+  }
+})
+
+test_that("block_cv and env_cv hold a block of units out whole", {
+  y <- sim_response(sim_series(n_unit = 24L, days = 2L))
+  tf <- list(label = rownames(y), order = seq_len(nrow(y)))
+  targets <- data.frame(plot = rownames(y), x = rep(1:6, each = 4L), y = rep(1:4, 6L),
+                        elevation = 1000 * (1:24) / 7, stringsAsFactors = FALSE)
+
+  blocks <- .as_fold_map(block_cv(c("x", "y"), v = 4L), y, targets, tf)
+  expect_s3_class(blocks, "timesift_folds")
+  expect_equal(names(blocks), rownames(y))
+  expect_equal(attr(blocks, "v"), 4L)
+  expect_true(attr(blocks, "grouped"))
+  expect_equal(unname(attr(blocks, "group")), as.character(unclass(blocks)))
+  expect_equal(as.integer(table(unclass(blocks))), rep(6L, 4L))
+
+  # The same columns given as a matrix, in the targets' own order, are the same map.
+  matrix_by <- .as_fold_map(block_cv(as.matrix(targets[, c("x", "y")]), v = 4L), y, targets, tf)
+  expect_equal(unclass(matrix_by), unclass(blocks))
+
+  # An environmental cut works on scaled columns, so a column in large units does not take them all.
+  env <- .as_fold_map(env_cv(c("x", "elevation"), v = 3L), y, targets, tf)
+  expect_equal(length(unique(unclass(env))), 3L)
+  raw <- .as_fold_map(block_cv(c("x", "elevation"), v = 3L), y, targets, tf)
+  expect_equal(as.integer(raw), .kd_blocks(targets[, c("x", "elevation")], 3L))
+
+  expect_error(block_cv(), "needs the columns")
+  expect_error(.as_fold_map(block_cv("nope"), y, targets, tf), "not a column of")
+  expect_error(.as_fold_map(block_cv("x", v = 30L), y, targets, tf), "between 2 and the 24")
+  expect_output(print.timesift_resampling(block_cv(c("x", "y"))), "cut on    : x, y")
+})
+
+test_that("cv stratifies on a column of the targets when asked to", {
+  y <- sim_response(sim_series(n_unit = 24L, days = 2L))
+  tf <- list(label = rownames(y), order = seq_len(nrow(y)))
+  targets <- data.frame(plot = rownames(y), elevation = seq(500, 2800, length.out = 24L),
+                        stringsAsFactors = FALSE)
+  by_column <- .as_fold_map(cv(v = 4L, strata = 3L, by = "elevation"), y, targets, tf)
+  expect_equal(unclass(by_column),
+               unclass(fold_map(y, v = 4L, strata = 3L, by = targets$elevation)))
+  by_vector <- .as_fold_map(cv(v = 4L, strata = 3L, by = targets$elevation), y, targets, tf)
+  expect_equal(unclass(by_vector), unclass(by_column))
+  expect_error(.as_fold_map(cv(by = "nope"), y, targets, tf), "numeric column")
+})

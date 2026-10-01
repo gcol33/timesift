@@ -12,11 +12,11 @@ import pytest
 
 from timesift.learners import flatten
 from timesift.representation import grain_matrix
-from timesift.response import Response, fold_map
+from timesift.response import Response, fold_map, kd_blocks
 from timesift.select import column_names, select_columns
 from timesift.specs import (Representation, Sift, TimesiftSpec, as_resampling, as_sift,
-                            auto_grains, build_representation, cv, expand_sift, grain, grains,
-                            grouped_cv, lookback, lookbacks, multigrain, n_targets, native,
+                            auto_grains, block_cv, build_representation, cv, env_cv,
+                            expand_sift, grain, grains, grouped_cv, lookback, lookbacks, multigrain, n_targets, native,
                             resolve_folds, target_labels)
 
 PLOTS = ("p2", "p1", "p3", "p4")
@@ -386,3 +386,48 @@ def test_a_fold_map_carries_its_grouping_and_the_inner_folds_a_fit_draws_keep_it
     for g in set(group[:18]):
         rows = [i for i in range(18) if group[i] == g]
         assert len({int(inner.fold[i]) for i in rows}) == 1
+
+
+# ---- blocks --------------------------------------------------------------------------------------
+
+GRID_XY = np.column_stack([np.repeat(np.arange(1, 5), 4), np.tile(np.arange(1, 5), 4)])
+
+
+def test_blocks_are_cut_by_halving_at_the_median_of_the_widest_column():
+    assert kd_blocks(GRID_XY, 4).tolist() == [1, 1, 2, 2] * 2 + [3, 3, 4, 4] * 2
+    assert kd_blocks(GRID_XY, 2).tolist() == [1] * 8 + [2] * 8
+    assert sorted(np.bincount(kd_blocks(GRID_XY, 3))[1:].tolist()) == [5, 5, 6]
+    tall = np.column_stack([np.tile([1, 2], 8), np.arange(1, 17) * 100])
+    assert kd_blocks(tall, 4).tolist() == [1] * 4 + [2] * 4 + [3] * 4 + [4] * 4
+    assert kd_blocks(np.ones((6, 1)), 3).tolist() == [1, 1, 2, 2, 3, 3]
+    for v in range(2, 10):
+        sizes = np.bincount(kd_blocks(GRID_XY, v))[1:]
+        assert len(sizes) == v and sizes.max() - sizes.min() <= 1
+
+
+def test_block_cv_and_env_cv_hold_a_block_of_units_out_whole():
+    units = tuple(f"u{i:02d}" for i in range(24))
+    y = Response(values=np.zeros((24, 1)), units=units, variables=("a",))
+    tg = {"x": [float(i // 4 + 1) for i in range(24)], "y": [float(i % 4 + 1) for i in range(24)],
+          "elevation": [1000.0 * (i + 1) / 7 for i in range(24)]}
+    blocks = resolve_folds(block_cv(["x", "y"], v=4), y, tg, spec())
+    assert blocks.v == 4 and blocks.grouped
+    assert np.bincount(blocks.fold)[1:].tolist() == [6, 6, 6, 6]
+    assert blocks.group == tuple(str(b) for b in blocks.fold)
+    as_array = resolve_folds(block_cv(np.column_stack([tg["x"], tg["y"]]), v=4), y, tg, spec())
+    assert as_array.fold.tolist() == blocks.fold.tolist()
+    env = resolve_folds(env_cv(["x", "elevation"], v=3), y, tg, spec())
+    assert env.v == 3
+    with pytest.raises(ValueError, match="needs the columns"):
+        block_cv(None)
+    with pytest.raises(ValueError, match="between 2 and the 24"):
+        resolve_folds(block_cv(["x"], v=30), y, tg, spec())
+
+
+def test_cv_stratifies_on_a_column_of_the_targets_when_asked_to():
+    units = tuple(f"u{i:02d}" for i in range(24))
+    y = Response(values=np.tile([[0.0], [1.0]], (12, 1)), units=units, variables=("a",))
+    tg = {"elevation": [500.0 + 100 * i for i in range(24)]}
+    got = resolve_folds(cv(v=4, strata=3, by="elevation"), y, tg, spec())
+    want = fold_map(y, v=4, strata=3, by=tg["elevation"])
+    assert got.fold.tolist() == want.fold.tolist()

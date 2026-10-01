@@ -44,7 +44,7 @@ SECTIONS = (
         title="Python: the split and the cells",
         desc="One fold map read by everything that scores, and the cells a score is defined on, "
              "computed with no model involved.",
-        names=("cv", "grouped_cv", "Resampling", "as_resampling", "resolve_folds", "fold_map",
+        names=("cv", "grouped_cv", "block_cv", "env_cv", "Resampling", "as_resampling", "resolve_folds", "fold_map",
                "scorable_cells", "align_folds", "as_response", "Response", "Folds", "Cells",
                "PRESENCE_ABSENCE", "positive_weights"),
     ),

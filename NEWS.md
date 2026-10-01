@@ -2,6 +2,12 @@
 
 ## New
 
+* `block_cv()` and `env_cv()` hold a block of targets out whole, cut on columns of `targets` by
+  halving at the median of the widest column, in space or, on scaled columns, in predictor space.
+  Nothing is drawn, so R and Python return the same blocks, pinned in `blocks.csv`. `cv(by = )`
+  stratifies on a column of `targets` instead of the richness of the response, which is biomod2's
+  `strat` strategy.
+
 * `table_metric()` reads biomod2's evaluation statistics off the table of decisions against
   observations: `pod`, `pofd`, `far`, `sr`, `accuracy`, `bias`, `or`, `orss`, `csi` and `ets`, at
   the cut of any rule of `decision_threshold()` or at one given. Each is registered by name, so

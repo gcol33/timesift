@@ -22,12 +22,12 @@ from .representation import (DAY_LEVEL_STATS, GRAINS, TimesiftMatrix, _check_bin
                              _check_stats, _columns, _format_duration, _parse_duration,
                              _parse_year_start, _unit_names, bind_channels, grain_matrix,
                              lookback_matrix)
-from .response import Folds, fold_map
+from .response import Folds, block_folds, fold_map
 from .select import column_names, select_columns
 
 __all__ = [
     "Representation", "Resampling", "Sift", "TimesiftSpec", "as_resampling", "as_sift",
-    "auto_grains", "build_representation", "cv", "expand_sift", "grain", "grains", "grouped_cv",
+    "auto_grains", "block_cv", "build_representation", "cv", "env_cv", "expand_sift", "grain", "grains", "grouped_cv",
     "lookback", "lookbacks", "multigrain", "n_targets", "native", "resolve_folds",
     "target_labels",
 ]
@@ -189,11 +189,40 @@ class Resampling:
     strata: int = 5
     group: str | None = None
     folds: object = None
+    by: object = None
+    scale: bool = False
 
 
-def cv(v: int = 10, seed: int = 1, strata: int = 5) -> Resampling:
-    """Hold out single targets, balanced within equal-count strata of the response."""
-    return Resampling(kind="cv", v=_whole(v, "v"), seed=seed, strata=_whole(strata, "strata"))
+def cv(v: int = 10, seed: int = 1, strata: int = 5, by=None) -> Resampling:
+    """Hold out single targets, balanced within equal-count strata of the response.
+
+    ``by`` stratifies on a numeric column of ``targets`` instead of the richness of the response.
+    """
+    return Resampling(kind="cv", v=_whole(v, "v"), seed=seed, strata=_whole(strata, "strata"),
+                      by=by)
+
+
+def block_cv(by, v: int = 4) -> Resampling:
+    """Hold out a block of targets whole, the blocks cut on the columns ``by`` of ``targets``.
+
+    The units are split at the median of the column with the widest range, the lower share going
+    to the left, and each part is cut again until there are ``v`` of them, so a block holds as many
+    units as another to within one. Nothing is drawn. Under the nested selection the inner folds
+    keep blocks whole too, so ``inner`` is at most ``v - 1``. ``by`` is column names, or a numeric
+    array with one row per target.
+    """
+    return _block_resampling("block_cv", by, v, False)
+
+
+def env_cv(by, v: int = 4) -> Resampling:
+    """As ``block_cv``, on columns centred and scaled first: blocks of predictor space."""
+    return _block_resampling("env_cv", by, v, True)
+
+
+def _block_resampling(kind: str, by, v: int, scale: bool) -> Resampling:
+    if by is None:
+        raise ValueError(f"`{kind}()` needs the columns the blocks are cut on")
+    return Resampling(kind=kind, v=_whole(v, "v"), seed=0, strata=1, by=by, scale=scale)
 
 
 def grouped_cv(group, v: int = 10, seed: int = 1) -> Resampling:
@@ -220,14 +249,31 @@ def resolve_folds(resampling, y, targets, spec) -> Folds:
     r = as_resampling(resampling)
     if r.kind == "given":
         return Folds.coerce(r.folds, y.units).align(y.units)
+    if r.kind in ("block_cv", "env_cv"):
+        return block_folds(_by_matrix(r, targets, r.kind + "()"), r.v, y.units, scale=r.scale)
     if r.kind == "cv":
-        return fold_map(y, v=r.v, seed=r.seed, strata=r.strata)
+        by = None
+        if r.by is not None:
+            by = _by_matrix(r, targets, "cv()")
+            if by.shape[1] != 1:
+                raise ValueError("`by` of cv() is one numeric column of `targets`")
+            by = by[:, 0]
+        return fold_map(y, v=r.v, seed=r.seed, strata=r.strata, by=by)
     named = select_columns(column_names(targets), r.group, "`group` of grouped_cv()")
     if len(named) != 1:
         raise ValueError(f"`group` of grouped_cv() names one column of `targets`, got "
                          f"{len(named)}")
     return fold_map(y, v=r.v, seed=r.seed, strata=r.strata,
                     group=[str(g) for g in targets[named[0]]])
+
+
+def _by_matrix(r: Resampling, targets, what: str) -> np.ndarray:
+    """The columns a resampling cuts or stratifies on, one row per target."""
+    if isinstance(r.by, str) or (isinstance(r.by, (list, tuple)) and r.by
+                                 and all(isinstance(b, str) for b in r.by)):
+        named = select_columns(column_names(targets), r.by, f"`by` of {what}")
+        return np.column_stack([np.asarray(targets[c], dtype=np.float64) for c in named])
+    return np.asarray(r.by, dtype=np.float64)
 
 
 # ---- building ----------------------------------------------------------------------------------

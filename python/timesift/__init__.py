@@ -40,8 +40,8 @@ from .select import column_names, select_columns
 from .selection import Selection, select_grain
 from .simulate import Simulation, simulate_records
 from .specs import (Representation, Resampling, Sift, TimesiftSpec, as_resampling, as_sift,
-                    auto_grains, build_representation, cv, expand_sift, grain, grains,
-                    grouped_cv, lookback, lookbacks, multigrain, n_targets, native,
+                    auto_grains, block_cv, build_representation, cv, env_cv, expand_sift, grain,
+                    grains, grouped_cv, lookback, lookbacks, multigrain, n_targets, native,
                     resolve_folds, target_labels)
 from .stack import (SPREAD_STATISTICS, EnsembleSpec, Stack, ensemble, ensemble_combine,
                     ensemble_fit, ensemble_spread)
@@ -86,9 +86,9 @@ __all__ = [
     "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "additive", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
     "average_precision", "boyce_index",
-    "bind_channels", "boosting", "build_representation", "calendar_channels", "candidate_table", "cnn",
+    "bind_channels", "block_cv", "boosting", "build_representation", "calendar_channels", "candidate_table", "cnn",
     "cohen_kappa", "column_names", "coverage", "cv", "decision_threshold", "digest_array", "discriminant",
-    "elasticnet", "envelope",
+    "elasticnet", "envelope", "env_cv",
     "ensemble", "ensemble_combine", "ensemble_fit", "ensemble_spread", "ensemble_weights",
     "expand_sift", "feature_matrix", "fit_learner", "flatten", "fold_map", "forest",
     "get_learner", "grain", "grain_contrasts",

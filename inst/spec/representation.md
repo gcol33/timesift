@@ -698,6 +698,17 @@ takes one value. Both languages evaluate `from_i` in that order of operations, w
 makes their windows agree to the last place. `metric_cases.csv` carries a case of 25 units for it,
 the other cases being too small to hold a unit in most windows.
 
+`blocks_input.csv` and `blocks.csv` hold 23 units on three columns, with ties in two of them, and
+the block each unit lands in under five cuts: `block_cv()` on two columns into four, three and five
+blocks, on one column into two, and `env_cv()` on three scaled columns into four. A block is cut by
+halving. With `k` blocks to make from `n` units, the left part takes `k %/% 2` of the blocks and
+`floor((2 n (k %/% 2) + k) / (2 k))` of the units, the units being ordered by the column of widest
+range (the first on a tie in range) and by order of arrival where tied on it. Blocks are numbered in
+the order the halving makes them, left before right, and the fold of a unit is its block. `env_cv()`
+centres each column and divides by its standard deviation with `n - 1` first, and a column of no
+spread becomes zero. The resulting map is grouped by block, so a split drawn inside a fold keeps a
+block whole.
+
 `contrast_cells.csv` and `contrast.csv` hold a fixed table of per-cell scores for two arms, with
 cells one arm scored and the other did not, and the paired contrast read off it. No model is
 involved: the pairing, the per-variable mean, the interval on Student's t with one degree of

@@ -197,6 +197,58 @@ def fold_map(y: Response, v: int = 10, seed: int = 1, strata: int = 5, by=None,
                  units=y.units, grouped=True, group=tuple(key.tolist()))
 
 
+def kd_blocks(x, v: int) -> np.ndarray:
+    """``v`` blocks of equal count to within one, by halving at the median of the widest column.
+
+    Block labels run from 1 in the order the halving reaches them. The integer split point rounds
+    half up, the first column wins a tie in range, and units tied on a column keep their order of
+    arrival, which is what makes the R side return the same labels.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    if x.ndim == 1:
+        x = x[:, None]
+    label = np.zeros(x.shape[0], dtype=np.int64)
+    made = [0]
+
+    def cut(idx: np.ndarray, k: int) -> None:
+        if k == 1:
+            made[0] += 1
+            label[idx] = made[0]
+            return
+        k_left = k // 2
+        sub = x[idx]
+        widest = int(np.argmax(sub.max(axis=0) - sub.min(axis=0)))
+        ordered = idx[np.lexsort((idx, x[idx, widest]))]
+        n_left = (2 * len(idx) * k_left + k) // (2 * k)
+        n_left = min(max(n_left, k_left), len(idx) - (k - k_left))
+        cut(ordered[:n_left], k_left)
+        cut(ordered[n_left:], k - k_left)
+
+    cut(np.arange(x.shape[0]), int(v))
+    return label
+
+
+def block_folds(x, v: int, units, scale: bool = False) -> Folds:
+    """A fold map whose folds are blocks of ``x``, one row per unit, held out whole.
+
+    ``scale`` centres and scales each column first, as an environmental split wants.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    if x.ndim == 1:
+        x = x[:, None]
+    if not np.isfinite(x).all():
+        raise ValueError("blocks are cut on numeric columns without missing values")
+    if v < 2 or v > x.shape[0]:
+        raise ValueError(f"`v` must be between 2 and the {x.shape[0]} units, got {v}")
+    if scale:
+        sd = x.std(axis=0, ddof=1)
+        safe = np.where(np.isfinite(sd) & (sd > 0), sd, 1.0)
+        x = np.where(np.isfinite(sd) & (sd > 0), (x - x.mean(axis=0)) / safe, 0.0)
+    block = kd_blocks(x, v)
+    return Folds(fold=block, units=tuple(units), grouped=True,
+                 group=tuple(str(b) for b in block))
+
+
 def _deal_response(yj: np.ndarray, v: int, seed: int, group=None) -> np.ndarray:
     """The deal for one response: over the groups where there is a grouping, and stratified on
     the response, so a rare outcome is spread over the folds as evenly as its count allows."""
