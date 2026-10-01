@@ -101,3 +101,44 @@ test_that("a grid says what it cannot search", {
   expect_error(tune(k_learner(), list(k = 1:2), inner = 1L), "2 or more")
   expect_error(tune("nope", list(k = 1)), "nope")
 })
+
+test_that("a learner with no grid of its own is searched over the one registered for it", {
+  d <- tune_data()
+  columns <- ncol(timesift:::.flatten(d$x))
+  grids <- timesift:::.default_grids()
+  expect_true(all(names(grids) %in% tunings()))
+
+  forest_grid <- timesift:::.registered_grid(forest(), d$x)
+  expect_equal(forest_grid$mtry, seq_len(min(10L, columns)))
+  fit <- fit_learner(tune(forest(trees = 10L), inner = 3L), d$x, d$y)
+  expect_equal(nrow(fit$model$table), min(10L, columns))
+
+  gbm <- timesift:::.registered_grid(boosting(), d$x)
+  expect_equal(gbm, list(trees = c(500L, 1000L, 2500L), depth = c(2L, 5L, 8L),
+                         shrinkage = c(0.001, 0.01, 0.1)))
+  xgb <- timesift:::.registered_grid(boosting(newton = TRUE), d$x)
+  expect_equal(xgb$shrinkage, c(0.3, 0.4))
+  expect_equal(xgb$colsample, c(0.6, 0.8))
+  expect_equal(timesift:::.registered_grid(mars(), d$x)$nprune,
+               2:max(21L, 2L * columns + 1L))
+  expect_equal(timesift:::.registered_grid(envelope(), d$x)$quantile,
+               c(0, 0.0125, 0.025, 0.05, 0.1))
+  expect_equal(fit_learner(tune(envelope(), inner = 3L), d$x, d$y)$model$table$settings,
+               sprintf("quantile = %s", c("0", "0.0125", "0.025", "0.05", "0.1")))
+  expect_equal(timesift:::.registered_grid(mlp(), d$x)$hidden, list(2L, 4L, 6L, 8L))
+
+  expect_error(tune(elasticnet()), "no grid is registered for the elasticnet learner")
+})
+
+test_that("a grid can be registered for a learner of one's own, as a list or as a function", {
+  d <- tune_data()
+  register_tuning("kl", list(k = 1:5), overwrite = TRUE)
+  on.exit(.tuning_reg$remove("kl"), add = TRUE)
+  expect_true("kl" %in% tunings())
+  expect_equal(fit_learner(tune(k_learner(), inner = 3L), d$x, d$y)$model$chosen$k, 3L)
+  register_tuning("kl", function(learner, x) list(k = c(2L, 3L)), overwrite = TRUE)
+  fit <- fit_learner(tune(k_learner(), inner = 3L), d$x, d$y)
+  expect_equal(nrow(fit$model$table), 2L)
+  expect_error(register_tuning("kl", 1:3, overwrite = TRUE), "named list")
+  expect_error(register_tuning("kl", list(k = 1)), "already registered")
+})

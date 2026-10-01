@@ -113,6 +113,7 @@ reference:
   - learner
   - register_learner
   - tune
+  - register_tuning
 - title: The split and the cells
   desc: |
     One fold map read by everything that scores, and the cells a score is defined on, computed with no model involved.

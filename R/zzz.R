@@ -21,6 +21,11 @@ utils::globalVariables("self")
 
   register_response("presence_absence", .presence_absence)
 
+  grids <- .default_grids()
+  for (name in names(grids)) {
+    register_tuning(name, grids[[name]])
+  }
+
   register_learner("elasticnet", elasticnet)
   register_learner("stepwise", stepwise)
   register_learner("forest", forest)

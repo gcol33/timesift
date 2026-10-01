@@ -18,8 +18,17 @@
 #' the `settings` column of the candidate table of a run, which reads the model fitted on all
 #' targets.
 #'
+#' With `grid` left unset the learner is searched over the grid registered under its name by
+#' [register_tuning()], which for the learners that ship is the one `BIOMOD_Tuning()` searches:
+#' `mtry` of a [forest()] from 1 to the smaller of 10 and the number of columns; `trees`, `depth`
+#' and `shrinkage` of a gbm-style [boosting()], `shrinkage` and `colsample` of the second-order one;
+#' `degree` and `nprune` of [mars()]; `degree` of [discriminant()]; `regmult` of [maxnet()];
+#' `quantile` of [envelope()]; and the layer width of [mlp()] at 2, 4, 6 and 8. biomod2's weight
+#' decay is a training setting here, which [train_control()] holds and a grid does not reach.
+#'
 #' @param learner A [learner()], or the name of a registered one.
-#' @param grid A named list of values to try, one element per setting.
+#' @param grid A named list of values to try, one element per setting, or `NULL` for the grid
+#'   registered for the learner.
 #' @param metric The registered metric, or a function of `(y, p)`, a setting is scored by. Left
 #'   unset it is the response head's own.
 #' @param inner Number of inner folds.
@@ -32,16 +41,23 @@
 #' tuned
 #'
 #' @export
-tune <- function(learner, grid, metric = NULL, inner = 5L, seed = 1L) {
+tune <- function(learner, grid = NULL, metric = NULL, inner = 5L, seed = 1L) {
   base <- .as_learner(learner)
   .check_count(inner, "inner", 2L)
-  points <- .tune_points(base, grid)
+  if (is.null(grid) && !.tuning_reg$has(base$name)) {
+    stop("no grid is registered for the ", base$name, " learner. Give `grid`, or register one ",
+         "with register_tuning(). Registered: ", .listing(tunings()), ".", call. = FALSE)
+  }
+  if (!is.null(grid)) {
+    .tune_points(base, grid)
+  }
   if (!is.null(metric)) {
     .as_metric(metric)
   }
   inner <- as.integer(inner)
   fit <- function(x, y, head, group = NULL, control = NULL, ...) {
     given <- list(...)
+    points <- .tune_points(base, grid %||% .registered_grid(base, x))
     search <- .tune_search(base, points, x, y, head, control, group, given, metric, inner, seed)
     best <- points[[search$best]]
     kept <- given[setdiff(names(given), names(best))]
@@ -123,4 +139,62 @@ tune <- function(learner, grid, metric = NULL, inner = 5L, seed = 1L) {
 .chosen_settings <- function(fit) {
   model <- fit$model
   if (inherits(model, "timesift_tuned")) .tune_label(model$chosen) else NA_character_
+}
+
+.tuning_reg <- .new_registry("tuning grid")
+
+#' Register the grid a learner is tuned over
+#'
+#' Makes `tune(learner)` search `grid` when it is given no grid of its own. The grids of the
+#' learners that ship are registered the same way.
+#'
+#' @param name Name of the learner the grid belongs to, as it reports under.
+#' @param grid A named list of values to try, or a function of `(learner, x)` returning one, where
+#'   `x` is the representation the learner is fitted on. The second form is for a grid that depends
+#'   on the data, as the number of columns does, or on a setting the learner carries.
+#' @param overwrite Replace an existing registration.
+#'
+#' @return The grid, invisibly.
+#'
+#' @examples
+#' register_tuning("flat_glm", list(thresh = c(1e-4, 1e-6)), overwrite = TRUE)
+#' tunings()
+#'
+#' @export
+register_tuning <- function(name, grid, overwrite = FALSE) {
+  if (!is.function(grid) && !(is.list(grid) && length(grid) && !is.null(names(grid)))) {
+    stop("a tuning grid is a named list of values, or a function of (learner, x) returning one.",
+         call. = FALSE)
+  }
+  .tuning_reg$set(name, grid, overwrite)
+}
+
+#' @rdname register_tuning
+#' @export
+tunings <- function() .tuning_reg$names()
+
+.registered_grid <- function(base, x) {
+  grid <- .tuning_reg$get(base$name)
+  if (is.function(grid)) grid(base, x) else grid
+}
+
+# The grids BIOMOD_Tuning() searches, on the settings the learners carry.
+.default_grids <- function() {
+  list(
+    forest = function(learner, x) list(mtry = seq_len(min(10L, ncol(.flatten(x))))),
+    boosting = function(learner, x) {
+      if (isTRUE(learner$params$newton)) {
+        list(trees = 50L, depth = 1L, shrinkage = c(0.3, 0.4), min_leaf = 1, subsample = 0.5,
+             colsample = c(0.6, 0.8), gamma = 0)
+      } else {
+        list(trees = c(500L, 1000L, 2500L), depth = c(2L, 5L, 8L),
+             shrinkage = c(0.001, 0.01, 0.1))
+      }
+    },
+    mars = function(learner, x) list(degree = 1:2, nprune = 2:max(21L, 2L * ncol(.flatten(x)) + 1L)),
+    discriminant = list(degree = 1:2),
+    maxnet = list(regmult = c(0.5, 1)),
+    envelope = list(quantile = c(0, 0.0125, 0.025, 0.05, 0.1)),
+    mlp = list(hidden = list(2L, 4L, 6L, 8L))
+  )
 }

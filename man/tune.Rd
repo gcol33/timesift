@@ -4,12 +4,13 @@
 \alias{tune}
 \title{Tune a learner's settings on the training units}
 \usage{
-tune(learner, grid, metric = NULL, inner = 5L, seed = 1L)
+tune(learner, grid = NULL, metric = NULL, inner = 5L, seed = 1L)
 }
 \arguments{
 \item{learner}{A \code{\link[=learner]{learner()}}, or the name of a registered one.}
 
-\item{grid}{A named list of values to try, one element per setting.}
+\item{grid}{A named list of values to try, one element per setting, or \code{NULL} for the grid
+registered for the learner.}
 
 \item{metric}{The registered metric, or a function of \verb{(y, p)}, a setting is scored by. Left
 unset it is the response head's own.}
@@ -40,6 +41,14 @@ first combination in the grid.
 What was chosen is recorded: on the fitted model as \verb{$model$chosen} and \verb{$model$table}, and in
 the \code{settings} column of the candidate table of a run, which reads the model fitted on all
 targets.
+
+With \code{grid} left unset the learner is searched over the grid registered under its name by
+\code{\link[=register_tuning]{register_tuning()}}, which for the learners that ship is the one \code{BIOMOD_Tuning()} searches:
+\code{mtry} of a \code{\link[=forest]{forest()}} from 1 to the smaller of 10 and the number of columns; \code{trees}, \code{depth}
+and \code{shrinkage} of a gbm-style \code{\link[=boosting]{boosting()}}, \code{shrinkage} and \code{colsample} of the second-order one;
+\code{degree} and \code{nprune} of \code{\link[=mars]{mars()}}; \code{degree} of \code{\link[=discriminant]{discriminant()}}; \code{regmult} of \code{\link[=maxnet]{maxnet()}};
+\code{quantile} of \code{\link[=envelope]{envelope()}}; and the layer width of \code{\link[=mlp]{mlp()}} at 2, 4, 6 and 8. biomod2's weight
+decay is a training setting here, which \code{\link[=train_control]{train_control()}} holds and a grid does not reach.
 }
 \examples{
 tuned <- tune(forest(), list(mtry = c(2, 4), min_node = c(1, 5)), inner = 3L)

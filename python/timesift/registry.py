@@ -46,6 +46,7 @@ class Registry:
 LEARNERS = Registry("learner")
 RESPONSES = Registry("response")
 METRICS = Registry("metric")
+TUNINGS = Registry("tuning grid")
 
 
 def resolve_metric(metric, default: str | None = None):
@@ -107,6 +108,26 @@ def register_metric(name: str, fn: Callable, overwrite: bool = False):
 def metrics() -> list[str]:
     """The metrics registered under this session."""
     return METRICS.names()
+
+
+def register_tuning(name: str, grid, overwrite: bool = False):
+    """Register the grid a learner is tuned over when ``tune`` is given none.
+
+    ``name`` is the learner's, as it reports under. ``grid`` is a dict of the values to try, or a
+    function of ``(learner, x)`` returning one, where ``x`` is the representation the learner is
+    fitted on: the second form is for a grid that depends on the data, as the number of columns
+    does, or on a setting the learner carries. The grids of the learners that ship are registered
+    the same way.
+    """
+    if not callable(grid) and not (isinstance(grid, dict) and grid):
+        raise ValueError("a tuning grid is a dict of values, or a function of (learner, x) "
+                         "returning one")
+    return TUNINGS.set(name, grid, overwrite)
+
+
+def tunings() -> list[str]:
+    """The learners a grid is registered for."""
+    return TUNINGS.names()
 
 
 RESPONSE_FIELDS = ("prepare", "activation", "loss", "metric", "cells")

@@ -84,7 +84,8 @@ SECTIONS = (
         title="Python: extending",
         desc="The response head and the metric are registrations, never a fork of the fitting "
              "code.",
-        names=("register_learner", "register_metric", "register_response", "learners", "metrics",
+        names=("register_learner", "register_metric", "register_response", "register_tuning", "tunings",
+               "learners", "metrics",
                "responses", "get_learner", "resolve_metric"),
     ),
     dict(

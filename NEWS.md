@@ -6,6 +6,9 @@
   cross-validation inside the units it is handed and fits the best one. Inside a run each outer
   fold chooses from its own training units. What was chosen is on the fitted model and in the new
   `settings` column of the candidate table. This is biomod2's `BIOMOD_Tuning()`. Both languages.
+  `tune(learner)` with no grid searches the one registered for it, which for `forest()`,
+  `boosting()`, `mars()`, `discriminant()`, `maxnet()`, `envelope()` and `mlp()` is the grid
+  `BIOMOD_Tuning()` searches, and `register_tuning()` adds a grid for a learner of one's own.
 
 * `response_curve()` varies one predictor of a fitted candidate across the range it takes while the
   others are held at the mean, median, minimum or maximum of their cells, and returns the

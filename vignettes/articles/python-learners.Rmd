@@ -443,7 +443,7 @@ parameter search stopped short of its tolerance is named in `stopped`.
 ## `tune()`
 
 ```python
-tune(learner, grid: dict, metric=None, inner: int = 5, seed: int = 1)
+tune(learner, grid: dict | None = None, metric=None, inner: int = 5, seed: int = 1)
 ```
 
 A learner that searches `grid` on the units it is fitted on and fits the best setting.
@@ -451,6 +451,14 @@ A learner that searches `grid` on the units it is fitted on and fits the best se
 The search is a cross-validation inside those units, so in a run the outer folds never see it:
 each fold chooses from its own training units, and the score it is then read at is not selected
 on. biomod2's `BIOMOD_Tuning()` searches a grid per algorithm by the same device.
+
+With `grid` left unset the learner is searched over the grid registered under its name by
+`register_tuning`, which for the learners that ship is the one `BIOMOD_Tuning()` searches:
+`mtry` of a forest from 1 to the smaller of 10 and the number of columns; `trees`,
+`depth` and `shrinkage` of a gbm-style boosting, `shrinkage` and `colsample` of the
+second-order one; `degree` and `nprune` of `mars`; `degree` of `discriminant`;
+`regmult` of `maxnet`; `quantile` of `envelope`; and the layer width of `mlp` at 2, 4,
+6 and 8. biomod2's weight decay is a training setting here, which the control holds.
 
 A learner's settings are the ones it carries as `params`. `grid` names some of them and
 gives the values to try, and the grid is every combination, the first setting varying fastest

@@ -109,3 +109,47 @@ def test_a_grid_says_what_it_cannot_search():
         tune(k_learner(), [1, 2, 3])
     with pytest.raises(ValueError, match="2 or more"):
         tune(k_learner(), {"k": [1, 2]}, inner=1)
+
+
+def test_a_learner_with_no_grid_of_its_own_is_searched_over_the_one_registered_for_it():
+    from timesift import (boosting, discriminant, elasticnet, envelope, mars, mlp, tunings)
+    from timesift.learners import flatten
+    from timesift.tune import _registered_grid, default_grids
+
+    x, y, _, _ = tune_data()
+    columns = flatten(x).shape[1]
+    assert set(default_grids()) <= set(tunings())
+    assert _registered_grid(forest(), x)["mtry"] == list(range(1, min(10, columns) + 1))
+    fit = fit_learner(tune(forest(trees=10), inner=3), x, y)
+    assert len(fit.model.table) == min(10, columns)
+
+    assert _registered_grid(boosting(), x) == {"trees": [500, 1000, 2500], "depth": [2, 5, 8],
+                                               "shrinkage": [0.001, 0.01, 0.1]}
+    xgb = _registered_grid(boosting(newton=True), x)
+    assert xgb["shrinkage"] == [0.3, 0.4] and xgb["colsample"] == [0.6, 0.8]
+    assert _registered_grid(mars(), x)["nprune"] == list(range(2, max(21, 2 * columns + 1) + 1))
+    assert _registered_grid(envelope(), x)["quantile"] == [0.0, 0.0125, 0.025, 0.05, 0.1]
+    labels = [r["settings"] for r in fit_learner(tune(envelope(), inner=3), x, y).model.table]
+    assert labels == [f"quantile = {q}" for q in ("0", "0.0125", "0.025", "0.05", "0.1")]
+    assert _registered_grid(mlp(), x)["hidden"] == [[2], [4], [6], [8]]
+    assert _registered_grid(discriminant(), x) == {"degree": [1, 2]}
+    with pytest.raises(ValueError, match="no grid is registered for the elasticnet learner"):
+        tune(elasticnet())
+
+
+def test_a_grid_can_be_registered_for_a_learner_of_ones_own_as_a_dict_or_as_a_function():
+    from timesift import register_tuning
+    from timesift.registry import TUNINGS
+
+    x, y, _, _ = tune_data()
+    register_tuning("kl", {"k": [1, 2, 3, 4, 5]}, overwrite=True)
+    try:
+        assert fit_learner(tune(k_learner(), inner=3), x, y).model.chosen == {"k": 3}
+        register_tuning("kl", lambda learner, x: {"k": [2, 3]}, overwrite=True)
+        assert len(fit_learner(tune(k_learner(), inner=3), x, y).model.table) == 2
+        with pytest.raises(ValueError, match="dict of values"):
+            register_tuning("kl", [1, 2], overwrite=True)
+        with pytest.raises(ValueError, match="already registered"):
+            register_tuning("kl", {"k": [1]})
+    finally:
+        TUNINGS.remove("kl")

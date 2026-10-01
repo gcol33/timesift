@@ -28,7 +28,7 @@ from .metrics import (TABLE_METRICS, average_precision, boyce_index, cohen_kappa
                       decision_threshold, kappa_score, model_agreement, roc_auc, table_metric, tss)
 from .occlusion import feature_matrix
 from .registry import (get_learner, learners, metrics, register_learner, register_metric,
-                       register_response, resolve_metric, responses)
+                       register_response, register_tuning, resolve_metric, responses, tunings)
 from .report import (candidate_table, ensemble_weights, occlusion, procedure_table,
                      summary)
 from .representation import (DAY_LEVEL_STATS, GRAINS, STATS, Coverage, TimesiftMatrix,
@@ -44,7 +44,7 @@ from .specs import (Representation, Resampling, Sift, TimesiftSpec, as_resamplin
                     auto_grains, block_cv, build_representation, cv, env_cv, expand_sift, grain,
                     grains, grouped_cv, lookback, lookbacks, multigrain, n_targets, native,
                     resolve_folds, target_labels)
-from .tune import Tuned, tune
+from .tune import Tuned, default_grids, tune
 from .stack import (SPREAD_STATISTICS, EnsembleSpec, Stack, ensemble, ensemble_combine,
                     ensemble_fit, ensemble_spread)
 
@@ -65,6 +65,9 @@ for _name in TABLE_METRICS:
     register_metric(_name, lambda y, p, _name=_name: table_metric(y, p, _name))
 
 register_response("presence_absence", PRESENCE_ABSENCE)
+
+for _name, _grid in default_grids().items():
+    register_tuning(_name, _grid)
 
 register_learner("elasticnet", elasticnet)
 register_learner("stepwise", stepwise)
@@ -100,9 +103,9 @@ __all__ = [
     "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "plot", "positive_weights",
     "procedure_table",
     "read_cells",
-    "read_folds", "read_response", "register_learner", "register_metric", "register_response",
+    "read_folds", "read_response", "register_learner", "register_metric", "register_response", "register_tuning",
     "rescnn", "resolve_folds", "response_curve", "resolve_metric", "responses", "roc_auc", "scorable_cells",
     "score_predictions", "select_columns", "table_metric",
     "select_grain", "simulate_records", "stepwise", "summary", "target_labels", "timesift", "timesift_set",
-    "train_control", "tree", "tss", "tune", "tss_inflation", "write_cells", "write_folds", "write_response",
+    "train_control", "tree", "tss", "tune", "tss_inflation", "tunings", "write_cells", "write_folds", "write_response",
 ]

@@ -8,11 +8,11 @@ from dataclasses import dataclass
 import numpy as np
 
 from .ladder import score_arm, variable_means
-from .learners import Learner, _call_fit, get_learner
-from .registry import resolve_metric
+from .learners import Learner, _call_fit, flatten, get_learner
+from .registry import TUNINGS, resolve_metric, tunings
 from .response import Response, fold_map
 
-__all__ = ["Tuned", "tune"]
+__all__ = ["Tuned", "default_grids", "tune"]
 
 
 @dataclass(frozen=True)
@@ -24,12 +24,20 @@ class Tuned:
     table: list
 
 
-def tune(learner, grid: dict, metric=None, inner: int = 5, seed: int = 1) -> Learner:
+def tune(learner, grid: dict | None = None, metric=None, inner: int = 5, seed: int = 1) -> Learner:
     """A learner that searches ``grid`` on the units it is fitted on and fits the best setting.
 
     The search is a cross-validation inside those units, so in a run the outer folds never see it:
     each fold chooses from its own training units, and the score it is then read at is not selected
     on. biomod2's ``BIOMOD_Tuning()`` searches a grid per algorithm by the same device.
+
+    With ``grid`` left unset the learner is searched over the grid registered under its name by
+    ``register_tuning``, which for the learners that ship is the one ``BIOMOD_Tuning()`` searches:
+    ``mtry`` of a forest from 1 to the smaller of 10 and the number of columns; ``trees``,
+    ``depth`` and ``shrinkage`` of a gbm-style boosting, ``shrinkage`` and ``colsample`` of the
+    second-order one; ``degree`` and ``nprune`` of ``mars``; ``degree`` of ``discriminant``;
+    ``regmult`` of ``maxnet``; ``quantile`` of ``envelope``; and the layer width of ``mlp`` at 2, 4,
+    6 and 8. biomod2's weight decay is a training setting here, which the control holds.
 
     A learner's settings are the ones it carries as ``params``. ``grid`` names some of them and
     gives the values to try, and the grid is every combination, the first setting varying fastest
@@ -42,11 +50,17 @@ def tune(learner, grid: dict, metric=None, inner: int = 5, seed: int = 1) -> Lea
     base = get_learner(learner)
     if not isinstance(inner, (int, np.integer)) or isinstance(inner, bool) or inner < 2:
         raise ValueError(f"`inner` is a number of folds of 2 or more, got {inner!r}")
-    points = _points(base, grid)
+    if grid is None and not TUNINGS.has(base.name):
+        raise ValueError(f"no grid is registered for the {base.name} learner. Give `grid`, or "
+                         f"register one with register_tuning(). Registered: "
+                         f"{', '.join(tunings())}")
+    if grid is not None:
+        _points(base, grid)
     if metric is not None:
         resolve_metric(metric)
 
     def fit(x, y, head=None, control=None, group=None, variables=None, **given):
+        points = _points(base, grid if grid is not None else _registered_grid(base, x))
         search = _search(base, points, x, y, head, control, group, variables, given, metric,
                          int(inner), seed)
         best = points[search["best"]]
@@ -59,6 +73,31 @@ def tune(learner, grid: dict, metric=None, inner: int = 5, seed: int = 1) -> Lea
 
     return Learner(name=base.name, fit=fit, predict=predict, needs=base.needs,
                    params=dict(base.params), data=base.data, reads=base.reads, multi=base.multi)
+
+
+def _registered_grid(base: Learner, x) -> dict:
+    grid = TUNINGS.get(base.name)
+    return grid(base, x) if callable(grid) else grid
+
+
+def default_grids() -> dict:
+    """The grids ``BIOMOD_Tuning()`` searches, on the settings the learners carry."""
+    def forest_grid(learner, x):
+        return {"mtry": list(range(1, min(10, flatten(x).shape[1]) + 1))}
+
+    def boosting_grid(learner, x):
+        if learner.params.get("newton"):
+            return {"trees": [50], "depth": [1], "shrinkage": [0.3, 0.4], "min_leaf": [1.0],
+                    "subsample": [0.5], "colsample": [0.6, 0.8], "gamma": [0.0]}
+        return {"trees": [500, 1000, 2500], "depth": [2, 5, 8], "shrinkage": [0.001, 0.01, 0.1]}
+
+    def mars_grid(learner, x):
+        return {"degree": [1, 2], "nprune": list(range(2, max(21, 2 * flatten(x).shape[1] + 1) + 1))}
+
+    return {"forest": forest_grid, "boosting": boosting_grid, "mars": mars_grid,
+            "discriminant": {"degree": [1, 2]}, "maxnet": {"regmult": [0.5, 1.0]},
+            "envelope": {"quantile": [0.0, 0.0125, 0.025, 0.05, 0.1]},
+            "mlp": {"hidden": [[2], [4], [6], [8]]}}
 
 
 def _points(base: Learner, grid: dict) -> list:
