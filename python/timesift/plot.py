@@ -16,6 +16,7 @@ import importlib.util
 import numpy as np
 
 from ._stats import t_ppf
+from .curves import ResponseCurve
 from .fit import Timesift
 from .ladder import Ladder, mean_se, per_variable, scored_cells, variable_means
 from .selection import Selection
@@ -48,8 +49,10 @@ def plot(x, col=None, interval: bool = True, ax=None, **kwargs) -> list[dict]:
         return _plot_run(x, col, interval, ax, **kwargs)
     if isinstance(x, Selection):
         return _plot_selection(x, col, ax, **kwargs)
-    raise TypeError(f"plot() draws a grain_ladder(), a timesift() or a select_grain() result, "
-                    f"got {type(x).__name__}")
+    if isinstance(x, ResponseCurve):
+        return _plot_curve(x, col, ax, **kwargs)
+    raise TypeError(f"plot() draws a grain_ladder(), a timesift(), a select_grain() or a "
+                    f"response_curve() result, got {type(x).__name__}")
 
 
 def _plot_ladder(x: Ladder, col, interval, ax, **kwargs):
@@ -89,6 +92,34 @@ def _plot_run(x: Timesift, col, interval, ax, **kwargs):
     _draw_curves(stat, col, interval, "representation", x.metric, ax, rule, **kwargs)
     return [dict(learner=s["arm"], representation=s["level"], score=s["score"], se=s["se"])
             for s in stat]
+
+
+def _plot_curve(x: ResponseCurve, col, ax, variable=None, **kwargs):
+    """One line per response against the value of the predictor; for two predictors, the
+    prediction of ``variable`` (the first by default) as an image over the grid of the two."""
+    import matplotlib.pyplot as plt
+
+    if ax is None:
+        _, ax = plt.subplots()
+    rows = []
+    if x.value_with is None:
+        for j, name in enumerate(x.variable):
+            rows.extend(dict(value=float(v), variable=name, prediction=float(p))
+                        for v, p in zip(x.value, x.prediction[:, j]))
+        for j, c in enumerate(_colours(col, len(x.variable))):
+            ax.plot(x.value, x.prediction[:, j], color=c, linewidth=2, label=x.variable[j])
+        ax.set(xlabel=x.predictor, ylabel="prediction", **kwargs)
+        ax.legend(frameon=False)
+        return rows
+    j = 0 if variable is None else list(x.variable).index(variable)
+    values, withs = np.unique(x.value), np.unique(x.value_with)
+    grid = x.prediction[:, j].reshape(len(withs), len(values))
+    ax.pcolormesh(values, withs, grid, shading="auto")
+    ax.set(xlabel=x.predictor, ylabel=x.with_label, title=x.variable[j], **kwargs)
+    rows.extend(dict(value=float(v), value_with=float(w), variable=x.variable[j],
+                     prediction=float(p))
+                for v, w, p in zip(x.value, x.value_with, x.prediction[:, j]))
+    return rows
 
 
 def _plot_selection(x: Selection, col, ax, **kwargs):

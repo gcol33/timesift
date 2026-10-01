@@ -147,13 +147,13 @@ test_that("a held-back bin moves whole and leaves the calendar where it is", {
   train <- 11:20
   set.seed(1)
   for (s in c("permute", "fold_mean", "unit_mean")) {
-    out <- timesift:::.occlude(x, test, train, 3L, "bin", s, held)
+    out <- timesift:::.occlude(x, test, train, 3L, "bin", s, held, sample.int(length(test)))
     expect_identical(out[, , c("year_sin", "year_cos")], x[test, , c("year_sin", "year_cos")],
                      info = s)
     expect_identical(out[, -3L, ], x[test, -3L, ], info = s)
   }
   # Every unit is shown one unit's whole bin, never channels drawn from different units.
-  out <- timesift:::.occlude(x, test, train, 3L, "bin", "permute", held)
+  out <- timesift:::.occlude(x, test, train, 3L, "bin", "permute", held, sample.int(length(test)))
   shown <- out[, 3L, held]
   source <- x[test, 3L, held]
   from <- vapply(seq_len(nrow(shown)), function(u) {
@@ -162,4 +162,73 @@ test_that("a held-back bin moves whole and leaves the calendar where it is", {
   }, integer(1L))
   expect_false(anyNA(from))
   expect_setequal(from, seq_along(test))
+})
+
+warm_reader <- function(name, scale = 1) {
+  learner(
+    name = name, multi = "joint",
+    fit = function(x, y, ...) list(),
+    predict = function(model, x) {
+      s <- scale * rowMeans(matrix(x[, , "warm_day"], nrow = dim(x)[1L]))
+      cbind(s, -s)
+    })
+}
+
+test_that("importance is one minus the correlation of the predictions with and without the part", {
+  sim <- planted_series(n_unit = 40L, seed = 66L)
+  y <- matrix(stats::rbinom(length(sim$warmth) * 2L, 1L,
+                            stats::plogis(3 * c(sim$warmth, -sim$warmth))),
+              ncol = 2L, dimnames = list(sim$units, c("sp1", "sp2")))
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "month",
+                     stats = c("cold_day", "mean", "warm_day"))
+  lad <- grain_ladder(x, y, list(warm_only = warm_reader("warm_only")),
+                      folds = fold_map(y, v = 4L, seed = 6L), keep_fits = TRUE, verbose = FALSE)
+  oc <- occlusion(lad, x, y, "month|warm_only", over = "channel", permutations = 5L, seed = 4L)
+  expect_true("importance" %in% names(oc))
+  by_part <- vapply(split(oc$importance, oc$part), mean, numeric(1L))
+  # A channel the model never reads leaves its predictions where they were.
+  expect_equal(unname(by_part[c("cold_day", "mean")]), c(0, 0))
+  expect_gt(by_part[["warm_day"]], 0.3)
+  expect_lte(max(oc$importance), 2)
+
+  # A permutation of the warmest day shifts every unit's prediction onto another unit's, so the
+  # correlation can be written out by hand for one fold.
+  folds <- .as_folds(attr(lad, "folds"), rownames(y))
+  fit <- attr(lad, "fits")[["month|warm_only|1"]]
+  test <- which(folds == 1L)
+  set.seed(9L)
+  order <- sample.int(length(test))
+  base <- stats::predict(fit, .subset_units(x, test))
+  moved <- stats::predict(fit, .occlude(x, test, which(folds != 1L), 3L, "channel", "permute",
+                                        .unit_varying(x), order))
+  expect_equal(1 - stats::cor(base[, 1L], moved[, 1L]),
+               1 - stats::cor(base[order, 1L], base[, 1L]))
+})
+
+test_that("the ensemble is held back by channel through the members it combines", {
+  sim <- planted_series(n_unit = 40L, seed = 67L)
+  y <- matrix(stats::rbinom(length(sim$warmth) * 2L, 1L,
+                            stats::plogis(3 * c(sim$warmth, -sim$warmth))),
+              ncol = 2L, dimnames = list(sim$units, c("sp1", "sp2")))
+  targets <- data.frame(plot = sim$units, y, stringsAsFactors = FALSE)
+  run <- suppressWarnings(timesift(
+    targets, sim$readings, y = c("sp1", "sp2"), id = plot, time = t, x = temp,
+    models = list(a = warm_reader("a"), b = warm_reader("b", 2)),
+    sift = grains("month", stats = c("cold_day", "mean", "warm_day")),
+    resampling = cv(v = 3L), inner = NULL, ensemble = ensemble("mean"),
+    keep_fits = TRUE, verbose = FALSE))
+  oc <- occlusion(run, "ensemble", over = "channel", permutations = 3L, seed = 4L)
+  expect_identical(attr(oc, "arm"), "ensemble")
+  expect_setequal(unique(oc$part), c("cold_day", "mean", "warm_day"))
+  weight <- vapply(split(oc$weight, oc$part), mean, numeric(1L))
+  expect_identical(unname(weight[c("cold_day", "mean")]), c(0, 0))
+  expect_gt(weight[["warm_day"]], 0.05)
+
+  expect_error(occlusion(run, "ensemble", over = "bin"), "different bins")
+  no_stack <- suppressWarnings(timesift(
+    targets, sim$readings, y = c("sp1", "sp2"), id = plot, time = t, x = temp,
+    models = warm_reader("a"), sift = grains("month", stats = c("cold_day", "mean", "warm_day")),
+    resampling = cv(v = 3L), inner = NULL,
+    ensemble = FALSE, keep_fits = TRUE, verbose = FALSE))
+  expect_error(occlusion(no_stack, "ensemble", over = "channel"), "no ensemble")
 })

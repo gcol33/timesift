@@ -2,6 +2,19 @@
 
 ## New
 
+* `response_curve()` varies one predictor of a fitted candidate across the range it takes while the
+  others are held at the mean, median, minimum or maximum of their cells, and returns the
+  prediction, as biomod2's response curves do. A predictor is a channel (moved in every bin, as a
+  `static` column is), a bin of a one-channel representation, or one cell; a second predictor gives
+  a surface, and for the ensemble `spread = TRUE` adds the members' standard deviation and
+  interval. `plot()` draws it. Both languages.
+
+* `occlusion()` reports `importance` beside the fall in score: one minus the correlation of the
+  held-out predictions with and without the part, which is biomod2's variable importance and needs
+  no response. `occlusion(fit, "ensemble", over = "channel")` reads the ensemble, withholding a
+  channel from every member that carries it and combining their predictions by the run's stack.
+  Both languages.
+
 * `block_cv()` and `env_cv()` hold a block of targets out whole, cut on columns of `targets` by
   halving at the median of the widest column, in space or, on scaled columns, in predictor space.
   Nothing is drawn, so R and Python return the same blocks, pinned in `blocks.csv`. `cv(by = )`

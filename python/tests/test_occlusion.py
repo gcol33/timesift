@@ -196,10 +196,11 @@ def test_a_held_back_bin_moves_whole_and_leaves_the_calendar_where_it_is():
     sub = x.take_units(test)
     rng = np.random.default_rng(1)
     for s in ("permute", "fold_mean", "unit_mean"):
-        out = _occlude(x, sub, train, 2, "bin", s, rng, held).values
+        order = rng.permutation(10) if s == "permute" else None
+        out = _occlude(x, sub, train, 2, "bin", s, order, held).values
         assert np.array_equal(out[:, :, 3:], sub.values[:, :, 3:])
         assert np.array_equal(np.delete(out, 2, axis=1), np.delete(sub.values, 2, axis=1))
-    shown = _occlude(x, sub, train, 2, "bin", "permute", rng, held).values[:, 2, held]
+    shown = _occlude(x, sub, train, 2, "bin", "permute", rng.permutation(10), held).values[:, 2, held]
     source = sub.values[:, 2, held]
     matched = [np.flatnonzero((source == row).all(axis=1)) for row in shown]
     assert all(len(m) == 1 for m in matched)
@@ -222,3 +223,55 @@ def test_a_cell_the_mask_leaves_unscored_carries_no_weight():
     out = ladder_occlusion(lad, x, y, "month|elasticnet", permutations=2, seed=4)
     assert np.isnan(out["weight"][:, 1]).all()
     assert np.isfinite(out["weight"][:, 0]).any()
+
+
+def warm_reader(name="warm_only", scale=1.0):
+    def predict(model, x):
+        s = scale * x.channel("warm_day").mean(axis=1)
+        return np.column_stack([s, -s])
+
+    return Learner(name=name, multi="joint", fit=lambda x, y, **k: None, predict=predict)
+
+
+def test_importance_is_one_minus_the_correlation_of_the_predictions_with_and_without_the_part():
+    readings, y, _ = planted(n_unit=40, seed=66)
+    x = grain_matrix(readings, "id", "time", "value", grain="month",
+                     stats=["cold_day", "mean", "warm_day"])
+    lad = grain_ladder(x, y, {"warm_only": warm_reader()}, folds=fold_map(y, v=4, seed=6),
+                       keep_fits=True, verbose=False)
+    out = ladder_occlusion(lad, x, y, "month|warm_only", over="channel", permutations=5, seed=4)
+    by_part = dict(zip(out["part"], np.nanmean(out["importance"], axis=1)))
+    # A channel the model never reads leaves its predictions where they were.
+    assert abs(by_part["cold_day"]) < 1e-12 and abs(by_part["mean"]) < 1e-12
+    assert by_part["warm_day"] > 0.3
+    assert np.nanmax(out["importance"]) <= 2
+
+
+def test_the_ensemble_is_held_back_by_channel_through_the_members_it_combines():
+    from timesift import ensemble, grains, timesift
+    from timesift.report import occlusion
+
+    readings, y, _ = planted(n_unit=40, seed=67)
+    readings = {"plot": readings["id"], "time": readings["time"], "value": readings["value"]}
+    targets = {"plot": list(y.units), "sp0": y.values[:, 0].tolist(),
+               "sp1": y.values[:, 1].tolist()}
+    run = timesift(targets, readings, y=["sp0", "sp1"], id="plot", time="time", x="value",
+                   models=[warm_reader("a"), warm_reader("b", 2.0)],
+                   sift=grains("month", stats=["cold_day", "mean", "warm_day"]),
+                   resampling=fold_map(y, v=3, seed=2), inner=None,
+                   ensemble=ensemble("mean"), keep_fits=True, verbose=False)
+    out = occlusion(run, "ensemble", over="channel", permutations=3, seed=4)
+    assert set(out["part"]) == {"cold_day", "mean", "warm_day"}
+    weight = dict(zip(out["part"], np.nanmean(out["weight"], axis=1)))
+    assert weight["cold_day"] == 0 and weight["mean"] == 0
+    assert weight["warm_day"] > 0.05
+
+    with pytest.raises(ValueError, match="different bins"):
+        occlusion(run, "ensemble", over="bin")
+    alone = timesift(targets, readings, y=["sp0", "sp1"], id="plot", time="time", x="value",
+                     models=[warm_reader("a")],
+                     sift=grains("month", stats=["cold_day", "mean", "warm_day"]),
+                     resampling=fold_map(y, v=3, seed=2), inner=None, ensemble=False,
+                     keep_fits=True, verbose=False)
+    with pytest.raises(ValueError, match="no ensemble"):
+        occlusion(alone, "ensemble", over="channel")

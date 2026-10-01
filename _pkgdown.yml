@@ -144,6 +144,7 @@ reference:
   - tss_inflation
   - implied_skill
   - occlusion
+  - response_curve
 - title: The arrays themselves
   desc: |
     Readings in long form to a `[unit, bin, channel]` array, reachable without the fitting layer.

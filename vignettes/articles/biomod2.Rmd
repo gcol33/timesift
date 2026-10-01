@@ -261,6 +261,28 @@ grid of 100 cuts. `table_metric()` reads it at the cut of the `rule` given, `"yo
 so the statistics are comparable at one operating point. Every name is a registered metric, so
 `grain_ladder(metric = "csi")` reads it.
 
+## Variable importance
+
+biomod2's `bm_VariablesImportance()` permutes one predictor and reports one minus its correlation
+with the prediction made without the permutation. `occlusion()` does the same on the models a run
+kept per fold, on the units each held out, and reports it as `importance` beside the fall in
+score. A predictor is a bin of the representation, or with `over = "channel"` one statistic of it
+across the record, which is where a column named in `static` sits when the run has a record.
+`occlusion(fit, "ensemble", over = "channel")` reads the combination.
+
+## Response curves
+
+`response_curve()` is `bm_PlotResponseCurves()`: one predictor is moved across the range it takes
+while the others sit at their `fixed` summary (`"mean"`, `"median"`, `"min"` or `"max"`, as
+`fixed.var`), and a second predictor `with` gives the bivariate surface (`do.bivariate`). A predictor
+is a statistic of the representation, so the curve of `"warm_day"` is the prediction as the warmest
+day moves in every bin together.
+
+```{r response-curve, eval = FALSE}
+rc <- response_curve(fit, "ensemble", "warm_day", spread = TRUE)
+plot(rc)
+```
+
 ## What differs from a biomod2 run
 
 - **Absences.** The learners read the absences they are given. `timesift` draws no pseudo-absences.

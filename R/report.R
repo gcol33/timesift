@@ -137,13 +137,19 @@ print.timesift_summary <- function(x, ...) {
 #' models the run was told to keep, so every bin is held back from a model that never saw the units
 #' it is rescored on. The candidate is named as `summary()` reports it.
 #'
-#' @param candidate Name of the candidate to read, for a run.
+#' @param candidate Name of the candidate to read, for a run, or `"ensemble"` for the combination
+#'   the run fitted. The members of an ensemble read different bins, so the ensemble is held back
+#'   by channel: a channel is withheld from every member that carries it, all of them shifted the
+#'   same way, and the members' predictions are combined by the stack the run fitted.
 #'
 #' @export
 occlusion.timesift <- function(x, candidate, over = c("bin", "channel"), ...) {
   over <- match.arg(over)
   fit <- x
   .check_run(fit)
+  if (identical(candidate, "ensemble")) {
+    return(.ensemble_occlusion(fit, over, ...))
+  }
   row <- .candidate_row(fit, candidate)
   arm <- paste(row$representation, row$learner, sep = "|")
   fits <- .fold_fits(fit, candidate, arm)
@@ -152,6 +158,53 @@ occlusion.timesift <- function(x, candidate, over = c("bin", "channel"), ...) {
 }
 
 # ---- reading the fitted object ---------------------------------------------------------------
+
+.ensemble_occlusion <- function(fit, over, substitute = c("permute", "fold_mean", "unit_mean"),
+                                metric = NULL, permutations = 20L, seed = 1L, ...) {
+  substitute <- match.arg(substitute)
+  if (is.null(fit$stack)) {
+    stop("this run fitted no ensemble to read.", call. = FALSE)
+  }
+  if (over != "channel") {
+    stop("the members of an ensemble read different bins, so it is held back by channel: ",
+         "use `over = \"channel\"`.", call. = FALSE)
+  }
+  members <- names(fit$stack$weights)
+  rows <- lapply(members, function(cd) .candidate_row(fit, cd))
+  arms <- vapply(rows, function(r) paste(r$representation, r$learner, sep = "|"), character(1L))
+  fits <- Map(function(cd, arm) .fold_fits(fit, cd, arm), members, arms)
+  arrays <- lapply(rows, function(r) fit$representations[[r$representation]])
+  units <- dimnames(arrays[[1L]])[[1L]]
+  y <- .align_response(.responses_reg$get(fit$response)$prepare(fit$y), units)
+  f <- .as_folds(fit$folds, units)
+  labels <- unique(unlist(lapply(arrays, function(m) dimnames(m)[[3L]]), use.names = FALSE))
+  metric <- if (is.null(metric)) list(fn = fit$scorer, name = fit$metric) else .as_metric(metric)
+
+  reader <- function(k) {
+    kept <- lapply(seq_along(members), function(j) fits[[j]][[paste(arms[j], k, sep = "|")]])
+    if (any(vapply(kept, is.null, logical(1L)))) {
+      return(NULL)
+    }
+    test <- which(f == k)
+    train <- which(f != k)
+    function(part, order) {
+      preds <- lapply(seq_along(members), function(j) {
+        m <- arrays[[j]]
+        i <- if (is.null(part)) NA_integer_ else match(labels[part], dimnames(m)[[3L]])
+        sub <- if (is.na(i)) {
+          .subset_units(m, test)
+        } else {
+          .occlude(m, test, train, i, "channel", substitute, NULL, order)
+        }
+        stats::predict(kept[[j]], sub)
+      })
+      ensemble_combine(fit$stack, stats::setNames(preds, members))
+    }
+  }
+  agg <- .occlusion_run(reader, f, y, fit$cells, metric$fn, labels, substitute, permutations, seed)
+  structure(agg, class = c("timesift_occlusion", "data.frame"), arm = "ensemble", over = over,
+            substitute = substitute, metric = metric$name)
+}
 
 .check_run <- function(fit) {
   if (!inherits(fit, "timesift")) {

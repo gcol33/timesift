@@ -53,11 +53,17 @@ over thresholds frequently does not move at all.}
 
 \item{seed}{Random seed.}
 
-\item{candidate}{Name of the candidate to read, for a run.}
+\item{candidate}{Name of the candidate to read, for a run, or \code{"ensemble"} for the combination
+the run fitted. The members of an ensemble read different bins, so the ensemble is held back
+by channel: a channel is withheld from every member that carries it, all of them shifted the
+same way, and the members' predictions are combined by the stack the run fitted.}
 }
 \value{
 A data frame of one row per held-back part and variable, carrying the mean weight over
-folds and the score with and without the part.
+folds, the score with and without the part, and \code{importance}: one minus the correlation
+between the predictions with and without the part, which is how biomod2 scores a predictor
+and needs no response. Both are read on the cells the fit was scored on, and \code{importance} is
+\code{NA} where either set of predictions is constant.
 }
 \description{
 Holds one bin of the record back at a time, rescores the held-out units, and records the fall in
@@ -80,6 +86,10 @@ bin sits rather than what a unit read there, and is left in place.
 
 Read with \code{over = "channel"} the same machinery asks what each statistic of a grain carries,
 holding one channel back across the whole record instead of one bin across all channels.
+
+A column named in \code{static} is a channel of a representation built from a record, constant across
+its bins, so \code{over = "channel"} holds it back; where the run has no record the columns are the
+bins of one block and \code{over = "bin"} does.
 
 Reached through a \code{\link[=timesift]{timesift()}} run rather than through a ladder, the profile reads the per-fold
 models the run was told to keep, so every bin is held back from a model that never saw the units

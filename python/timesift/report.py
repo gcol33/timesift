@@ -11,8 +11,9 @@ from __future__ import annotations
 import numpy as np
 
 from .ladder import Ladder, scored_cells, table_columns, variable_means
-from .occlusion import ladder_occlusion, occlusion_profile
-from .response import align_folds, as_response
+from .occlusion import _occlude, ladder_occlusion, occlusion_profile, run_occlusion
+from .registry import RESPONSES, resolve_metric
+from .response import Folds, align_folds, as_response
 
 __all__ = ["candidate_table", "ensemble_weights", "occlusion", "procedure_table", "summary"]
 
@@ -130,12 +131,60 @@ def occlusion(x, *args, **kwargs):
 
 def _run_occlusion(fit, candidate: str, over: str = "bin", substitute: str = "permute",
                    metric=None, permutations: int = 20, seed: int = 1):
+    if candidate == "ensemble":
+        return _ensemble_occlusion(fit, over, substitute, metric, permutations, seed)
     m = _representation(fit, candidate)
     return occlusion_profile(_kept_fits(fit, candidate), m, _field(fit, "y"),
                              _field(fit, "folds"), over=over, substitute=substitute,
                              metric=_field(fit, "scorer") if metric is None else metric,
                              response=_field(fit, "response"),
                              permutations=permutations, seed=seed)
+
+
+def _ensemble_occlusion(fit, over: str, substitute: str, metric, permutations: int, seed: int):
+    """The ensemble held back by channel, through the members it combines.
+
+    The members read different bins, so a channel is withheld from every member that carries it,
+    all of them shifted the same way, and their predictions are combined by the stack the fit made.
+    """
+    from .stack import ensemble_combine
+    stack = _field(fit, "stack", None)
+    if stack is None:
+        raise ValueError("this fit made no ensemble to read")
+    if over != "channel":
+        raise ValueError("the members of an ensemble read different bins, so it is held back by "
+                         "channel: use over='channel'")
+    if substitute not in ("permute", "fold_mean", "unit_mean"):
+        raise ValueError(f"unknown substitute {substitute!r}")
+    members = list(stack.members)
+    arrays = [_representation(fit, c) for c in members]
+    kept = [_kept_fits(fit, c) for c in members]
+    spec = RESPONSES.get(_field(fit, "response"))
+    units = arrays[0].units
+    y = spec["prepare"](as_response(_field(fit, "y"))).align(units)
+    folds = Folds.coerce(_field(fit, "folds"), units).align(units)
+    labels = list(dict.fromkeys(label for m in arrays for label in m.stats))
+
+    def reader(k):
+        if any(int(k) not in fits for fits in kept):
+            return None
+        test = np.flatnonzero(folds.fold == k)
+        train = np.flatnonzero(folds.fold != k)
+        subs = [m.take_units(test) for m in arrays]
+
+        def predict(part, order):
+            preds = {}
+            for name, m, sub, fits in zip(members, arrays, subs, kept):
+                at = m.stats.index(labels[part]) if part is not None and labels[part] in m.stats                     else None
+                x = sub if at is None else _occlude(m, sub, train, at, "channel", substitute,
+                                                    order, None)
+                preds[name] = fits[int(k)].predict(x)
+            return ensemble_combine(stack, preds)
+        return predict
+
+    scorer = _field(fit, "scorer") if metric is None else metric
+    return run_occlusion(reader, y, folds, spec["cells"](y, folds), resolve_metric(scorer)[0],
+                         labels, substitute, permutations, seed)
 
 
 def _kept_fits(fit, candidate: str) -> dict:

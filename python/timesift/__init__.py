@@ -17,6 +17,7 @@ from .artifacts import (read_cells, read_folds, read_response, write_cells,
                         write_folds, write_response)
 from .contrasts import grain_contrasts
 from .control import TrainControl, train_control
+from .curves import ResponseCurve, response_curve
 from .digest import digest_array
 from .fit import Timesift, timesift
 from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
@@ -81,7 +82,7 @@ register_learner("rescnn", rescnn)
 __all__ = [
     "Cells", "Coverage", "DAY_LEVEL_STATS", "EnsembleSpec", "Fit", "Folds",
     "GRAINS",
-    "Ladder", "Learner", "PRESENCE_ABSENCE", "Representation", "Resampling", "Response",
+    "Ladder", "Learner", "PRESENCE_ABSENCE", "ResponseCurve", "Representation", "Resampling", "Response",
     "SPREAD_STATISTICS", "STATS",
     "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "additive", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
@@ -99,7 +100,7 @@ __all__ = [
     "procedure_table",
     "read_cells",
     "read_folds", "read_response", "register_learner", "register_metric", "register_response",
-    "rescnn", "resolve_folds", "resolve_metric", "responses", "roc_auc", "scorable_cells",
+    "rescnn", "resolve_folds", "response_curve", "resolve_metric", "responses", "roc_auc", "scorable_cells",
     "score_predictions", "select_columns", "table_metric",
     "select_grain", "simulate_records", "stepwise", "summary", "target_labels", "timesift", "timesift_set",
     "train_control", "tree", "tss", "tss_inflation", "write_cells", "write_folds", "write_response",

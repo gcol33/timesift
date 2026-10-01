@@ -86,50 +86,97 @@ def occlusion_profile(fits: dict, m: TimesiftMatrix, y, folds, over: str = "bin"
     y = spec["prepare"](as_response(y)).align(m.units)
     folds = Folds.coerce(folds, m.units).align(m.units)
     f = folds.fold
-    score = resolve_metric(metric)[0]
-    # The cells a score is defined on, from the response and the fold map alone, so a weight is read
-    # on the cells the ladder scored and nowhere else.
-    cells = spec["cells"](y, folds)
-    scorable = {(v, int(k)): bool(ok) for v, k, ok in zip(cells.variable, cells.fold,
-                                                           cells.scorable)}
     held = _unit_varying(m.values)
-
-    n_parts = m.values.shape[1] if over == "bin" else m.values.shape[2]
     labels = m.bins if over == "bin" else m.stats
-    rng = np.random.default_rng(seed)
 
-    weight = np.full((n_parts, len(y.variables)), np.nan)
-    counted = np.zeros((n_parts, len(y.variables)))
-    for k in np.unique(f):
+    def reader(k):
         fit = fits.get(int(k))
         if fit is None:
-            continue
+            return None
         test = np.flatnonzero(f == k)
         train = np.flatnonzero(f != k)
         sub = m.take_units(test)
-        ok_cell = [scorable.get((v, int(k)), False) for v in y.variables]
-
-        def score_columns(p):
-            return np.asarray([score(y.values[test, j], p[:, j]) if ok_cell[j] else np.nan
-                               for j in range(len(y.variables))])
 
         # The baseline is one prediction for the fold, not one per variable: the model reads the
         # whole block and an encoder would otherwise be rebuilt from its arrays once per response.
-        base = score_columns(fit.predict(sub))
+        def predict(part, order):
+            if part is None:
+                return fit.predict(sub)
+            return fit.predict(_occlude(m, sub, train, part, over, substitute, order, held))
+        return predict
+
+    return run_occlusion(reader, y, folds, spec["cells"](y, folds), resolve_metric(metric)[0],
+                         labels, substitute, permutations, seed)
+
+
+def run_occlusion(reader, y: Response, folds: Folds, cells, score, labels, substitute: str,
+                  permutations: int, seed: int):
+    """The profile itself, whatever it is that predicts.
+
+    ``reader(k)`` is None where fold ``k`` kept no model, and otherwise a function of
+    ``(part, order)`` giving the held-out units' predictions with part ``part`` of ``labels`` held
+    back, or none held back where ``part`` is None. ``order`` is the permutation a held-back part
+    is shifted by, drawn here so that every model a reader consults shifts it the same way. The
+    cells a score is defined on come from the response and the fold map alone, so a weight is read
+    on the cells the ladder scored and nowhere else.
+    """
+    f = folds.fold
+    scorable = {(v, int(k)): bool(ok) for v, k, ok in zip(cells.variable, cells.fold,
+                                                           cells.scorable)}
+    n_parts, n_var = len(labels), len(y.variables)
+    rng = np.random.default_rng(seed)
+
+    weight = np.zeros((n_parts, n_var))
+    counted = np.zeros((n_parts, n_var))
+    importance = np.zeros((n_parts, n_var))
+    imp_counted = np.zeros((n_parts, n_var))
+    for k in np.unique(f):
+        predict = reader(k)
+        if predict is None:
+            continue
+        test = np.flatnonzero(f == k)
+        ok_cell = np.asarray([scorable.get((v, int(k)), False) for v in y.variables])
+
+        def score_columns(p):
+            return np.asarray([score(y.values[test, j], p[:, j]) if ok_cell[j] else np.nan
+                               for j in range(n_var)])
+
+        base_p = np.asarray(predict(None, None), dtype=np.float64)
+        base = score_columns(base_p)
         for i in range(n_parts):
             draws = permutations if substitute == "permute" else 1
-            acc = np.zeros((draws, len(y.variables)))
+            acc = np.zeros((draws, n_var))
+            agree = np.zeros((draws, n_var))
             for r in range(draws):
-                occluded = _occlude(m, sub, train, i, over, substitute, rng, held)
-                acc[r] = score_columns(fit.predict(occluded))
+                order = rng.permutation(len(test)) if substitute == "permute" else None
+                held_back = np.asarray(predict(i, order), dtype=np.float64)
+                acc[r] = score_columns(held_back)
+                agree[r] = _column_cor(base_p, held_back, ok_cell)
             fall = base - acc.mean(axis=0)
             ok = np.isfinite(fall)
-            weight[i, ok] = np.where(np.isnan(weight[i, ok]), 0, weight[i, ok]) + fall[ok]
+            weight[i, ok] += fall[ok]
             counted[i, ok] += 1
+            moved = 1.0 - agree.mean(axis=0)
+            usable = ok & np.isfinite(moved)
+            importance[i, usable] += moved[usable]
+            imp_counted[i, usable] += 1
 
     with np.errstate(invalid="ignore"):
-        weight = weight / np.where(counted > 0, counted, np.nan)
-    return {"part": list(labels), "variable": list(y.variables), "weight": weight}
+        weight = np.where(counted > 0, weight / np.where(counted > 0, counted, 1), np.nan)
+        importance = np.where(imp_counted > 0,
+                              importance / np.where(imp_counted > 0, imp_counted, 1), np.nan)
+    return {"part": list(labels), "variable": list(y.variables), "weight": weight,
+            "importance": importance}
+
+
+def _column_cor(a: np.ndarray, b: np.ndarray, ok) -> np.ndarray:
+    """The Pearson correlation of two sets of predictions, response by response, where the cell is
+    one a score is defined on and neither is constant."""
+    out = np.full(a.shape[1], np.nan)
+    for j in range(a.shape[1]):
+        if ok[j] and a[:, j].std() > 0 and b[:, j].std() > 0:
+            out[j] = np.corrcoef(a[:, j], b[:, j])[0, 1]
+    return out
 
 
 def _unit_varying(values: np.ndarray) -> np.ndarray:
@@ -138,19 +185,18 @@ def _unit_varying(values: np.ndarray) -> np.ndarray:
     return np.flatnonzero((values != values[:1]).any(axis=(0, 1)))
 
 
-def _occlude(m: TimesiftMatrix, sub: TimesiftMatrix, train, i, over, substitute, rng,
+def _occlude(m: TimesiftMatrix, sub: TimesiftMatrix, train, i, over, substitute, order,
              held) -> TimesiftMatrix:
     values = sub.values.copy()
     n = values.shape[0]
     if over == "channel":
         if substitute == "permute":
-            values[:, :, i] = values[rng.permutation(n), :, i]
+            values[:, :, i] = values[order, :, i]
         elif substitute == "fold_mean":
             values[:, :, i] = m.values[train, :, i].mean(axis=0)[None, :]
         else:
             values[:, :, i] = values[:, :, i].mean(axis=1)[:, None]
         return replace(sub, values=values)
-    order = rng.permutation(n) if substitute == "permute" else None
     for ch in held:
         if substitute == "permute":
             values[:, i, ch] = values[order, i, ch]

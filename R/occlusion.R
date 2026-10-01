@@ -20,6 +20,10 @@
 #' Read with `over = "channel"` the same machinery asks what each statistic of a grain carries,
 #' holding one channel back across the whole record instead of one bin across all channels.
 #'
+#' A column named in `static` is a channel of a representation built from a record, constant across
+#' its bins, so `over = "channel"` holds it back; where the run has no record the columns are the
+#' bins of one block and `over = "bin"` does.
+#'
 #' @param x A [timesift()] fit, or a [grain_ladder()] result, in either case fitted with
 #'   `keep_fits = TRUE`.
 #' @param data The representation set the ladder was fitted on.
@@ -38,7 +42,10 @@
 #' @param seed Random seed.
 #'
 #' @return A data frame of one row per held-back part and variable, carrying the mean weight over
-#'   folds and the score with and without the part.
+#'   folds, the score with and without the part, and `importance`: one minus the correlation
+#'   between the predictions with and without the part, which is how biomod2 scores a predictor
+#'   and needs no response. Both are read on the cells the fit was scored on, and `importance` is
+#'   `NA` where either set of predictions is constant.
 #'
 #' @examples
 #' set.seed(1)
@@ -92,74 +99,110 @@ occlusion.timesift_ladder <- function(x, data, y, arm, over = c("bin", "channel"
   units <- dimnames(m)[[1L]]
   y <- .align_response(.responses_reg$get(attr(ladder, "response"))$prepare(y), units)
   f <- .as_folds(attr(ladder, "folds"), units)
-  cells <- attr(ladder, "cells")
   # Left unset the profile is read by the metric the fit was scored under, so a weight is a fall
   # in the number the summary reports rather than in a second one.
   metric <- if (is.null(metric)) list(fn = attr(ladder, "scorer"), name = attr(ladder, "metric"))
             else .as_metric(metric)
-  score <- metric$fn
 
-  parts <- if (over == "bin") seq_len(dim(m)[2L]) else seq_len(dim(m)[3L])
   labels <- if (over == "bin") dimnames(m)[[2L]] else dimnames(m)[[3L]]
   held <- .unit_varying(m)
+  reader <- function(k) {
+    fit <- fits[[paste(label, k, sep = "|")]]
+    if (is.null(fit)) {
+      return(NULL)
+    }
+    test <- which(f == k)
+    train <- which(f != k)
+    function(part, order) {
+      sub <- if (is.null(part)) {
+        .subset_units(m, test)
+      } else {
+        .occlude(m, test, train, part, over, substitute, held, order)
+      }
+      stats::predict(fit, sub)
+    }
+  }
+  agg <- .occlusion_run(reader, f, y, attr(ladder, "cells"), metric$fn, labels, substitute,
+                        permutations, seed)
+  structure(agg, class = c("timesift_occlusion", "data.frame"), arm = label, over = over,
+            substitute = substitute, metric = metric$name)
+}
 
+# The profile itself, whatever it is that predicts. `reader(k)` returns NULL where fold `k` kept no
+# model, and otherwise a function of `(part, order)` giving the held-out units' predictions with
+# part `part` of `labels` held back, or none held back where `part` is NULL. `order` is the
+# permutation a held-back part is shifted by, drawn here so that every model a reader consults
+# shifts it the same way.
+.occlusion_run <- function(reader, f, y, cells, score, labels, substitute, permutations, seed) {
   old <- .seed_state()
   on.exit(.restore_seed(old), add = TRUE)
   set.seed(seed)
 
   out <- list()
   for (k in sort(unique(f))) {
-    fit <- fits[[paste(label, k, sep = "|")]]
-    if (is.null(fit)) {
+    predict_fold <- reader(k)
+    if (is.null(predict_fold)) {
       next
     }
     test <- which(f == k)
-    train <- which(f != k)
-    base <- stats::predict(fit, .subset_units(m, test))
+    y_test <- y[test, , drop = FALSE]
+    base <- predict_fold(NULL, NULL)
     ok <- .scorable_for(cells, colnames(y), k)
-    full <- .score_columns(y[test, , drop = FALSE], base, ok, score)
+    full <- .score_columns(y_test, base, ok, score)
 
-    for (i in seq_along(parts)) {
+    for (i in seq_along(labels)) {
       draws <- if (substitute == "permute") permutations else 1L
-      acc <- matrix(0, nrow = draws, ncol = ncol(y))
+      acc <- agree <- matrix(0, nrow = draws, ncol = ncol(y))
       for (r in seq_len(draws)) {
-        occluded <- .occlude(m, test, train, parts[i], over, substitute, held)
-        acc[r, ] <- .score_columns(y[test, , drop = FALSE],
-                                   stats::predict(fit, occluded), ok, score)
+        order <- if (substitute == "permute") sample.int(length(test))
+        held_back <- predict_fold(i, order)
+        acc[r, ] <- .score_columns(y_test, held_back, ok, score)
+        agree[r, ] <- .column_cor(base, held_back, ok)
       }
       out[[length(out) + 1L]] <- data.frame(
         part = labels[i], variable = colnames(y), fold = k,
         score_full = full, score_held_back = colMeans(acc),
-        weight = full - colMeans(acc), stringsAsFactors = FALSE)
+        weight = full - colMeans(acc), importance = 1 - colMeans(agree),
+        stringsAsFactors = FALSE)
     }
   }
   out <- do.call(rbind, out)
   out <- out[!is.na(out$weight), , drop = FALSE]
-  agg <- stats::aggregate(out[c("score_full", "score_held_back", "weight")],
-                          out[c("part", "variable")], mean)
+  agg <- stats::aggregate(out[c("score_full", "score_held_back", "weight", "importance")],
+                          out[c("part", "variable")], mean, na.rm = TRUE)
+  agg$importance[is.nan(agg$importance)] <- NA_real_
   agg$part <- factor(agg$part, levels = labels)
   agg <- agg[order(agg$part, agg$variable, method = "radix"), ]
   agg$part <- as.character(agg$part)
   rownames(agg) <- NULL
-  structure(agg, class = c("timesift_occlusion", "data.frame"), arm = label, over = over,
-            substitute = substitute, metric = metric$name)
+  agg
 }
 
-.occlude <- function(m, test, train, i, over, substitute, held) {
+# The Pearson correlation of two sets of predictions, response by response, where the cell is one a
+# score is defined on and neither is constant.
+.column_cor <- function(a, b, ok) {
+  vapply(seq_len(ncol(a)), function(j) {
+    if (!isTRUE(ok[j]) || !isTRUE(stats::sd(a[, j]) > 0) || !isTRUE(stats::sd(b[, j]) > 0)) {
+      return(NA_real_)
+    }
+    stats::cor(a[, j], b[, j])
+  }, numeric(1L))
+}
+
+.occlude <- function(m, test, train, i, over, substitute, held, order) {
   sub <- .subset_units(m, test)
   n <- dim(sub)[1L]
   b <- dim(sub)[2L]
   if (over == "channel") {
     sub[, , i] <- switch(
       substitute,
-      permute = .plane(sub, i)[sample.int(n), , drop = FALSE],
+      permute = .plane(sub, i)[order, , drop = FALSE],
       fold_mean = matrix(colMeans(.plane(m, i)[train, , drop = FALSE]),
                          nrow = n, ncol = b, byrow = TRUE),
       unit_mean = matrix(rowMeans(.plane(sub, i)), nrow = n, ncol = b)
     )
     return(sub)
   }
-  order <- if (substitute == "permute") sample.int(n) else NULL
   for (ch in held) {
     sub[, i, ch] <- switch(
       substitute,

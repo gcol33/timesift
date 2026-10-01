@@ -77,7 +77,7 @@ SECTIONS = (
         names=("tss", "roc_auc", "average_precision", "kappa_score", "table_metric", "boyce_index",
                "cohen_kappa", "decision_threshold",
                "model_agreement", "score_predictions", "paired_contrast", "grain_contrasts",
-               "tss_inflation", "implied_skill", "occlusion", "simulate_records", "Simulation"),
+               "tss_inflation", "implied_skill", "occlusion", "response_curve", "ResponseCurve", "simulate_records", "Simulation"),
     ),
     dict(
         slug="python-extending",
