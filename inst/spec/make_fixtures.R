@@ -597,6 +597,51 @@ write_fixture(
   "metrics.csv"
 )
 
+# The metrics of a numeric response and of ordinal classes. The cases are ones a value can be
+# written out for by hand: a perfect prediction, one off by a constant, a response that is
+# constant, and ordinal classes with a tie between two classes, a class never predicted and a
+# class nothing is observed in.
+NUMERIC_CASES <- list(
+  exact = list(y = c(1, 2, 3, 4, 5), p = c(1, 2, 3, 4, 5)),
+  offset = list(y = c(1, 2, 3, 4), p = c(1.5, 2.5, 3.5, 4.5)),
+  constant_y = list(y = c(3, 3, 3, 3), p = c(2, 3, 4, 5)),
+  constant_p = list(y = c(1, 2, 3, 4), p = c(2, 2, 2, 2)),
+  noisy = list(y = c(1, 2, 3, 4, 5, 6), p = c(1.2, 1.7, 3.4, 3.5, 5.3, 6.4)),
+  ordinal_mixed = list(y = c(1, 1, 2, 2, 3, 3, 3), p = c(1.2, 2.4, 2, 1.4, 2.8, 3.4, 2.2)),
+  ordinal_tie = list(y = c(1, 2, 3, 3), p = c(1.5, 2.5, 3.5, 2.5)),
+  ordinal_gap = list(y = c(0, 0, 2, 2, 5), p = c(0.4, 1.1, 1.9, 3.6, 4.9))
+)
+write_fixture(
+  do.call(rbind, lapply(names(NUMERIC_CASES), function(nm) {
+    d <- NUMERIC_CASES[[nm]]
+    data.frame(case = nm, y = sprintf("%.12g", d$y), p = sprintf("%.12g", d$p),
+               stringsAsFactors = FALSE)
+  })),
+  "numeric_metric_cases.csv"
+)
+NUMERIC_FNS <- c(
+  stats::setNames(lapply(names(timesift:::.regression_metrics), function(m) {
+    force(m)
+    function(y, p) regression_metric(y, p, m)
+  }), names(timesift:::.regression_metrics)),
+  stats::setNames(lapply(names(timesift:::.ordinal_metrics), function(m) {
+    force(m)
+    function(y, p) ordinal_metric(y, p, m)
+  }), paste0("ordinal_", names(timesift:::.ordinal_metrics)))
+)
+write_fixture(
+  do.call(rbind, lapply(names(NUMERIC_CASES), function(nm) {
+    d <- NUMERIC_CASES[[nm]]
+    data.frame(case = nm, metric = names(NUMERIC_FNS),
+               value = vapply(NUMERIC_FNS, function(fn) {
+                 v <- fn(d$y, d$p)
+                 if (is.finite(v)) sprintf("%.12g", v) else "NA"
+               }, character(1L)),
+               stringsAsFactors = FALSE)
+  })),
+  "numeric_metrics.csv"
+)
+
 # Blocks of units held out whole. Nothing is drawn, so the labels are a function of the columns
 # alone and both languages read the same ones: columns with ties, so the order of arrival decides,
 # cut into a number of blocks that is not a power of two, and once on scaled columns.

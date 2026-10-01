@@ -154,6 +154,36 @@ test_that("every threshold metric matches the value the fixtures pin", {
                     "all_presence", "all_absence", "perfect", "reversed") %in% expected$case))
 })
 
+test_that("the metrics of a numeric response match the values the fixtures pin", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures are not in the built package")
+
+  cases <- read_fixture(dir, "numeric_metric_cases.csv")
+  expected <- read_fixture(dir, "numeric_metrics.csv")
+  fns <- c(
+    stats::setNames(lapply(names(timesift:::.regression_metrics), function(m) {
+      force(m)
+      function(y, p) regression_metric(y, p, m)
+    }), names(timesift:::.regression_metrics)),
+    stats::setNames(lapply(names(timesift:::.ordinal_metrics), function(m) {
+      force(m)
+      function(y, p) ordinal_metric(y, p, m)
+    }), paste0("ordinal_", names(timesift:::.ordinal_metrics)))
+  )
+  expect_setequal(unique(expected$metric), names(fns))
+  for (i in seq_len(nrow(expected))) {
+    row <- expected[i, ]
+    case <- cases[cases$case == row$case, ]
+    got <- fns[[row$metric]](as.numeric(case$y), as.numeric(case$p))
+    label <- paste(row$case, row$metric)
+    if (row$value == "NA") {
+      expect_false(is.finite(got), info = label)
+    } else {
+      expect_identical(sprintf("%.12g", got), row$value, info = label)
+    }
+  }
+})
+
 test_that("the blocks match the labels the fixtures pin", {
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")

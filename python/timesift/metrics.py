@@ -187,6 +187,98 @@ def boyce_index(y, p, resolution: int = 100, width: float = 0.1) -> float:
     return float(np.corrcoef(a, b)[0, 1])
 
 
+def _r_squared(y, p):
+    sst = np.sum((y - y.mean()) ** 2)
+    return 1 - np.sum((y - p) ** 2) / sst if sst > 0 else float("nan")
+
+
+def _pearson(y, p):
+    return float(np.corrcoef(y, p)[0, 1]) if y.std() > 0 and p.std() > 0 else float("nan")
+
+
+REGRESSION_METRICS = {
+    "r_squared": _r_squared,
+    "pearson": _pearson,
+    "rmse": lambda y, p: float(np.sqrt(np.mean((y - p) ** 2))),
+    "mse": lambda y, p: float(np.mean((y - p) ** 2)),
+    "mae": lambda y, p: float(np.mean(np.abs(y - p))),
+    "max_error": lambda y, p: float(np.max(np.abs(y - p))),
+}
+
+
+def regression_metric(y, p, metric: str) -> float:
+    """A metric of a numeric response and its predictions, as biomod2 reads an abundance model.
+
+    ``metric`` is ``r_squared`` (``1 - sum(e**2) / sum((y - mean(y))**2)``, NaN where ``y`` is
+    constant), ``pearson``, ``rmse``, ``mse``, ``mae`` or ``max_error``. A comparison reads the
+    highest score as the best, so the four errors are registered as ``neg_rmse``, ``neg_mse``,
+    ``neg_mae`` and ``neg_max_error`` with their sign reversed.
+    """
+    if metric not in REGRESSION_METRICS:
+        raise ValueError(f"metric must be one of {tuple(REGRESSION_METRICS)}, got {metric!r}")
+    y = np.asarray(y, dtype=np.float64)
+    p = np.asarray(p, dtype=np.float64)
+    if y.shape != p.shape:
+        raise ValueError("`y` and `p` must be the same length")
+    if not len(y) or np.isnan(y).any() or not np.isfinite(p).all():
+        return float("nan")
+    value = float(REGRESSION_METRICS[metric](y, p))
+    return value if np.isfinite(value) else float("nan")
+
+
+def _ordinal_accuracy(m):
+    return float(np.trace(m) / m.sum())
+
+
+def _recall(m):
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return float(np.nansum(np.diag(m) / m.sum(axis=0)) / m.shape[0])
+
+
+def _precision(m):
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return float(np.nansum(np.diag(m) / m.sum(axis=1)) / m.shape[0])
+
+
+def _f1(m):
+    r, q = _recall(m), _precision(m)
+    return 2 * q * r / (q + r) if q + r > 0 else float("nan")
+
+
+ORDINAL_METRICS = {"accuracy": _ordinal_accuracy, "recall": _recall, "precision": _precision,
+                   "f1": _f1}
+
+
+def ordinal_metric(y, p, metric: str) -> float:
+    """A metric of ordinal classes, as biomod2 reads a model of an ordinal response.
+
+    The response is a column of whole-number classes, the model predicts a number on the same
+    scale, and each prediction is read as the observed class nearest to it, the lower class on a
+    tie. With ``m[i, j]`` the units of observed class ``j`` predicted as class ``i``, over the
+    ``k`` classes observed in the cell: ``accuracy`` is ``trace(m) / sum(m)``, ``recall`` the mean
+    over the ``k`` classes of ``m[j, j]`` over the units of class ``j``, ``precision`` the mean of
+    ``m[i, i]`` over the units predicted as ``i``, and ``f1`` is ``2 P R / (P + R)`` of the two
+    means. A class with no unit, or in which nothing is predicted, adds zero to its mean. They are
+    registered as ``ordinal_accuracy``, ``ordinal_recall``, ``ordinal_precision`` and
+    ``ordinal_f1``.
+    """
+    if metric not in ORDINAL_METRICS:
+        raise ValueError(f"metric must be one of {tuple(ORDINAL_METRICS)}, got {metric!r}")
+    y = np.asarray(y, dtype=np.float64)
+    p = np.asarray(p, dtype=np.float64)
+    if y.shape != p.shape:
+        raise ValueError("`y` and `p` must be the same length")
+    if not len(y) or np.isnan(y).any() or not np.isfinite(p).all():
+        return float("nan")
+    classes = np.unique(y)
+    predicted = np.argmin(np.abs(classes[None, :] - p[:, None]), axis=1)
+    observed = np.searchsorted(classes, y)
+    m = np.zeros((len(classes), len(classes)))
+    np.add.at(m, (predicted, observed), 1.0)
+    value = ORDINAL_METRICS[metric](m)
+    return value if np.isfinite(value) else float("nan")
+
+
 def decision_threshold(y, p=None, rule: str = "youden", candidate: str = "ensemble",
                        perc: float = 0.9):
     """The probability cut a rule selects. Presence is predicted at ``p >= threshold``.

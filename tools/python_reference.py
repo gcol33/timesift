@@ -46,7 +46,7 @@ SECTIONS = (
              "computed with no model involved.",
         names=("cv", "grouped_cv", "block_cv", "env_cv", "Resampling", "as_resampling", "resolve_folds", "fold_map",
                "scorable_cells", "align_folds", "as_response", "Response", "Folds", "Cells",
-               "PRESENCE_ABSENCE", "positive_weights"),
+               "PRESENCE_ABSENCE", "CONTINUOUS", "ABUNDANCE", "ORDINAL", "positive_weights"),
     ),
     dict(
         slug="python-fitting",
@@ -74,7 +74,7 @@ SECTIONS = (
         desc="The metrics, the paired contrast between two arms on matched cells, every grain "
              "against a learner's best, the inflation of a score read at its own best threshold, "
              "what a fitted model read, and a record with a planted grain to test all of it on.",
-        names=("tss", "roc_auc", "average_precision", "kappa_score", "table_metric", "boyce_index",
+        names=("tss", "roc_auc", "average_precision", "kappa_score", "table_metric", "boyce_index", "regression_metric", "ordinal_metric",
                "cohen_kappa", "decision_threshold",
                "model_agreement", "score_predictions", "paired_contrast", "grain_contrasts",
                "tss_inflation", "implied_skill", "occlusion", "response_curve", "ResponseCurve", "project", "range_change",

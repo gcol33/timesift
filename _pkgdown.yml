@@ -142,6 +142,8 @@ reference:
   - kappa_score
   - table_metric
   - boyce_index
+  - regression_metric
+  - ordinal_metric
   - score_predictions
   - paired_contrast
   - grain_contrasts

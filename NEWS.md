@@ -2,6 +2,13 @@
 
 ## New
 
+* Three response heads for a numeric response: `"continuous"`, `"abundance"` (not negative) and
+  `"ordinal"` (whole-number classes), fitted under squared error through an identity output by
+  every learner but `maxnet()`, `envelope()` and `discriminant()`. `regression_metric()` carries
+  biomod2's `RMSE`, `MSE`, `MAE` and `Max_error` and `R^2` and the correlation, and
+  `ordinal_metric()` its `Accuracy`, `Recall`, `Precision` and `F1`, all registered by name.
+  Both languages, pinned in `numeric_metrics.csv`.
+
 * `project()` applies a fit to one target per cell of a raster and returns the prediction as a
   raster with a layer per response: `type = "binary"` the binary map at the fit's own cuts and
   `type = "spread"` the ensemble's disagreement, which is `BIOMOD_Projection()` and

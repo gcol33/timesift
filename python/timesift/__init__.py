@@ -24,8 +24,9 @@ from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
 from .learners import (Fit, Learner, additive, boosting, cnn, discriminant, elasticnet, envelope,
                        fit_learner, flatten, forest, mars, maxnet, mlp, rescnn, stepwise, tree)
-from .metrics import (TABLE_METRICS, average_precision, boyce_index, cohen_kappa,
-                      decision_threshold, kappa_score, model_agreement, roc_auc, table_metric, tss)
+from .metrics import (ORDINAL_METRICS, TABLE_METRICS, average_precision, boyce_index,
+                      cohen_kappa, decision_threshold, kappa_score, model_agreement,
+                      ordinal_metric, regression_metric, roc_auc, table_metric, tss)
 from .occlusion import feature_matrix
 from .raster import RangeChange, project, range_change
 from .registry import (get_learner, learners, metrics, register_learner, register_metric,
@@ -35,7 +36,7 @@ from .report import (candidate_table, ensemble_weights, occlusion, procedure_tab
 from .representation import (DAY_LEVEL_STATS, GRAINS, STATS, Coverage, TimesiftMatrix,
                              TimesiftSet, bind_channels, calendar_channels, coverage,
                              grain_matrix, lookback_matrix, timesift_set)
-from .response import (PRESENCE_ABSENCE, Cells, Folds, Response, align_folds, as_response,
+from .response import (ABUNDANCE, CONTINUOUS, ORDINAL, PRESENCE_ABSENCE, Cells, Folds, Response, align_folds, as_response,
                        fold_map, positive_weights, scorable_cells)
 from .plot import plot
 from .select import column_names, select_columns
@@ -64,8 +65,17 @@ register_metric("kappa_youden", lambda y, p: kappa_score(y, p, "youden"))
 register_metric("boyce", boyce_index)
 for _name in TABLE_METRICS:
     register_metric(_name, lambda y, p, _name=_name: table_metric(y, p, _name))
+for _name in ("r_squared", "pearson"):
+    register_metric(_name, lambda y, p, _name=_name: regression_metric(y, p, _name))
+for _name in ("rmse", "mse", "mae", "max_error"):
+    register_metric("neg_" + _name, lambda y, p, _name=_name: -regression_metric(y, p, _name))
+for _name in ORDINAL_METRICS:
+    register_metric("ordinal_" + _name, lambda y, p, _name=_name: ordinal_metric(y, p, _name))
 
 register_response("presence_absence", PRESENCE_ABSENCE)
+register_response("continuous", CONTINUOUS)
+register_response("abundance", ABUNDANCE)
+register_response("ordinal", ORDINAL)
 
 for _name, _grid in default_grids().items():
     register_tuning(_name, _grid)
@@ -87,11 +97,11 @@ register_learner("rescnn", rescnn)
 __all__ = [
     "Cells", "Coverage", "DAY_LEVEL_STATS", "EnsembleSpec", "Fit", "Folds",
     "GRAINS",
-    "Ladder", "Learner", "PRESENCE_ABSENCE", "RangeChange", "ResponseCurve", "Representation", "Resampling", "Response",
+    "ABUNDANCE", "CONTINUOUS", "Ladder", "Learner", "ORDINAL", "PRESENCE_ABSENCE", "RangeChange", "ResponseCurve", "Representation", "Resampling", "Response",
     "SPREAD_STATISTICS", "STATS",
     "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "Tuned", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "additive", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
-    "average_precision", "boyce_index",
+    "average_precision", "boyce_index", "ordinal_metric", "regression_metric",
     "bind_channels", "block_cv", "boosting", "build_representation", "calendar_channels", "candidate_table", "cnn",
     "cohen_kappa", "column_names", "coverage", "cv", "decision_threshold", "digest_array", "discriminant",
     "elasticnet", "envelope", "env_cv",

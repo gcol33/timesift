@@ -709,6 +709,18 @@ centres each column and divides by its standard deviation with `n - 1` first, an
 spread becomes zero. The resulting map is grouped by block, so a split drawn inside a fold keeps a
 block whole.
 
+`numeric_metric_cases.csv` and `numeric_metrics.csv` hold eight `(y, p)` cases and the value of
+every metric of a numeric response and of ordinal classes on each. With `e = y - p`, `r_squared` is
+`1 - sum(e^2) / sum((y - mean(y))^2)`, `pearson` the correlation, `rmse`, `mse`, `mae` and
+`max_error` the root mean, the mean, the mean absolute and the greatest absolute of `e`; where `y`
+or `p` is constant the first two are `NA`, as is any metric where `p` holds a value that is not a
+number. For the ordinal metrics each prediction is read as the observed class nearest to it, the
+lower class on a tie, `m[i, j]` counts the units of observed class `j` read as class `i`, and with
+`k` the classes observed `accuracy` is `trace(m) / sum(m)`, `recall` is the sum of `m[j, j]` over
+the column sums, `precision` the sum of `m[i, i]` over the row sums, each over classes with a
+nonzero sum and divided by `k`, and `f1` is `2 P R / (P + R)` of the last two. The cells of a
+numeric head hold a cell scorable where each side of the split holds two distinct values.
+
 `contrast_cells.csv` and `contrast.csv` hold a fixed table of per-cell scores for two arms, with
 cells one arm scored and the other did not, and the paired contrast read off it. No model is
 involved: the pairing, the per-variable mean, the interval on Student's t with one degree of

@@ -261,6 +261,20 @@ grid of 100 cuts. `table_metric()` reads it at the cut of the `rule` given, `"yo
 so the statistics are comparable at one operating point. Every name is a registered metric, so
 `grain_ladder(metric = "csi")` reads it.
 
+## Abundance, ordinal and continuous responses
+
+biomod2 4.3 also models abundances and ordinal classes. The response head decides what a response
+is, and three ship beside presence-absence: `response = "continuous"` for any real number,
+`"abundance"` for a non-negative one, and `"ordinal"` for whole-number classes. All three are
+fitted under squared error through an identity output, so every learner but the three above and
+the combiner read them unchanged. `r_squared` is what a continuous or abundance comparison reads
+by default, and `regression_metric()` carries biomod2's `RMSE`, `MSE`, `MAE` and `Max_error`
+(registered as `neg_rmse`, `neg_mse`, `neg_mae` and `neg_max_error`, since the highest score is the
+best). `ordinal_metric()` carries `Accuracy`, `Recall`, `Precision` and `F1`, each prediction being
+read as the observed class nearest to it. A multiclass response is one presence-absence column
+per class. A count under a Poisson loss is not shipped: the penalised, tree, boosting and
+stepwise cores would each need that family.
+
 ## Maps
 
 `BIOMOD_Projection()` and `BIOMOD_EnsembleForecasting()` apply the fit to a stack of rasters.
@@ -325,8 +339,9 @@ plot(rc)
 - **Case weights.** The response head sets them, and `positive_weights()` gives the presence-absence
   head's. A learner that cannot use them (the background `maxnet()`, `envelope()`) says so in its
   documentation.
-- **Presence-absence only for four algorithms.** `maxnet()`, `envelope()`, `discriminant()` and the
-  logistic refit of `mars()` need a binary response. The other learners follow the head's loss.
+- **Presence-absence only for three algorithms.** `maxnet()`, `envelope()` and `discriminant()`
+  need a binary response and refuse a head fitted under squared error. The other learners follow
+  the head's loss, and `mars()` is among them.
 - **Predictors.** The columns of a representation are the predictors, one per bin and channel, and
   a column of `targets` such as elevation reaches the model where `static` names it.
 

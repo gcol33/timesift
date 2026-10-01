@@ -163,6 +163,24 @@ def test_the_metric_cases_cover_where_the_tie_rule_is_the_whole_answer():
             "all_presence", "all_absence", "perfect", "reversed"} <= cases
 
 
+def test_the_metrics_of_a_numeric_response_match_the_values_the_fixtures_pin():
+    from timesift.metrics import ORDINAL_METRICS, REGRESSION_METRICS, ordinal_metric, regression_metric
+
+    cases = read_fixture("numeric_metric_cases.csv")
+    expected = read_fixture("numeric_metrics.csv")
+    fns = {m: (lambda y, p, m=m: regression_metric(y, p, m)) for m in REGRESSION_METRICS}
+    fns.update({"ordinal_" + m: (lambda y, p, m=m: ordinal_metric(y, p, m))
+                for m in ORDINAL_METRICS})
+    assert {r["metric"] for r in expected} == set(fns)
+    for row in expected:
+        picked = [r for r in cases if r["case"] == row["case"]]
+        got = fns[row["metric"]]([float(r["y"]) for r in picked], [float(r["p"]) for r in picked])
+        if row["value"] == "NA":
+            assert not np.isfinite(got), (row["case"], row["metric"])
+        else:
+            assert f"{got:.12g}" == row["value"], (row["case"], row["metric"])
+
+
 def test_the_blocks_match_the_labels_the_fixtures_pin():
     from timesift.response import block_folds, kd_blocks
 

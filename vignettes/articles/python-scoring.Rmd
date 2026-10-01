@@ -76,6 +76,37 @@ the index is the Spearman correlation of that ratio with the window's midpoint. 
 repeated values. NaN where the cell defines none, the predictions are all equal, the ratio is
 defined in fewer than three windows or takes one value.
 
+## `regression_metric()`
+
+```python
+regression_metric(y, p, metric: str)
+```
+
+A metric of a numeric response and its predictions, as biomod2 reads an abundance model.
+
+`metric` is `r_squared` (`1 - sum(e**2) / sum((y - mean(y))**2)`, NaN where `y` is
+constant), `pearson`, `rmse`, `mse`, `mae` or `max_error`. A comparison reads the
+highest score as the best, so the four errors are registered as `neg_rmse`, `neg_mse`,
+`neg_mae` and `neg_max_error` with their sign reversed.
+
+## `ordinal_metric()`
+
+```python
+ordinal_metric(y, p, metric: str)
+```
+
+A metric of ordinal classes, as biomod2 reads a model of an ordinal response.
+
+The response is a column of whole-number classes, the model predicts a number on the same
+scale, and each prediction is read as the observed class nearest to it, the lower class on a
+tie. With `m[i, j]` the units of observed class `j` predicted as class `i`, over the
+`k` classes observed in the cell: `accuracy` is `trace(m) / sum(m)`, `recall` the mean
+over the `k` classes of `m[j, j]` over the units of class `j`, `precision` the mean of
+`m[i, i]` over the units predicted as `i`, and `f1` is `2 P R / (P + R)` of the two
+means. A class with no unit, or in which nothing is predicted, adds zero to its mean. They are
+registered as `ordinal_accuracy`, `ordinal_recall`, `ordinal_precision` and
+`ordinal_f1`.
+
 ## `cohen_kappa()`
 
 ```python

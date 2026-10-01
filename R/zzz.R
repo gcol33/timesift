@@ -20,6 +20,28 @@ utils::globalVariables("self")
   }
 
   register_response("presence_absence", .presence_absence)
+  heads <- .numeric_heads()
+  for (name in names(heads)) {
+    register_response(name, heads[[name]])
+  }
+  for (name in c("r_squared", "pearson")) {
+    register_metric(name, local({
+      metric <- name
+      function(y, p) regression_metric(y, p, metric)
+    }))
+  }
+  for (name in c("rmse", "mse", "mae", "max_error")) {
+    register_metric(paste0("neg_", name), local({
+      metric <- name
+      function(y, p) -regression_metric(y, p, metric)
+    }))
+  }
+  for (name in names(.ordinal_metrics)) {
+    register_metric(paste0("ordinal_", name), local({
+      metric <- name
+      function(y, p) ordinal_metric(y, p, metric)
+    }))
+  }
 
   grids <- .default_grids()
   for (name in names(grids)) {

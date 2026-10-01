@@ -350,6 +350,64 @@ def scorable_cells(y: Response, folds) -> Cells:
                            (p_test >= 1) & (a_test >= 1))[order])
 
 
+def numeric_cells(y: Response, folds) -> Cells:
+    """The cells of a numeric response. A model needs two distinct values to be fitted on and a
+    score two to be read at, so a cell is scorable where each side of its split holds at least two.
+    The counts the table carries are of units, ``pres_*``, and of distinct values, ``abs_*``."""
+    folds = align_folds(folds, y.units)
+    variable, fold, occ, p_train, a_train, p_test, a_test = [], [], [], [], [], [], []
+    for k in np.unique(folds):
+        test = folds == k
+        for j, name in enumerate(y.variables):
+            col = y.values[:, j]
+            variable.append(name)
+            fold.append(int(k))
+            occ.append(len(np.unique(col)))
+            p_train.append(int((~test).sum()))
+            a_train.append(len(np.unique(col[~test])))
+            p_test.append(int(test.sum()))
+            a_test.append(len(np.unique(col[test])))
+    order = np.lexsort((np.asarray(fold), np.asarray(variable)))
+
+    def arr(v):
+        return np.asarray(v, dtype=np.int64)[order]
+
+    a_train, a_test = arr(a_train), arr(a_test)
+    return Cells(variable=np.asarray(variable)[order], fold=np.asarray(fold)[order],
+                 n_occ=arr(occ), pres_train=arr(p_train), abs_train=a_train,
+                 pres_test=arr(p_test), abs_test=a_test,
+                 scorable=(a_train >= 2) & (a_test >= 2))
+
+
+def _numeric_head(check, metric: str) -> dict:
+    def prepare(y):
+        y = as_response(y)
+        if not np.isfinite(y.values).all():
+            raise ValueError("a numeric response is finite numbers, with no missing value")
+        check(y.values)
+        return y
+
+    return dict(prepare=prepare, activation="identity", loss="squared_error", metric=metric,
+                cells=numeric_cells)
+
+
+def _check_abundance(v):
+    if (v < 0).any():
+        raise ValueError("an abundance response is not negative")
+
+
+def _check_ordinal(v):
+    if (v != np.round(v)).any():
+        raise ValueError("an ordinal response holds whole-number classes")
+
+
+# The heads for a numeric response. All three are fitted under squared error through an identity
+# output; they differ in what the response may hold and in the metric a comparison reads.
+CONTINUOUS = _numeric_head(lambda v: None, "r_squared")
+ABUNDANCE = _numeric_head(_check_abundance, "r_squared")
+ORDINAL = _numeric_head(_check_ordinal, "ordinal_f1")
+
+
 def positive_weights(y, cap: float = 50.0, fitting=None) -> np.ndarray:
     """Case weights that balance a rare response.
 
