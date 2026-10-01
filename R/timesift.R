@@ -310,6 +310,9 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
     fit_learner(learners[[fitted$learner[j]]], built[[fitted$representation[j]]], y_matrix,
                 response = response, control = control, group = group)
   }), fitted$candidate)
+  grid$settings <- NA_character_
+  grid$settings[match(fitted$candidate, grid$candidate)] <-
+    vapply(models_out, .chosen_settings, character(1L), USE.NAMES = FALSE)
   stack <- if (stacking) {
     ensemble_fit(oof = oof, y = y_matrix, cells = cells, folds = folds, spec = ensemble,
                  scores = scores)

@@ -110,7 +110,7 @@ test_that("the candidate table names the representation, the learner and the arr
   fit <- run_toy(toy_case())
   expect_equal(names(fit$candidates),
                c("candidate", "representation", "learner", "grain", "bins", "channels",
-                 "status", "note"))
+                 "status", "note", "settings"))
   expect_true(all(fit$candidates$status == "fitted"))
   expect_equal(fit$candidates$bins,
                vapply(fit$representations, function(m) dim(m)[2L], integer(1L)),

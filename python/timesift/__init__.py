@@ -44,6 +44,7 @@ from .specs import (Representation, Resampling, Sift, TimesiftSpec, as_resamplin
                     auto_grains, block_cv, build_representation, cv, env_cv, expand_sift, grain,
                     grains, grouped_cv, lookback, lookbacks, multigrain, n_targets, native,
                     resolve_folds, target_labels)
+from .tune import Tuned, tune
 from .stack import (SPREAD_STATISTICS, EnsembleSpec, Stack, ensemble, ensemble_combine,
                     ensemble_fit, ensemble_spread)
 
@@ -84,7 +85,7 @@ __all__ = [
     "GRAINS",
     "Ladder", "Learner", "PRESENCE_ABSENCE", "ResponseCurve", "Representation", "Resampling", "Response",
     "SPREAD_STATISTICS", "STATS",
-    "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "TimesiftSet", "TimesiftSpec",
+    "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "Tuned", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "additive", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",
     "average_precision", "boyce_index",
     "bind_channels", "block_cv", "boosting", "build_representation", "calendar_channels", "candidate_table", "cnn",
@@ -103,5 +104,5 @@ __all__ = [
     "rescnn", "resolve_folds", "response_curve", "resolve_metric", "responses", "roc_auc", "scorable_cells",
     "score_predictions", "select_columns", "table_metric",
     "select_grain", "simulate_records", "stepwise", "summary", "target_labels", "timesift", "timesift_set",
-    "train_control", "tree", "tss", "tss_inflation", "write_cells", "write_folds", "write_response",
+    "train_control", "tree", "tss", "tune", "tss_inflation", "write_cells", "write_folds", "write_response",
 ]

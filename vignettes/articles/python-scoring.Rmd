@@ -237,6 +237,73 @@ Takes a `timesift.fit.timesift` run or a `timesift.ladder.grain_ladder` result,
 and the profile itself is one implementation either way. The models kept per fold are the ones
 read, so the profile is measured where the score was: on the units each model held out.
 
+## `response_curve()`
+
+```python
+response_curve(
+    fit,
+    candidate: str = 'ensemble',
+    predictor=None,
+    with_=None,
+    fixed: str = 'mean',
+    n: int = 50,
+    spread: bool = False,
+)
+```
+
+Vary one predictor of a fitted candidate across the range it takes, the rest held fixed.
+
+A predictor is a cell of the representation the candidate reads: one statistic in one bin.
+Given as the name of a channel it is that statistic moved together in every bin, which is the
+way a column named in `static` is moved; given as `{"bin": ..., "channel": ...}` it is one
+cell, and a bare bin name is enough where the representation has a single channel. The
+reference is one made-up unit whose every cell holds the `fixed` summary (`"mean"`,
+`"median"`, `"min"` or `"max"`) of that cell over the targets; a cell that is the same
+for every target keeps its value. The curve is read off the model fitted on all targets.
+
+For the ensemble every member is moved the same way, a member that does not carry the predictor
+is held at the reference, and the members' predictions are combined by the stack; `spread`
+adds the members' standard deviation and interval. `with_` is a second predictor, and the
+prediction is then read over the grid of the two; it is `with` in R, which Python reserves.
+
+## `ResponseCurve`
+
+```python
+ResponseCurve(
+    value,
+    variable,
+    prediction,
+    candidate,
+    predictor,
+    fixed,
+    value_with,
+    with_label,
+    sd,
+    lower,
+    upper,
+)
+```
+
+The prediction against the value of a predictor, or of two.
+
+`prediction` is `[value, response]`; with a second predictor `value` and `value_with`
+run over the grid of the two, the first fastest, as R's table does. `sd`, `lower` and
+`upper` are the ensemble members' spread at every value, and `None` where it was not asked.
+
+Attributes:
+
+- `value` - np.ndarray
+- `variable` - tuple[str, ...]
+- `prediction` - np.ndarray
+- `candidate` - str
+- `predictor` - str
+- `fixed` - str
+- `value_with` - np.ndarray | None
+- `with_label` - str | None
+- `sd` - np.ndarray | None
+- `lower` - np.ndarray | None
+- `upper` - np.ndarray | None
+
 ## `simulate_records()`
 
 ```python

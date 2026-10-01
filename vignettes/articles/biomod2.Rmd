@@ -261,6 +261,18 @@ grid of 100 cuts. `table_metric()` reads it at the cut of the `rule` given, `"yo
 so the statistics are comparable at one operating point. Every name is a registered metric, so
 `grain_ladder(metric = "csi")` reads it.
 
+## Tuning
+
+`BIOMOD_Tuning()` searches a grid per algorithm. `tune()` wraps a learner so that it searches a grid
+of its own settings on the units it is fitted on, by cross-validation inside them, and fits the
+best. Inside a run each outer fold chooses from its own training units, so the score a tuned
+candidate is read at is not selected on. The settings it chose are in the candidate table.
+
+```{r tune, eval = FALSE}
+timesift(targets, series, y = starts_with("sp"), id = plot, time = t, x = temp,
+         models = list(RF = tune(forest(), list(mtry = c(2, 5, 10), min_node = c(1, 5)))))
+```
+
 ## Variable importance
 
 biomod2's `bm_VariablesImportance()` permutes one predictor and reports one minus its correlation

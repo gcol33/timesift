@@ -1991,6 +1991,8 @@ call site.
 | drawing a ladder, a run or a selection | `plot()`, a method on the base generic for each, on base graphics | `plot()`, one function taking any of the three, on matplotlib |
 | a simulated record | a `timesift_simulation` list whose `readings` is a data frame | the `Simulation` dataclass, whose `readings` is a mapping of column to array; the first reading instant is `from_`, since `from` is a keyword |
 | boosting's L2 penalty on a leaf | `boosting(lambda =)` | `boosting(lambda_=)`, since `lambda` is a keyword |
+| a tuned learner | `tune()`, a learner whose fitted model is a `timesift_tuned` holding `model`, `chosen` and `table` | `tune()`, a `Learner` whose fitted model is a `Tuned` holding the same three, `table` a list of rows |
+| the settings a candidate chose | the `settings` column of `candidates`, `NA` where the learner was not tuned | the `settings` column of `candidates`, an empty string there |
 | a response curve | `response_curve()`, an S3 generic with a method on a run, a data frame in long form with a `plot()` method; the second predictor is `with =` | `response_curve()`, one function returning a `ResponseCurve` whose `prediction` is `[value, response]`; the second predictor is `with_=`, since `with` is a keyword |
 | the occlusion of an ensemble | `occlusion(fit, "ensemble", over = "channel")` | the same call, `occlusion(fit, "ensemble", over="channel")` |
 

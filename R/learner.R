@@ -189,14 +189,27 @@ fit_learner <- function(learner, x, y, response = "presence_absence", control = 
   spec <- .responses_reg$get(response)
   y <- spec$prepare(y)
   y <- .align_response(y, dimnames(x)[[1L]])
-  # A setting given here overrides the one the learner carries, rather than reaching `fit` twice.
-  given <- list(...)
+  model <- .call_fit(learner, x, y, spec, control, group, list(...))
+  # The bins and the channels the fit was made on travel with it, and a representation asked to
+  # predict is checked against them once, before any learner sees it: a calendar grain's bins are
+  # named by their starts, so a record from another period is refused by the first bin that
+  # differs rather than read by position.
+  structure(list(learner = .learner_ref(learner), model = model, response = response,
+                 variables = colnames(y), grain = attr(x, "grain"),
+                 stats = attr(x, "stats"), bins = dimnames(x)[[2L]],
+                 channels = dimnames(x)[[3L]]),
+            class = "timesift_fit")
+}
+
+# The call to a learner's `fit`, arguments assembled from what the learner declares. A setting
+# given here overrides the one the learner carries, rather than reaching `fit` twice. A learner
+# that trains under a control declares one; the resolved control reaches it through that argument
+# and through nothing else, so a learner with no training settings never sees one. The response
+# head reaches a fit the same way, so what a learner fits toward is the registration and never a
+# second copy of it inside the learner.
+.call_fit <- function(learner, x, y, spec, control, group, given = list()) {
   carried <- learner$params[setdiff(names(learner$params), names(given))]
   args <- c(list(x = x, y = y), carried, given)
-  # A learner that trains under a control declares one; the resolved control reaches it through
-  # that argument and through nothing else, so a learner with no training settings never sees one.
-  # The response head reaches a fit the same way, so what a learner fits toward is the
-  # registration and never a second copy of it inside the learner.
   declared <- names(formals(learner$fit))
   if ("control" %in% declared) {
     args$control <- .resolve_control(control, learner$control)
@@ -214,16 +227,7 @@ fit_learner <- function(learner, x, y, response = "presence_absence", control = 
     }
     args["group"] <- list(if (is.null(group)) NULL else as.character(group))
   }
-  model <- do.call(learner$fit, args)
-  # The bins and the channels the fit was made on travel with it, and a representation asked to
-  # predict is checked against them once, before any learner sees it: a calendar grain's bins are
-  # named by their starts, so a record from another period is refused by the first bin that
-  # differs rather than read by position.
-  structure(list(learner = .learner_ref(learner), model = model, response = response,
-                 variables = colnames(y), grain = attr(x, "grain"),
-                 stats = attr(x, "stats"), bins = dimnames(x)[[2L]],
-                 channels = dimnames(x)[[3L]]),
-            class = "timesift_fit")
+  do.call(learner$fit, args)
 }
 
 # What a fit was made on and what it is asked to predict have to be one representation: the

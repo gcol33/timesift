@@ -2,6 +2,11 @@
 
 ## New
 
+* `tune()` wraps a learner so that, whenever it is fitted, it searches a grid of its settings by
+  cross-validation inside the units it is handed and fits the best one. Inside a run each outer
+  fold chooses from its own training units. What was chosen is on the fitted model and in the new
+  `settings` column of the candidate table. This is biomod2's `BIOMOD_Tuning()`. Both languages.
+
 * `response_curve()` varies one predictor of a fitted candidate across the range it takes while the
   others are held at the mean, median, minimum or maximum of their cells, and returns the
   prediction, as biomod2's response curves do. A predictor is a channel (moved in every bin, as a

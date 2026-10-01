@@ -136,13 +136,19 @@ def fit_learner(learner, x: TimesiftMatrix, y, response: str = "presence_absence
     if group is not None and len(group) != x.values.shape[0]:
         raise ValueError(f"`group` must have one value per unit, got {len(group)} for "
                          f"{x.values.shape[0]}")
-    given = _declared(learner.fit, head=head, control=control, variables=y.variables,
-                      group=None if group is None else tuple(str(g) for g in group))
-    if "weights" in inspect.signature(learner.fit).parameters:
-        given["weights"] = _head_weights(head, y.values)
-    model =learner.fit(x, y.values, **{**learner.params, **kwargs, **given})
+    model = _call_fit(learner, x, y.values, head, control, y.variables, group, kwargs)
     return Fit(learner=learner, model=model, variables=y.variables, response=response,
                bins=tuple(x.bins), channels=tuple(x.stats))
+
+
+def _call_fit(learner: Learner, x, y: np.ndarray, head, control, variables, group, given):
+    """The call to a learner's ``fit``, with the arguments it declares added to the settings it
+    carries and the ones given, which override the carried ones."""
+    declared = _declared(learner.fit, head=head, control=control, variables=variables,
+                         group=None if group is None else tuple(str(g) for g in group))
+    if "weights" in inspect.signature(learner.fit).parameters:
+        declared["weights"] = _head_weights(head, y)
+    return learner.fit(x, y, **{**learner.params, **given, **declared})
 
 
 def _declared(fit, **given) -> dict:

@@ -336,7 +336,8 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
             estimate += _run_estimate("ensemble", y_mat, p_ensemble, f, levels, cells, response,
                                       score, metric_name)
 
-    return Timesift(candidates=_candidate_table(pairs, representations), scores=scores, oof=oof,
+    return Timesift(candidates=_candidate_table(pairs, representations, fitted), scores=scores,
+                    oof=oof,
                     representations=representations,
                     sift=Sift({k: v["spec"] for k, v in used.items()}), stack=stack,
                     weights=weights,
@@ -496,11 +497,12 @@ def _refuse_one_bin(pairs, representations) -> None:
                               f"{m.values.shape[2]} features")
 
 
-def _candidate_table(pairs, representations) -> dict:
+def _candidate_table(pairs, representations, fitted) -> dict:
     """One row per pair, the ones that could not be fitted among them: a pair carrying no score is
     what the summary reads as not applicable."""
+    from .tune import Tuned, label
     columns: dict = {k: [] for k in ("candidate", "representation", "learner", "grain", "bins",
-                                     "channels", "multi", "reason")}
+                                     "channels", "multi", "reason", "settings")}
     for pair in pairs:
         m = representations.get(pair["representation"])
         columns["candidate"].append(pair["candidate"])
@@ -511,6 +513,8 @@ def _candidate_table(pairs, representations) -> dict:
         columns["channels"].append(0 if m is None else int(m.values.shape[2]))
         columns["multi"].append(pair["learner"].multi)
         columns["reason"].append(pair["reason"] or "")
+        model = getattr(fitted.get(pair["candidate"]), "model", None)
+        columns["settings"].append(label(model.chosen) if isinstance(model, Tuned) else "")
     return {k: np.asarray(v) for k, v in columns.items()}
 
 
