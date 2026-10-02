@@ -3,8 +3,9 @@
 One generalised linear model per variable, its terms chosen by Akaike's
 criterion over every bin-by-channel column. The family is the response
 head's: logistic under a binary cross-entropy loss, Gaussian under a
-squared-error one. So are the case weights, so a rare response weighs
-here what it weighs in every other learner.
+squared-error one and Poisson under a Poisson-deviance one. So are the
+case weights, so a rare response weighs here what it weighs in every
+other learner.
 
 ## Usage
 

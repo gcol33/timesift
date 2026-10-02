@@ -109,10 +109,10 @@
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
 
-<table class="table table"><tr><td><code>metric</code></td><td>reads</td></tr><tr><td><code>"r_squared"</code></td><td><code>1 - sum(e^2) / sum((y - mean(y))^2)</code>, <code>NA</code> where <code>y</code> is constant</td></tr><tr><td><code>"pearson"</code></td><td>the correlation of <code>y</code> and <code>p</code>, <code>NA</code> where either is constant</td></tr><tr><td><code>"rmse"</code></td><td><code>sqrt(mean(e^2))</code></td></tr><tr><td><code>"mse"</code></td><td><code>mean(e^2)</code></td></tr><tr><td><code>"mae"</code></td><td><code>mean(abs(e))</code></td></tr><tr><td><code>"max_error"</code></td><td><code>max(abs(e))</code></td></tr></table><p>A comparison across candidates reads the highest score as the best, so the four errors are
-registered under the names <code>neg_rmse</code>, <code>neg_mse</code>, <code>neg_mae</code> and <code>neg_max_error</code> with their sign
-reversed, and <code>r_squared</code> and <code>pearson</code> under their own names. A cell holding a prediction that
-is not a number scores <code>NA</code>.</p>
+<table class="table table"><tr><td><code>metric</code></td><td>reads</td></tr><tr><td><code>"r_squared"</code></td><td><code>1 - sum(e^2) / sum((y - mean(y))^2)</code>, <code>NA</code> where <code>y</code> is constant</td></tr><tr><td><code>"pearson"</code></td><td>the correlation of <code>y</code> and <code>p</code>, <code>NA</code> where either is constant</td></tr><tr><td><code>"rmse"</code></td><td><code>sqrt(mean(e^2))</code></td></tr><tr><td><code>"mse"</code></td><td><code>mean(e^2)</code></td></tr><tr><td><code>"mae"</code></td><td><code>mean(abs(e))</code></td></tr><tr><td><code>"max_error"</code></td><td><code>max(abs(e))</code></td></tr><tr><td><code>"poisson_deviance"</code></td><td><code>mean(2 (y log(y / p) - (y - p)))</code>, the logarithm taken as zero at <code>y = 0</code>; <code>NA</code> where a prediction is negative or is zero beside a count above zero</td></tr></table><p>A comparison across candidates reads the highest score as the best, so the five errors are
+registered under the names <code>neg_rmse</code>, <code>neg_mse</code>, <code>neg_mae</code>, <code>neg_max_error</code> and
+<code>neg_poisson_deviance</code> with their sign reversed, and <code>r_squared</code> and <code>pearson</code> under their own
+names. A cell holding a prediction that is not a number scores <code>NA</code>.</p>
     </div>
 
     <div class="section level2">

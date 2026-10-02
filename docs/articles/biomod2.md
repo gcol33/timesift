@@ -180,7 +180,7 @@ fit
 #> 
 #> procedure, chosen and weighted inside each outer training fold
 #> selected                  0.780  se 0.012
-#> ensemble                  0.758  se 0.014
+#> ensemble                  0.759  se 0.014
 #> selected MAXNET / week in 5 of 5 folds
 #> 
 #> choice on every target  MAXNET / week
@@ -307,10 +307,10 @@ fit_ca <- timesift(
 )
 subset(fit_ca$estimate, metric %in% c("roc_auc", "tss"), c(arm, metric, score, se))
 #>         arm  metric     score         se
-#> 24 selected roc_auc 0.7800964 0.01178032
-#> 26 selected     tss 0.5580208 0.01515674
-#> 50 ensemble roc_auc 0.7236305 0.03402524
-#> 52 ensemble     tss 0.4526556 0.05909692
+#> 25 selected roc_auc 0.7804232 0.01208863
+#> 27 selected     tss 0.5599815 0.01711471
+#> 52 ensemble roc_auc 0.7236305 0.03402524
+#> 54 ensemble     tss 0.4526556 0.05909692
 ```
 
 `EMcv` and `EMci` read the members of the ensemble side by side.
@@ -375,12 +375,13 @@ reads it at the cut of the `rule` given, `"youden"` by default, so the
 statistics are comparable at one operating point. Every name is a
 registered metric, so `grain_ladder(metric = "csi")` reads it.
 
-## Abundance, ordinal and continuous responses
+## Abundance, ordinal, continuous and count responses
 
-biomod2 4.3 also models abundances and ordinal classes. The response
-head decides what a response is, and three ship beside presence-absence:
-`response = "continuous"` for any real number, `"abundance"` for a
-non-negative one, and `"ordinal"` for whole-number classes. All three
+biomod2 4.3 also models abundances, ordinal classes and counts. The
+response head decides what a response is, and four ship beside
+presence-absence: `response = "continuous"` for any real number,
+`"abundance"` for a non-negative one, `"ordinal"` for whole-number
+classes and `"count"` for whole numbers of zero or more. The first three
 are fitted under squared error through an identity output, so every
 learner but the three above and the combiner read them unchanged.
 `r_squared` is what a continuous or abundance comparison reads by
@@ -392,9 +393,19 @@ score is the best).
 [`ordinal_metric()`](https://gillescolling.com/timesift/reference/ordinal_metric.md)
 carries `Accuracy`, `Recall`, `Precision` and `F1`, each prediction
 being read as the observed class nearest to it. A multiclass response is
-one presence-absence column per class. A count under a Poisson loss is
-not shipped: the penalised, tree, boosting and stepwise cores would each
-need that family.
+one presence-absence column per class.
+
+A count is fitted under the Poisson deviance through a log link and an
+exponential output, and a comparison reads `neg_poisson_deviance`, the
+mean deviance with its sign reversed. The elastic net, the stepwise
+search, MARS, the additive model, the tree and the boosted trees each
+fit the Poisson family on their own core, pinned against glmnet, MASS
+and [`glm()`](https://rdrr.io/r/stats/glm.html), earth, mgcv, rpart and
+gbm or xgboost’s `count:poisson`. The forest cuts a count on its
+variance, the networks train under the deviance and the combiner
+minimises it. A tree shrinks a leaf’s rate towards the rate of the units
+it is grown on, as rpart does, and `tree(shrink = 0)` takes the
+shrinkage away.
 
 ## Maps
 

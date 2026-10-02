@@ -1288,15 +1288,19 @@ by its standard deviation with <code>n - 1</code> first, and a column of
 no spread becomes zero. The resulting map is grouped by block, so a
 split drawn inside a fold keeps a block whole.</p>
 <p><code>numeric_metric_cases.csv</code> and
-<code>numeric_metrics.csv</code> hold eight <code>(y, p)</code> cases
+<code>numeric_metrics.csv</code> hold eleven <code>(y, p)</code> cases
 and the value of every metric of a numeric response and of ordinal
 classes on each. With <code>e = y - p</code>, <code>r_squared</code> is
 <code>1 - sum(e^2) / sum((y - mean(y))^2)</code>, <code>pearson</code>
 the correlation, <code>rmse</code>, <code>mse</code>, <code>mae</code>
 and <code>max_error</code> the root mean, the mean, the mean absolute
-and the greatest absolute of <code>e</code>; where <code>y</code> or
-<code>p</code> is constant the first two are <code>NA</code>, as is any
-metric where <code>p</code> holds a value that is not a number. For the
+and the greatest absolute of <code>e</code>, and
+<code>poisson_deviance</code> the mean of
+<code>2 (y log(y / p) - (y - p))</code>, the logarithm taken as zero at
+<code>y = 0</code>; where <code>y</code> or <code>p</code> is constant
+the first two are <code>NA</code>, as is any metric where <code>p</code>
+holds a value that is not a number, and the Poisson deviance where
+<code>p</code> is negative or is zero beside a count above zero. For the
 ordinal metrics each prediction is read as the observed class nearest to
 it, the lower class on a tie, <code>m[i, j]</code> counts the units of
 observed class <code>j</code> read as class <code>i</code>, and with
@@ -1392,7 +1396,8 @@ rather than an elastic net of our own.</p>
 <ul>
 <li>Case weights are normalised to sum to one, and the objective is the
 mean deviance halved for a Gaussian family and the mean negative log
-likelihood for a binomial one, plus
+likelihood for a binomial or a Poisson one, the Poisson one without its
+<code>log(y!)</code>, plus
 <code>lambda * (alpha * sum |b| + (1 - alpha) / 2 * sum b^2)</code>.</li>
 <li>Every column is centred on its weighted mean and divided by its
 weighted standard deviation, taken with those weights and no correction
@@ -1413,7 +1418,10 @@ start.</li>
 <li>The path ends early where a step explains almost nothing more: a
 Gaussian family reads that share against the deviance explained so far
 and a binomial one reads it outright, which is the difference glmnet’s
-two solvers carry. It also ends where a fit explains more than
+solvers carry. A Poisson family reads the share gained over the last
+four steps, the fifth point’s deviance explained less the first’s,
+relative to the deviance explained now, against ten times that
+threshold. It also ends where a fit explains more than
 <code>0.999</code> of the null deviance. Neither rule is read before the
 fifth point, and neither applies to a path of supplied penalties.</li>
 <li>The fit is iteratively reweighted least squares with a cyclic
@@ -1432,6 +1440,19 @@ and the descent still stops only on a pass that moved nothing.</li>
 <li>A Gaussian fit folds the root of each case weight into the
 standardised columns and into the intercept’s column, so its quadratic
 has unit weight.</li>
+<li>A Poisson response is a count under the log link, none of it
+negative and some above zero, and more than one value. Its null model is
+the weighted mean count, whose logarithm is the starting intercept (a
+mean of one where the fit has no intercept), and the quadratic there,
+the mean as the working weight and <code>y - mean</code> times the case
+weight as the residual, is what the largest penalty is read off. A
+reweighting rebuilds it at the current coefficients, the linear
+predictor held within 250 either side. Like a binomial fit it is
+reweighted least squares inside a coordinate descent, and its deviance
+explained is read against the null deviance of the weighted mean. A
+held-out case’s deviance is <code>2 (y log(y / mu) - (y - mu))</code> at
+the predicted mean, the logarithm taken as zero at
+<code>y = 0</code>.</li>
 <li>A fit that does not settle at a penalty, inside
 <code>max_irls</code> reweightings or inside what is left of the path’s
 <code>max_pass</code> passes, ends the path there: the points before it
@@ -1473,8 +1494,12 @@ the standardisation exists for, a reading of ten degrees and its square
 of a hundred, and the weekly bins of one record are collinear the way
 adjacent bins are. Beside it are a binomial response, the continuous
 driver it was generated from, a case weight per unit and a five-fold
-map.</p>
-<p><code>penalised_cases.csv</code> names twelve cases, each family at
+map. <code>count_response.csv</code> holds a count response for the
+Poisson family, read by unit: the driver in standard units read as a
+rate <code>exp(0.4 + 0.6 z)</code>, and that Poisson’s quantiles at a
+low-discrepancy sequence rather than a draw, so no random stream is
+advanced.</p>
+<p><code>penalised_cases.csv</code> names eighteen cases, each family at
 each of three mixings with and without the weights, and carries the
 convergence threshold and the pass budget the reference was read at and
 the tolerances a suite is allowed. <code>penalised_path.csv</code> holds
@@ -1502,7 +1527,9 @@ the reference, which is the direction the arm is allowed to move in;
 sitting above it is the arm being weakened, which is the thing this
 replacement was not allowed to do. Measured at a matched threshold of
 <code>1e-14</code>, the core sits between <code>3e-13</code> and
-<code>2e-7</code> above glmnet across the twelve cases.</li>
+<code>2e-7</code> above glmnet across the twelve Gaussian and binomial
+cases, and at most <code>6.7e-8</code> above it across the six Poisson
+ones.</li>
 <li>
 <strong>A coefficient is allowed <code>1e-4</code></strong>, against
 the largest coefficient of the case. It is looser than the objective on
@@ -1514,8 +1541,9 @@ agree far closer, to <code>2e-6</code> at a matched threshold of
 <li>
 <strong>The cross-validated penalty is exact.</strong>
 <code>lambda.min</code> and <code>lambda.1se</code> are the same point
-of the same path in all twelve cases, and the held-out deviance agrees
-to <code>1e-4</code> relative.</li>
+of the same path in all eighteen cases, and the held-out deviance agrees
+to <code>1e-4</code> relative, to <code>2.2e-7</code> on the Poisson
+ones.</li>
 </ul>
 <p>One point of the path is different by construction, and only for a
 ridge. glmnet fits its first point at a penalty of <code>9.9e35</code>
@@ -1526,6 +1554,12 @@ mixing of zero there is no threshold, and the core solves the point it
 reports while glmnet reports a fit made at an infinite penalty. The
 fixtures therefore start at the second point, and the difference at the
 first is asserted to be small rather than absent.</p>
+<p>A Poisson path that ends on the rule that stops it, rather than at
+its last penalty, ends on a comparison with a threshold, and glmnet’s
+Newton iteration settles at a tolerance of its own. The generator
+refuses a Poisson reference whose comparison at either of its last two
+points lies within a thousandth of the threshold, so no length hangs on
+that tolerance.</p>
 <p>The reference is generated with glmnet’s own pass budget raised well
 above its default. At the threshold the reference is read at, a
 collinear design runs past that default, and glmnet then warns,
@@ -1682,10 +1716,31 @@ value is an error rather than a surrogate split. A binomial response is
 0 or 1, and case weights are zero or more and sum to more than
 zero.</li>
 <li>A binomial family splits on the Gini index of the weighted class
-counts, a Gaussian one on the weighted sum of squares. A node’s risk is
-the weight it misclassifies under its majority class, the first class
-winning a tie, or its weighted sum of squares about its weighted mean.
-Its value is the weighted share of ones, or that mean.</li>
+counts, a Gaussian one on the weighted sum of squares, a Poisson one on
+the Poisson deviance of the unshrunk rates. A node’s risk is the weight
+it misclassifies under its majority class, the first class winning a
+tie, its weighted sum of squares about its weighted mean, or its Poisson
+deviance about its shrunk rate. Its value is the weighted share of ones,
+that mean, or that rate.</li>
+<li>A Poisson response is a count, none of it negative, with some weight
+on a count above zero. A node holding events <code>S = sum w y</code>
+over exposure <code>W = sum w</code> predicts the rate
+<code>(S + a) / (W + b)</code>, the posterior mean of a gamma prior of
+coefficient of variation <code>shrink</code> centred on the rate of the
+units the tree is grown on: <code>a = 1 / shrink^2</code> and
+<code>b = a W_0 / S_0</code> from those units’ totals, and
+<code>a = b = 0</code>, the unshrunk <code>S / W</code>, where
+<code>shrink</code> is zero. Its risk is
+<code>sum 2 w (y log(y / rate) - (y - rate))</code> about that rate, the
+logarithm taken as zero at <code>y = 0</code>. A cut gains the deviance
+of the unshrunk rates it removes,
+<code>2 (S_l log(S_l / W_l) + S_r log(S_r / W_r) - S log(S / W))</code>
+with a term of no events counted as zero, as a share of the node’s risk,
+and sends the side of the lower unshrunk rate left. The tree grown on a
+cross-validation fold’s units takes its prior from those units, and a
+held-out observation’s loss is the deviance
+<code>2 (y log(y / rate) - (y - rate))</code> of the leaf it
+reaches.</li>
 <li>A column’s observations are sorted once, by rpart’s own quicksort,
 and every node reads them in that order. The order matters beyond the
 sort: a node’s sums are taken in it, and two sums of the same numbers in
@@ -1743,14 +1798,17 @@ way. The core falls the same way on every machine.</li>
 <div class="section level3">
 <h3 id="the-fixtures-2">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-2"></a>
 </h3>
-<p><code>tree_cases.csv</code> names twelve cases: each family, with
+<p><code>tree_cases.csv</code> names twenty-two cases: each family, with
 every weight one and with the integer counts
 <code>tree_weights.csv</code> holds, under rpart’s own defaults,
 biomod2’s tuned option set, and a shallow tree grown with no complexity
-threshold at all. Each is grown on the design
+threshold at all, and four Poisson cases under the tuned option set at a
+<code>shrink</code> of zero and of one half. Each is grown on the design
 <code>penalised_input.csv</code> carries, with its five-fold map as the
-cross-validation’s folds. <code>tree_nodes.csv</code> holds rpart’s node
-table, <code>tree_cptable.csv</code> its complexity table with the
+cross-validation’s folds, and on the count response of
+<code>count_response.csv</code> under the Poisson family.
+<code>tree_nodes.csv</code> holds rpart’s node table,
+<code>tree_cptable.csv</code> its complexity table with the
 cross-validated error, and <code>tree_predict.csv</code> the predictions
 of the tree rpart’s <code>prune()</code> leaves at the row biomod2’s
 rule picks.</p>
@@ -1763,8 +1821,9 @@ counts and the number of splits in each row of the table are asserted
 exactly. Every number of the node table and the complexity table, the
 thresholds, weights, risks, complexities, values, cross-validated errors
 and their spreads, and every prediction of the pruned tree, is asserted
-to <code>1e-12</code> relative. On the twelve cases the largest
-difference from rpart is <code>1.1e-16</code>.</p>
+to <code>1e-12</code> relative. On the twelve binomial and Gaussian
+cases the largest difference from rpart is <code>1.1e-16</code>, and on
+the ten Poisson ones <code>1.8e-14</code>.</p>
 </div>
 </div>
 <div class="section level2">
@@ -1865,12 +1924,14 @@ values, taken in tree order, over the number of trees.</li>
 <p><code>preset = "package"</code> is randomForest’s own defaults, which
 is what biomod2’s default option set fits: 500 trees, <code>mtry</code>
 the square root of the column count rounded down under a binomial family
-and a third of it under a Gaussian one, never below one, and
-<code>min_node</code>, the <code>min_leaf</code> above, one and five
-under the two. <code>preset = "bigboss"</code> is biomod2’s tuned option
-set: 500 trees, <code>mtry = 2</code>, <code>min_node = 5</code>. A
-setting given explicitly beats either, and an <code>mtry</code> above
-the column count is the column count.</p>
+and a third of it under a Gaussian or a Poisson one, never below one,
+and <code>min_node</code>, the <code>min_leaf</code> above, one and five
+under the two. A forest cuts a count as it cuts a continuous response,
+on the weighted sum of squares, and a leaf holds the mean count of its
+draws. <code>preset = "bigboss"</code> is biomod2’s tuned option set:
+500 trees, <code>mtry = 2</code>, <code>min_node = 5</code>. A setting
+given explicitly beats either, and an <code>mtry</code> above the column
+count is the column count.</p>
 </div>
 <div class="section level3">
 <h3 id="the-fixtures-3">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-3"></a>
@@ -1879,8 +1940,8 @@ the column count is the column count.</p>
 the forest grown from this text in R alone,
 <code>tests/testthat/helper-oracle-forest.R</code>, which computes the
 generator’s arithmetic in doubles where every step is exact.
-<code>forest_cases.csv</code> names six cases on the tree’s design: each
-family, flat weights and the tree’s counts, a balanced forest, one
+<code>forest_cases.csv</code> names eight cases on the tree’s design:
+each family, flat weights and the tree’s counts, a balanced forest, one
 trying every column, and a seed of 2^32 - 1.
 <code>forest_nodes.csv</code> holds each tree’s node table and
 <code>forest_predict.csv</code> the forest’s prediction for every unit,
@@ -1915,11 +1976,12 @@ forest’s generator.</p>
 </h3>
 <ul>
 <li>The score of every observation starts at
-<code>log(S / (T - S))</code> under a binomial family and
-<code>S / T</code> under a Gaussian one, <code>S</code> the sum of
-weight times response and <code>T</code> the sum of weights, each taken
-in row order. A binomial fit with no weight on one class is an
-error.</li>
+<code>log(S / (T - S))</code> under a binomial family,
+<code>S / T</code> under a Gaussian one and <code>log(S / T)</code>
+under a Poisson one, <code>S</code> the sum of weight times response and
+<code>T</code> the sum of weights, each taken in row order. A binomial
+fit with no weight on one class is an error, and so is a Poisson one
+with no weight on a count above zero.</li>
 <li>Tree <code>t</code> of fit <code>f</code> draws from the stream
 <code>f * trees + t</code> of the fit’s seed, fit 0 being the fit on
 every observation and fit <code>g + 1</code> the one holding fold
@@ -1932,11 +1994,13 @@ floor of <code>colsample</code> times the column count, at least one, by
 the forest’s partial shuffle of a fresh arrangement of the column
 indices, tried in ascending order.</li>
 <li>The working response is, first order,
-<code>y - 1 / (1 + exp(-F))</code> or <code>y - F</code>; second order,
-the gradient <code>w (p - y)</code> and hessian
-<code>w max(p (1 - p), 1e-16)</code> under a binomial family,
-<code>w (F - y)</code> and <code>w</code> under a Gaussian one,
-<code>p</code> the logistic of the score <code>F</code>.</li>
+<code>y - 1 / (1 + exp(-F))</code>, <code>y - exp(F)</code> or
+<code>y - F</code>; second order, the gradient <code>w (p - y)</code>
+and hessian <code>w max(p (1 - p), 1e-16)</code> under a binomial
+family, <code>w (mu - y)</code> and <code>w mu e^0.7</code> under a
+Poisson one, <code>w (F - y)</code> and <code>w</code> under a Gaussian
+one, <code>p</code> the logistic of the score <code>F</code> and
+<code>mu</code> its exponential.</li>
 <li>Each tree is grown on the bag’s observations, and each column’s
 observations are read in ascending order, ties in row order.</li>
 <li>A leaf’s value is its step times <code>shrinkage</code>, and every
@@ -1968,7 +2032,12 @@ order.</li>
 parent’s split left the sums. A binomial leaf’s is one Newton step, the
 sum of <code>w z</code> over the sum of
 <code>w (y - z) (1 - y + z)</code> over the bag’s observations in it, in
-row order, and zero where that is zero.</li>
+row order, and zero where that is zero. A Poisson leaf’s is
+<code>log(sum w y / sum w exp(F))</code> over the bag’s observations in
+it, in row order, <code>-1</code> where it holds no count and
+<code>0</code> where it holds no exposure, and then held to at most
+<code>19</code> less the greatest score in the leaf and at least
+<code>-19</code> less the least.</li>
 </ul>
 </div>
 <div class="section level3">
@@ -1989,7 +2058,11 @@ are both leaves and whose gain is below <code>gamma</code> is collapsed,
 which can make its parent such a split in turn.</li>
 <li>A leaf’s step is <code>-G / (H + lambda)</code> over the bag’s
 observations in it, in row order, and zero where the denominator is
-zero.</li>
+zero. Under a Poisson family the step is held within <code>0.7</code>
+either side and a split gains what the held steps remove,
+<code>-(2 G w + (H + lambda) w^2)</code> at the step <code>w</code> of
+each side and of the node, which is <code>G^2 / (H + lambda)</code>
+wherever the step is not held.</li>
 </ul>
 </div>
 <div class="section level3">
@@ -1997,7 +2070,9 @@ zero.</li>
 </h3>
 <p>Where folds are given, each fold’s fit scores its held-out
 observations after every tree by the weighted deviance,
-<code>-2 sum w (y F - log(1 + exp(F))) / sum w</code> or
+<code>-2 sum w (y F - log(1 + exp(F))) / sum w</code>,
+<code>-2 sum w (y F - exp(F)) / sum w</code> (the Poisson deviance
+without its saturated term, which no tree changes) or
 <code>sum w (y - F)^2 / sum w</code>. The error after tree
 <code>t</code> is each fold’s deviance times the observations the fold
 holds, summed over the folds in order and divided by all the
@@ -2024,17 +2099,20 @@ are zero under gbm’s trees and an error to set otherwise.</p>
 <div class="section level3">
 <h3 id="the-fixtures-4">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-4"></a>
 </h3>
-<p><code>boost_cases.csv</code> names twelve cases on the tree’s design.
-Six are gbm’s, each family with flat weights and the tree’s counts, and
-a cross-validated fit of each over the design’s five folds; gbm grows
-them with <code>bag.fraction = 1</code>, each fold’s fit behind
-<code>nTrain</code> as <code>gbmDoFold</code> arranges it. Four are
-xgboost’s <code>tree_method = "exact"</code>, with <code>lambda</code>
-and <code>gamma</code> set and, for a binomial response, the weights
-<code>boost_weights.csv</code> holds: under equal weights the first
-round’s gradients take two values, many splits then tie exactly, and the
-two libraries’ sums break such a tie differently. Two draw a subsample
-and a column sample and are grown from this text in R alone,
+<p><code>boost_cases.csv</code> names seventeen cases on the tree’s
+design. Nine are gbm’s, each family with flat weights and the tree’s
+counts, and a cross-validated fit of each over the design’s five folds;
+gbm grows them with <code>bag.fraction = 1</code>, each fold’s fit
+behind <code>nTrain</code> as <code>gbmDoFold</code> arranges it, the
+Poisson ones under its <code>poisson</code> distribution on the count
+response of <code>count_response.csv</code>. Six are xgboost’s
+<code>tree_method = "exact"</code>, two of them its
+<code>count:poisson</code>, with <code>lambda</code> and
+<code>gamma</code> set and, for a binomial or a Poisson response, the
+weights <code>boost_weights.csv</code> holds: under equal weights the
+first round’s gradients take two values, many splits then tie exactly,
+and the two libraries’ sums break such a tie differently. Two draw a
+subsample and a column sample and are grown from this text in R alone,
 <code>tests/testthat/helper-oracle-boost.R</code>.
 <code>boost_predict.csv</code> holds every case’s prediction for every
 unit and <code>boost_cv.csv</code> the cross-validated error after every
@@ -2048,7 +2126,8 @@ asserted to <code>1e-12</code> relative, the largest difference from gbm
 being <code>6.7e-16</code>; gbm rescales the weights before it fits,
 which moves a sum in the last place. The second-order predictions are
 asserted to <code>1e-5</code>, since xgboost stores the design and the
-gradients in single precision.</p>
+gradients in single precision; its Poisson cases differ by at most
+<code>1.9e-7</code>.</p>
 </div>
 </div>
 <div class="section level2">
@@ -2140,25 +2219,37 @@ of each term the model holds, in the order it holds them.</li>
 <li>
 <strong>Each fit</strong> is iteratively reweighted least squares as
 <code>glm.fit</code>: starting means <code>(w y + 0.5) / (w + 1)</code>
-under the binomial family and <code>y</code> under the Gaussian one; at
-each iteration the working response <code>eta + (y - mu) / mu_eta</code>
-and working weights <code>sqrt(w mu_eta^2 / V(mu))</code>, solved by
-LINPACK’s <code>dqrdc2</code> Householder decomposition with its limited
-pivoting at a tolerance of <code>min(1e-7, epsilon / 1000)</code>, a
-column falling below that share of its original norm moved to the end
-and given a coefficient of zero; and the stopping rule
+under the binomial family, <code>y + 0.1</code> under the Poisson one
+and <code>y</code> under the Gaussian one; at each iteration the working
+response <code>eta + (y - mu) / mu_eta</code> and working weights
+<code>sqrt(w mu_eta^2 / V(mu))</code>, solved by LINPACK’s
+<code>dqrdc2</code> Householder decomposition with its limited pivoting
+at a tolerance of <code>min(1e-7, epsilon / 1000)</code>, a column
+falling below that share of its original norm moved to the end and given
+a coefficient of zero; and the stopping rule
 <code>|dev - dev_old| / (|dev| + 0.1) &lt; epsilon</code>,
 <code>epsilon = 1e-8</code>, within 25 iterations. The logit link holds
 the linear predictor at 30 either side as R’s does: below
 <code>-30</code> the mean is <code>eps / (1 + eps)</code> and above
 <code>30</code> it is <code>1 / (1 + eps)</code> with <code>eps</code>
 the machine epsilon, and the derivative is <code>eps</code> outside that
-range. The rank is the decomposition’s at the last iteration.</li>
+range. The log link of the Poisson family takes the mean and its
+derivative as <code>max(exp(eta), eps)</code>, and its variance function
+is the mean. The rank is the decomposition’s at the last iteration.</li>
 <li>
 <strong>The criterion</strong> is <code>deviance + 2 rank</code>
-under the binomial family and, under the Gaussian one,
-<code>n (log(2 pi deviance / n) + 1) + 2 - sum(log w) + 2 rank</code>,
-the deviance weighted by the case weights in both.</li>
+under the binomial family,
+<code>deviance - 2 sum w (y log y - y - log y!) + 2 rank</code> under
+the Poisson one, which is <code>-2 log L + 2 rank</code> with the
+saturated log likelihood put back, and, under the Gaussian one, `n
+(log(2 pi deviance / n) + 1) + 2 - sum(log
+<ol start="23" style="list-style-type: lower-alpha">
+<li><ul>
+<li>2 rank`, the deviance weighted by the case weights in all
+three.</li>
+</ul></li>
+</ol>
+</li>
 <li>
 <strong>The search.</strong> <code>"forward"</code> and
 <code>"both"</code> start from the intercept, <code>"backward"</code>
@@ -2188,19 +2279,20 @@ back.</li>
 <div class="section level3">
 <h3 id="the-fixtures-6">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-6"></a>
 </h3>
-<p><code>stepwise_cases.csv</code> names thirteen cases on the weekly
-columns maxnet’s fixtures read. Seven are MASS’s <code>stepAIC()</code>
+<p><code>stepwise_cases.csv</code> names eighteen cases on the weekly
+columns maxnet’s fixtures read. Ten are MASS’s <code>stepAIC()</code>
 over biomod2’s formula <code>x + I(x^2)</code> (<code>I(x^3)</code>
 beside them in one) from the intercept or from every term, in every
-direction: two of them carry the first column twice, so a term is
-aliased and the backward search drops it before anything else. MASS’s
-binomial family rounds a fractional weight into a count, so its binomial
-cases are unweighted; its Gaussian criterion differs from the core’s by
-a constant, and one Gaussian case is weighted. Two are
-<code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> on every term, and four are the forward search over
-column terms written in R alone,
-<code>tests/testthat/helper-oracle-stepwise.R</code>, under fractional
-case weights. Each case carries the terms chosen as
+direction, three of them under the Poisson family on the count response
+of <code>count_response.csv</code>: two of them carry the first column
+twice, so a term is aliased and the backward search drops it before
+anything else. MASS’s binomial family rounds a fractional weight into a
+count, so its binomial cases are unweighted; its Gaussian criterion
+differs from the core’s by a constant, and one Gaussian case is
+weighted, as is one of the Poisson ones. Three are <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> on
+every term, and five are the forward search over column terms written in
+R alone, <code>tests/testthat/helper-oracle-stepwise.R</code>, under
+fractional case weights. Each case carries the terms chosen as
 <code>column:power</code> in the order the model holds them,
 <code>0</code> for a polynomial, with the rank, the deviance, whether
 the fit settled and the number of steps.
@@ -2217,7 +2309,7 @@ are asserted exactly.</strong></li>
 <strong>The deviance is asserted to <code>1e-9</code> relative and
 the predictions to <code>1e-8</code>.</strong> The iteration is
 <code>glm.fit</code>’s own and the two settle on the same iterate;
-across the thirteen cases they agree to about <code>1e-14</code>.</li>
+across the eighteen cases they agree to about <code>1e-14</code>.</li>
 </ul>
 </div>
 </div>
@@ -2402,9 +2494,9 @@ terms are.</li>
 </li>
 <li>
 <strong>The refit</strong> is over the kept terms unweighted, the
-weighted basis divided by <code>sqrt(w)</code>: under the binomial
-family <code>glm.fit</code> from <code>src/ts_glm.cpp</code> with the
-head’s weights, under the Gaussian one <code>dqrls</code> at
+weighted basis divided by <code>sqrt(w)</code>: under the binomial or
+the Poisson family <code>glm.fit</code> from <code>src/ts_glm.cpp</code>
+with the head’s weights, under the Gaussian one <code>dqrls</code> at
 <code>1e-7</code> over the terms and the response each times
 <code>sqrt(w)</code>. A dependent kept term is an error.</li>
 <li>
@@ -2414,7 +2506,8 @@ their coefficients, the termination code, the kept size’s generalised
 cross-validation and whether the refit settled. The prediction is each
 kept term as the product of its factors, <code>max(0, x - t)</code>,
 <code>max(0, t - x)</code> or <code>x</code>, then the linear predictor,
-through the logit link under the binomial family.</li>
+through the logit link under the binomial family and the exponential
+under the Poisson one.</li>
 <li>The columns of one parent are independent searches, and
 <code>threads</code> runs them at once; their results are taken in
 column order afterwards, so what comes back does not depend on it.</li>
@@ -2422,18 +2515,19 @@ column order afterwards, so what comes back does not depend on it.</li>
 <div class="section level3">
 <h3 id="the-fixtures-7">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-7"></a>
 </h3>
-<p><code>mars_cases.csv</code> names ten cases on the weekly columns
-maxnet’s fixtures read: earth’s own fits over the binomial and the
-Gaussian response, at degrees one and two, unweighted and under the
-fractional weights, unpruned, with <code>nprune = 5</code>, and with
-<code>minspan = 3</code>, <code>endspan = 5</code> and every term a
-parent. Each case carries every forward term as
-<code>column:direction:cut</code> factors, the kept terms, the
-termination code and the kept size’s generalised cross-validation.
-<code>mars_coef.csv</code> holds the kept terms’ coefficients, the
-logistic refit’s under the binomial response, and
-<code>mars_predict.csv</code> the predictions on every reading scaled by
-<code>1.01</code>. The weighted cases are earth’s QR at every knot.</p>
+<p><code>mars_cases.csv</code> names thirteen cases on the weekly
+columns maxnet’s fixtures read: earth’s own fits over the binomial, the
+Gaussian and the Poisson response, at degrees one and two, unweighted
+and under the fractional weights, unpruned, with
+<code>nprune = 5</code>, and with <code>minspan = 3</code>,
+<code>endspan = 5</code> and every term a parent. Each case carries
+every forward term as <code>column:direction:cut</code> factors, the
+kept terms, the termination code and the kept size’s generalised
+cross-validation. <code>mars_coef.csv</code> holds the kept terms’
+coefficients, the logistic refit’s under the binomial response and the
+Poisson one’s under the Poisson, and <code>mars_predict.csv</code> the
+predictions on every reading scaled by <code>1.01</code>. The weighted
+cases are earth’s QR at every knot.</p>
 </div>
 <div class="section level3">
 <h3 id="how-exactly-8">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-8"></a>
@@ -2446,7 +2540,7 @@ a cut is a reading.</li>
 <li>
 <strong>The coefficients and the generalised cross-validation are
 asserted to <code>1e-8</code> relative and the predictions to
-<code>1e-9</code>.</strong> Across the ten cases the core and earth
+<code>1e-9</code>.</strong> Across the thirteen cases the core and earth
 agree to <code>8e-14</code> or better, weighted cases included.</li>
 </ul>
 </div>
@@ -2653,9 +2747,10 @@ compile. A biomod2 user’s <code>GAM</code> is
 <code>mgcv::gam(y ~ 1 + s(x1) + s(x2) + ..., family, weights = w, method = "GCV.Cp")</code>
 under mgcv’s (1.9-4) defaults: a thin plate regression spline of basis
 dimension 10 per column (Wood 2003), the smoothing parameters chosen by
-the unbiased risk estimator under the binomial family and by generalised
-cross-validation under the Gaussian one (Wood 2008). The least squares
-are the Householder QR of <code>src/ts_glm.cpp</code>.</p>
+the unbiased risk estimator under the binomial and the Poisson family,
+whose scale is known, and by generalised cross-validation under the
+Gaussian one (Wood 2008). The least squares are the Householder QR of
+<code>src/ts_glm.cpp</code>.</p>
 <ul>
 <li>
 <strong>A column’s term.</strong> Its distinct values, sorted, are
@@ -2729,23 +2824,27 @@ coefficient held at zero.</li>
 <code>lambda</code>.</strong> Penalised iteratively reweighted least
 squares: the working weights <code>W = w mu (1 - mu)</code> and response
 <code>z = eta + (y - mu) / (mu (1 - mu))</code> under the binomial
-family, <code>W = w</code> and <code>z = y</code> under the Gaussian
-one, and each step the least squares of <code>sqrt(W) z</code> on
-<code>sqrt(W) X</code> stacked on the diagonal
+family, <code>W = w mu</code> and <code>z = eta + (y - mu) / mu</code>
+under the Poisson one, <code>W = w</code> and <code>z = y</code> under
+the Gaussian one, and each step the least squares of
+<code>sqrt(W) z</code> on <code>sqrt(W) X</code> stacked on the diagonal
 <code>sqrt(lambda_j d_c)</code> of the penalty. The first step starts
-from the means <code>(w y + 0.5) / (w + 1)</code>, later fits from the
-coefficients the search last reached, and a step that raises the
+from the means <code>(w y + 0.5) / (w + 1)</code> under the binomial
+family and <code>y + 0.1</code> under the Poisson one, later fits from
+the coefficients the search last reached, and a step that raises the
 penalised deviance is halved back towards the coefficients it left, at
 most thirty times. The fit stops once the penalised deviance moves by at
 most <code>1e-13 (|pdev| + 0.1)</code>; the Gaussian one is one step.
 The mean is the inverse logit with the linear predictor held at 30
-either side.</li>
+either side, or the exponential held off zero by the machine
+epsilon.</li>
 <li>
 <strong>The criterion.</strong> With <code>D</code> the deviance,
 <code>n</code> the units and <code>tau = tr((X'WX + S)^-1 X'WX)</code>,
 the unbiased risk estimator <code>D / n + 2 gamma tau / n - 1</code>
-under the binomial family and the generalised cross-validation
-<code>n D / (n - gamma tau)^2</code> under the Gaussian one.</li>
+under the binomial and the Poisson family and the generalised
+cross-validation <code>n D / (n - gamma tau)^2</code> under the Gaussian
+one.</li>
 <li>
 <strong>The search.</strong> Newton’s method on
 <code>rho = log(lambda)</code>, each held to <code>[-25, 25]</code>,
@@ -2784,7 +2883,7 @@ the coefficients, the smoothing parameters, each term’s effective
 degrees of freedom, the criterion, the Newton steps taken and whether
 the search settled. The prediction is the terms’ columns at each value
 times the coefficients, through the inverse logit under the binomial
-family.</li>
+family and the exponential under the Poisson one.</li>
 <li>
 <strong>A fit at given smoothing parameters.</strong>
 <code>sp</code>, one value per smooth in column order and shared by the
@@ -2802,46 +2901,50 @@ share the terms, so fitting them together is fitting each alone.</li>
 <div class="section level3">
 <h3 id="the-fixtures-9">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-9"></a>
 </h3>
-<p><code>additive_cases.csv</code> names seven cases on the weekly
-columns maxnet’s fixtures read and on inputs of their own: mgcv’s own
-fits under the fractional weights and without them, under the Gaussian
-response, with every one of the eleven columns at <code>k = 5</code>
-under the Gaussian response, at <code>gamma = 1.4</code>, on
-<code>additive_input.csv</code>, whose second column holds five distinct
-values and whose third holds two, against mgcv’s
-<code>s(v02, k = 5)</code> and the linear <code>v03</code>, and on
-<code>additive_knots_input.csv</code>, 2100 units of two columns, past
-the subsample. Each is run to a tight tolerance
-(<code>epsilon = 1e-13</code>, <code>mgcv.tol = 1e-15</code>, Newton’s
-<code>conv.tol = 1e-13</code>), and refused unless mgcv, restarted under
-its default tolerances from smoothing parameters of <code>1e-2</code>,
-<code>1</code>, <code>1e2</code> and <code>1e4</code>, settles at the
-same criterion to <code>1e-6</code> from each, and, under the Gaussian
-response, unless a direct penalised least-squares solve at the smoothing
-parameters mgcv reports gives its coefficients: <code>magic</code> takes
-the square root of the summed penalty by a pivoted Cholesky, which drops
-the penalty directions of the moderately smoothed columns as numerically
-null where another column’s smoothing parameter is many orders of
-magnitude larger. Each case carries the criterion and every column’s
-effective degrees of freedom, and <code>additive_predict.csv</code> the
-fitted mean on the design scaled by <code>1.01</code>, at every tenth
-unit of the subsample’s input.</p>
+<p><code>additive_cases.csv</code> names ten cases on the weekly columns
+maxnet’s fixtures read and on inputs of their own: mgcv’s own fits under
+the fractional weights and without them, under the Gaussian response,
+under the Poisson response of <code>count_response.csv</code> on the
+late columns at <code>k = 5</code> and unweighted at <code>k = 10</code>
+and on the first three at <code>k = 5</code>, with every one of the
+eleven columns at <code>k = 5</code> under the Gaussian response, at
+<code>gamma = 1.4</code>, on <code>additive_input.csv</code>, whose
+second column holds five distinct values and whose third holds two,
+against mgcv’s <code>s(v02, k = 5)</code> and the linear
+<code>v03</code>, and on <code>additive_knots_input.csv</code>, 2100
+units of two columns, past the subsample. Each is run to a tight
+tolerance (<code>epsilon = 1e-13</code>, <code>mgcv.tol = 1e-15</code>,
+Newton’s <code>conv.tol = 1e-13</code>), and refused unless mgcv,
+restarted under its default tolerances from smoothing parameters of
+<code>1e-2</code>, <code>1</code>, <code>1e2</code> and
+<code>1e4</code>, settles at the same criterion to <code>1e-6</code>
+from each, and, under the Gaussian response, unless a direct penalised
+least-squares solve at the smoothing parameters mgcv reports gives its
+coefficients: <code>magic</code> takes the square root of the summed
+penalty by a pivoted Cholesky, which drops the penalty directions of the
+moderately smoothed columns as numerically null where another column’s
+smoothing parameter is many orders of magnitude larger. Each case
+carries the criterion and every column’s effective degrees of freedom,
+and <code>additive_predict.csv</code> the fitted mean on the design
+scaled by <code>1.01</code>, at every tenth unit of the subsample’s
+input.</p>
 <p>A fit at given smoothing parameters is asserted against the penalised
 problem solved outright. Both suites read the design and the penalty off
 the fit, solve the weighted design stacked on the root of the penalty by
 a singular value decomposition, which takes no rank decision, and under
-the binomial family repeat that at the working weights with step halving
-until the coefficients stop moving. The fitted means, each term’s
-effective degrees of freedom and the criterion are asserted to
-<code>1e-7</code>, <code>1e-6</code> and <code>1e-7</code> at seven
+the binomial and the Poisson family repeat that at the working weights
+with step halving until the coefficients stop moving. The fitted means,
+each term’s effective degrees of freedom and the criterion are asserted
+to <code>1e-7</code>, <code>1e-6</code> and <code>1e-7</code> at seven
 patterns of smoothing parameters spanning <code>1e-4</code> to
 <code>1e12</code>, among them one column at <code>1e12</code> beside the
 rest at <code>1e-4</code>, on the binomial weekly columns, the Gaussian
-eleven columns at <code>k = 5</code> and <code>gamma = 1.4</code>, and
-the binomial <code>few</code> input. The same reference at smoothing
-parameters off by a relative <code>1e-6</code> differs by
-<code>4e-8</code> in the fitted means, so the tolerance holds a
-parameter to about <code>1e-5</code>.</p>
+eleven columns at <code>k = 5</code> and <code>gamma = 1.4</code>, the
+binomial <code>few</code> input and the Poisson late columns at
+<code>k = 5</code>. The same reference at smoothing parameters off by a
+relative <code>1e-6</code> differs by <code>4e-8</code> in the fitted
+means, so the tolerance holds a parameter to about
+<code>1e-5</code>.</p>
 </div>
 <div class="section level3">
 <h3 id="how-exactly-10">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-10"></a>
@@ -2855,7 +2958,168 @@ at the same point to the tolerance they are run at and no closer, and
 the basis is an eigenproblem each solves to its own tolerance. Across
 the seven cases the core and mgcv agree to <code>5e-10</code> in the
 criterion, <code>3.5e-7</code> in the degrees of freedom and
-<code>1e-8</code> in the fitted means.</li>
+<code>1e-8</code> in the fitted means, and across the three Poisson ones
+to <code>6.2e-10</code>, <code>4.8e-7</code> and
+<code>1.2e-7</code>.</li>
+</ul>
+</div>
+</div>
+<div class="section level2">
+<h2 id="the-hierarchical-model">The hierarchical model<a class="anchor" aria-label="anchor" href="#the-hierarchical-model"></a>
+</h2>
+<p><code><a href="../reference/hierarchical.html">hierarchical()</a></code> is one Bayesian logistic model per
+response, over <code>src/ts_hierarchical.cpp</code>, which both
+languages compile, with <code>src/ts_sparse.cpp</code> under its
+nearest-neighbour field. The linear predictor of target <code>i</code>
+is <code>x_i' beta + u_g(i) + f(s_i)</code>: the fixed effects, an
+intercept for the unit the target belongs to and a Gaussian-process
+field at the target’s place, each target’s log likelihood scaled by its
+case weight.</p>
+<ul>
+<li>
+<strong>The design.</strong> The intercept’s column, then every
+flattened column that is not constant over the fitting targets, centred
+on its mean and divided by its sample standard deviation. A prediction
+centres and scales by the fit’s own.</li>
+<li>
+<strong>The priors.</strong> <code>beta_j ~ N(0, 2.5^2)</code> for
+every fixed effect, the intercept included. A unit’s intercept is
+<code>N(0, sd_u^2)</code>, and the field has a marginal standard
+deviation <code>sd_f</code> and a range <code>r</code>. Each standard
+deviation has the penalised-complexity prior with
+<code>P(sd &gt; 3) = 0.01</code>, density
+<code>lambda exp(-lambda sd)</code> with
+<code>lambda = -log(0.01) / 3</code>, and the range the
+penalised-complexity prior of a two-dimensional field,
+<code>P(r &lt; r0) = 0.5</code>, an exponential prior on
+<code>1 / r</code> with rate <code>-log(0.5) r0</code>, where
+<code>r0</code> is a fifth of the extent. Both are densities in the
+logarithm of the parameter, so each carries its Jacobian.</li>
+<li>
+<strong>The coordinates</strong> are centred on the column means and
+divided by one factor, the root of the mean of the two columns’ sample
+variances, so that distances keep their proportions. The extent is the
+diagonal of their bounding box.</li>
+<li>
+<strong>The Hilbert-space field</strong> (<code>hsgp</code>) has
+<code>m</code> Laplacian eigenfunctions per axis,
+<code>sin(pi j (x + L) / (2 L)) / sqrt(L)</code> for
+<code>j = 1..m</code> on a box whose half-width <code>L</code> is
+<code>boundary</code> times half the coordinates’ range, no less than
+0.1, about the middle of their range, with the eigenvalue
+<code>(pi j1 / 2 L1)^2 + (pi j2 / 2 L2)^2</code>, <code>j2</code>
+fastest. A coefficient has the prior <code>N(0, 1)</code> and multiplies
+the square root of the squared-exponential spectral density
+<code>sd_f^2 2 pi r^2 exp(-r^2 w^2 / 2)</code> at its eigenvalue
+<code>w^2</code>.</li>
+<li>
+<strong>The nearest-neighbour field</strong> (<code>nngp</code>)
+lives on the distinct locations, sorted by the first coordinate then the
+second. Location <code>i</code> is conditioned on its
+<code>neighbours</code> nearest among the locations before it, nearest
+first. With <code>C</code> their covariance, <code>c</code> its
+covariance with <code>i</code>, and a nugget of <code>1e-8</code> on
+<code>C</code>’s diagonal, the regression is <code>a = C^-1 c</code> and
+the conditional variance <code>max(sd_f^2 - c'a, 1e-10)</code>; the
+first location has the marginal variance. The precision is
+<code>(I - A)' D^-1 (I - A)</code> and its log determinant
+<code>-sum log D</code>. The covariance is <code>sd_f^2</code> times
+<code>exp(-d / r)</code>, <code>(1 + x) exp(-x)</code> with
+<code>x = sqrt(3) d / r</code>, <code>(1 + x + x^2 / 3) exp(-x)</code>
+with <code>x = sqrt(5) d / r</code>, or <code>exp(-(d / r)^2)</code>.
+The precision is sparse, its pattern the cliques of a location and its
+neighbours and the pairs of a target’s location and unit, and is
+factored by a Cholesky decomposition under a minimum-degree ordering
+analysed once.</li>
+<li>
+<strong>The conditional fit</strong> at fixed hyperparameters is
+Laplace’s method over the coefficients, the field and the unit
+intercepts together: Newton’s method with step halving to the mode of
+the penalised log likelihood, and the log marginal likelihood
+<code>J + (1/2) log |Q| - (1/2) log |H|</code>, <code>J</code> the
+penalised log likelihood at the mode, <code>Q</code> the prior’s
+precision and <code>H</code> the information there. The unit intercepts
+are eliminated by their diagonal information under a dense field block,
+and the coefficients by a Schur complement under a sparse one.</li>
+<li>
+<strong>The hyperparameters</strong> are the logarithms of
+<code>sd_u</code> where there are unit intercepts, then of
+<code>sd_f</code> and <code>r</code> where there is a field, and the log
+posterior is the conditional log marginal plus the log hyperprior.
+Without a field the mode of <code>log sd_u</code> is the fit, the
+empirical-Bayes estimate, and without either the fit is the posterior
+mode of the coefficients. With a field the mode is found by BFGS on
+central differences, the curvature there by finite differences, and each
+axis of its eigendecomposition is spread <code>nodes</code> points
+<code>1.25</code> standard deviations apart, the deviation held within
+<code>[0.05, 2]</code>. Each node’s conditional fit is weighted by
+<code>exp</code> of its log posterior, and the fit is their weighted
+mean.</li>
+<li>
+<strong>A prediction</strong> is the weighted sum over the nodes of
+<code>x' beta</code>, the unit’s intercept where the unit was fitted and
+zero where it was not, and the field at the new place: the
+eigenfunctions times the coefficients under <code>hsgp</code>, and under
+<code>nngp</code> the conditional mean <code>c'C^-1 f</code> over the
+<code>neighbours</code> nearest fitted locations of any order, a nugget
+of <code>1e-6</code> on <code>C</code>’s diagonal.</li>
+</ul>
+<p>The coordinates and the unit of each target ride on the array as a
+placement, not a channel: no learner reads them as a predictor, and a
+split of the targets splits them with it.
+<code>timesift(coords = )</code> names the two columns, and a learner
+with a field refuses an array that carries none.</p>
+<div class="section level3">
+<h3 id="the-fixtures-10">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-10"></a>
+</h3>
+<p><code>hierarchical_input.csv</code> holds 60 targets in 20 units of
+three, and tulpa’s own fits of <code>y ~ x1 + x2</code> to it, at the
+levels where its answer is deterministic.
+<code>hierarchical_cases.csv</code> carries the posterior mode of the
+coefficients, with the case weights and without, and the empirical-Bayes
+fit with an intercept for each unit, each with its coefficients and log
+marginal likelihood, and the last with the standard deviation of the
+intercepts, whose estimates are in <code>hierarchical_ranef.csv</code>.
+<code>hierarchical_hsgp_nodes.csv</code> and
+<code>hierarchical_nngp_nodes.csv</code> hold the nodes of tulpa’s
+nested Laplace grid that carry weight: the hyperparameters, the log
+weight and the latent mode, the coefficients then the field’s values, in
+target order for the nearest-neighbour field. The coefficients there
+have a prior standard deviation of 100, which is what the nested route
+fits under, and the core is asked for it. A node is the latent mode at
+fixed hyperparameters, so what is pinned is that mode and the constancy
+across the nodes of the difference between the core’s log posterior and
+tulpa’s log weight.</p>
+<p>A model with unit intercepts and a field is asserted against the same
+Laplace marginal written out densely, the Vecchia precision built
+location by location, the basis from its formula and Newton’s method on
+full matrices, at fixed hyperparameters, under every covariance, in both
+suites.</p>
+</div>
+<div class="section level3">
+<h3 id="how-exactly-11">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-11"></a>
+</h3>
+<ul>
+<li>
+<strong>The mode and the log marginal likelihood without a
+field</strong> are tulpa’s to <code>1e-11</code> and <code>1e-8</code>
+relative to the tolerance the case carries, <code>1e-7</code>; the
+empirical-Bayes standard deviation, the coefficients, the log marginal
+likelihood and the intercepts to <code>2.3e-8</code>,
+<code>4.5e-9</code>, <code>1.7e-8</code> and <code>3.3e-8</code>.</li>
+<li>
+<strong>A node’s mode</strong> is tulpa’s to <code>1e-13</code>
+under <code>hsgp</code> and <code>2e-14</code> under <code>nngp</code>,
+and the difference between the core’s log posterior and tulpa’s log
+weight is constant across the nodes to <code>3e-10</code> and
+<code>4e-9</code>. The grid itself, the mode of the hyperparameters and
+so the nodes a fit places, is not pinned: two searches settle at the
+same point to the tolerance they are run at and no closer, and tulpa’s
+own search differs from this one.</li>
+<li>
+<strong>The dense marginal</strong> is the core’s to
+<code>1e-8</code> relative and the latent mode to
+<code>1e-7</code>.</li>
 </ul>
 </div>
 </div>
@@ -2892,7 +3156,12 @@ and <code>"all"</code> is <code>scope = "all"</code>.</p>
 <h3 id="the-weights">The weights<a class="anchor" aria-label="anchor" href="#the-weights"></a>
 </h3>
 <p><code>"stack"</code> minimises the head’s loss over the scorable
-cells on the simplex. <code>"mean"</code>, <code>"median"</code> and
+cells on the simplex. The loss is the cross entropy under
+<code>binary_cross_entropy</code>, the mean squared error under
+<code>squared_error</code>, and under <code>poisson_deviance</code> the
+mean of <code>2 (y log(y / p) - (y - p))</code>, the logarithm taken as
+zero at <code>y = 0</code>, with a combined mean read no closer to zero
+than the machine epsilon. <code>"mean"</code>, <code>"median"</code> and
 <code>"committee"</code> weigh every member the same.
 <code>"weighted"</code> with <code>decay = "proportional"</code> takes
 each member’s score, zero where it is at or below zero, over their sum.
@@ -2944,7 +3213,8 @@ a percentage;</li>
 <code>m -+ t(1 - alpha / 2, n - 1) s sqrt(sum(w^2))</code>,
 <code>n</code> the members carrying a weight above zero, held inside the
 range of the head’s predictions, <code>[0, 1]</code> under
-<code>binary_cross_entropy</code>. Under equal weights this is the t
+<code>binary_cross_entropy</code> and <code>[0, Inf)</code> under
+<code>poisson_deviance</code>. Under equal weights this is the t
 interval of a mean of <code>n</code> members. biomod2 reads its quantile
 on <code>n + 1</code> degrees of freedom; <code>n - 1</code> is the
 interval’s own.</li>
@@ -2955,7 +3225,7 @@ fewer than two members carry weight. The array is
 both sides.</p>
 </div>
 <div class="section level3">
-<h3 id="the-fixtures-10">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-10"></a>
+<h3 id="the-fixtures-11">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-11"></a>
 </h3>
 <p><code>ensemble_oof.csv</code> holds five candidates’ out-of-fold
 predictions of the response fixture, rounded to six decimals, two of
@@ -2969,15 +3239,24 @@ over as a run does. <code>ensemble_weights.csv</code> holds each case’s
 members and weights, <code>ensemble_thresholds.csv</code> each committee
 member’s cut on each variable, and <code>ensemble_predict.csv</code>
 each case’s combination and spread at <code>alpha = 0.1</code> for every
-unit and variable.</p>
+unit and variable. <code>ensemble_count_response.csv</code> holds sixty
+counts with a five-fold map, <code>ensemble_count_oof.csv</code> four
+candidates’ out-of-fold means of them rounded to six decimals, and
+<code>ensemble_count_cases.csv</code> the stack, the mean and the median
+under the Poisson deviance, with <code>ensemble_count_weights.csv</code>
+and <code>ensemble_count_predict.csv</code> holding their weights and
+their combination and spread. The counts and the means are
+deterministic. The generator refuses the stack’s weights unless their
+loss is within <code>1e-7</code> of the least a derivative-free search
+over the simplex reaches from five starts.</p>
 </div>
 <div class="section level3">
-<h3 id="how-exactly-11">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-11"></a>
+<h3 id="how-exactly-12">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-12"></a>
 </h3>
-<p>Everything is asserted to <code>1e-10</code> relative. The file holds
-twelve significant digits, and the largest difference either side reads
-is <code>4.8e-12</code>, the stack’s weights included: the two solvers
-take the same steps.</p>
+<p>Everything is asserted to <code>1e-10</code> relative, the count
+cases to <code>1e-9</code>. The file holds twelve significant digits,
+and the largest difference either side reads is <code>4.8e-12</code>,
+the stack’s weights included: the two solvers take the same steps.</p>
 </div>
 </div>
 <div class="section level2">
@@ -3097,57 +3376,62 @@ unselected</td>
 <td><code><a href="../reference/additive.html">additive()</a></code></td>
 </tr>
 <tr class="even">
+<td>the Bayesian logistic model with unit intercepts and a spatial
+field</td>
+<td><code><a href="../reference/hierarchical.html">hierarchical()</a></code></td>
+</tr>
+<tr class="odd">
 <td>the encoders</td>
 <td>
 <code><a href="../reference/torch_learners.html">mlp()</a></code>, <code><a href="../reference/torch_learners.html">cnn()</a></code>, <code><a href="../reference/torch_learners.html">rescnn()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>how an encoder is trained</td>
 <td><code><a href="../reference/train_control.html">train_control()</a></code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>fitting one learner on one representation</td>
 <td><code><a href="../reference/fit_learner.html">fit_learner()</a></code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the resampling</td>
 <td>
 <code><a href="../reference/cv.html">cv()</a></code> and <code><a href="../reference/cv.html">grouped_cv()</a></code>, and
 <code><a href="../reference/cv.html">block_cv()</a></code> and <code><a href="../reference/cv.html">env_cv()</a></code> for the spatial and
 environmental splits</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the fold map and the mask</td>
 <td>
 <code><a href="../reference/fold_map.html">fold_map()</a></code> and <code><a href="../reference/scorable_cells.html">scorable_cells()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>fitting across a set of grains</td>
 <td>
 <code><a href="../reference/grain_ladder.html">grain_ladder()</a></code>, and <code><a href="../reference/select_grain.html">select_grain()</a></code> for the
 nested selection</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the combiner</td>
 <td>
 <code><a href="../reference/ensemble.html">ensemble()</a></code>, <code><a href="../reference/ensemble_fit.html">ensemble_fit()</a></code>,
 <code><a href="../reference/ensemble_combine.html">ensemble_combine()</a></code> and <code><a href="../reference/ensemble_weights.html">ensemble_weights()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>how far an ensemble’s members disagree</td>
 <td>
 <code><a href="../reference/ensemble_spread.html">ensemble_spread()</a></code>, and
 <code>predict(type = "spread")</code> on a run</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>scoring held-out predictions</td>
 <td>
 <code><a href="../reference/score_predictions.html">score_predictions()</a></code>, on the cells the mask allows</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the metrics</td>
 <td>
 <code><a href="../reference/tss.html">tss()</a></code>, <code><a href="../reference/roc_auc.html">roc_auc()</a></code>,
@@ -3157,46 +3441,46 @@ nested selection</td>
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> and <code><a href="../reference/kappa_score.html">model_agreement()</a></code>
 beside them</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the cut a fit applies</td>
 <td>
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> given a fit in place of the
 response, one cut per response learned from a candidate’s out-of-fold
 predictions</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>two arms on matched cells</td>
 <td><code><a href="../reference/paired_contrast.html">paired_contrast()</a></code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>every grain against a learner’s best</td>
 <td>
 <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code>, the mixed model of the per-cell
 scores and Dunnett’s many-to-one comparisons off it</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>a record with a planted grain</td>
 <td>
 <code><a href="../reference/simulate_records.html">simulate_records()</a></code>, the vignette’s and the recovery
 tests’ generator</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the inflation of a self-selected threshold</td>
 <td>
 <code><a href="../reference/tss_inflation.html">tss_inflation()</a></code>, and <code><a href="../reference/implied_skill.html">implied_skill()</a></code> for
 the level it implies</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>a set of representations</td>
 <td>
 <code><a href="../reference/timesift_set.html">timesift_set()</a></code>, which reads as a mapping of grain name
 to representation</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>folds of the inner cross-validation</td>
 <td><code>n_inner</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the three artifacts</td>
 <td>
 <code><a href="../reference/artifacts.html">write_folds()</a></code> and <code><a href="../reference/artifacts.html">read_folds()</a></code>,
@@ -3204,12 +3488,12 @@ to representation</td>
 <code><a href="../reference/artifacts.html">write_cells()</a></code> and <code><a href="../reference/artifacts.html">read_cells()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the digest</td>
 <td>
 <code><a href="../reference/digest_array.html">digest_array()</a></code>, exported</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the registries</td>
 <td>
 <code><a href="../reference/register_learner.html">register_learner()</a></code> and <code><a href="../reference/register_learner.html">learners()</a></code>,
@@ -3218,13 +3502,13 @@ to representation</td>
 <code><a href="../reference/register_tuning.html">register_tuning()</a></code> and <code><a href="../reference/register_tuning.html">tunings()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>pseudo-absences</td>
 <td>
 <code><a href="../reference/pseudo_absences.html">pseudo_absences()</a></code>, the random, sre and disk
 strategies</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>what a rare response weighs</td>
 <td>
 <code><a href="../reference/positive_weights.html">positive_weights()</a></code>, the case weights the shipped
@@ -3363,13 +3647,13 @@ however many bins the grain has.</li>
 response of its own: the encoders train under the head’s
 <code>loss</code> and predict through its <code>activation</code>, and
 the three learners fitting one model per response take the family the
-loss names, logistic under <code>binary_cross_entropy</code> and
-Gaussian under <code>squared_error</code>. A fit that declares a
-<code>head</code> argument is handed the head, as one that declares
-<code>control</code> is handed the control, and one that declares
-<code>weights</code> is handed the head’s case weights, the matrix of
-the response’s shape the learners that ship fit under; a fit declaring
-none fits unweighted.</li>
+loss names, logistic under <code>binary_cross_entropy</code>, Gaussian
+under <code>squared_error</code> and Poisson under
+<code>poisson_deviance</code>. A fit that declares a <code>head</code>
+argument is handed the head, as one that declares <code>control</code>
+is handed the control, and one that declares <code>weights</code> is
+handed the head’s case weights, the matrix of the response’s shape the
+learners that ship fit under; a fit declaring none fits unweighted.</li>
 <li>A fitted encoder holds its weights as arrays and the device
 <em>setting</em> rather than the device it resolved to, and rebuilds the
 network when it predicts, so a fit written with <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code>
@@ -3749,15 +4033,6 @@ is a name, a list of names, a glob such as <code>"sp_*"</code> or a
 predicate on the name, resolved by <code>select_columns()</code>.</td>
 </tr></tbody>
 </table>
-<div class="line-block">
-<code><a href="../reference/hierarchical.html">hierarchical()</a></code> and
-<code>timesift(coords = )</code> | tulpa’s Bayesian logistic model with
-an optional Gaussian-process field over the targets’ coordinates. tulpa
-is an R package, so the learner is R’s alone; the coordinates ride on
-the array as an attribute, a placement a learner may read and not a
-channel. Both reach a prediction through
-<code><a href="../reference/predict.timesift.html">predict.timesift()</a></code>, which rebuilds them from the new
-targets. |</div>
 <table class="table">
 <colgroup>
 <col width="50%">
@@ -3808,7 +4083,7 @@ it by name.</td>
 <code>GRAINS</code>, <code>STATS</code>,
 <code>DAY_LEVEL_STATS</code>, <code>SPREAD_STATISTICS</code>,
 <code>PRESENCE_ABSENCE</code>, <code>CONTINUOUS</code>,
-<code>ABUNDANCE</code>, <code>ORDINAL</code>
+<code>ABUNDANCE</code>, <code>ORDINAL</code>, <code>COUNT</code>
 </td>
 <td>the grain, statistic and spread vocabularies as tuples, and the
 shipped heads as the mappings <code><a href="../reference/register_response.html">register_response()</a></code> takes. R

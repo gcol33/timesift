@@ -107,12 +107,13 @@ a second fitting path.</p>
 
 <dt id="arg-spec">spec<a class="anchor" aria-label="anchor" href="#arg-spec"></a></dt>
 <dd><p>A list with elements <code>prepare(y)</code>, returning the numeric matrix a learner is fitted
-on; <code>activation</code>, the name of the output transform (<code>"sigmoid"</code> or <code>"identity"</code>); <code>loss</code>, the
-name of the training objective (<code>"binary_cross_entropy"</code> or <code>"squared_error"</code>); <code>metric</code>, the
+on; <code>activation</code>, the name of the output transform (<code>"sigmoid"</code>, <code>"identity"</code> or <code>"exp"</code>);
+<code>loss</code>, the name of the training objective (<code>"binary_cross_entropy"</code>, <code>"squared_error"</code> or
+<code>"poisson_deviance"</code>); <code>metric</code>, the
 default metric name; and <code>cells(y, folds)</code>, returning the mask of scorable cells. Every
 learner that ships reads <code>loss</code> and <code>activation</code> from here: the encoders train under the loss
 and predict through the activation, and the learners fitting one model per response take the
-family the loss names, logistic or Gaussian. The combiner minimises the same loss. An
+family the loss names, logistic, Gaussian or Poisson. The combiner minimises the same loss. An
 optional <code>weights(y, fitting)</code> returns a <code>[unit, variable]</code> matrix of case weights every
 learner fits under, with <code>fitting</code> a logical vector marking the rows the model is fitted on:
 whatever the head reads off the response, it reads off those rows, and it weights every row,

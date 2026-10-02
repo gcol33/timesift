@@ -32,7 +32,8 @@ from .select import column_names, select_columns
 # pair back out of that name, so the two share one separator rather than agreeing on one.
 from .stack import SEPARATOR, run_ensemble
 from .specs import (Representation, Sift, TimesiftSpec, _needs_target_time, as_resampling,
-                    as_sift, build_representation, expand_sift, grains, resolve_folds, target_labels)
+                    as_sift, build_representation, check_coords, expand_sift, grains,
+                    resolve_folds, target_labels)
 
 __all__ = ["Timesift", "timesift"]
 
@@ -173,7 +174,7 @@ class Timesift:
 
 
 def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time=None,
-             static=None, models=None, sift=None, ensemble=True, resampling=None, inner=5,
+             static=None, coords=None, models=None, sift=None, ensemble=True, resampling=None, inner=5,
              rule: str = "argmax", response: str = "presence_absence", metric=None,
              control=None, keep_fits: bool = False, seed: int = 1,
              verbose: bool = True, refit: bool = True) -> Timesift:
@@ -181,8 +182,10 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
 
     ``targets`` is one row per thing to predict and ``series`` is the long, time-stamped record
     belonging to it; both are mappings of column name to array, which a data frame satisfies.
-    ``y``, ``x`` and ``static`` are selections over their own table: a name, a list of names, a
-    glob such as ``"sp_*"``, or a function of a name.
+    ``y``, ``x``, ``static`` and ``coords`` are selections over their own table: a name, a list of
+    names, a glob such as ``"sp_*"``, or a function of a name. ``coords`` names the two columns
+    holding each target's coordinates; they place a target and are not predictors, and a learner
+    that places a spatial field by them, :func:`~timesift.hierarchical`, reads them off the array.
 
     Within each outer fold of ``resampling`` the training targets are split again into ``inner``
     folds. Every candidate is cross-validated on that inner split, ``rule`` picks one on its inner
@@ -222,14 +225,15 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
             if verbose:
                 print(f"repeat {r + 1} of {drawn.repeats}")
             runs.append(timesift(targets, series, y=y, x=x, id=id, time=time,
-                                 target_time=target_time, static=static, models=models,
-                                 sift=sift, ensemble=ensemble,
+                                 target_time=target_time, static=static, coords=coords,
+                                 models=models, sift=sift, ensemble=ensemble,
                                  resampling=replace(drawn, seed=drawn.seed + r, repeats=1),
                                  inner=inner, rule=rule, response=response, metric=metric,
                                  control=control, keep_fits=keep_fits and r == 0, seed=seed,
                                  verbose=verbose and r == 0, refit=r == 0))
         return _combine_repeats(runs, run_ensemble(ensemble, response))
-    spec = _resolve_spec(targets, series, y, x, id, time, target_time, static, response, metric)
+    spec = _resolve_spec(targets, series, y, x, id, time, target_time, static, response, metric,
+                         coords)
     labels = target_labels(targets, spec)
     _check_rows(labels, spec)
 
@@ -640,7 +644,7 @@ def _default_models() -> list:
 # ---- reading the arguments -----------------------------------------------------------------------
 
 def _resolve_spec(targets, series, y, x, id, time, target_time, static, response,
-                  metric) -> TimesiftSpec:
+                  metric, coords=None) -> TimesiftSpec:
     columns = column_names(targets)
     y_names = select_columns(columns, y, "`y`")
     if not y_names:
@@ -652,6 +656,10 @@ def _resolve_spec(targets, series, y, x, id, time, target_time, static, response
     taken = tuple(y_names) + tuple(n for n in (id, target_time) if n is not None)
     static_names = () if static is None else tuple(
         select_columns([c for c in columns if c not in taken], static, "`static`", exclude=taken))
+    coord_names = () if coords is None else tuple(
+        select_columns([c for c in columns if c not in taken], coords, "`coords`",
+                       exclude=taken))
+    check_coords(targets, coord_names)
 
     if series is None:
         if target_time is not None:
@@ -661,7 +669,7 @@ def _resolve_spec(targets, series, y, x, id, time, target_time, static, response
             raise ValueError("without `series` there is nothing to predict from. Name the "
                              "predictor columns in `static`.")
         return TimesiftSpec(y=tuple(y_names), id=id, static=static_names, response=response,
-                            metric=metric)
+                            metric=metric, coords=coord_names)
 
     offered = column_names(series)
     if id is None:
@@ -679,7 +687,8 @@ def _resolve_spec(targets, series, y, x, id, time, target_time, static, response
     if not x_names:
         raise ValueError("`x` names no value column of `series`")
     return TimesiftSpec(y=tuple(y_names), x=x_names, id=id, time=time, target_time=target_time,
-                        static=static_names, response=response, metric=metric)
+                        static=static_names, response=response, metric=metric,
+                        coords=coord_names)
 
 
 def _check_rows(labels, spec) -> None:

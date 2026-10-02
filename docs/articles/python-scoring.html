@@ -199,11 +199,14 @@ an abundance model.</p>
 <p><code>metric</code> is <code>r_squared</code>
 (<code>1 - sum(e**2) / sum((y - mean(y))**2)</code>, NaN where
 <code>y</code> is constant), <code>pearson</code>, <code>rmse</code>,
-<code>mse</code>, <code>mae</code> or <code>max_error</code>. A
-comparison reads the highest score as the best, so the four errors are
-registered as <code>neg_rmse</code>, <code>neg_mse</code>,
-<code>neg_mae</code> and <code>neg_max_error</code> with their sign
-reversed.</p>
+<code>mse</code>, <code>mae</code>, <code>max_error</code> or
+<code>poisson_deviance</code>
+(<code>mean(2 (y log(y / p) - (y - p)))</code>, the logarithm taken as
+zero at <code>y = 0</code>, NaN where a prediction is negative or is
+zero beside a count above zero). A comparison reads the highest score as
+the best, so the five errors are registered as <code>neg_rmse</code>,
+<code>neg_mse</code>, <code>neg_mae</code>, <code>neg_max_error</code>
+and <code>neg_poisson_deviance</code> with their sign reversed.</p>
 </div>
 <div class="section level2">
 <h2 id="ordinal_metric">

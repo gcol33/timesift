@@ -2053,3 +2053,70 @@ write_fixture(cbind(do.call(rbind, ad_rows), score_tolerance = 1e-9, edf_toleran
                     prediction_tolerance = 1e-7), "additive_cases.csv")
 write_fixture(do.call(rbind, ad_pred), "additive_predict.csv")
 cat("wrote", nrow(AD_CASES), "additive cases\n")
+
+# The hierarchical model.
+#
+# tulpa's own fits of `y ~ x1 + x2` over 60 targets in 20 units of three, at the levels where its
+# answer is deterministic: the posterior mode of the coefficients (`mode = "laplace"`, weighted and
+# not), the empirical-Bayes fit with a random intercept for each unit (`mode = "eb"`), and each node
+# of the nested Laplace grid of a nearest-neighbour and of a Hilbert-space field, which is where
+# that route's own integration over the hyperparameters is a sum of conditional fits. A node is the
+# latent mode at fixed hyperparameters, and the nodes' posterior weights fix the log marginal
+# likelihood plus the log hyperprior up to one constant, so what is pinned is the mode itself and
+# the constancy of the difference between that log posterior and tulpa's log weight. The
+# coefficients' prior there has standard deviation 100, which is the one tulpa's nested route
+# fits under; `mode = "laplace"` and `"eb"` fit under 2.5.
+if (!requireNamespace("tulpa", quietly = TRUE)) {
+  stop("the hierarchical fixtures are the fits the tulpa package gives, so it has to be installed ",
+       "to regenerate them.", call. = FALSE)
+}
+set.seed(2L)
+HI_N <- 60L
+hi <- data.frame(x1 = round(stats::rnorm(HI_N), 6), x2 = round(stats::rnorm(HI_N), 6),
+                 lon = round(stats::runif(HI_N), 6), lat = round(stats::runif(HI_N), 6),
+                 unit = rep(sprintf("g%02d", 1:20), each = 3L),
+                 weight = round(stats::runif(HI_N, 0.5, 1.5), 6), stringsAsFactors = FALSE)
+hi_shift <- stats::rnorm(20L, sd = 0.7)[rep(1:20, each = 3L)]
+hi$y <- stats::rbinom(HI_N, 1L, stats::plogis(-0.3 + 2 * sin(5 * hi$lon) + 0.5 * hi$x1 + hi_shift))
+write_fixture(data.frame(y = hi$y, x1 = sprintf("%.6f", hi$x1), x2 = sprintf("%.6f", hi$x2),
+                         lon = sprintf("%.6f", hi$lon), lat = sprintf("%.6f", hi$lat),
+                         unit = hi$unit, weight = sprintf("%.6f", hi$weight),
+                         stringsAsFactors = FALSE), "hierarchical_input.csv")
+hi_data <- data.frame(y = hi$y, x1 = hi$x1, x2 = hi$x2, ts_coord_1 = hi$lon, ts_coord_2 = hi$lat,
+                      unit = factor(hi$unit))
+hi_beta <- function(b) stats::setNames(sprintf("%.15g", b), c("b0", "b1", "b2"))
+hi_map <- function(case, weighted) {
+  f <- if (weighted) {
+    tulpa::tulpa(y ~ x1 + x2, data = hi_data, family = "binomial", mode = "laplace",
+                 weights = hi$weight)
+  } else {
+    tulpa::tulpa(y ~ x1 + x2, data = hi_data, family = "binomial", mode = "laplace")
+  }
+  data.frame(case = case, weighted = weighted, sd_unit = "", log_marginal = sprintf("%.15g", f$log_marginal),
+             t(hi_beta(stats::coef(f))), stringsAsFactors = FALSE)
+}
+hi_eb <- tulpa::tulpa(y ~ x1 + x2 + (1 | unit), data = hi_data, family = "binomial", mode = "eb")
+hi_eb_row <- data.frame(case = "eb", weighted = FALSE, sd_unit = sprintf("%.15g", exp(hi_eb$theta_hat)),
+                        log_marginal = sprintf("%.15g", hi_eb$log_marginal),
+                        t(hi_beta(stats::coef(hi_eb))), stringsAsFactors = FALSE)
+write_fixture(cbind(rbind(hi_map("map", FALSE), hi_map("map_weighted", TRUE), hi_eb_row),
+                    tolerance = 1e-7), "hierarchical_cases.csv")
+hi_ranef <- tulpa::ranef(hi_eb)
+write_fixture(data.frame(unit = sub("]", "", sub("unit[", "", hi_ranef$term, fixed = TRUE), fixed = TRUE),
+                         effect = sprintf("%.15g", hi_ranef$estimate), tolerance = 1e-6),
+              "hierarchical_ranef.csv")
+hi_nodes <- function(approx, file) {
+  f <- tulpa::tulpa(y ~ x1 + x2, data = hi_data, family = "binomial", mode = "auto",
+                    spatial = tulpa::spatial_gp(~ ts_coord_1 + ts_coord_2, approx = approx))
+  keep <- which(f$weights > 0)
+  coefs <- f$modes[keep, , drop = FALSE]
+  colnames(coefs) <- c("b0", "b1", "b2", sprintf("c%03d", seq_len(ncol(coefs) - 3L)))
+  out <- data.frame(node = seq_along(keep), sigma2 = sprintf("%.15g", f$theta_grid[keep, 1L]),
+                    range = sprintf("%.15g", f$theta_grid[keep, 2L]),
+                    log_weight = sprintf("%.15g", log(f$weights[keep])),
+                    apply(coefs, 2L, function(v) sprintf("%.15g", v)), stringsAsFactors = FALSE)
+  write_fixture(cbind(out, tolerance = 1e-8, weight_tolerance = 1e-5), file)
+  cat("wrote", length(keep), approx, "nodes\n")
+}
+hi_nodes("hsgp", "hierarchical_hsgp_nodes.csv")
+hi_nodes("nngp", "hierarchical_nngp_nodes.csv")

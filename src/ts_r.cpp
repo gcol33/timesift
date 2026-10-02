@@ -8,6 +8,7 @@
 #include "ts_core.h"
 #include "ts_envelope.h"
 #include "ts_fda.h"
+#include "ts_hierarchical.h"
 #include "ts_mars.h"
 #include "ts_maxnet.h"
 #include "ts_penalised.h"
@@ -1027,3 +1028,134 @@ cpp11::doubles ts_additive_predict_(cpp11::list fit, cpp11::doubles newx, int n,
                              static_cast<std::size_t>(p), out.data());
   return give(out);
 }
+
+// The hierarchical model, from the same core the Python side calls. A fit crosses into R as a list
+// of plain vectors and comes back the same way to predict.
+namespace {
+
+timesift::Field field_from_name(const std::string& name) {
+  if (name == "none") return timesift::Field::none;
+  if (name == "hsgp") return timesift::Field::hsgp;
+  if (name == "nngp") return timesift::Field::nngp;
+  cpp11::stop("a hierarchical field is none, hsgp or nngp, not '%s'.", name.c_str());
+}
+
+const char* field_name(timesift::Field f) {
+  switch (f) {
+    case timesift::Field::none: return "none";
+    case timesift::Field::hsgp: return "hsgp";
+    case timesift::Field::nngp: return "nngp";
+  }
+  return "none";
+}
+
+std::vector<std::int32_t> take_units(cpp11::sexp unit) {
+  std::vector<std::int32_t> units;
+  if (unit != R_NilValue) {
+    cpp11::integers u(unit);
+    for (R_xlen_t i = 0; i < u.size(); ++i) units.push_back(u[i]);
+  }
+  return units;
+}
+
+}  // namespace
+
+[[cpp11::register]]
+cpp11::list ts_hierarchical_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n,
+                                 int p, cpp11::sexp unit, int n_unit, cpp11::sexp coords,
+                                 std::string field, double beta_sd, double sd_u,
+                                 double sd_alpha, double range_fraction, double range_alpha, int m,
+                                 double boundary, int neighbours, int cov, int nodes, double step,
+                                 int threads, cpp11::sexp theta) {
+  timesift::HierSpec spec;
+  spec.beta_sd = beta_sd;
+  spec.unit = unit != R_NilValue;
+  spec.field = field_from_name(field);
+  spec.sd_u = sd_u;
+  spec.sd_alpha = sd_alpha;
+  spec.range_fraction = range_fraction;
+  spec.range_alpha = range_alpha;
+  spec.m = m;
+  spec.boundary = boundary;
+  spec.neighbours = neighbours;
+  spec.cov = cov;
+  spec.nodes = nodes;
+  spec.step = step;
+  spec.threads = threads;
+  if (theta != R_NilValue) {
+    cpp11::doubles t(theta);
+    for (R_xlen_t i = 0; i < t.size(); ++i) spec.theta.push_back(t[i]);
+  }
+  const std::vector<std::int32_t> units = take_units(unit);
+  const double* xy = coords == R_NilValue ? nullptr : REAL_RO(coords);
+  const timesift::Hierarchical fit = timesift::hierarchical_fit(
+      REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
+      REAL_RO(y.data()), REAL_RO(w.data()), units.empty() ? nullptr : units.data(),
+      static_cast<std::size_t>(n_unit), xy, spec);
+  using namespace cpp11::literals;
+  return cpp11::writable::list({
+    "field"_nm = cpp11::as_sexp(std::string(field_name(fit.field))),
+    "n_column"_nm = cpp11::as_sexp(fit.n_column),
+    "n_unit"_nm = cpp11::as_sexp(fit.n_unit),
+    "n_theta"_nm = cpp11::as_sexp(fit.n_theta),
+    "beta"_nm = give(fit.beta),
+    "unit_effect"_nm = give(fit.unit_effect),
+    "theta_hat"_nm = give(fit.theta_hat),
+    "log_marginal"_nm = cpp11::as_sexp(fit.log_marginal),
+    "n_node"_nm = cpp11::as_sexp(fit.n_node),
+    "node_theta"_nm = give(fit.node_theta),
+    "node_weight"_nm = give(fit.node_weight),
+    "node_log_post"_nm = give(fit.node_log_post),
+    "node_field"_nm = give(fit.node_field),
+    "n_field"_nm = cpp11::as_sexp(fit.n_field),
+    "converged"_nm = cpp11::as_sexp(fit.converged),
+    "centre"_nm = give(std::vector<double>(fit.centre, fit.centre + 2)),
+    "scale"_nm = cpp11::as_sexp(fit.scale),
+    "m"_nm = cpp11::as_sexp(fit.m),
+    "box_centre"_nm = give(std::vector<double>(fit.box_centre, fit.box_centre + 2)),
+    "box_half"_nm = give(std::vector<double>(fit.box_half, fit.box_half + 2)),
+    "location"_nm = give(fit.location),
+    "n_location"_nm = cpp11::as_sexp(fit.n_location),
+    "neighbours"_nm = cpp11::as_sexp(fit.neighbours),
+    "cov"_nm = cpp11::as_sexp(fit.cov)
+  });
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_hierarchical_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p,
+                                        cpp11::sexp unit, cpp11::sexp coords) {
+  timesift::Hierarchical h;
+  h.field = field_from_name(cpp11::as_cpp<std::string>(fit["field"]));
+  h.n_column = cpp11::as_cpp<int>(fit["n_column"]);
+  h.n_unit = cpp11::as_cpp<int>(fit["n_unit"]);
+  h.n_theta = cpp11::as_cpp<int>(fit["n_theta"]);
+  h.beta = take_field<double>(fit, "beta");
+  h.unit_effect = take_field<double>(fit, "unit_effect");
+  h.n_node = cpp11::as_cpp<int>(fit["n_node"]);
+  h.node_theta = take_field<double>(fit, "node_theta");
+  h.node_weight = take_field<double>(fit, "node_weight");
+  h.node_field = take_field<double>(fit, "node_field");
+  h.n_field = cpp11::as_cpp<int>(fit["n_field"]);
+  const std::vector<double> centre = take_field<double>(fit, "centre");
+  const std::vector<double> box_centre = take_field<double>(fit, "box_centre");
+  const std::vector<double> box_half = take_field<double>(fit, "box_half");
+  for (int c = 0; c < 2; ++c) {
+    h.centre[c] = centre[static_cast<std::size_t>(c)];
+    h.box_centre[c] = box_centre[static_cast<std::size_t>(c)];
+    h.box_half[c] = box_half[static_cast<std::size_t>(c)];
+  }
+  h.scale = cpp11::as_cpp<double>(fit["scale"]);
+  h.m = cpp11::as_cpp<int>(fit["m"]);
+  h.location = take_field<double>(fit, "location");
+  h.n_location = cpp11::as_cpp<int>(fit["n_location"]);
+  h.neighbours = cpp11::as_cpp<int>(fit["neighbours"]);
+  h.cov = cpp11::as_cpp<int>(fit["cov"]);
+  const std::vector<std::int32_t> units = take_units(unit);
+  const double* xy = coords == R_NilValue ? nullptr : REAL_RO(coords);
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::hierarchical_predict(h, REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                                 static_cast<std::size_t>(p), units.empty() ? nullptr : units.data(),
+                                 xy, out.data());
+  return give(out);
+}
+

@@ -58,6 +58,7 @@ def project(fit, series=None, static=None, candidate: str = "ensemble", type: st
 
     flat_static = {k: np.asarray(v.transpose(*dims).values, dtype=np.float64).reshape(total)
                    for k, v in statics.items()}
+    flat_static.update(_cell_coordinates(spec, template, dims, shape))
     flat_series = {k: np.asarray(v.transpose("time", *dims).values,
                                  dtype=np.float64).reshape(len(v["time"]), total)
                    for k, v in records.items()}
@@ -128,6 +129,27 @@ def _inputs(spec, series, static):
             raise ValueError("the inputs have to share one grid: the same spatial dimensions and "
                              "sizes")
     return records, statics, template
+
+
+def _cell_coordinates(spec, template, dims, shape) -> dict:
+    """The columns a fit made with ``coords`` reads each target's place from, one value per cell.
+
+    A spatial dimension named as a coordinate column supplies that column, and a column no
+    dimension is named for takes the dimensions left, in their order, so a grid with dimensions
+    ``("y", "x")`` and a fit with ``coords=("x", "y")`` places each cell by its own ``x`` and
+    ``y`` whichever way the grid is laid out.
+    """
+    if not spec.coords:
+        return {}
+    free = [d for d in dims if d not in spec.coords]
+    index = np.indices(shape)
+    out = {}
+    for c in spec.coords:
+        d = c if c in dims else free.pop(0)
+        along = np.asarray(template[d].values if d in template.coords else np.arange(len(
+            template[d])), dtype=np.float64)
+        out[c] = along[index[dims.index(d)].reshape(-1)]
+    return out
 
 
 def _project_chunk(fit, spec, flat_static, flat_series, records, cells, candidate, type, kwargs):

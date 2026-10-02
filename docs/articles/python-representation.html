@@ -418,7 +418,9 @@ unit. That is the whole point of comparing against it.</p>
 <span id="cb19-13"><a href="#cb19-13" tabindex="-1"></a>    lag,</span>
 <span id="cb19-14"><a href="#cb19-14" tabindex="-1"></a>    static,</span>
 <span id="cb19-15"><a href="#cb19-15" tabindex="-1"></a>    position,</span>
-<span id="cb19-16"><a href="#cb19-16" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb19-16"><a href="#cb19-16" tabindex="-1"></a>    coords,</span>
+<span id="cb19-17"><a href="#cb19-17" tabindex="-1"></a>    unit_ids,</span>
+<span id="cb19-18"><a href="#cb19-18" tabindex="-1"></a>)</span></code></pre></div>
 <p>A <code>[row, bin, channel]</code> representation and the reduction
 that produced it.</p>
 <p>A row is a unit where the calendar did the binning and a target where
@@ -432,6 +434,12 @@ encoders read at their own amplitude rather than standardise.</p>
 <p><code>bin_start</code>, <code>bin_end</code> and
 <code>bin_partial</code> are the calendar’s, and are <code>None</code>
 on a representation the calendar did not bin.</p>
+<p><code>coords</code> is each row’s pair of coordinates and
+<code>unit_ids</code> the identifier of the unit each row belongs to,
+where <code>timesift.timesift</code> was given <code>coords</code> and
+<code>id</code>. They place a row and are not channels, so no learner
+reads them as a predictor, and a split of the rows splits them with
+it.</p>
 <p>Attributes:</p>
 <ul>
 <li>
@@ -462,6 +470,10 @@ on a representation the calendar did not bin.</p>
 <code>static</code> - tuple[str, …]</li>
 <li>
 <code>position</code> - tuple[str, …]</li>
+<li>
+<code>coords</code> - np.ndarray | None</li>
+<li>
+<code>unit_ids</code> - tuple[str, …] | None</li>
 </ul>
 <div class="section level3">
 <h3 id="shape">

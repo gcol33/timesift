@@ -130,8 +130,8 @@ fits mda’s flexible discriminant analysis over one,
 [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
 fits mgcv’s generalised additive model over one,
 [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
-fits a Bayesian logistic model with a spatial field through tulpa, and
-the `torch` encoders
+fits a Bayesian logistic model with unit intercepts and a spatial field,
+and the `torch` encoders
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md),
 [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
 and

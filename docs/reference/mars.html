@@ -182,8 +182,9 @@ ages up the queue. <code>fast_k = 0</code> tries every term.</p></dd>
 residuals least, and keeps the subset of least generalised cross-validation, which charges
 <code>penalty</code> for each knot. Under a presence-absence head the kept terms are refitted as a logistic
 model, as earth's <code>glm = list(family = binomial)</code> refits them and biomod2 asks it to, and the
-prediction is that model's probability; under a squared-error head they are refitted by least
-squares.</p>
+prediction is that model's probability; under a count head they are refitted as a Poisson model
+with a log link, as earth's <code>glm = list(family = poisson)</code> refits them, and the prediction is its
+mean count; under a squared-error head they are refitted by least squares.</p>
 <p>The defaults are earth's own, which biomod2 uses under its default option set and under
 <code>"bigboss"</code> alike: degree one, <code>penalty = 2</code>, <code>thresh = 0.001</code>, <code>nk = min(200, max(20, 2 p)) + 1</code>
 for <code>p</code> columns, Friedman's rules for the spans between knots, and Fast MARS over the 20 best

@@ -82,9 +82,10 @@ A
 ## Details
 
 The family is the response head's: a binary cross-entropy loss fits a
-logistic model and a squared-error loss a linear one, so the learner is
-the same under a presence-absence head and under a continuous one. So
-are the case weights: the head's `weights`,
+logistic model, a squared-error loss a linear one and a Poisson-deviance
+loss a log-linear one, so the learner is the same under a
+presence-absence head, a continuous one and a count one. So are the case
+weights: the head's `weights`,
 [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
 for presence-absence, are what every learner that ships fits under.
 

@@ -42,7 +42,6 @@ Suggests:
     testthat (>= 3.0.0),
     torch,
     glmnet,
-    tulpa (>= 0.6.0),
     lme4,
     lmerTest,
     emmeans,

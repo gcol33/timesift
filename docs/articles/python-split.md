@@ -309,6 +309,12 @@ ABUNDANCE = _numeric_head(_check_abundance, 'r_squared')
 ORDINAL = _numeric_head(_check_ordinal, 'ordinal_f1')
 ```
 
+## `COUNT`
+
+``` python
+COUNT = _numeric_head(_check_count, 'neg_poisson_deviance', activation='exp', loss='poisson_deviance')
+```
+
 ## `positive_weights()`
 
 ``` python

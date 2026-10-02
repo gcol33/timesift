@@ -229,41 +229,57 @@ extern "C" SEXP _timesift_ts_additive_predict_(SEXP fit, SEXP newx, SEXP n, SEXP
     return cpp11::as_sexp(ts_additive_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p)));
   END_CPP11
 }
+// ts_r.cpp
+cpp11::list ts_hierarchical_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, cpp11::sexp unit, int n_unit, cpp11::sexp coords, std::string field, double beta_sd, double sd_u, double sd_alpha, double range_fraction, double range_alpha, int m, double boundary, int neighbours, int cov, int nodes, double step, int threads, cpp11::sexp theta);
+extern "C" SEXP _timesift_ts_hierarchical_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP unit, SEXP n_unit, SEXP coords, SEXP field, SEXP beta_sd, SEXP sd_u, SEXP sd_alpha, SEXP range_fraction, SEXP range_alpha, SEXP m, SEXP boundary, SEXP neighbours, SEXP cov, SEXP nodes, SEXP step, SEXP threads, SEXP theta) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_hierarchical_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(unit), cpp11::as_cpp<cpp11::decay_t<int>>(n_unit), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(coords), cpp11::as_cpp<cpp11::decay_t<std::string>>(field), cpp11::as_cpp<cpp11::decay_t<double>>(beta_sd), cpp11::as_cpp<cpp11::decay_t<double>>(sd_u), cpp11::as_cpp<cpp11::decay_t<double>>(sd_alpha), cpp11::as_cpp<cpp11::decay_t<double>>(range_fraction), cpp11::as_cpp<cpp11::decay_t<double>>(range_alpha), cpp11::as_cpp<cpp11::decay_t<int>>(m), cpp11::as_cpp<cpp11::decay_t<double>>(boundary), cpp11::as_cpp<cpp11::decay_t<int>>(neighbours), cpp11::as_cpp<cpp11::decay_t<int>>(cov), cpp11::as_cpp<cpp11::decay_t<int>>(nodes), cpp11::as_cpp<cpp11::decay_t<double>>(step), cpp11::as_cpp<cpp11::decay_t<int>>(threads), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(theta)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::doubles ts_hierarchical_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p, cpp11::sexp unit, cpp11::sexp coords);
+extern "C" SEXP _timesift_ts_hierarchical_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p, SEXP unit, SEXP coords) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_hierarchical_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(unit), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(coords)));
+  END_CPP11
+}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
-    {"_timesift_ts_additive_fit_",      (DL_FUNC) &_timesift_ts_additive_fit_,      12},
-    {"_timesift_ts_additive_predict_",  (DL_FUNC) &_timesift_ts_additive_predict_,   4},
-    {"_timesift_ts_bin_nexts_",         (DL_FUNC) &_timesift_ts_bin_nexts_,          4},
-    {"_timesift_ts_bin_starts_",        (DL_FUNC) &_timesift_ts_bin_starts_,         4},
-    {"_timesift_ts_boost_fit_",         (DL_FUNC) &_timesift_ts_boost_fit_,         19},
-    {"_timesift_ts_boost_predict_",     (DL_FUNC) &_timesift_ts_boost_predict_,      4},
-    {"_timesift_ts_coverage_",          (DL_FUNC) &_timesift_ts_coverage_,           8},
-    {"_timesift_ts_cycle_fraction_",    (DL_FUNC) &_timesift_ts_cycle_fraction_,     3},
-    {"_timesift_ts_cycle_phase_",       (DL_FUNC) &_timesift_ts_cycle_phase_,        3},
-    {"_timesift_ts_envelope_fit_",      (DL_FUNC) &_timesift_ts_envelope_fit_,       5},
-    {"_timesift_ts_envelope_predict_",  (DL_FUNC) &_timesift_ts_envelope_predict_,   4},
-    {"_timesift_ts_fda_fit_",           (DL_FUNC) &_timesift_ts_fda_fit_,           12},
-    {"_timesift_ts_fda_predict_",       (DL_FUNC) &_timesift_ts_fda_predict_,        4},
-    {"_timesift_ts_forest_fit_",        (DL_FUNC) &_timesift_ts_forest_fit_,        12},
-    {"_timesift_ts_forest_predict_",    (DL_FUNC) &_timesift_ts_forest_predict_,     4},
-    {"_timesift_ts_forest_stream_",     (DL_FUNC) &_timesift_ts_forest_stream_,      3},
-    {"_timesift_ts_mars_fit_",          (DL_FUNC) &_timesift_ts_mars_fit_,          17},
-    {"_timesift_ts_mars_predict_",      (DL_FUNC) &_timesift_ts_mars_predict_,       4},
-    {"_timesift_ts_maxnet_design_",     (DL_FUNC) &_timesift_ts_maxnet_design_,     10},
-    {"_timesift_ts_maxnet_fit_",        (DL_FUNC) &_timesift_ts_maxnet_fit_,        18},
-    {"_timesift_ts_maxnet_predict_",    (DL_FUNC) &_timesift_ts_maxnet_predict_,     6},
-    {"_timesift_ts_penalised_coef_",    (DL_FUNC) &_timesift_ts_penalised_coef_,     5},
-    {"_timesift_ts_penalised_cv_",      (DL_FUNC) &_timesift_ts_penalised_cv_,      17},
-    {"_timesift_ts_penalised_path_",    (DL_FUNC) &_timesift_ts_penalised_path_,    14},
-    {"_timesift_ts_penalised_predict_", (DL_FUNC) &_timesift_ts_penalised_predict_,  7},
-    {"_timesift_ts_reduce_",            (DL_FUNC) &_timesift_ts_reduce_,            11},
-    {"_timesift_ts_reduce_lookbacks_",  (DL_FUNC) &_timesift_ts_reduce_lookbacks_,  12},
-    {"_timesift_ts_stepwise_fit_",      (DL_FUNC) &_timesift_ts_stepwise_fit_,      11},
-    {"_timesift_ts_stepwise_predict_",  (DL_FUNC) &_timesift_ts_stepwise_predict_,   4},
-    {"_timesift_ts_tree_fit_",          (DL_FUNC) &_timesift_ts_tree_fit_,          13},
-    {"_timesift_ts_tree_predict_",      (DL_FUNC) &_timesift_ts_tree_predict_,       4},
-    {"_timesift_ts_tree_prune_",        (DL_FUNC) &_timesift_ts_tree_prune_,         2},
+    {"_timesift_ts_additive_fit_",         (DL_FUNC) &_timesift_ts_additive_fit_,         12},
+    {"_timesift_ts_additive_predict_",     (DL_FUNC) &_timesift_ts_additive_predict_,      4},
+    {"_timesift_ts_bin_nexts_",            (DL_FUNC) &_timesift_ts_bin_nexts_,             4},
+    {"_timesift_ts_bin_starts_",           (DL_FUNC) &_timesift_ts_bin_starts_,            4},
+    {"_timesift_ts_boost_fit_",            (DL_FUNC) &_timesift_ts_boost_fit_,            19},
+    {"_timesift_ts_boost_predict_",        (DL_FUNC) &_timesift_ts_boost_predict_,         4},
+    {"_timesift_ts_coverage_",             (DL_FUNC) &_timesift_ts_coverage_,              8},
+    {"_timesift_ts_cycle_fraction_",       (DL_FUNC) &_timesift_ts_cycle_fraction_,        3},
+    {"_timesift_ts_cycle_phase_",          (DL_FUNC) &_timesift_ts_cycle_phase_,           3},
+    {"_timesift_ts_envelope_fit_",         (DL_FUNC) &_timesift_ts_envelope_fit_,          5},
+    {"_timesift_ts_envelope_predict_",     (DL_FUNC) &_timesift_ts_envelope_predict_,      4},
+    {"_timesift_ts_fda_fit_",              (DL_FUNC) &_timesift_ts_fda_fit_,              12},
+    {"_timesift_ts_fda_predict_",          (DL_FUNC) &_timesift_ts_fda_predict_,           4},
+    {"_timesift_ts_forest_fit_",           (DL_FUNC) &_timesift_ts_forest_fit_,           12},
+    {"_timesift_ts_forest_predict_",       (DL_FUNC) &_timesift_ts_forest_predict_,        4},
+    {"_timesift_ts_forest_stream_",        (DL_FUNC) &_timesift_ts_forest_stream_,         3},
+    {"_timesift_ts_hierarchical_fit_",     (DL_FUNC) &_timesift_ts_hierarchical_fit_,     22},
+    {"_timesift_ts_hierarchical_predict_", (DL_FUNC) &_timesift_ts_hierarchical_predict_,  6},
+    {"_timesift_ts_mars_fit_",             (DL_FUNC) &_timesift_ts_mars_fit_,             17},
+    {"_timesift_ts_mars_predict_",         (DL_FUNC) &_timesift_ts_mars_predict_,          4},
+    {"_timesift_ts_maxnet_design_",        (DL_FUNC) &_timesift_ts_maxnet_design_,        10},
+    {"_timesift_ts_maxnet_fit_",           (DL_FUNC) &_timesift_ts_maxnet_fit_,           18},
+    {"_timesift_ts_maxnet_predict_",       (DL_FUNC) &_timesift_ts_maxnet_predict_,        6},
+    {"_timesift_ts_penalised_coef_",       (DL_FUNC) &_timesift_ts_penalised_coef_,        5},
+    {"_timesift_ts_penalised_cv_",         (DL_FUNC) &_timesift_ts_penalised_cv_,         17},
+    {"_timesift_ts_penalised_path_",       (DL_FUNC) &_timesift_ts_penalised_path_,       14},
+    {"_timesift_ts_penalised_predict_",    (DL_FUNC) &_timesift_ts_penalised_predict_,     7},
+    {"_timesift_ts_reduce_",               (DL_FUNC) &_timesift_ts_reduce_,               11},
+    {"_timesift_ts_reduce_lookbacks_",     (DL_FUNC) &_timesift_ts_reduce_lookbacks_,     12},
+    {"_timesift_ts_stepwise_fit_",         (DL_FUNC) &_timesift_ts_stepwise_fit_,         11},
+    {"_timesift_ts_stepwise_predict_",     (DL_FUNC) &_timesift_ts_stepwise_predict_,      4},
+    {"_timesift_ts_tree_fit_",             (DL_FUNC) &_timesift_ts_tree_fit_,             13},
+    {"_timesift_ts_tree_predict_",         (DL_FUNC) &_timesift_ts_tree_predict_,          4},
+    {"_timesift_ts_tree_prune_",           (DL_FUNC) &_timesift_ts_tree_prune_,            2},
     {NULL, NULL, 0}
 };
 }

@@ -24,8 +24,8 @@ from .representation import TimesiftMatrix
 from .response import fitting_rows
 
 __all__ = ["Fit", "Learner", "READS", "MULTI", "additive", "boosting", "cnn", "discriminant", "elasticnet",
-           "fit_learner", "envelope", "flatten", "mars", "mlp", "rescnn", "forest", "stepwise",
-           "tree"]
+           "fit_learner", "envelope", "flatten", "hierarchical", "mars", "mlp", "rescnn", "forest",
+           "stepwise", "tree"]
 
 READS = ("tabular", "sequence")
 MULTI = ("joint", "separate")
@@ -1499,3 +1499,131 @@ def _discriminant_fit(x, y, degree, penalty, nk, thresh, prune, calibrate, threa
 def _discriminant_predict(model, x):
     from ._fda import fda_predict
     return _predict_columns(model["models"], flatten(x), fda_predict)
+
+
+def hierarchical(data=None, spatial="none", random=False, cov="exponential", neighbours=15, m=6,
+                 boundary=1.5, nodes=5, threads=1) -> Learner:
+    """One Bayesian logistic model per response: a logistic regression on every bin-by-channel
+    column of the representation, standardised so the prior on a coefficient means the same thing
+    for each, optionally with an intercept for each unit and a Gaussian-process field over the
+    targets' coordinates. A unit then carries what its own record says and what its neighbours'
+    presences say, under the folds every other learner is scored on.
+
+    The coefficients, the intercept included, have a ``N(0, 2.5^2)`` prior. A unit's intercept is
+    ``N(0, sd^2)`` and the field has a marginal standard deviation and a range, each standard
+    deviation under a penalised-complexity prior (Simpson et al. 2017) with ``P(sd > 3) = 0.01``,
+    and the range under one anchored at a fifth of the coordinates' extent with
+    ``P(range < anchor) = 0.5`` (Fuglstad et al. 2019). Coordinates are centred and divided by one
+    factor, so distances keep their proportions.
+
+    The field is a Gaussian process on the two columns named by ``coords`` in
+    :func:`~timesift.timesift`. ``"hsgp"`` is the Hilbert-space approximation (Solin and Sarkka
+    2020) with ``m`` Laplacian eigenfunctions per axis, and ``"nngp"`` the nearest-neighbour
+    process (Datta et al. 2016) over the distinct locations, each conditioned on its
+    ``neighbours`` nearest among those before it in lexicographic order of the coordinates, with
+    the covariance ``cov``, one of ``"exponential"``, ``"matern32"``, ``"matern52"`` and
+    ``"gaussian"``, whose range is the field's. Its sparse precision is factored once per set of
+    hyperparameters, so the fit scales with the number of locations rather than their square.
+
+    Inference is Laplace's method over the coefficients, the intercepts and the field together,
+    and the hyperparameters are integrated over on a grid of ``nodes`` points per hyperparameter,
+    centred on the mode of their posterior and weighted by it (Rue, Martino and Chopin 2009). With
+    an intercept alone its standard deviation is set at the mode of its posterior; with neither
+    the fit is the posterior mode of the coefficients. A prediction at new units interpolates the
+    field to their coordinates, so the targets it is given carry the same coordinate columns. The
+    head's case weights enter the likelihood in every configuration. A response holding one value
+    is predicted its mean. The learner fits a presence-absence head.
+
+    With ``random=True`` each unit, as named by ``id`` in :func:`~timesift.timesift`, gets an
+    intercept, which absorbs what its several targets share beyond the record: it is identified
+    where a unit carries more than one target. A prediction adds a unit's intercept where the unit
+    was in the fit and leaves it at zero, the population level, where it was not, so a unit held
+    out whole is predicted from its record and its place alone.
+
+    Both languages call one C++ core, so the same input gives the same fit in either.
+    """
+    from ._hierarchical import COVARIANCES
+    if spatial not in ("none", "nngp", "hsgp"):
+        raise ValueError(f'`spatial` is "none", "nngp" or "hsgp", got {spatial!r}.')
+    if cov not in COVARIANCES:
+        raise ValueError(f"`cov` is one of {', '.join(COVARIANCES)}, got {cov!r}.")
+    if not isinstance(random, (bool, np.bool_)):
+        raise ValueError(f"`random` is True or False, got {random!r}.")
+    for name, value, lo, hi in (("neighbours", neighbours, 1, 200), ("m", m, 3, 50),
+                                ("nodes", nodes, 1, 99)):
+        if isinstance(value, bool) or not float(value).is_integer() or not lo <= value <= hi:
+            raise ValueError(f"`{name}` is one whole number from {lo} to {hi}, got {value!r}.")
+    if isinstance(boundary, bool) or not isinstance(boundary, (int, float)) or not boundary >= 1:
+        raise ValueError(f"`boundary` is one number of one or more, got {boundary!r}.")
+    return Learner(name="hierarchical", fit=_hierarchical_fit, predict=_hierarchical_predict,
+                   data=data, reads="tabular", multi="separate",
+                   params=dict(spatial=spatial, random=bool(random), cov=cov,
+                               neighbours=int(neighbours), m=int(m), boundary=float(boundary),
+                               nodes=int(nodes), threads=int(threads)))
+
+
+def _hierarchical_coords(x, spatial):
+    if spatial == "none":
+        return None
+    if x.coords is None:
+        raise ValueError(f"a hierarchical learner with a `{spatial}` field places each unit by its "
+                         "coordinates; name the two columns in `timesift(coords=)`.")
+    return x.coords
+
+
+def _hierarchical_units(x, random):
+    if not random:
+        return None
+    if x.unit_ids is None:
+        raise ValueError("a hierarchical learner with an intercept for each unit names each "
+                         "target's unit; give the identifier in `timesift(id=)`.")
+    return np.asarray(x.unit_ids)
+
+
+def _hierarchical_design(m, centre, scale):
+    return np.hstack([np.ones((m.shape[0], 1)), (m - centre) / scale])
+
+
+def _hierarchical_fit(x, y, spatial, random, cov, neighbours, m, boundary, nodes, threads, head,
+                      variables, **_):
+    from ._hierarchical import COVARIANCES, hierarchical_fit
+    if _family(head) != "binomial":
+        raise ValueError("the hierarchical learner fits a presence-absence head.")
+    mat = flatten(x)
+    weights = _head_weights(head, y)
+    coords = _hierarchical_coords(x, spatial)
+    units = _hierarchical_units(x, random)
+    sd = mat.std(axis=0, ddof=1) if mat.shape[0] > 1 else np.zeros(mat.shape[1])
+    keep = np.isfinite(sd) & (sd > 0)
+    centre = mat[:, keep].mean(axis=0)
+    scale = sd[keep]
+    design = _hierarchical_design(mat[:, keep], centre, scale)
+    levels = sorted(set(units.tolist())) if random else None
+    index = None if not random else np.array([levels.index(u) for u in units], dtype=np.int32)
+
+    def make(d, yj, seed_j, w):
+        return hierarchical_fit(d, yj, w, unit=index, n_unit=len(levels or []), coords=coords,
+                                field=spatial, m=m, boundary=boundary, neighbours=neighbours,
+                                cov=COVARIANCES.index(cov), nodes=nodes, threads=threads)
+
+    models = _fit_columns(design, y, make, [0] * y.shape[1], weights)
+    return dict(models=models, keep=keep, centre=centre, scale=scale, levels=levels,
+                spatial=spatial, random=random,
+                unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)],
+                stopped=[str(v) for v, f in zip(variables, models)
+                         if isinstance(f, dict) and not f["converged"]])
+
+
+def _hierarchical_predict(model, x):
+    from ._hierarchical import hierarchical_predict
+    mat = flatten(x)
+    design = _hierarchical_design(mat[:, model["keep"]], model["centre"], model["scale"])
+    coords = _hierarchical_coords(x, model["spatial"])
+    index = None
+    if model["random"]:
+        position = {u: i for i, u in enumerate(model["levels"])}
+        index = np.array([position.get(u, -1) for u in _hierarchical_units(x, True)],
+                         dtype=np.int32)
+    return _predict_columns(
+        model["models"], design,
+        lambda f, d: 1.0 / (1.0 + np.exp(-hierarchical_predict(f, d, unit=index, coords=coords))))

@@ -1739,6 +1739,99 @@ so the tolerance holds a parameter to about `1e-5`.
   in the degrees of freedom and `1e-8` in the fitted means, and across the three Poisson ones to
   `6.2e-10`, `4.8e-7` and `1.2e-7`.
 
+## The hierarchical model
+
+`hierarchical()` is one Bayesian logistic model per response, over `src/ts_hierarchical.cpp`, which
+both languages compile, with `src/ts_sparse.cpp` under its nearest-neighbour field. The linear
+predictor of target `i` is `x_i' beta + u_g(i) + f(s_i)`: the fixed effects, an intercept for the
+unit the target belongs to and a Gaussian-process field at the target's place, each target's log
+likelihood scaled by its case weight.
+
+- **The design.** The intercept's column, then every flattened column that is not constant over the
+  fitting targets, centred on its mean and divided by its sample standard deviation. A prediction
+  centres and scales by the fit's own.
+- **The priors.** `beta_j ~ N(0, 2.5^2)` for every fixed effect, the intercept included. A unit's
+  intercept is `N(0, sd_u^2)`, and the field has a marginal standard deviation `sd_f` and a range
+  `r`. Each standard deviation has the penalised-complexity prior with `P(sd > 3) = 0.01`, density
+  `lambda exp(-lambda sd)` with `lambda = -log(0.01) / 3`, and the range the penalised-complexity
+  prior of a two-dimensional field, `P(r < r0) = 0.5`, an exponential prior on `1 / r` with rate
+  `-log(0.5) r0`, where `r0` is a fifth of the extent. Both are densities in the logarithm of the
+  parameter, so each carries its Jacobian.
+- **The coordinates** are centred on the column means and divided by one factor, the root of the
+  mean of the two columns' sample variances, so that distances keep their proportions. The extent
+  is the diagonal of their bounding box.
+- **The Hilbert-space field** (`hsgp`) has `m` Laplacian eigenfunctions per axis,
+  `sin(pi j (x + L) / (2 L)) / sqrt(L)` for `j = 1..m` on a box whose half-width `L` is `boundary`
+  times half the coordinates' range, no less than 0.1, about the middle of their range, with the
+  eigenvalue `(pi j1 / 2 L1)^2 + (pi j2 / 2 L2)^2`, `j2` fastest. A coefficient has the prior
+  `N(0, 1)` and multiplies the square root of the squared-exponential spectral density
+  `sd_f^2 2 pi r^2 exp(-r^2 w^2 / 2)` at its eigenvalue `w^2`.
+- **The nearest-neighbour field** (`nngp`) lives on the distinct locations, sorted by the first
+  coordinate then the second. Location `i` is conditioned on its `neighbours` nearest among the
+  locations before it, nearest first. With `C` their covariance, `c` its covariance with `i`, and a
+  nugget of `1e-8` on `C`'s diagonal, the regression is `a = C^-1 c` and the conditional variance
+  `max(sd_f^2 - c'a, 1e-10)`; the first location has the marginal variance. The precision is
+  `(I - A)' D^-1 (I - A)` and its log determinant `-sum log D`. The covariance is `sd_f^2` times
+  `exp(-d / r)`, `(1 + x) exp(-x)` with `x = sqrt(3) d / r`, `(1 + x + x^2 / 3) exp(-x)` with
+  `x = sqrt(5) d / r`, or `exp(-(d / r)^2)`. The precision is sparse, its pattern the cliques of a
+  location and its neighbours and the pairs of a target's location and unit, and is factored by a
+  Cholesky decomposition under a minimum-degree ordering analysed once.
+- **The conditional fit** at fixed hyperparameters is Laplace's method over the coefficients, the
+  field and the unit intercepts together: Newton's method with step halving to the mode of the
+  penalised log likelihood, and the log marginal likelihood
+  `J + (1/2) log |Q| - (1/2) log |H|`, `J` the penalised log likelihood at the mode, `Q` the
+  prior's precision and `H` the information there. The unit intercepts are eliminated by their
+  diagonal information under a dense field block, and the coefficients by a Schur complement under
+  a sparse one.
+- **The hyperparameters** are the logarithms of `sd_u` where there are unit intercepts, then of
+  `sd_f` and `r` where there is a field, and the log posterior is the conditional log marginal plus
+  the log hyperprior. Without a field the mode of `log sd_u` is the fit, the empirical-Bayes
+  estimate, and without either the fit is the posterior mode of the coefficients. With a field the
+  mode is found by BFGS on central differences, the curvature there by finite differences, and each
+  axis of its eigendecomposition is spread `nodes` points `1.25` standard deviations apart, the
+  deviation held within `[0.05, 2]`. Each node's conditional fit is weighted by `exp` of its log
+  posterior, and the fit is their weighted mean.
+- **A prediction** is the weighted sum over the nodes of `x' beta`, the unit's intercept where the
+  unit was fitted and zero where it was not, and the field at the new place: the eigenfunctions
+  times the coefficients under `hsgp`, and under `nngp` the conditional mean `c'C^-1 f` over the
+  `neighbours` nearest fitted locations of any order, a nugget of `1e-6` on `C`'s diagonal.
+
+The coordinates and the unit of each target ride on the array as a placement, not a channel: no
+learner reads them as a predictor, and a split of the targets splits them with it. `timesift(coords
+= )` names the two columns, and a learner with a field refuses an array that carries none.
+
+### The fixtures
+
+`hierarchical_input.csv` holds 60 targets in 20 units of three, and tulpa's own fits of
+`y ~ x1 + x2` to it, at the levels where its answer is deterministic. `hierarchical_cases.csv`
+carries the posterior mode of the coefficients, with the case weights and without, and the
+empirical-Bayes fit with an intercept for each unit, each with its coefficients and log marginal
+likelihood, and the last with the standard deviation of the intercepts, whose estimates are in
+`hierarchical_ranef.csv`. `hierarchical_hsgp_nodes.csv` and `hierarchical_nngp_nodes.csv` hold the
+nodes of tulpa's nested Laplace grid that carry weight: the hyperparameters, the log weight and the
+latent mode, the coefficients then the field's values, in target order for the nearest-neighbour
+field. The coefficients there have a prior standard deviation of 100, which is what the nested
+route fits under, and the core is asked for it. A node is the latent mode at fixed hyperparameters,
+so what is pinned is that mode and the constancy across the nodes of the difference between the
+core's log posterior and tulpa's log weight.
+
+A model with unit intercepts and a field is asserted against the same Laplace marginal written out
+densely, the Vecchia precision built location by location, the basis from its formula and Newton's
+method on full matrices, at fixed hyperparameters, under every covariance, in both suites.
+
+### How exactly
+
+- **The mode and the log marginal likelihood without a field** are tulpa's to `1e-11` and `1e-8`
+  relative to the tolerance the case carries, `1e-7`; the empirical-Bayes standard deviation, the
+  coefficients, the log marginal likelihood and the intercepts to `2.3e-8`, `4.5e-9`, `1.7e-8` and
+  `3.3e-8`.
+- **A node's mode** is tulpa's to `1e-13` under `hsgp` and `2e-14` under `nngp`, and the difference
+  between the core's log posterior and tulpa's log weight is constant across the nodes to `3e-10`
+  and `4e-9`. The grid itself, the mode of the hyperparameters and so the nodes a fit places, is
+  not pinned: two searches settle at the same point to the tolerance they are run at and no
+  closer, and tulpa's own search differs from this one.
+- **The dense marginal** is the core's to `1e-8` relative and the latent mode to `1e-7`.
+
 ## The combiner
 
 `ensemble_fit()` is handed each candidate's out-of-fold predictions, the response, the mask and the
@@ -1855,6 +1948,7 @@ call site.
 | multivariate adaptive regression splines | `mars()` |
 | flexible discriminant analysis | `discriminant()` |
 | generalised additive models | `additive()` |
+| the Bayesian logistic model with unit intercepts and a spatial field | `hierarchical()` |
 | the encoders | `mlp()`, `cnn()`, `rescnn()` |
 | how an encoder is trained | `train_control()` |
 | fitting one learner on one representation | `fit_learner()` |
@@ -2107,8 +2201,6 @@ is a function because it has none.
 | in R only | why |
 |---|---|
 | `starts_with()`, `ends_with()`, `contains()`, `matches()`, `all_of()`, `any_of()`, `everything()` and `where()` | tidyselect's verbs, re-exported so that `y = starts_with("sp_")` is written the way R writes a selection. Python has no non-standard evaluation, so a selection there is a name, a list of names, a glob such as `"sp_*"` or a predicate on the name, resolved by `select_columns()`. |
-
-| `hierarchical()` and `timesift(coords = )` | tulpa's Bayesian logistic model with an optional Gaussian-process field over the targets' coordinates. tulpa is an R package, so the learner is R's alone; the coordinates ride on the array as an attribute, a placement a learner may read and not a channel. Both reach a prediction through `predict.timesift()`, which rebuilds them from the new targets. |
 
 | in Python only | what it is |
 |---|---|

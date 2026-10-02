@@ -315,6 +315,8 @@ TimesiftMatrix(
     lag,
     static,
     position,
+    coords,
+    unit_ids,
 )
 ```
 
@@ -332,6 +334,11 @@ encoders read at their own amplitude rather than standardise.
 `bin_start`, `bin_end` and `bin_partial` are the calendar’s, and are
 `None` on a representation the calendar did not bin.
 
+`coords` is each row’s pair of coordinates and `unit_ids` the identifier
+of the unit each row belongs to, where `timesift.timesift` was given
+`coords` and `id`. They place a row and are not channels, so no learner
+reads them as a predictor, and a split of the rows splits them with it.
+
 Attributes:
 
 - `values` - np.ndarray
@@ -348,6 +355,8 @@ Attributes:
 - `lag` - int \| None
 - `static` - tuple\[str, …\]
 - `position` - tuple\[str, …\]
+- `coords` - np.ndarray \| None
+- `unit_ids` - tuple\[str, …\] \| None
 
 ### `shape`
 

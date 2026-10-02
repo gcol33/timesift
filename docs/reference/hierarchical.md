@@ -1,12 +1,11 @@
-# Bayesian logistic model with a spatial field, through tulpa
+# Bayesian logistic model with a spatial field
 
-One model per response, fitted by the tulpa package: a logistic
-regression on every bin-by-channel column of the representation,
-standardised so the prior on a coefficient means the same thing for
-each, and optionally a Gaussian-process field over the targets'
-coordinates. A unit then carries what its own record says and what its
-neighbours' presences say, under the folds every other learner is scored
-on.
+One model per response: a logistic regression on every bin-by-channel
+column of the representation, standardised so the prior on a coefficient
+means the same thing for each, optionally with an intercept for each
+unit and a Gaussian-process field over the targets' coordinates. A unit
+then carries what its own record says and what its neighbours' presences
+say, under the folds every other learner is scored on.
 
 ## Usage
 
@@ -15,7 +14,12 @@ hierarchical(
   data = NULL,
   spatial = c("none", "nngp", "hsgp"),
   random = FALSE,
-  inference = NULL
+  cov = c("exponential", "matern32", "matern52", "gaussian"),
+  neighbours = 15L,
+  m = 6L,
+  boundary = 1.5,
+  nodes = 5L,
+  threads = 1L
 )
 ```
 
@@ -33,14 +37,38 @@ hierarchical(
 
 - random:
 
-  A random intercept for each unit.
+  An intercept for each unit.
 
-- inference:
+- cov:
 
-  tulpa's `mode`. `NULL` takes `"laplace"` without a field or an
-  intercept, `"eb"` with an intercept alone, which estimates its
-  standard deviation by empirical Bayes, and `"auto"` with a field,
-  which integrates the field's hyperparameters.
+  The covariance of the `"nngp"` field: `"exponential"`, `"matern32"`,
+  `"matern52"` or `"gaussian"`, `sigma^2 exp(-d / range)` for the first.
+
+- neighbours:
+
+  The neighbours each location of an `"nngp"` field is conditioned on.
+
+- m:
+
+  Eigenfunctions per axis of an `"hsgp"` field.
+
+- boundary:
+
+  The factor by which an `"hsgp"` field's box is wider than the
+  coordinates.
+
+- nodes:
+
+  Grid points per hyperparameter.
+
+- threads:
+
+  How many fits of one response's inner cross-validation run at once.
+  The path on every fitting unit and the path of each inner fold are one
+  independent fit each, so they parallelise without sharing anything,
+  and `n_inner + 1` threads is as many as a response can use. The
+  default is serial, because a package does not take a machine's cores
+  without being asked. What comes back does not depend on it.
 
 ## Value
 
@@ -49,36 +77,50 @@ A
 
 ## Details
 
-The field is a Gaussian process on the two columns named by `coords` in
-[`timesift()`](https://gillescolling.com/timesift/reference/timesift.md):
-`"nngp"` is the nearest-neighbour approximation and `"hsgp"` the
-Hilbert-space one, and the field's hyperparameters are integrated by
-nested Laplace. A prediction at new units interpolates the field to
-their coordinates, so
-[`predict.timesift()`](https://gillescolling.com/timesift/reference/predict.timesift.md)
-is given targets that carry the same coordinate columns. Without a field
-no coordinates are needed and the model is a Bayesian logistic
-regression, conditioned on the posterior mode by Laplace's method.
+The coefficients, the intercept included, have a `N(0, 2.5^2)` prior. A
+unit's intercept is `N(0, sd^2)` and the field has a marginal standard
+deviation and a range, each standard deviation under a
+penalised-complexity prior (Simpson et al. 2017) with
+`P(sd > 3) = 0.01`, and the range under one anchored at a fifth of the
+coordinates' extent with `P(range < anchor) = 0.5` (Fuglstad et al.
+2019). Coordinates are centred and divided by one factor, so distances
+keep their proportions.
 
-tulpa's nested Laplace and its random-effect integrators carry no case
-weights on every route, so a fit with a field or an intercept is
-unweighted whatever the response head weighs; without either, the head's
-weights enter the likelihood. A response holding one value is predicted
-its mean and named in `unfitted`. The learner fits a presence-absence
-head: tulpa holds a Gaussian response's dispersion fixed unless it is
-estimated by empirical Bayes, which a field does not allow.
+The field is a Gaussian process on the two columns named by `coords` in
+[`timesift()`](https://gillescolling.com/timesift/reference/timesift.md).
+`"hsgp"` is the Hilbert-space approximation (Solin and Sarkka 2020) with
+`m` Laplacian eigenfunctions per axis, and `"nngp"` the
+nearest-neighbour process (Datta et al. 2016) over the distinct
+locations, each conditioned on its `neighbours` nearest among those
+before it in lexicographic order of the coordinates, with the covariance
+`cov`, whose range is the field's. Its sparse precision is factored once
+per set of hyperparameters, so the fit scales with the number of
+locations rather than their square.
+
+Inference is Laplace's method over the coefficients, the intercepts and
+the field together, and the hyperparameters are integrated over on a
+grid of `nodes` points per hyperparameter, centred on the mode of their
+posterior and weighted by it (Rue, Martino and Chopin 2009). With an
+intercept alone its standard deviation is set at the mode of its
+posterior; with neither the fit is the posterior mode of the
+coefficients. A prediction at new units interpolates the field to their
+coordinates, so
+[`predict.timesift()`](https://gillescolling.com/timesift/reference/predict.timesift.md)
+is given targets that carry the same coordinate columns. The head's case
+weights enter the likelihood in every configuration. A response holding
+one value is predicted its mean and named in `unfitted`. The learner
+fits a presence-absence head.
 
 With `random = TRUE` each unit, as named by `id` in
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md),
-gets a random intercept, which absorbs what its several targets share
-beyond the record: it is identified where a unit carries more than one
-target, as an anchored fit's units do. Its standard deviation is
-estimated, not conditioned on. A prediction adds a unit's intercept
+gets an intercept, which absorbs what its several targets share beyond
+the record: it is identified where a unit carries more than one target,
+as an anchored fit's units do. A prediction adds a unit's intercept
 where the unit was in the fit and leaves it at zero, the population
 level, where it was not, so a unit held out whole is predicted from its
 record and its place alone.
 
-This learner is in the R package only, because tulpa is an R package.
+Both languages call one C++ core, `src/ts_hierarchical.cpp`.
 
 ## Examples
 

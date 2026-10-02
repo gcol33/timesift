@@ -91,10 +91,13 @@ A metric of a numeric response and its predictions, as biomod2 reads an
 abundance model.
 
 `metric` is `r_squared` (`1 - sum(e**2) / sum((y - mean(y))**2)`, NaN
-where `y` is constant), `pearson`, `rmse`, `mse`, `mae` or `max_error`.
-A comparison reads the highest score as the best, so the four errors are
-registered as `neg_rmse`, `neg_mse`, `neg_mae` and `neg_max_error` with
-their sign reversed.
+where `y` is constant), `pearson`, `rmse`, `mse`, `mae`, `max_error` or
+`poisson_deviance` (`mean(2 (y log(y / p) - (y - p)))`, the logarithm
+taken as zero at `y = 0`, NaN where a prediction is negative or is zero
+beside a count above zero). A comparison reads the highest score as the
+best, so the five errors are registered as `neg_rmse`, `neg_mse`,
+`neg_mae`, `neg_max_error` and `neg_poisson_deviance` with their sign
+reversed.
 
 ## `ordinal_metric()`
 

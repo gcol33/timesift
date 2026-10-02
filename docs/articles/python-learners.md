@@ -26,9 +26,10 @@ cross-validation on the fitting units.
 There is no discrete selection step: the penalty path uses every column
 and shrinks, and nothing about the model is decided outside the fold it
 is fitted in. The family is the response head’s: logistic under a binary
-cross-entropy loss, linear under a squared-error one, and so are the
-case weights, `timesift.response.positive_weights` under
-presence-absence, which every learner that ships fits under.
+cross-entropy loss, log-linear under a Poisson-deviance one, linear
+under a squared-error one, and so are the case weights,
+`timesift.response.positive_weights` under presence-absence, which every
+learner that ships fits under.
 
 The path is fitted by the same core the R package calls, so the two
 return the same coefficients for the same input. Its conventions are
@@ -78,7 +79,8 @@ stepwise(
 One generalised linear model per variable, its terms chosen by Akaike’s
 criterion over every bin-by-channel column. The family is the response
 head’s: logistic under a binary cross-entropy loss, Gaussian under a
-squared-error one, and so are the case weights.
+squared-error one and Poisson under a Poisson-deviance one, and so are
+the case weights.
 
 `terms` says what one term is. Under `"column"` it is a column’s
 orthogonal polynomial of degree `degree`, so a column enters with its
@@ -120,20 +122,21 @@ tree(
     prune='se_sum',
     n_inner=None,
     preset='package',
+    shrink=1.0,
     seed=1,
 )
 ```
 
 One classification or regression tree per variable, over every
 bin-by-channel column, grown under rpart’s rules: the Gini index under a
-presence-absence head and the sum of squares under a head with a
-squared-error loss, a split only between two distinct values of a
-column, and the cost-complexity bookkeeping that keeps a split only
-where it lowers the risk by at least `cp` of the root’s. On the same
-columns, weights and folds the tree is the one rpart grows, split for
-split, and its complexity table the one rpart reports; the tree is grown
-by the core the R package calls, so the two languages grow it
-identically.
+presence-absence head, the sum of squares under a head with a
+squared-error loss and the Poisson deviance under a count head, a split
+only between two distinct values of a column, and the cost-complexity
+bookkeeping that keeps a split only where it lowers the risk by at least
+`cp` of the root’s. On the same columns, weights and folds the tree is
+the one rpart grows, split for split, and its complexity table the one
+rpart reports; the tree is grown by the core the R package calls, so the
+two languages grow it identically.
 
 The grown tree is pruned back by an inner cross-validation. Its folds
 are dealt for each response and stratified on it, as the elastic net’s
@@ -155,8 +158,16 @@ five inner folds. A setting given explicitly beats either.
 
 The case weights are the response head’s,
 `timesift.response.positive_weights` under presence-absence. They weigh
-every class count and sum of squares the tree is grown on; `min_split`
-and `min_leaf` count observations, as rpart’s do.
+every class count, sum of squares and event count the tree is grown on;
+`min_split` and `min_leaf` count observations, as rpart’s do.
+
+Under a count head a leaf predicts a rate, and the rate is shrunk
+towards the rate of the units the tree is grown on, as rpart’s
+`method = "poisson"` shrinks it: the posterior mean of a gamma prior
+whose coefficient of variation is `shrink`, `0` for none and rpart’s
+default `1`. A split is chosen on the deviance of the unshrunk rates,
+and a subtree’s risk, its complexity and the pruning’s cross-validated
+error are read on the shrunk ones.
 
 ## `forest()`
 
@@ -175,10 +186,11 @@ forest(
 
 One random forest per variable, over every bin-by-channel column: a
 probability forest under a presence-absence head and a regression forest
-under a head with a squared-error loss. Trees split on one column at a
-time and pay nothing for columns that carry nothing, so a forest reads a
-wide tabular representation without a penalty path and without a
-selection step.
+under a head with a squared-error loss or a count head, a count being
+cut on its variance and a leaf reporting its mean. Trees split on one
+column at a time and pay nothing for columns that carry nothing, so a
+forest reads a wide tabular representation without a penalty path and
+without a selection step.
 
 Each tree is grown on a bootstrap draw of the units, as many draws as
 there are units, and each node is split on the best of `mtry` columns
@@ -228,12 +240,13 @@ boosting(
 ```
 
 One boosted model per variable, over every bin-by-channel column: a
-logistic model under a presence-absence head and a squared-error one
-under a head with a squared-error loss. The score starts at the log-odds
-of the weighted share of presences, or the weighted mean, and each tree
-is fitted to the loss’s gradient at the current score and added to it
-scaled by `shrinkage`. Each tree is grown on a subsample of the units
-drawn without replacement, and reads a subsample of the columns.
+logistic model under a presence-absence head, a squared-error one under
+a head with a squared-error loss and a Poisson one with a log link under
+a count head. The score starts at the log-odds of the weighted share of
+presences, or the weighted mean, and each tree is fitted to the loss’s
+gradient at the current score and added to it scaled by `shrinkage`.
+Each tree is grown on a subsample of the units drawn without
+replacement, and reads a subsample of the columns.
 
 `newton` picks the trees. Off, they are gbm’s, which is what biomod2
 fits as `GBM`: `depth` splits grown best first, each the one that most
@@ -402,8 +415,10 @@ loss raises the residuals least, and keeps the subset of least
 generalised cross-validation, which charges `penalty` per knot. Under a
 binary cross-entropy head the kept terms are refitted as a logistic
 model, as earth’s `glm = list(family = binomial)` refits them, and the
-prediction is its probability; under a squared-error head they are
-refitted by least squares.
+prediction is its probability; under a count head they are refitted as a
+Poisson model with a log link, as earth’s `glm = list(family = poisson)`
+refits them, and the prediction is its mean count; under a squared-error
+head they are refitted by least squares.
 
 The defaults are earth’s, which biomod2 uses under its default and
 `"bigboss"` option sets alike: degree one, `penalty` 2 (3 above degree
@@ -504,6 +519,72 @@ that many columns and variables at once and does not change what comes
 back. A variable holding one value is predicted its mean and named in
 `unfitted`, and one whose smoothing parameter search stopped short of
 its tolerance is named in `stopped`.
+
+## `hierarchical()`
+
+``` python
+hierarchical(
+    data=None,
+    spatial='none',
+    random=False,
+    cov='exponential',
+    neighbours=15,
+    m=6,
+    boundary=1.5,
+    nodes=5,
+    threads=1,
+)
+```
+
+One Bayesian logistic model per response: a logistic regression on every
+bin-by-channel column of the representation, standardised so the prior
+on a coefficient means the same thing for each, optionally with an
+intercept for each unit and a Gaussian-process field over the targets’
+coordinates. A unit then carries what its own record says and what its
+neighbours’ presences say, under the folds every other learner is scored
+on.
+
+The coefficients, the intercept included, have a `N(0, 2.5^2)` prior. A
+unit’s intercept is `N(0, sd^2)` and the field has a marginal standard
+deviation and a range, each standard deviation under a
+penalised-complexity prior (Simpson et al. 2017) with
+`P(sd > 3) = 0.01`, and the range under one anchored at a fifth of the
+coordinates’ extent with `P(range < anchor) = 0.5` (Fuglstad et
+al. 2019). Coordinates are centred and divided by one factor, so
+distances keep their proportions.
+
+The field is a Gaussian process on the two columns named by `coords` in
+`timesift.timesift`. `"hsgp"` is the Hilbert-space approximation (Solin
+and Sarkka 2020) with `m` Laplacian eigenfunctions per axis, and
+`"nngp"` the nearest-neighbour process (Datta et al. 2016) over the
+distinct locations, each conditioned on its `neighbours` nearest among
+those before it in lexicographic order of the coordinates, with the
+covariance `cov`, one of `"exponential"`, `"matern32"`, `"matern52"` and
+`"gaussian"`, whose range is the field’s. Its sparse precision is
+factored once per set of hyperparameters, so the fit scales with the
+number of locations rather than their square.
+
+Inference is Laplace’s method over the coefficients, the intercepts and
+the field together, and the hyperparameters are integrated over on a
+grid of `nodes` points per hyperparameter, centred on the mode of their
+posterior and weighted by it (Rue, Martino and Chopin 2009). With an
+intercept alone its standard deviation is set at the mode of its
+posterior; with neither the fit is the posterior mode of the
+coefficients. A prediction at new units interpolates the field to their
+coordinates, so the targets it is given carry the same coordinate
+columns. The head’s case weights enter the likelihood in every
+configuration. A response holding one value is predicted its mean. The
+learner fits a presence-absence head.
+
+With `random=True` each unit, as named by `id` in `timesift.timesift`,
+gets an intercept, which absorbs what its several targets share beyond
+the record: it is identified where a unit carries more than one target.
+A prediction adds a unit’s intercept where the unit was in the fit and
+leaves it at zero, the population level, where it was not, so a unit
+held out whole is predicted from its record and its place alone.
+
+Both languages call one C++ core, so the same input gives the same fit
+in either.
 
 ## `tune()`
 

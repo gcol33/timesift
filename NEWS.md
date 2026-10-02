@@ -78,10 +78,17 @@
   as `"boyce"`, and `decision_threshold(rule = "mpa", perc = )` is the minimum predicted area cut.
   Both languages, pinned in `metrics.csv`.
 
-* `hierarchical()` fits a Bayesian logistic model through tulpa, with an optional nearest-neighbour
-  or Hilbert-space Gaussian-process field over the targets' coordinates, named in the new
-  `timesift(coords = )`, and an optional random intercept for each unit. The coordinates and the
-  unit names travel with every representation and are split with its units. tulpa is in Suggests, and the learner is in R only.
+* `hierarchical()` fits a Bayesian logistic model with an optional nearest-neighbour or
+  Hilbert-space Gaussian-process field over the targets' coordinates, named in the new
+  `timesift(coords = )`, and an optional intercept for each unit. Laplace's method over the
+  coefficients, the field and the intercepts together, with the hyperparameters integrated on a grid
+  around their posterior mode, in a C++ core both languages compile (`src/ts_hierarchical.cpp`),
+  the nearest-neighbour precision factored by a sparse Cholesky decomposition under a
+  minimum-degree ordering (`src/ts_sparse.cpp`) so the cost follows the number of locations. The
+  case weights enter every configuration. The coordinates and the unit names travel with every
+  representation and are split with its units. Pinned in the fixtures against tulpa's posterior
+  mode, empirical-Bayes fit and each node of its nested grid, and in both suites against the same
+  marginal written out densely. Both languages; tulpa is not a dependency.
 
 * `mlp(activation = )` sets the nonlinearity between the hidden layers: `"relu"` (the default),
   `"gelu"` or `"selu"`, in both languages.

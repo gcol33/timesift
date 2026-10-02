@@ -129,28 +129,33 @@ and fitting across a set of grains on its own.</p>
 <span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>    time<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>    target_time<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>    static<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>    models<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>    sift<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>    ensemble<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>    resampling<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>    inner<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>    rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'argmax'</span>,</span>
-<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>    response: <span class="bu">str</span> <span class="op">=</span> <span class="st">'presence_absence'</span>,</span>
-<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>    metric<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>    control<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>    keep_fits: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>,</span>
-<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a>    verbose: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
-<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a>    refit: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
-<span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>    coords<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>    models<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>    sift<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>    ensemble<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>    resampling<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>    inner<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>    rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'argmax'</span>,</span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>    response: <span class="bu">str</span> <span class="op">=</span> <span class="st">'presence_absence'</span>,</span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>    metric<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>    control<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a>    keep_fits: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>,</span>
+<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a>    verbose: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
+<span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a>    refit: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
+<span id="cb1-25"><a href="#cb1-25" tabindex="-1"></a>)</span></code></pre></div>
 <p>Compare every learner across every representation, and estimate
 choosing among them.</p>
 <p><code>targets</code> is one row per thing to predict and
 <code>series</code> is the long, time-stamped record belonging to it;
 both are mappings of column name to array, which a data frame satisfies.
-<code>y</code>, <code>x</code> and <code>static</code> are selections
-over their own table: a name, a list of names, a glob such as
-<code>"sp_*"</code>, or a function of a name.</p>
+<code>y</code>, <code>x</code>, <code>static</code> and
+<code>coords</code> are selections over their own table: a name, a list
+of names, a glob such as <code>"sp_*"</code>, or a function of a name.
+<code>coords</code> names the two columns holding each target’s
+coordinates; they place a target and are not predictors, and a learner
+that places a spatial field by them, <code>timesift.hierarchical</code>,
+reads them off the array.</p>
 <p>Within each outer fold of <code>resampling</code> the training
 targets are split again into <code>inner</code> folds. Every candidate
 is cross-validated on that inner split, <code>rule</code> picks one on
@@ -322,7 +327,7 @@ map cell an uncertainty map.</p>
 <h2 id="timesiftspec">
 <code>TimesiftSpec</code><a class="anchor" aria-label="anchor" href="#timesiftspec"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>TimesiftSpec(y, x, <span class="bu">id</span>, time, target_time, static, response, metric)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>TimesiftSpec(y, x, <span class="bu">id</span>, time, target_time, static, response, metric, coords)</span></code></pre></div>
 <p>How a fit was asked for: the columns each table plays, and the
 calendar they are read in.</p>
 <p>Attributes:</p>
@@ -343,6 +348,8 @@ calendar they are read in.</p>
 <code>response</code> - str</li>
 <li>
 <code>metric</code> - object</li>
+<li>
+<code>coords</code> - tuple[str, …]</li>
 </ul>
 </div>
 <div class="section level2">

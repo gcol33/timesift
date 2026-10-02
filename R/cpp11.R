@@ -127,3 +127,11 @@ ts_additive_fit_ <- function(x, y, w, n, p, r, family, k, gamma, max_knots, thre
 ts_additive_predict_ <- function(fit, newx, n, p) {
   .Call(`_timesift_ts_additive_predict_`, fit, newx, n, p)
 }
+
+ts_hierarchical_fit_ <- function(x, y, w, n, p, unit, n_unit, coords, field, beta_sd, sd_u, sd_alpha, range_fraction, range_alpha, m, boundary, neighbours, cov, nodes, step, threads, theta) {
+  .Call(`_timesift_ts_hierarchical_fit_`, x, y, w, n, p, unit, n_unit, coords, field, beta_sd, sd_u, sd_alpha, range_fraction, range_alpha, m, boundary, neighbours, cov, nodes, step, threads, theta)
+}
+
+ts_hierarchical_predict_ <- function(fit, newx, n, p, unit, coords) {
+  .Call(`_timesift_ts_hierarchical_predict_`, fit, newx, n, p, unit, coords)
+}

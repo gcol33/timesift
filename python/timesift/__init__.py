@@ -23,7 +23,8 @@ from .fit import Timesift, timesift
 from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
 from .learners import (Fit, Learner, additive, boosting, cnn, discriminant, elasticnet, envelope,
-                       fit_learner, flatten, forest, mars, maxnet, mlp, rescnn, stepwise, tree)
+                       fit_learner, flatten, forest, hierarchical, mars, maxnet, mlp, rescnn,
+                       stepwise, tree)
 from .metrics import (ORDINAL_METRICS, TABLE_METRICS, average_precision, boyce_index,
                       cohen_kappa, decision_threshold, kappa_score, model_agreement,
                       ordinal_metric, regression_metric, roc_auc, table_metric, tss)
@@ -92,6 +93,7 @@ register_learner("envelope", envelope)
 register_learner("mars", mars)
 register_learner("discriminant", discriminant)
 register_learner("additive", additive)
+register_learner("hierarchical", hierarchical)
 register_learner("mlp", mlp)
 register_learner("cnn", cnn)
 register_learner("rescnn", rescnn)
@@ -110,7 +112,8 @@ __all__ = [
     "ensemble", "ensemble_combine", "ensemble_fit", "ensemble_spread", "ensemble_weights",
     "expand_sift", "feature_matrix", "fit_learner", "flatten", "fold_map", "forest",
     "get_learner", "grain", "grain_contrasts",
-    "grain_ladder", "grain_matrix", "grains", "grouped_cv", "implied_skill", "kappa_score",
+    "grain_ladder", "grain_matrix", "grains", "grouped_cv", "hierarchical", "implied_skill",
+    "kappa_score",
     "learners", "lookback", "lookback_matrix", "lookbacks", "mars", "maxnet", "metrics", "mlp",
     "model_agreement",
     "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "plot", "positive_weights", "project", "pseudo_absences",

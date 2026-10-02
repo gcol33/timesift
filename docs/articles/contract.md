@@ -881,22 +881,24 @@ each column and divides by its standard deviation with `n - 1` first,
 and a column of no spread becomes zero. The resulting map is grouped by
 block, so a split drawn inside a fold keeps a block whole.
 
-`numeric_metric_cases.csv` and `numeric_metrics.csv` hold eight `(y, p)`
-cases and the value of every metric of a numeric response and of ordinal
-classes on each. With `e = y - p`, `r_squared` is
+`numeric_metric_cases.csv` and `numeric_metrics.csv` hold eleven
+`(y, p)` cases and the value of every metric of a numeric response and
+of ordinal classes on each. With `e = y - p`, `r_squared` is
 `1 - sum(e^2) / sum((y - mean(y))^2)`, `pearson` the correlation,
 `rmse`, `mse`, `mae` and `max_error` the root mean, the mean, the mean
-absolute and the greatest absolute of `e`; where `y` or `p` is constant
-the first two are `NA`, as is any metric where `p` holds a value that is
-not a number. For the ordinal metrics each prediction is read as the
-observed class nearest to it, the lower class on a tie, `m[i, j]` counts
-the units of observed class `j` read as class `i`, and with `k` the
-classes observed `accuracy` is `trace(m) / sum(m)`, `recall` is the sum
-of `m[j, j]` over the column sums, `precision` the sum of `m[i, i]` over
-the row sums, each over classes with a nonzero sum and divided by `k`,
-and `f1` is `2 P R / (P + R)` of the last two. The cells of a numeric
-head hold a cell scorable where each side of the split holds two
-distinct values.
+absolute and the greatest absolute of `e`, and `poisson_deviance` the
+mean of `2 (y log(y / p) - (y - p))`, the logarithm taken as zero at
+`y = 0`; where `y` or `p` is constant the first two are `NA`, as is any
+metric where `p` holds a value that is not a number, and the Poisson
+deviance where `p` is negative or is zero beside a count above zero. For
+the ordinal metrics each prediction is read as the observed class
+nearest to it, the lower class on a tie, `m[i, j]` counts the units of
+observed class `j` read as class `i`, and with `k` the classes observed
+`accuracy` is `trace(m) / sum(m)`, `recall` is the sum of `m[j, j]` over
+the column sums, `precision` the sum of `m[i, i]` over the row sums,
+each over classes with a nonzero sum and divided by `k`, and `f1` is
+`2 P R / (P + R)` of the last two. The cells of a numeric head hold a
+cell scorable where each side of the split holds two distinct values.
 
 `pa_pool.csv`, `pa_presences.csv` and `pa_candidates.csv` hold a pool of
 36 units on a six-by-six grid of longitude and latitude, five presences
@@ -982,7 +984,8 @@ was agreement with it rather than an elastic net of our own.
 
 - Case weights are normalised to sum to one, and the objective is the
   mean deviance halved for a Gaussian family and the mean negative log
-  likelihood for a binomial one, plus
+  likelihood for a binomial or a Poisson one, the Poisson one without
+  its `log(y!)`, plus
   `lambda * (alpha * sum |b| + (1 - alpha) / 2 * sum b^2)`.
 - Every column is centred on its weighted mean and divided by its
   weighted standard deviation, taken with those weights and no
@@ -1001,8 +1004,11 @@ was agreement with it rather than an elastic net of our own.
 - The path ends early where a step explains almost nothing more: a
   Gaussian family reads that share against the deviance explained so far
   and a binomial one reads it outright, which is the difference glmnet’s
-  two solvers carry. It also ends where a fit explains more than `0.999`
-  of the null deviance. Neither rule is read before the fifth point, and
+  solvers carry. A Poisson family reads the share gained over the last
+  four steps, the fifth point’s deviance explained less the first’s,
+  relative to the deviance explained now, against ten times that
+  threshold. It also ends where a fit explains more than `0.999` of the
+  null deviance. Neither rule is read before the fifth point, and
   neither applies to a path of supplied penalties.
 - The fit is iteratively reweighted least squares with a cyclic
   coordinate descent inside it, warm-started along the path, restricted
@@ -1020,6 +1026,18 @@ was agreement with it rather than an elastic net of our own.
 - A Gaussian fit folds the root of each case weight into the
   standardised columns and into the intercept’s column, so its quadratic
   has unit weight.
+- A Poisson response is a count under the log link, none of it negative
+  and some above zero, and more than one value. Its null model is the
+  weighted mean count, whose logarithm is the starting intercept (a mean
+  of one where the fit has no intercept), and the quadratic there, the
+  mean as the working weight and `y - mean` times the case weight as the
+  residual, is what the largest penalty is read off. A reweighting
+  rebuilds it at the current coefficients, the linear predictor held
+  within 250 either side. Like a binomial fit it is reweighted least
+  squares inside a coordinate descent, and its deviance explained is
+  read against the null deviance of the weighted mean. A held-out case’s
+  deviance is `2 (y log(y / mu) - (y - mu))` at the predicted mean, the
+  logarithm taken as zero at `y = 0`.
 - A fit that does not settle at a penalty, inside `max_irls`
   reweightings or inside what is left of the path’s `max_pass` passes,
   ends the path there: the points before it are the path, and `stalled`
@@ -1058,8 +1076,12 @@ exists for, a reading of ten degrees and its square of a hundred, and
 the weekly bins of one record are collinear the way adjacent bins are.
 Beside it are a binomial response, the continuous driver it was
 generated from, a case weight per unit and a five-fold map.
+`count_response.csv` holds a count response for the Poisson family, read
+by unit: the driver in standard units read as a rate `exp(0.4 + 0.6 z)`,
+and that Poisson’s quantiles at a low-discrepancy sequence rather than a
+draw, so no random stream is advanced.
 
-`penalised_cases.csv` names twelve cases, each family at each of three
+`penalised_cases.csv` names eighteen cases, each family at each of three
 mixings with and without the weights, and carries the convergence
 threshold and the pass budget the reference was read at and the
 tolerances a suite is allowed. `penalised_path.csv` holds glmnet’s
@@ -1083,7 +1105,9 @@ closer, so what is required is a distance:
   the direction the arm is allowed to move in; sitting above it is the
   arm being weakened, which is the thing this replacement was not
   allowed to do. Measured at a matched threshold of `1e-14`, the core
-  sits between `3e-13` and `2e-7` above glmnet across the twelve cases.
+  sits between `3e-13` and `2e-7` above glmnet across the twelve
+  Gaussian and binomial cases, and at most `6.7e-8` above it across the
+  six Poisson ones.
 - **A coefficient is allowed `1e-4`**, against the largest coefficient
   of the case. It is looser than the objective on purpose: two nearly
   identical columns split one coefficient between them differently in
@@ -1091,8 +1115,9 @@ closer, so what is required is a distance:
   the fit is. On a design without collinear columns the two agree far
   closer, to `2e-6` at a matched threshold of `1e-14`.
 - **The cross-validated penalty is exact.** `lambda.min` and
-  `lambda.1se` are the same point of the same path in all twelve cases,
-  and the held-out deviance agrees to `1e-4` relative.
+  `lambda.1se` are the same point of the same path in all eighteen
+  cases, and the held-out deviance agrees to `1e-4` relative, to
+  `2.2e-7` on the Poisson ones.
 
 One point of the path is different by construction, and only for a
 ridge. glmnet fits its first point at a penalty of `9.9e35` and reports
@@ -1103,6 +1128,13 @@ zero there is no threshold, and the core solves the point it reports
 while glmnet reports a fit made at an infinite penalty. The fixtures
 therefore start at the second point, and the difference at the first is
 asserted to be small rather than absent.
+
+A Poisson path that ends on the rule that stops it, rather than at its
+last penalty, ends on a comparison with a threshold, and glmnet’s Newton
+iteration settles at a tolerance of its own. The generator refuses a
+Poisson reference whose comparison at either of its last two points lies
+within a thousandth of the threshold, so no length hangs on that
+tolerance.
 
 The reference is generated with glmnet’s own pass budget raised well
 above its default. At the threshold the reference is read at, a
@@ -1232,10 +1264,28 @@ one they already fit.
   is an error rather than a surrogate split. A binomial response is 0 or
   1, and case weights are zero or more and sum to more than zero.
 - A binomial family splits on the Gini index of the weighted class
-  counts, a Gaussian one on the weighted sum of squares. A node’s risk
-  is the weight it misclassifies under its majority class, the first
-  class winning a tie, or its weighted sum of squares about its weighted
-  mean. Its value is the weighted share of ones, or that mean.
+  counts, a Gaussian one on the weighted sum of squares, a Poisson one
+  on the Poisson deviance of the unshrunk rates. A node’s risk is the
+  weight it misclassifies under its majority class, the first class
+  winning a tie, its weighted sum of squares about its weighted mean, or
+  its Poisson deviance about its shrunk rate. Its value is the weighted
+  share of ones, that mean, or that rate.
+- A Poisson response is a count, none of it negative, with some weight
+  on a count above zero. A node holding events `S = sum w y` over
+  exposure `W = sum w` predicts the rate `(S + a) / (W + b)`, the
+  posterior mean of a gamma prior of coefficient of variation `shrink`
+  centred on the rate of the units the tree is grown on:
+  `a = 1 / shrink^2` and `b = a W_0 / S_0` from those units’ totals, and
+  `a = b = 0`, the unshrunk `S / W`, where `shrink` is zero. Its risk is
+  `sum 2 w (y log(y / rate) - (y - rate))` about that rate, the
+  logarithm taken as zero at `y = 0`. A cut gains the deviance of the
+  unshrunk rates it removes,
+  `2 (S_l log(S_l / W_l) + S_r log(S_r / W_r) - S log(S / W))` with a
+  term of no events counted as zero, as a share of the node’s risk, and
+  sends the side of the lower unshrunk rate left. The tree grown on a
+  cross-validation fold’s units takes its prior from those units, and a
+  held-out observation’s loss is the deviance
+  `2 (y log(y / rate) - (y - rate))` of the leaf it reaches.
 - A column’s observations are sorted once, by rpart’s own quicksort, and
   every node reads them in that order. The order matters beyond the
   sort: a node’s sums are taken in it, and two sums of the same numbers
@@ -1288,15 +1338,17 @@ one they already fit.
 
 ### The fixtures
 
-`tree_cases.csv` names twelve cases: each family, with every weight one
-and with the integer counts `tree_weights.csv` holds, under rpart’s own
-defaults, biomod2’s tuned option set, and a shallow tree grown with no
-complexity threshold at all. Each is grown on the design
-`penalised_input.csv` carries, with its five-fold map as the
-cross-validation’s folds. `tree_nodes.csv` holds rpart’s node table,
-`tree_cptable.csv` its complexity table with the cross-validated error,
-and `tree_predict.csv` the predictions of the tree rpart’s `prune()`
-leaves at the row biomod2’s rule picks.
+`tree_cases.csv` names twenty-two cases: each family, with every weight
+one and with the integer counts `tree_weights.csv` holds, under rpart’s
+own defaults, biomod2’s tuned option set, and a shallow tree grown with
+no complexity threshold at all, and four Poisson cases under the tuned
+option set at a `shrink` of zero and of one half. Each is grown on the
+design `penalised_input.csv` carries, with its five-fold map as the
+cross-validation’s folds, and on the count response of
+`count_response.csv` under the Poisson family. `tree_nodes.csv` holds
+rpart’s node table, `tree_cptable.csv` its complexity table with the
+cross-validated error, and `tree_predict.csv` the predictions of the
+tree rpart’s `prune()` leaves at the row biomod2’s rule picks.
 
 ### How exactly
 
@@ -1305,8 +1357,9 @@ counts and the number of splits in each row of the table are asserted
 exactly. Every number of the node table and the complexity table, the
 thresholds, weights, risks, complexities, values, cross-validated errors
 and their spreads, and every prediction of the pruned tree, is asserted
-to `1e-12` relative. On the twelve cases the largest difference from
-rpart is `1.1e-16`.
+to `1e-12` relative. On the twelve binomial and Gaussian cases the
+largest difference from rpart is `1.1e-16`, and on the ten Poisson ones
+`1.8e-14`.
 
 ## The forest
 
@@ -1388,11 +1441,13 @@ modulo 2^32.
 `preset = "package"` is randomForest’s own defaults, which is what
 biomod2’s default option set fits: 500 trees, `mtry` the square root of
 the column count rounded down under a binomial family and a third of it
-under a Gaussian one, never below one, and `min_node`, the `min_leaf`
-above, one and five under the two. `preset = "bigboss"` is biomod2’s
-tuned option set: 500 trees, `mtry = 2`, `min_node = 5`. A setting given
-explicitly beats either, and an `mtry` above the column count is the
-column count.
+under a Gaussian or a Poisson one, never below one, and `min_node`, the
+`min_leaf` above, one and five under the two. A forest cuts a count as
+it cuts a continuous response, on the weighted sum of squares, and a
+leaf holds the mean count of its draws. `preset = "bigboss"` is
+biomod2’s tuned option set: 500 trees, `mtry = 2`, `min_node = 5`. A
+setting given explicitly beats either, and an `mtry` above the column
+count is the column count.
 
 ### The fixtures
 
@@ -1400,9 +1455,9 @@ No package grows a forest from this generator, so the reference is the
 forest grown from this text in R alone,
 `tests/testthat/helper-oracle-forest.R`, which computes the generator’s
 arithmetic in doubles where every step is exact. `forest_cases.csv`
-names six cases on the tree’s design: each family, flat weights and the
-tree’s counts, a balanced forest, one trying every column, and a seed of
-2^32 - 1. `forest_nodes.csv` holds each tree’s node table and
+names eight cases on the tree’s design: each family, flat weights and
+the tree’s counts, a balanced forest, one trying every column, and a
+seed of 2^32 - 1. `forest_nodes.csv` holds each tree’s node table and
 `forest_predict.csv` the forest’s prediction for every unit, the
 thresholds, the values and the predictions as hexadecimal floats: R
 reads a seventeen-digit decimal exactly only where it has extended
@@ -1431,9 +1486,11 @@ forest’s generator.
 ### The fit
 
 - The score of every observation starts at `log(S / (T - S))` under a
-  binomial family and `S / T` under a Gaussian one, `S` the sum of
-  weight times response and `T` the sum of weights, each taken in row
-  order. A binomial fit with no weight on one class is an error.
+  binomial family, `S / T` under a Gaussian one and `log(S / T)` under a
+  Poisson one, `S` the sum of weight times response and `T` the sum of
+  weights, each taken in row order. A binomial fit with no weight on one
+  class is an error, and so is a Poisson one with no weight on a count
+  above zero.
 - Tree `t` of fit `f` draws from the stream `f * trees + t` of the fit’s
   seed, fit 0 being the fit on every observation and fit `g + 1` the one
   holding fold `g` out. It first draws its bag, gbm’s way: with `k` the
@@ -1443,10 +1500,12 @@ forest’s generator.
   `colsample` times the column count, at least one, by the forest’s
   partial shuffle of a fresh arrangement of the column indices, tried in
   ascending order.
-- The working response is, first order, `y - 1 / (1 + exp(-F))` or
-  `y - F`; second order, the gradient `w (p - y)` and hessian
-  `w max(p (1 - p), 1e-16)` under a binomial family, `w (F - y)` and `w`
-  under a Gaussian one, `p` the logistic of the score `F`.
+- The working response is, first order, `y - 1 / (1 + exp(-F))`,
+  `y - exp(F)` or `y - F`; second order, the gradient `w (p - y)` and
+  hessian `w max(p (1 - p), 1e-16)` under a binomial family,
+  `w (mu - y)` and `w mu e^0.7` under a Poisson one, `w (F - y)` and `w`
+  under a Gaussian one, `p` the logistic of the score `F` and `mu` its
+  exponential.
 - Each tree is grown on the bag’s observations, and each column’s
   observations are read in ascending order, ties in row order.
 - A leaf’s value is its step times `shrinkage`, and every observation’s
@@ -1473,7 +1532,11 @@ forest’s generator.
 - A Gaussian leaf’s step is its weighted mean working response, as its
   parent’s split left the sums. A binomial leaf’s is one Newton step,
   the sum of `w z` over the sum of `w (y - z) (1 - y + z)` over the
-  bag’s observations in it, in row order, and zero where that is zero.
+  bag’s observations in it, in row order, and zero where that is zero. A
+  Poisson leaf’s is `log(sum w y / sum w exp(F))` over the bag’s
+  observations in it, in row order, `-1` where it holds no count and `0`
+  where it holds no exposure, and then held to at most `19` less the
+  greatest score in the leaf and at least `-19` less the least.
 
 ### The second-order tree
 
@@ -1489,15 +1552,21 @@ forest’s generator.
   are both leaves and whose gain is below `gamma` is collapsed, which
   can make its parent such a split in turn.
 - A leaf’s step is `-G / (H + lambda)` over the bag’s observations in
-  it, in row order, and zero where the denominator is zero.
+  it, in row order, and zero where the denominator is zero. Under a
+  Poisson family the step is held within `0.7` either side and a split
+  gains what the held steps remove, `-(2 G w + (H + lambda) w^2)` at the
+  step `w` of each side and of the node, which is `G^2 / (H + lambda)`
+  wherever the step is not held.
 
 ### The number of trees
 
 Where folds are given, each fold’s fit scores its held-out observations
 after every tree by the weighted deviance,
-`-2 sum w (y F - log(1 + exp(F))) / sum w` or `sum w (y - F)^2 / sum w`.
-The error after tree `t` is each fold’s deviance times the observations
-the fold holds, summed over the folds in order and divided by all the
+`-2 sum w (y F - log(1 + exp(F))) / sum w`,
+`-2 sum w (y F - exp(F)) / sum w` (the Poisson deviance without its
+saturated term, which no tree changes) or `sum w (y - F)^2 / sum w`. The
+error after tree `t` is each fold’s deviance times the observations the
+fold holds, summed over the folds in order and divided by all the
 observations, gbm’s `gbmCrossValErr`, and the fit on every observation
 keeps its trees up to the first of least error.
 
@@ -1515,12 +1584,14 @@ error to set otherwise.
 
 ### The fixtures
 
-`boost_cases.csv` names twelve cases on the tree’s design. Six are
+`boost_cases.csv` names seventeen cases on the tree’s design. Nine are
 gbm’s, each family with flat weights and the tree’s counts, and a
 cross-validated fit of each over the design’s five folds; gbm grows them
 with `bag.fraction = 1`, each fold’s fit behind `nTrain` as `gbmDoFold`
-arranges it. Four are xgboost’s `tree_method = "exact"`, with `lambda`
-and `gamma` set and, for a binomial response, the weights
+arranges it, the Poisson ones under its `poisson` distribution on the
+count response of `count_response.csv`. Six are xgboost’s
+`tree_method = "exact"`, two of them its `count:poisson`, with `lambda`
+and `gamma` set and, for a binomial or a Poisson response, the weights
 `boost_weights.csv` holds: under equal weights the first round’s
 gradients take two values, many splits then tie exactly, and the two
 libraries’ sums break such a tie differently. Two draw a subsample and a
@@ -1535,7 +1606,8 @@ The first-order predictions and the cross-validated errors are asserted
 to `1e-12` relative, the largest difference from gbm being `6.7e-16`;
 gbm rescales the weights before it fits, which moves a sum in the last
 place. The second-order predictions are asserted to `1e-5`, since
-xgboost stores the design and the gradients in single precision.
+xgboost stores the design and the gradients in single precision; its
+Poisson cases differ by at most `1.9e-7`.
 
 ## The envelope
 
@@ -1602,23 +1674,29 @@ comparison ran and the rest is what a biomod2 user’s `GLM` is.
 - **The design** is the intercept followed by the columns of each term
   the model holds, in the order it holds them.
 - **Each fit** is iteratively reweighted least squares as `glm.fit`:
-  starting means `(w y + 0.5) / (w + 1)` under the binomial family and
-  `y` under the Gaussian one; at each iteration the working response
-  `eta + (y - mu) / mu_eta` and working weights
-  `sqrt(w mu_eta^2 / V(mu))`, solved by LINPACK’s `dqrdc2` Householder
-  decomposition with its limited pivoting at a tolerance of
-  `min(1e-7, epsilon / 1000)`, a column falling below that share of its
-  original norm moved to the end and given a coefficient of zero; and
-  the stopping rule `|dev - dev_old| / (|dev| + 0.1) < epsilon`,
-  `epsilon = 1e-8`, within 25 iterations. The logit link holds the
-  linear predictor at 30 either side as R’s does: below `-30` the mean
-  is `eps / (1 + eps)` and above `30` it is `1 / (1 + eps)` with `eps`
-  the machine epsilon, and the derivative is `eps` outside that range.
-  The rank is the decomposition’s at the last iteration.
-- **The criterion** is `deviance + 2 rank` under the binomial family
-  and, under the Gaussian one,
-  `n (log(2 pi deviance / n) + 1) + 2 - sum(log w) + 2 rank`, the
-  deviance weighted by the case weights in both.
+  starting means `(w y + 0.5) / (w + 1)` under the binomial family,
+  `y + 0.1` under the Poisson one and `y` under the Gaussian one; at
+  each iteration the working response `eta + (y - mu) / mu_eta` and
+  working weights `sqrt(w mu_eta^2 / V(mu))`, solved by LINPACK’s
+  `dqrdc2` Householder decomposition with its limited pivoting at a
+  tolerance of `min(1e-7, epsilon / 1000)`, a column falling below that
+  share of its original norm moved to the end and given a coefficient of
+  zero; and the stopping rule
+  `|dev - dev_old| / (|dev| + 0.1) < epsilon`, `epsilon = 1e-8`, within
+  25 iterations. The logit link holds the linear predictor at 30 either
+  side as R’s does: below `-30` the mean is `eps / (1 + eps)` and above
+  `30` it is `1 / (1 + eps)` with `eps` the machine epsilon, and the
+  derivative is `eps` outside that range. The log link of the Poisson
+  family takes the mean and its derivative as `max(exp(eta), eps)`, and
+  its variance function is the mean. The rank is the decomposition’s at
+  the last iteration.
+- **The criterion** is `deviance + 2 rank` under the binomial family,
+  `deviance - 2 sum w (y log y - y - log y!) + 2 rank` under the Poisson
+  one, which is `-2 log L + 2 rank` with the saturated log likelihood
+  put back, and, under the Gaussian one, \`n (log(2 pi deviance
+  / n) + 1) + 2 - sum(log
+  23. - 2 rank\`, the deviance weighted by the case weights in all
+        three.
 - **The search.** `"forward"` and `"both"` start from the intercept,
   `"backward"` and `"none"` from every term. `"none"` stops there.
   Otherwise each step fits the model with each held term dropped, where
@@ -1642,17 +1720,19 @@ comparison ran and the rest is what a biomod2 user’s `GLM` is.
 
 ### The fixtures
 
-`stepwise_cases.csv` names thirteen cases on the weekly columns maxnet’s
-fixtures read. Seven are MASS’s `stepAIC()` over biomod2’s formula
+`stepwise_cases.csv` names eighteen cases on the weekly columns maxnet’s
+fixtures read. Ten are MASS’s `stepAIC()` over biomod2’s formula
 `x + I(x^2)` (`I(x^3)` beside them in one) from the intercept or from
-every term, in every direction: two of them carry the first column
-twice, so a term is aliased and the backward search drops it before
-anything else. MASS’s binomial family rounds a fractional weight into a
-count, so its binomial cases are unweighted; its Gaussian criterion
-differs from the core’s by a constant, and one Gaussian case is
-weighted. Two are [`glm()`](https://rdrr.io/r/stats/glm.html) on every
-term, and four are the forward search over column terms written in R
-alone, `tests/testthat/helper-oracle-stepwise.R`, under fractional case
+every term, in every direction, three of them under the Poisson family
+on the count response of `count_response.csv`: two of them carry the
+first column twice, so a term is aliased and the backward search drops
+it before anything else. MASS’s binomial family rounds a fractional
+weight into a count, so its binomial cases are unweighted; its Gaussian
+criterion differs from the core’s by a constant, and one Gaussian case
+is weighted, as is one of the Poisson ones. Three are
+[`glm()`](https://rdrr.io/r/stats/glm.html) on every term, and five are
+the forward search over column terms written in R alone,
+`tests/testthat/helper-oracle-stepwise.R`, under fractional case
 weights. Each case carries the terms chosen as `column:power` in the
 order the model holds them, `0` for a polynomial, with the rank, the
 deviance, whether the fit settled and the number of steps.
@@ -1665,7 +1745,7 @@ on every reading scaled by `1.01`.
   asserted exactly.**
 - **The deviance is asserted to `1e-9` relative and the predictions to
   `1e-8`.** The iteration is `glm.fit`’s own and the two settle on the
-  same iterate; across the thirteen cases they agree to about `1e-14`.
+  same iterate; across the eighteen cases they agree to about `1e-14`.
 
 ## MARS
 
@@ -1804,42 +1884,44 @@ from `src/ts_glm.cpp`, which the stepwise model shares.
         n`; the first size of least value up to`nprune`is kept. Unpruned, the first`nprune\`
         terms are.
 - **The refit** is over the kept terms unweighted, the weighted basis
-  divided by `sqrt(w)`: under the binomial family `glm.fit` from
-  `src/ts_glm.cpp` with the head’s weights, under the Gaussian one
-  `dqrls` at `1e-7` over the terms and the response each times
-  `sqrt(w)`. A dependent kept term is an error.
+  divided by `sqrt(w)`: under the binomial or the Poisson family
+  `glm.fit` from `src/ts_glm.cpp` with the head’s weights, under the
+  Gaussian one `dqrls` at `1e-7` over the terms and the response each
+  times `sqrt(w)`. A dependent kept term is an error.
 - **What a fit keeps**: every term of the forward pass as its factors
   (column, direction and cut), the kept terms in their order, their
   coefficients, the termination code, the kept size’s generalised
   cross-validation and whether the refit settled. The prediction is each
   kept term as the product of its factors, `max(0, x - t)`,
   `max(0, t - x)` or `x`, then the linear predictor, through the logit
-  link under the binomial family.
+  link under the binomial family and the exponential under the Poisson
+  one.
 - The columns of one parent are independent searches, and `threads` runs
   them at once; their results are taken in column order afterwards, so
   what comes back does not depend on it.
 
 ### The fixtures
 
-`mars_cases.csv` names ten cases on the weekly columns maxnet’s fixtures
-read: earth’s own fits over the binomial and the Gaussian response, at
-degrees one and two, unweighted and under the fractional weights,
-unpruned, with `nprune = 5`, and with `minspan = 3`, `endspan = 5` and
-every term a parent. Each case carries every forward term as
-`column:direction:cut` factors, the kept terms, the termination code and
-the kept size’s generalised cross-validation. `mars_coef.csv` holds the
-kept terms’ coefficients, the logistic refit’s under the binomial
-response, and `mars_predict.csv` the predictions on every reading scaled
-by `1.01`. The weighted cases are earth’s QR at every knot.
+`mars_cases.csv` names thirteen cases on the weekly columns maxnet’s
+fixtures read: earth’s own fits over the binomial, the Gaussian and the
+Poisson response, at degrees one and two, unweighted and under the
+fractional weights, unpruned, with `nprune = 5`, and with `minspan = 3`,
+`endspan = 5` and every term a parent. Each case carries every forward
+term as `column:direction:cut` factors, the kept terms, the termination
+code and the kept size’s generalised cross-validation. `mars_coef.csv`
+holds the kept terms’ coefficients, the logistic refit’s under the
+binomial response and the Poisson one’s under the Poisson, and
+`mars_predict.csv` the predictions on every reading scaled by `1.01`.
+The weighted cases are earth’s QR at every knot.
 
 ### How exactly
 
 - **The forward terms, the kept terms and the termination code are
   asserted exactly**, the cuts to `1e-12` relative: a cut is a reading.
 - **The coefficients and the generalised cross-validation are asserted
-  to `1e-8` relative and the predictions to `1e-9`.** Across the ten
-  cases the core and earth agree to `8e-14` or better, weighted cases
-  included.
+  to `1e-8` relative and the predictions to `1e-9`.** Across the
+  thirteen cases the core and earth agree to `8e-14` or better, weighted
+  cases included.
 
 ## The discriminant
 
@@ -1996,9 +2078,10 @@ is one generalised additive model per response, over
 `mgcv::gam(y ~ 1 + s(x1) + s(x2) + ..., family, weights = w, method = "GCV.Cp")`
 under mgcv’s (1.9-4) defaults: a thin plate regression spline of basis
 dimension 10 per column (Wood 2003), the smoothing parameters chosen by
-the unbiased risk estimator under the binomial family and by generalised
-cross-validation under the Gaussian one (Wood 2008). The least squares
-are the Householder QR of `src/ts_glm.cpp`.
+the unbiased risk estimator under the binomial and the Poisson family,
+whose scale is known, and by generalised cross-validation under the
+Gaussian one (Wood 2008). The least squares are the Householder QR of
+`src/ts_glm.cpp`.
 
 - **A column’s term.** Its distinct values, sorted, are `u`. A column of
   one value has no term. A column of two enters linearly: the one column
@@ -2052,20 +2135,23 @@ are the Householder QR of `src/ts_glm.cpp`.
 - **The fit at smoothing parameters `lambda`.** Penalised iteratively
   reweighted least squares: the working weights `W = w mu (1 - mu)` and
   response `z = eta + (y - mu) / (mu (1 - mu))` under the binomial
-  family, `W = w` and `z = y` under the Gaussian one, and each step the
+  family, `W = w mu` and `z = eta + (y - mu) / mu` under the Poisson
+  one, `W = w` and `z = y` under the Gaussian one, and each step the
   least squares of `sqrt(W) z` on `sqrt(W) X` stacked on the diagonal
   `sqrt(lambda_j d_c)` of the penalty. The first step starts from the
-  means `(w y + 0.5) / (w + 1)`, later fits from the coefficients the
-  search last reached, and a step that raises the penalised deviance is
-  halved back towards the coefficients it left, at most thirty times.
-  The fit stops once the penalised deviance moves by at most
+  means `(w y + 0.5) / (w + 1)` under the binomial family and `y + 0.1`
+  under the Poisson one, later fits from the coefficients the search
+  last reached, and a step that raises the penalised deviance is halved
+  back towards the coefficients it left, at most thirty times. The fit
+  stops once the penalised deviance moves by at most
   `1e-13 (|pdev| + 0.1)`; the Gaussian one is one step. The mean is the
-  inverse logit with the linear predictor held at 30 either side.
+  inverse logit with the linear predictor held at 30 either side, or the
+  exponential held off zero by the machine epsilon.
 - **The criterion.** With `D` the deviance, `n` the units and
   `tau = tr((X'WX + S)^-1 X'WX)`, the unbiased risk estimator
-  `D / n + 2 gamma tau / n - 1` under the binomial family and the
-  generalised cross-validation `n D / (n - gamma tau)^2` under the
-  Gaussian one.
+  `D / n + 2 gamma tau / n - 1` under the binomial and the Poisson
+  family and the generalised cross-validation `n D / (n - gamma tau)^2`
+  under the Gaussian one.
 - **The search.** Newton’s method on `rho = log(lambda)`, each held to
   `[-25, 25]`, with the exact gradient and Hessian, from the start that
   makes each penalty’s mean diagonal that of `X'W_0X` over its columns,
@@ -2096,7 +2182,8 @@ are the Householder QR of `src/ts_glm.cpp`.
   parameters, each term’s effective degrees of freedom, the criterion,
   the Newton steps taken and whether the search settled. The prediction
   is the terms’ columns at each value times the coefficients, through
-  the inverse logit under the binomial family.
+  the inverse logit under the binomial family and the exponential under
+  the Poisson one.
 - **A fit at given smoothing parameters.** `sp`, one value per smooth in
   column order and shared by the responses, replaces the search: the fit
   is the penalised likelihood’s maximum at those parameters, held as
@@ -2111,12 +2198,14 @@ are the Householder QR of `src/ts_glm.cpp`.
 
 ### The fixtures
 
-`additive_cases.csv` names seven cases on the weekly columns maxnet’s
+`additive_cases.csv` names ten cases on the weekly columns maxnet’s
 fixtures read and on inputs of their own: mgcv’s own fits under the
-fractional weights and without them, under the Gaussian response, with
-every one of the eleven columns at `k = 5` under the Gaussian response,
-at `gamma = 1.4`, on `additive_input.csv`, whose second column holds
-five distinct values and whose third holds two, against mgcv’s
+fractional weights and without them, under the Gaussian response, under
+the Poisson response of `count_response.csv` on the late columns at
+`k = 5` and unweighted at `k = 10` and on the first three at `k = 5`,
+with every one of the eleven columns at `k = 5` under the Gaussian
+response, at `gamma = 1.4`, on `additive_input.csv`, whose second column
+holds five distinct values and whose third holds two, against mgcv’s
 `s(v02, k = 5)` and the linear `v03`, and on `additive_knots_input.csv`,
 2100 units of two columns, past the subsample. Each is run to a tight
 tolerance (`epsilon = 1e-13`, `mgcv.tol = 1e-15`, Newton’s
@@ -2137,16 +2226,16 @@ A fit at given smoothing parameters is asserted against the penalised
 problem solved outright. Both suites read the design and the penalty off
 the fit, solve the weighted design stacked on the root of the penalty by
 a singular value decomposition, which takes no rank decision, and under
-the binomial family repeat that at the working weights with step halving
-until the coefficients stop moving. The fitted means, each term’s
-effective degrees of freedom and the criterion are asserted to `1e-7`,
-`1e-6` and `1e-7` at seven patterns of smoothing parameters spanning
-`1e-4` to `1e12`, among them one column at `1e12` beside the rest at
-`1e-4`, on the binomial weekly columns, the Gaussian eleven columns at
-`k = 5` and `gamma = 1.4`, and the binomial `few` input. The same
-reference at smoothing parameters off by a relative `1e-6` differs by
-`4e-8` in the fitted means, so the tolerance holds a parameter to about
-`1e-5`.
+the binomial and the Poisson family repeat that at the working weights
+with step halving until the coefficients stop moving. The fitted means,
+each term’s effective degrees of freedom and the criterion are asserted
+to `1e-7`, `1e-6` and `1e-7` at seven patterns of smoothing parameters
+spanning `1e-4` to `1e12`, among them one column at `1e12` beside the
+rest at `1e-4`, on the binomial weekly columns, the Gaussian eleven
+columns at `k = 5` and `gamma = 1.4`, the binomial `few` input and the
+Poisson late columns at `k = 5`. The same reference at smoothing
+parameters off by a relative `1e-6` differs by `4e-8` in the fitted
+means, so the tolerance holds a parameter to about `1e-5`.
 
 ### How exactly
 
@@ -2156,7 +2245,136 @@ reference at smoothing parameters off by a relative `1e-6` differs by
   run at and no closer, and the basis is an eigenproblem each solves to
   its own tolerance. Across the seven cases the core and mgcv agree to
   `5e-10` in the criterion, `3.5e-7` in the degrees of freedom and
-  `1e-8` in the fitted means.
+  `1e-8` in the fitted means, and across the three Poisson ones to
+  `6.2e-10`, `4.8e-7` and `1.2e-7`.
+
+## The hierarchical model
+
+[`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
+is one Bayesian logistic model per response, over
+`src/ts_hierarchical.cpp`, which both languages compile, with
+`src/ts_sparse.cpp` under its nearest-neighbour field. The linear
+predictor of target `i` is `x_i' beta + u_g(i) + f(s_i)`: the fixed
+effects, an intercept for the unit the target belongs to and a
+Gaussian-process field at the target’s place, each target’s log
+likelihood scaled by its case weight.
+
+- **The design.** The intercept’s column, then every flattened column
+  that is not constant over the fitting targets, centred on its mean and
+  divided by its sample standard deviation. A prediction centres and
+  scales by the fit’s own.
+- **The priors.** `beta_j ~ N(0, 2.5^2)` for every fixed effect, the
+  intercept included. A unit’s intercept is `N(0, sd_u^2)`, and the
+  field has a marginal standard deviation `sd_f` and a range `r`. Each
+  standard deviation has the penalised-complexity prior with
+  `P(sd > 3) = 0.01`, density `lambda exp(-lambda sd)` with
+  `lambda = -log(0.01) / 3`, and the range the penalised-complexity
+  prior of a two-dimensional field, `P(r < r0) = 0.5`, an exponential
+  prior on `1 / r` with rate `-log(0.5) r0`, where `r0` is a fifth of
+  the extent. Both are densities in the logarithm of the parameter, so
+  each carries its Jacobian.
+- **The coordinates** are centred on the column means and divided by one
+  factor, the root of the mean of the two columns’ sample variances, so
+  that distances keep their proportions. The extent is the diagonal of
+  their bounding box.
+- **The Hilbert-space field** (`hsgp`) has `m` Laplacian eigenfunctions
+  per axis, `sin(pi j (x + L) / (2 L)) / sqrt(L)` for `j = 1..m` on a
+  box whose half-width `L` is `boundary` times half the coordinates’
+  range, no less than 0.1, about the middle of their range, with the
+  eigenvalue `(pi j1 / 2 L1)^2 + (pi j2 / 2 L2)^2`, `j2` fastest. A
+  coefficient has the prior `N(0, 1)` and multiplies the square root of
+  the squared-exponential spectral density
+  `sd_f^2 2 pi r^2 exp(-r^2 w^2 / 2)` at its eigenvalue `w^2`.
+- **The nearest-neighbour field** (`nngp`) lives on the distinct
+  locations, sorted by the first coordinate then the second. Location
+  `i` is conditioned on its `neighbours` nearest among the locations
+  before it, nearest first. With `C` their covariance, `c` its
+  covariance with `i`, and a nugget of `1e-8` on `C`’s diagonal, the
+  regression is `a = C^-1 c` and the conditional variance
+  `max(sd_f^2 - c'a, 1e-10)`; the first location has the marginal
+  variance. The precision is `(I - A)' D^-1 (I - A)` and its log
+  determinant `-sum log D`. The covariance is `sd_f^2` times
+  `exp(-d / r)`, `(1 + x) exp(-x)` with `x = sqrt(3) d / r`,
+  `(1 + x + x^2 / 3) exp(-x)` with `x = sqrt(5) d / r`, or
+  `exp(-(d / r)^2)`. The precision is sparse, its pattern the cliques of
+  a location and its neighbours and the pairs of a target’s location and
+  unit, and is factored by a Cholesky decomposition under a
+  minimum-degree ordering analysed once.
+- **The conditional fit** at fixed hyperparameters is Laplace’s method
+  over the coefficients, the field and the unit intercepts together:
+  Newton’s method with step halving to the mode of the penalised log
+  likelihood, and the log marginal likelihood
+  `J + (1/2) log |Q| - (1/2) log |H|`, `J` the penalised log likelihood
+  at the mode, `Q` the prior’s precision and `H` the information there.
+  The unit intercepts are eliminated by their diagonal information under
+  a dense field block, and the coefficients by a Schur complement under
+  a sparse one.
+- **The hyperparameters** are the logarithms of `sd_u` where there are
+  unit intercepts, then of `sd_f` and `r` where there is a field, and
+  the log posterior is the conditional log marginal plus the log
+  hyperprior. Without a field the mode of `log sd_u` is the fit, the
+  empirical-Bayes estimate, and without either the fit is the posterior
+  mode of the coefficients. With a field the mode is found by BFGS on
+  central differences, the curvature there by finite differences, and
+  each axis of its eigendecomposition is spread `nodes` points `1.25`
+  standard deviations apart, the deviation held within `[0.05, 2]`. Each
+  node’s conditional fit is weighted by `exp` of its log posterior, and
+  the fit is their weighted mean.
+- **A prediction** is the weighted sum over the nodes of `x' beta`, the
+  unit’s intercept where the unit was fitted and zero where it was not,
+  and the field at the new place: the eigenfunctions times the
+  coefficients under `hsgp`, and under `nngp` the conditional mean
+  `c'C^-1 f` over the `neighbours` nearest fitted locations of any
+  order, a nugget of `1e-6` on `C`’s diagonal.
+
+The coordinates and the unit of each target ride on the array as a
+placement, not a channel: no learner reads them as a predictor, and a
+split of the targets splits them with it. `timesift(coords = )` names
+the two columns, and a learner with a field refuses an array that
+carries none.
+
+### The fixtures
+
+`hierarchical_input.csv` holds 60 targets in 20 units of three, and
+tulpa’s own fits of `y ~ x1 + x2` to it, at the levels where its answer
+is deterministic. `hierarchical_cases.csv` carries the posterior mode of
+the coefficients, with the case weights and without, and the
+empirical-Bayes fit with an intercept for each unit, each with its
+coefficients and log marginal likelihood, and the last with the standard
+deviation of the intercepts, whose estimates are in
+`hierarchical_ranef.csv`. `hierarchical_hsgp_nodes.csv` and
+`hierarchical_nngp_nodes.csv` hold the nodes of tulpa’s nested Laplace
+grid that carry weight: the hyperparameters, the log weight and the
+latent mode, the coefficients then the field’s values, in target order
+for the nearest-neighbour field. The coefficients there have a prior
+standard deviation of 100, which is what the nested route fits under,
+and the core is asked for it. A node is the latent mode at fixed
+hyperparameters, so what is pinned is that mode and the constancy across
+the nodes of the difference between the core’s log posterior and tulpa’s
+log weight.
+
+A model with unit intercepts and a field is asserted against the same
+Laplace marginal written out densely, the Vecchia precision built
+location by location, the basis from its formula and Newton’s method on
+full matrices, at fixed hyperparameters, under every covariance, in both
+suites.
+
+### How exactly
+
+- **The mode and the log marginal likelihood without a field** are
+  tulpa’s to `1e-11` and `1e-8` relative to the tolerance the case
+  carries, `1e-7`; the empirical-Bayes standard deviation, the
+  coefficients, the log marginal likelihood and the intercepts to
+  `2.3e-8`, `4.5e-9`, `1.7e-8` and `3.3e-8`.
+- **A node’s mode** is tulpa’s to `1e-13` under `hsgp` and `2e-14` under
+  `nngp`, and the difference between the core’s log posterior and
+  tulpa’s log weight is constant across the nodes to `3e-10` and `4e-9`.
+  The grid itself, the mode of the hyperparameters and so the nodes a
+  fit places, is not pinned: two searches settle at the same point to
+  the tolerance they are run at and no closer, and tulpa’s own search
+  differs from this one.
+- **The dense marginal** is the core’s to `1e-8` relative and the latent
+  mode to `1e-7`.
 
 ## The combiner
 
@@ -2190,7 +2408,11 @@ map, so `em.by = "algo"` is each candidate itself, and `"all"` is
 ### The weights
 
 `"stack"` minimises the head’s loss over the scorable cells on the
-simplex. `"mean"`, `"median"` and `"committee"` weigh every member the
+simplex. The loss is the cross entropy under `binary_cross_entropy`, the
+mean squared error under `squared_error`, and under `poisson_deviance`
+the mean of `2 (y log(y / p) - (y - p))`, the logarithm taken as zero at
+`y = 0`, with a combined mean read no closer to zero than the machine
+epsilon. `"mean"`, `"median"` and `"committee"` weigh every member the
 same. `"weighted"` with `decay = "proportional"` takes each member’s
 score, zero where it is at or below zero, over their sum. With a number
 `d` the `K` members scoring above zero are ordered from the highest, the
@@ -2231,10 +2453,10 @@ members’ predictions:
 - `lower` and `upper` are
   `m -+ t(1 - alpha / 2, n - 1) s sqrt(sum(w^2))`, `n` the members
   carrying a weight above zero, held inside the range of the head’s
-  predictions, `[0, 1]` under `binary_cross_entropy`. Under equal
-  weights this is the t interval of a mean of `n` members. biomod2 reads
-  its quantile on `n + 1` degrees of freedom; `n - 1` is the interval’s
-  own.
+  predictions, `[0, 1]` under `binary_cross_entropy` and `[0, Inf)`
+  under `poisson_deviance`. Under equal weights this is the t interval
+  of a mean of `n` members. biomod2 reads its quantile on `n + 1`
+  degrees of freedom; `n - 1` is the interval’s own.
 
 `sd`, `cv` and the interval are missing where fewer than two members
 carry weight. The array is `[unit, variable, statistic]` in that order
@@ -2252,14 +2474,23 @@ candidates under its own `tss` and hands those scores over as a run
 does. `ensemble_weights.csv` holds each case’s members and weights,
 `ensemble_thresholds.csv` each committee member’s cut on each variable,
 and `ensemble_predict.csv` each case’s combination and spread at
-`alpha = 0.1` for every unit and variable.
+`alpha = 0.1` for every unit and variable. `ensemble_count_response.csv`
+holds sixty counts with a five-fold map, `ensemble_count_oof.csv` four
+candidates’ out-of-fold means of them rounded to six decimals, and
+`ensemble_count_cases.csv` the stack, the mean and the median under the
+Poisson deviance, with `ensemble_count_weights.csv` and
+`ensemble_count_predict.csv` holding their weights and their combination
+and spread. The counts and the means are deterministic. The generator
+refuses the stack’s weights unless their loss is within `1e-7` of the
+least a derivative-free search over the simplex reaches from five
+starts.
 
 ### How exactly
 
-Everything is asserted to `1e-10` relative. The file holds twelve
-significant digits, and the largest difference either side reads is
-`4.8e-12`, the stack’s weights included: the two solvers take the same
-steps.
+Everything is asserted to `1e-10` relative, the count cases to `1e-9`.
+The file holds twelve significant digits, and the largest difference
+either side reads is `4.8e-12`, the stack’s weights included: the two
+solvers take the same steps.
 
 ## What each language carries
 
@@ -2290,6 +2521,7 @@ the difference is recorded here rather than found at a call site.
 | multivariate adaptive regression splines | [`mars()`](https://gillescolling.com/timesift/reference/mars.md) |
 | flexible discriminant analysis | [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md) |
 | generalised additive models | [`additive()`](https://gillescolling.com/timesift/reference/additive.md) |
+| the Bayesian logistic model with unit intercepts and a spatial field | [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md) |
 | the encoders | [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md) |
 | how an encoder is trained | [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md) |
 | fitting one learner on one representation | [`fit_learner()`](https://gillescolling.com/timesift/reference/fit_learner.md) |
@@ -2438,11 +2670,12 @@ the difference is recorded here rather than found at a call site.
   response of its own: the encoders train under the head’s `loss` and
   predict through its `activation`, and the three learners fitting one
   model per response take the family the loss names, logistic under
-  `binary_cross_entropy` and Gaussian under `squared_error`. A fit that
-  declares a `head` argument is handed the head, as one that declares
-  `control` is handed the control, and one that declares `weights` is
-  handed the head’s case weights, the matrix of the response’s shape the
-  learners that ship fit under; a fit declaring none fits unweighted.
+  `binary_cross_entropy`, Gaussian under `squared_error` and Poisson
+  under `poisson_deviance`. A fit that declares a `head` argument is
+  handed the head, as one that declares `control` is handed the control,
+  and one that declares `weights` is handed the head’s case weights, the
+  matrix of the response’s shape the learners that ship fit under; a fit
+  declaring none fits unweighted.
 - A fitted encoder holds its weights as arrays and the device *setting*
   rather than the device it resolved to, and rebuilds the network when
   it predicts, so a fit written with
@@ -2639,20 +2872,11 @@ it has none.
 |----|----|
 | [`starts_with()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`ends_with()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`contains()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`matches()`](https://tidyselect.r-lib.org/reference/starts_with.html), [`all_of()`](https://tidyselect.r-lib.org/reference/all_of.html), [`any_of()`](https://tidyselect.r-lib.org/reference/all_of.html), [`everything()`](https://tidyselect.r-lib.org/reference/everything.html) and [`where()`](https://tidyselect.r-lib.org/reference/where.html) | tidyselect’s verbs, re-exported so that `y = starts_with("sp_")` is written the way R writes a selection. Python has no non-standard evaluation, so a selection there is a name, a list of names, a glob such as `"sp_*"` or a predicate on the name, resolved by `select_columns()`. |
 
-[`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
-and`timesift(coords = )` \| tulpa’s Bayesian logistic model withan
-optional Gaussian-process field over the targets’ coordinates. tulpais
-an R package, so the learner is R’s alone; the coordinates ride onthe
-array as an attribute, a placement a learner may read and not achannel.
-Both reach a prediction
-through[`predict.timesift()`](https://gillescolling.com/timesift/reference/predict.timesift.md),
-which rebuilds them from the newtargets. \|
-
 | in Python only | what it is |
 |----|----|
 | `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
 | `Representation`, `Sift`, `Resampling`, `TimesiftSpec`, `Learner`, `TrainControl`, `TimesiftMatrix`, `TimesiftSet`, `Coverage`, `Response`, `Folds`, `Cells`, `Fit`, `Ladder`, `Selection`, `Timesift`, `Stack`, `EnsembleSpec`, `Simulation` | the types. R attaches a class attribute to a list or an array and the constructor is the only door to it; a Python dataclass is the type itself, and a user annotating a function or building one by hand reaches it by name. |
-| `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `SPREAD_STATISTICS`, `PRESENCE_ABSENCE`, `CONTINUOUS`, `ABUNDANCE`, `ORDINAL` | the grain, statistic and spread vocabularies as tuples, and the shipped heads as the mappings [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through [`responses()`](https://gillescolling.com/timesift/reference/register_response.md) on both sides. |
+| `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `SPREAD_STATISTICS`, `PRESENCE_ABSENCE`, `CONTINUOUS`, `ABUNDANCE`, `ORDINAL`, `COUNT` | the grain, statistic and spread vocabularies as tuples, and the shipped heads as the mappings [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through [`responses()`](https://gillescolling.com/timesift/reference/register_response.md) on both sides. |
 
 Models are the one thing neither side promises. A fit in torch and a fit
 in libtorch cannot be byte-identical, and the encoders match module for

@@ -454,6 +454,61 @@ works that many columns and variables at once and does not change what comes bac
 holding one value is predicted its mean and named in `unfitted`, and one whose smoothing
 parameter search stopped short of its tolerance is named in `stopped`.
 
+## `hierarchical()`
+
+```python
+hierarchical(
+    data=None,
+    spatial='none',
+    random=False,
+    cov='exponential',
+    neighbours=15,
+    m=6,
+    boundary=1.5,
+    nodes=5,
+    threads=1,
+)
+```
+
+One Bayesian logistic model per response: a logistic regression on every bin-by-channel
+column of the representation, standardised so the prior on a coefficient means the same thing
+for each, optionally with an intercept for each unit and a Gaussian-process field over the
+targets' coordinates. A unit then carries what its own record says and what its neighbours'
+presences say, under the folds every other learner is scored on.
+
+The coefficients, the intercept included, have a `N(0, 2.5^2)` prior. A unit's intercept is
+`N(0, sd^2)` and the field has a marginal standard deviation and a range, each standard
+deviation under a penalised-complexity prior (Simpson et al. 2017) with `P(sd > 3) = 0.01`,
+and the range under one anchored at a fifth of the coordinates' extent with
+`P(range < anchor) = 0.5` (Fuglstad et al. 2019). Coordinates are centred and divided by one
+factor, so distances keep their proportions.
+
+The field is a Gaussian process on the two columns named by `coords` in
+`timesift.timesift`. `"hsgp"` is the Hilbert-space approximation (Solin and Sarkka
+2020) with `m` Laplacian eigenfunctions per axis, and `"nngp"` the nearest-neighbour
+process (Datta et al. 2016) over the distinct locations, each conditioned on its
+`neighbours` nearest among those before it in lexicographic order of the coordinates, with
+the covariance `cov`, one of `"exponential"`, `"matern32"`, `"matern52"` and
+`"gaussian"`, whose range is the field's. Its sparse precision is factored once per set of
+hyperparameters, so the fit scales with the number of locations rather than their square.
+
+Inference is Laplace's method over the coefficients, the intercepts and the field together,
+and the hyperparameters are integrated over on a grid of `nodes` points per hyperparameter,
+centred on the mode of their posterior and weighted by it (Rue, Martino and Chopin 2009). With
+an intercept alone its standard deviation is set at the mode of its posterior; with neither
+the fit is the posterior mode of the coefficients. A prediction at new units interpolates the
+field to their coordinates, so the targets it is given carry the same coordinate columns. The
+head's case weights enter the likelihood in every configuration. A response holding one value
+is predicted its mean. The learner fits a presence-absence head.
+
+With `random=True` each unit, as named by `id` in `timesift.timesift`, gets an
+intercept, which absorbs what its several targets share beyond the record: it is identified
+where a unit carries more than one target. A prediction adds a unit's intercept where the unit
+was in the fit and leaves it at zero, the population level, where it was not, so a unit held
+out whole is predicted from its record and its place alone.
+
+Both languages call one C++ core, so the same input gives the same fit in either.
+
 ## `tune()`
 
 ```python

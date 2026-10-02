@@ -14,6 +14,7 @@
 #include "ts_core.h"
 #include "ts_envelope.h"
 #include "ts_fda.h"
+#include "ts_hierarchical.h"
 #include "ts_mars.h"
 #include "ts_maxnet.h"
 #include "ts_penalised.h"
@@ -904,4 +905,114 @@ NB_MODULE(_core, m) {
           return give(std::move(out));
         },
         nb::arg("fit"), nb::arg("newx"));
+
+  m.def("hierarchical_fit",
+        [](ConstMat x, ConstF64 y, ConstF64 w, std::optional<ConstI32> unit, std::size_t n_unit,
+           std::optional<ConstMat> coords, const std::string& field, double beta_sd,
+           double sd_u, double sd_alpha, double range_fraction, double range_alpha, int m_basis,
+           double boundary, int neighbours, int cov, int nodes, double step, int threads,
+           std::optional<std::vector<double>> theta) {
+          timesift::HierSpec spec;
+          spec.beta_sd = beta_sd;
+          spec.unit = unit.has_value();
+          if (field == "none") {
+            spec.field = timesift::Field::none;
+          } else if (field == "hsgp") {
+            spec.field = timesift::Field::hsgp;
+          } else if (field == "nngp") {
+            spec.field = timesift::Field::nngp;
+          } else {
+            throw timesift::Error("a hierarchical field is none, hsgp or nngp, not '" + field + "'.");
+          }
+          spec.sd_u = sd_u;
+          spec.sd_alpha = sd_alpha;
+          spec.range_fraction = range_fraction;
+          spec.range_alpha = range_alpha;
+          spec.m = m_basis;
+          spec.boundary = boundary;
+          spec.neighbours = neighbours;
+          spec.cov = cov;
+          spec.nodes = nodes;
+          spec.step = step;
+          spec.threads = threads;
+          if (theta.has_value()) spec.theta = *theta;
+          const timesift::Hierarchical f = timesift::hierarchical_fit(
+              x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+              unit.has_value() ? unit->data() : nullptr, n_unit,
+              coords.has_value() ? coords->data() : nullptr, spec);
+          nb::dict out;
+          out["field"] = field;
+          out["n_column"] = f.n_column;
+          out["n_unit"] = f.n_unit;
+          out["n_theta"] = f.n_theta;
+          out["beta"] = give(std::vector<double>(f.beta));
+          out["unit_effect"] = give(std::vector<double>(f.unit_effect));
+          out["theta_hat"] = give(std::vector<double>(f.theta_hat));
+          out["log_marginal"] = f.log_marginal;
+          out["n_node"] = f.n_node;
+          out["node_theta"] = give(std::vector<double>(f.node_theta));
+          out["node_weight"] = give(std::vector<double>(f.node_weight));
+          out["node_log_post"] = give(std::vector<double>(f.node_log_post));
+          out["node_field"] = give(std::vector<double>(f.node_field));
+          out["n_field"] = f.n_field;
+          out["converged"] = f.converged;
+          out["centre"] = give(std::vector<double>(f.centre, f.centre + 2));
+          out["scale"] = f.scale;
+          out["m"] = f.m;
+          out["box_centre"] = give(std::vector<double>(f.box_centre, f.box_centre + 2));
+          out["box_half"] = give(std::vector<double>(f.box_half, f.box_half + 2));
+          out["location"] = give(std::vector<double>(f.location));
+          out["n_location"] = f.n_location;
+          out["neighbours"] = f.neighbours;
+          out["cov"] = f.cov;
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("unit") = nb::none(),
+        nb::arg("n_unit") = 0, nb::arg("coords") = nb::none(), nb::arg("field") = "none",
+        nb::arg("beta_sd") = 2.5, nb::arg("sd_u") = 3.0, nb::arg("sd_alpha") = 0.01,
+        nb::arg("range_fraction") = 0.2, nb::arg("range_alpha") = 0.5, nb::arg("m") = 6,
+        nb::arg("boundary") = 1.5, nb::arg("neighbours") = 15, nb::arg("cov") = 0,
+        nb::arg("nodes") = 5, nb::arg("step") = 1.25, nb::arg("threads") = 1,
+        nb::arg("theta") = nb::none());
+
+  m.def("hierarchical_predict",
+        [](const nb::dict& fit, ConstMat newx, std::optional<ConstI32> unit,
+           std::optional<ConstMat> coords) {
+          timesift::Hierarchical h;
+          const std::string field = nb::cast<std::string>(fit["field"]);
+          h.field = field == "none"   ? timesift::Field::none
+                    : field == "hsgp" ? timesift::Field::hsgp
+                                      : timesift::Field::nngp;
+          h.n_column = nb::cast<std::int32_t>(fit["n_column"]);
+          h.n_unit = nb::cast<std::int32_t>(fit["n_unit"]);
+          h.n_theta = nb::cast<std::int32_t>(fit["n_theta"]);
+          h.beta = take_field<double>(fit, "beta");
+          h.unit_effect = take_field<double>(fit, "unit_effect");
+          h.n_node = nb::cast<std::int32_t>(fit["n_node"]);
+          h.node_theta = take_field<double>(fit, "node_theta");
+          h.node_weight = take_field<double>(fit, "node_weight");
+          h.node_field = take_field<double>(fit, "node_field");
+          h.n_field = nb::cast<std::int32_t>(fit["n_field"]);
+          const std::vector<double> centre = take_field<double>(fit, "centre");
+          const std::vector<double> box_centre = take_field<double>(fit, "box_centre");
+          const std::vector<double> box_half = take_field<double>(fit, "box_half");
+          for (int c = 0; c < 2; ++c) {
+            h.centre[c] = centre[static_cast<std::size_t>(c)];
+            h.box_centre[c] = box_centre[static_cast<std::size_t>(c)];
+            h.box_half[c] = box_half[static_cast<std::size_t>(c)];
+          }
+          h.scale = nb::cast<double>(fit["scale"]);
+          h.m = nb::cast<std::int32_t>(fit["m"]);
+          h.location = take_field<double>(fit, "location");
+          h.n_location = nb::cast<std::int32_t>(fit["n_location"]);
+          h.neighbours = nb::cast<std::int32_t>(fit["neighbours"]);
+          h.cov = nb::cast<std::int32_t>(fit["cov"]);
+          std::vector<double> out(newx.shape(0));
+          timesift::hierarchical_predict(h, newx.data(), newx.shape(0), newx.shape(1),
+                                         unit.has_value() ? unit->data() : nullptr,
+                                         coords.has_value() ? coords->data() : nullptr, out.data());
+          return give(std::move(out));
+        },
+        nb::arg("fit"), nb::arg("newx"), nb::arg("unit") = nb::none(),
+        nb::arg("coords") = nb::none());
 }

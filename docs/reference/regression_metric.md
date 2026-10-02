@@ -37,12 +37,13 @@ One number, or `NA` where the cell defines none.
 | `"mse"` | `mean(e^2)` |
 | `"mae"` | `mean(abs(e))` |
 | `"max_error"` | `max(abs(e))` |
+| `"poisson_deviance"` | `mean(2 (y log(y / p) - (y - p)))`, the logarithm taken as zero at `y = 0`; `NA` where a prediction is negative or is zero beside a count above zero |
 
 A comparison across candidates reads the highest score as the best, so
-the four errors are registered under the names `neg_rmse`, `neg_mse`,
-`neg_mae` and `neg_max_error` with their sign reversed, and `r_squared`
-and `pearson` under their own names. A cell holding a prediction that is
-not a number scores `NA`.
+the five errors are registered under the names `neg_rmse`, `neg_mse`,
+`neg_mae`, `neg_max_error` and `neg_poisson_deviance` with their sign
+reversed, and `r_squared` and `pearson` under their own names. A cell
+holding a prediction that is not a number scores `NA`.
 
 ## Examples
 

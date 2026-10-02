@@ -16,6 +16,7 @@ timesift(
     time=None,
     target_time=None,
     static=None,
+    coords=None,
     models=None,
     sift=None,
     ensemble=True,
@@ -37,9 +38,12 @@ among them.
 
 `targets` is one row per thing to predict and `series` is the long,
 time-stamped record belonging to it; both are mappings of column name to
-array, which a data frame satisfies. `y`, `x` and `static` are
+array, which a data frame satisfies. `y`, `x`, `static` and `coords` are
 selections over their own table: a name, a list of names, a glob such as
-`"sp_*"`, or a function of a name.
+`"sp_*"`, or a function of a name. `coords` names the two columns
+holding each target’s coordinates; they place a target and are not
+predictors, and a learner that places a spatial field by them,
+`timesift.hierarchical`, reads them off the array.
 
 Within each outer fold of `resampling` the training targets are split
 again into `inner` folds. Every candidate is cross-validated on that
@@ -191,7 +195,7 @@ uncertainty map.
 ## `TimesiftSpec`
 
 ``` python
-TimesiftSpec(y, x, id, time, target_time, static, response, metric)
+TimesiftSpec(y, x, id, time, target_time, static, response, metric, coords)
 ```
 
 How a fit was asked for: the columns each table plays, and the calendar
@@ -207,6 +211,7 @@ Attributes:
 - `static` - tuple\[str, …\]
 - `response` - str
 - `metric` - object
+- `coords` - tuple\[str, …\]
 
 ## `n_targets()`
 

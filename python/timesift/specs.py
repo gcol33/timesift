@@ -303,6 +303,7 @@ class TimesiftSpec:
     static: tuple[str, ...] = ()
     response: str = "presence_absence"
     metric: object = None
+    coords: tuple[str, ...] = ()
 
 
 def n_targets(targets, spec: TimesiftSpec) -> int:
@@ -364,7 +365,7 @@ def build_representation(rep: Representation, series, targets, spec: TimesiftSpe
     """The array one representation names, for these targets, in their own row order."""
     labels = target_labels(targets, spec)
     if rep.kind == "static":
-        return _static_block(targets, spec, labels)
+        return _carry_coords(_static_block(targets, spec, labels), targets, spec)
     if series is None:
         raise ValueError(f"the {rep.label} representation reads a series, and none was given")
     if rep.kind == "grain":
@@ -375,7 +376,40 @@ def build_representation(rep: Representation, series, targets, spec: TimesiftSpe
         built = _lookback_block(rep, series, targets, spec, labels)
     else:
         raise ValueError(f"a {rep.kind} representation is expanded before it is built")
-    return _with_static(built, targets, spec)
+    return _carry_coords(_with_static(built, targets, spec), targets, spec)
+
+
+def _carry_coords(m: TimesiftMatrix, targets, spec: TimesiftSpec) -> TimesiftMatrix:
+    """The coordinates of the targets and the unit each belongs to, in the order of the array's
+    rows. They place a target and are not channels, so no learner reads them as a predictor and a
+    split of the targets splits them with it."""
+    units = None
+    if spec.id is not None:
+        units = tuple(str(u) for u in targets[spec.id])
+    coords = None
+    if spec.coords:
+        coords = np.column_stack([np.asarray(targets[c], dtype=np.float64) for c in spec.coords])
+    if units is None and coords is None:
+        return m
+    return replace(m, coords=coords, unit_ids=units)
+
+
+def check_coords(targets, columns) -> None:
+    """``coords`` names the two columns of a target's coordinates, numbers with no missing or
+    infinite value."""
+    if not columns:
+        return
+    if len(columns) != 2:
+        raise ValueError(f"`coords` names the two columns of a target's coordinates, got "
+                         f"{len(columns)}: {', '.join(columns)}.")
+    for c in columns:
+        try:
+            v = np.asarray(targets[c], dtype=np.float64)
+        except (TypeError, ValueError):
+            v = None
+        if v is None or not np.isfinite(v).all():
+            raise ValueError(f"the coordinate column `{c}` must be numeric with no missing or "
+                             "infinite value.")
 
 
 def _grain_block(name, stats, year_start, series, spec, labels) -> TimesiftMatrix:

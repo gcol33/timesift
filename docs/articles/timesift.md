@@ -96,59 +96,61 @@ and weighting included.
 ``` r
 
 fit$estimate[c("arm", "metric", "score", "se", "lower", "upper")]
-#>         arm            metric      score          se       lower      upper
-#> 1  selected          accuracy  0.8750000 0.009378857  0.85089088  0.8991091
-#> 2  selected average_precision  0.9107680 0.012782597  0.87790930  0.9436267
-#> 3  selected              bias  1.0608069 0.063369831  0.89790954  1.2237042
-#> 4  selected             boyce  0.5831371 0.034972189  0.49323818  0.6730359
-#> 5  selected               csi  0.7721429 0.018589735  0.72435642  0.8199293
-#> 6  selected               ets  0.6116214 0.028640968  0.53799748  0.6852454
-#> 7  selected               far  0.1264683 0.022321808  0.06908822  0.1838483
-#> 8  selected             kappa  0.6142196 0.027961977  0.54234103  0.6860981
-#> 9  selected      kappa_youden  0.7439128 0.021912758  0.68758424  0.8002413
-#> 10 selected           neg_mae -0.2715151 0.023577914 -0.33212406 -0.2109061
-#> 11 selected     neg_max_error -0.7345480 0.014257001 -0.77119683 -0.6978993
-#> 12 selected           neg_mse -0.1338696 0.010710803 -0.16140260 -0.1063366
-#> 13 selected          neg_rmse -0.3596157 0.014615244 -0.39718533 -0.3220460
-#> 14 selected                or 24.0000000 0.577350269 21.51586229 26.4841377
-#> 15 selected  ordinal_accuracy  0.8055556 0.020030840  0.75406464  0.8570465
-#> 16 selected        ordinal_f1  0.8138427 0.019885672  0.76272493  0.8649604
-#> 17 selected ordinal_precision  0.8171429 0.019897146  0.76599561  0.8682901
-#> 18 selected    ordinal_recall  0.8110119 0.020116978  0.75929957  0.8627242
-#> 19 selected              orss  0.9865082 0.006570675  0.96961770  1.0033986
-#> 20 selected           pearson  0.7045520 0.029907514  0.62767224  0.7814317
-#> 21 selected               pod  0.8886905 0.030541705  0.81018052  0.9672004
-#> 22 selected              pofd  0.1292063 0.020990916  0.07524748  0.1831652
-#> 23 selected         r_squared  0.4317789 0.046822580  0.31141760  0.5521401
-#> 24 selected           roc_auc  0.9028340 0.018192706  0.85606816  0.9495998
-#> 25 selected                sr  0.8735317 0.022321808  0.81615171  0.9309118
-#> 26 selected               tss  0.7594841 0.028655394  0.68582309  0.8331452
-#> 27 ensemble          accuracy  0.8722222 0.009296223  0.84832552  0.8961189
-#> 28 ensemble average_precision  0.9130114 0.012886860  0.87988467  0.9461381
-#> 29 ensemble              bias  1.1074735 0.054437350  0.96753788  1.2474092
-#> 30 ensemble             boyce  0.6056176 0.034449809  0.51706154  0.6941736
-#> 31 ensemble               csi  0.7773280 0.013547515  0.74250305  0.8121530
-#> 32 ensemble               ets  0.6102246 0.025560413  0.54451947  0.6759297
-#> 33 ensemble               far  0.1412831 0.023311641  0.08135859  0.2012075
-#> 34 ensemble             kappa  0.6027910 0.033505416  0.51666259  0.6889194
-#> 35 ensemble      kappa_youden  0.7421500 0.020134502  0.69039258  0.7939073
-#> 36 ensemble           neg_mae -0.2734524 0.022721677 -0.33186036 -0.2150445
-#> 37 ensemble     neg_max_error -0.7345814 0.015123972 -0.77345880 -0.6957040
-#> 38 ensemble           neg_mse -0.1337877 0.010764031 -0.16145750 -0.1061179
-#> 39 ensemble          neg_rmse -0.3594603 0.014569086 -0.39691131 -0.3220093
-#> 40 ensemble                or 24.0000000 0.577350269 21.51586229 26.4841377
-#> 41 ensemble  ordinal_accuracy  0.8083333 0.017612075  0.76306005  0.8536066
-#> 42 ensemble        ordinal_f1  0.8152329 0.019053557  0.76625414  0.8642116
-#> 43 ensemble ordinal_precision  0.8176984 0.019657004  0.76716847  0.8682284
-#> 44 ensemble    ordinal_recall  0.8132540 0.018695997  0.76519438  0.8613136
-#> 45 ensemble              orss  0.9865082 0.006570675  0.96961770  1.0033986
-#> 46 ensemble           pearson  0.7056780 0.029416049  0.63006168  0.7812944
-#> 47 ensemble               pod  0.9086905 0.022048335  0.85201343  0.9653675
-#> 48 ensemble              pofd  0.1482540 0.028898110  0.07396901  0.2225389
-#> 49 ensemble         r_squared  0.4320407 0.047136933  0.31087136  0.5532101
-#> 50 ensemble           roc_auc  0.9057540 0.016491834  0.86336036  0.9481476
-#> 51 ensemble                sr  0.8587169 0.023311641  0.79879245  0.9186414
-#> 52 ensemble               tss  0.7604365 0.024839273  0.69658512  0.8242879
+#>         arm               metric      score          se       lower      upper
+#> 1  selected             accuracy  0.8750000 0.009378857  0.85089088  0.8991091
+#> 2  selected    average_precision  0.9107680 0.012782597  0.87790930  0.9436267
+#> 3  selected                 bias  1.0608069 0.063369831  0.89790954  1.2237042
+#> 4  selected                boyce  0.5831371 0.034972189  0.49323818  0.6730359
+#> 5  selected                  csi  0.7721429 0.018589735  0.72435642  0.8199293
+#> 6  selected                  ets  0.6116214 0.028640968  0.53799748  0.6852454
+#> 7  selected                  far  0.1264683 0.022321808  0.06908822  0.1838483
+#> 8  selected                kappa  0.6142196 0.027961977  0.54234103  0.6860981
+#> 9  selected         kappa_youden  0.7439128 0.021912758  0.68758424  0.8002413
+#> 10 selected              neg_mae -0.2715152 0.023577789 -0.33212387 -0.2109066
+#> 11 selected        neg_max_error -0.7345475 0.014256765 -0.77119566 -0.6978993
+#> 12 selected              neg_mse -0.1338696 0.010710719 -0.16140236 -0.1063368
+#> 13 selected neg_poisson_deviance -0.4176026 0.022150567 -0.47454241 -0.3606627
+#> 14 selected             neg_rmse -0.3596157 0.014615085 -0.39718499 -0.3220464
+#> 15 selected                   or 24.0000000 0.577350269 21.51586229 26.4841377
+#> 16 selected     ordinal_accuracy  0.8055556 0.020030840  0.75406464  0.8570465
+#> 17 selected           ordinal_f1  0.8138427 0.019885672  0.76272493  0.8649604
+#> 18 selected    ordinal_precision  0.8171429 0.019897146  0.76599561  0.8682901
+#> 19 selected       ordinal_recall  0.8110119 0.020116978  0.75929957  0.8627242
+#> 20 selected                 orss  0.9865082 0.006570675  0.96961770  1.0033986
+#> 21 selected              pearson  0.7045518 0.029907404  0.62767236  0.7814312
+#> 22 selected                  pod  0.8886905 0.030541705  0.81018052  0.9672004
+#> 23 selected                 pofd  0.1292063 0.020990916  0.07524748  0.1831652
+#> 24 selected            r_squared  0.4317790 0.046822319  0.31141842  0.5521396
+#> 25 selected              roc_auc  0.9028340 0.018192706  0.85606816  0.9495998
+#> 26 selected                   sr  0.8735317 0.022321808  0.81615171  0.9309118
+#> 27 selected                  tss  0.7594841 0.028655394  0.68582309  0.8331452
+#> 28 ensemble             accuracy  0.8722222 0.009296223  0.84832552  0.8961189
+#> 29 ensemble    average_precision  0.9130114 0.012886860  0.87988467  0.9461381
+#> 30 ensemble                 bias  1.1074735 0.054437350  0.96753788  1.2474092
+#> 31 ensemble                boyce  0.6056176 0.034449809  0.51706154  0.6941736
+#> 32 ensemble                  csi  0.7773280 0.013547515  0.74250305  0.8121530
+#> 33 ensemble                  ets  0.6102246 0.025560413  0.54451947  0.6759297
+#> 34 ensemble                  far  0.1412831 0.023311641  0.08135859  0.2012075
+#> 35 ensemble                kappa  0.6027910 0.033505416  0.51666259  0.6889194
+#> 36 ensemble         kappa_youden  0.7421500 0.020134502  0.69039258  0.7939073
+#> 37 ensemble              neg_mae -0.2734525 0.022721579 -0.33186019 -0.2150448
+#> 38 ensemble        neg_max_error -0.7345809 0.015123610 -0.77345741 -0.6957045
+#> 39 ensemble              neg_mse -0.1337877 0.010763976 -0.16145733 -0.1061180
+#> 40 ensemble neg_poisson_deviance -0.4156521 0.022939963 -0.47462114 -0.3566830
+#> 41 ensemble             neg_rmse -0.3594603 0.014568970 -0.39691105 -0.3220096
+#> 42 ensemble                   or 24.0000000 0.577350269 21.51586229 26.4841377
+#> 43 ensemble     ordinal_accuracy  0.8083333 0.017612075  0.76306005  0.8536066
+#> 44 ensemble           ordinal_f1  0.8152329 0.019053557  0.76625414  0.8642116
+#> 45 ensemble    ordinal_precision  0.8176984 0.019657004  0.76716847  0.8682284
+#> 46 ensemble       ordinal_recall  0.8132540 0.018695997  0.76519438  0.8613136
+#> 47 ensemble                 orss  0.9865082 0.006570675  0.96961770  1.0033986
+#> 48 ensemble              pearson  0.7056779 0.029416036  0.63006155  0.7812942
+#> 49 ensemble                  pod  0.9086905 0.022048335  0.85201343  0.9653675
+#> 50 ensemble                 pofd  0.1482540 0.028898110  0.07396901  0.2225389
+#> 51 ensemble            r_squared  0.4320409 0.047136780  0.31087192  0.5532098
+#> 52 ensemble              roc_auc  0.9057540 0.016491834  0.86336036  0.9481476
+#> 53 ensemble                   sr  0.8587169 0.023311641  0.79879245  0.9186414
+#> 54 ensemble                  tss  0.7604365 0.024839273  0.69658512  0.8242879
 fit$selected[c("fold", "candidate", "inner_score")]
 #>   fold          candidate inner_score
 #> 1    1 elasticnet / month   0.8968360
@@ -216,7 +218,7 @@ as were observed.
 
 decision_threshold(fit, rule = "prevalence")
 #>       sp1       sp2       sp3       sp4       sp5       sp6 
-#> 0.5643007 0.4907931 0.5252334 0.5132033 0.6334853 0.5234278
+#> 0.5643002 0.4907909 0.5252335 0.5131875 0.6334832 0.5234282
 predict(fit, targets, series, type = "binary", rule = "prevalence")[1:3, 1:4]
 #>      sp1 sp2 sp3 sp4
 #> p001   0   1   0   1
@@ -453,7 +455,7 @@ summary(both)
 #> selected elasticnet / month in 5 of 5 folds
 #> 
 #> choice on every target  elasticnet / month
-#> weights on every target  elasticnet / week 0.34   elasticnet / month 0.34   weighted_glm / month 0.28   1nn / month 0.03
+#> weights on every target  elasticnet / week 0.35   elasticnet / month 0.34   weighted_glm / month 0.28   1nn / month 0.03
 ```
 
 ## The combination
@@ -474,7 +476,7 @@ weights are in `fit$fold_weights`.
 
 ensemble_weights(fit)
 #>   elasticnet / day  elasticnet / week elasticnet / month 
-#>         0.01546353         0.30141328         0.68312318
+#>         0.01546323         0.30141036         0.68312641
 ```
 
 The weights say how much of the combination each candidate carries, and
@@ -631,9 +633,9 @@ kept <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
 weight <- occlusion(kept, "elasticnet / month", permutations = 5)
 head(aggregate(weight ~ part, weight, mean), 4)
 #>                   part     weight
-#> 1 2021-09-01T00:00:00Z 0.09502425
-#> 2 2021-10-01T00:00:00Z 0.11467438
-#> 3 2021-11-01T00:00:00Z 0.07147178
+#> 1 2021-09-01T00:00:00Z 0.09523258
+#> 2 2021-10-01T00:00:00Z 0.11486486
+#> 3 2021-11-01T00:00:00Z 0.07128131
 #> 4 2021-12-01T00:00:00Z 0.05093959
 ```
 

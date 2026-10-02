@@ -4,6 +4,29 @@
 
 ### New
 
+- A count response. `response = "count"` is whole numbers of zero or
+  more, fitted under the Poisson deviance through a log link and an
+  exponential output, and read by `neg_poisson_deviance`
+  (`regression_metric(y, p, "poisson_deviance")`). Every core that
+  follows a head’s loss takes the family: the penalised fit (glmnet’s
+  `family = "poisson"`), the stepwise search and the MARS refit
+  (`glm(family = poisson)`, MASS’s `stepAIC()` with the Poisson
+  likelihood, earth’s `glm = list(family = poisson)`), the additive
+  model (mgcv’s `gam(family = poisson)`, whose scale is known, so the
+  criterion is the unbiased risk estimator), the tree (rpart’s
+  `method = "poisson"`, with the gamma shrinkage of a leaf’s rate as
+  `tree(shrink = )`) and the boosted trees (gbm’s `poisson`
+  distribution, and xgboost’s `count:poisson` under `newton = TRUE`). A
+  forest cuts a count on its variance and a leaf holds the mean count,
+  the encoders train under the deviance, and the combiner minimises it.
+  [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md),
+  [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
+  and
+  [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
+  refuse a count head as they refuse any numeric one. Both languages,
+  pinned core by core in the fixtures, with the response in
+  `count_response.csv`.
+
 - `cv(repeats = )` and `grouped_cv(repeats = )` draw the outer split
   several times, each with its own seed, as biomod2’s `nb.rep` does.
   [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
@@ -112,12 +135,21 @@
   area cut. Both languages, pinned in `metrics.csv`.
 
 - [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
-  fits a Bayesian logistic model through tulpa, with an optional
-  nearest-neighbour or Hilbert-space Gaussian-process field over the
-  targets’ coordinates, named in the new `timesift(coords = )`, and an
-  optional random intercept for each unit. The coordinates and the unit
+  fits a Bayesian logistic model with an optional nearest-neighbour or
+  Hilbert-space Gaussian-process field over the targets’ coordinates,
+  named in the new `timesift(coords = )`, and an optional intercept for
+  each unit. Laplace’s method over the coefficients, the field and the
+  intercepts together, with the hyperparameters integrated on a grid
+  around their posterior mode, in a C++ core both languages compile
+  (`src/ts_hierarchical.cpp`), the nearest-neighbour precision factored
+  by a sparse Cholesky decomposition under a minimum-degree ordering
+  (`src/ts_sparse.cpp`) so the cost follows the number of locations. The
+  case weights enter every configuration. The coordinates and the unit
   names travel with every representation and are split with its units.
-  tulpa is in Suggests, and the learner is in R only.
+  Pinned in the fixtures against tulpa’s posterior mode, empirical-Bayes
+  fit and each node of its nested grid, and in both suites against the
+  same marginal written out densely. Both languages; tulpa is not a
+  dependency.
 
 - `mlp(activation = )` sets the nonlinearity between the hidden layers:
   `"relu"` (the default), `"gelu"` or `"selu"`, in both languages.

@@ -48,6 +48,11 @@ class TimesiftMatrix:
 
     ``bin_start``, ``bin_end`` and ``bin_partial`` are the calendar's, and are ``None`` on a
     representation the calendar did not bin.
+
+    ``coords`` is each row's pair of coordinates and ``unit_ids`` the identifier of the unit each
+    row belongs to, where :func:`~timesift.timesift` was given ``coords`` and ``id``. They place a
+    row and are not channels, so no learner reads them as a predictor, and a split of the rows
+    splits them with it.
     """
 
     values: np.ndarray
@@ -64,6 +69,8 @@ class TimesiftMatrix:
     lag: int | None = None
     static: tuple[str, ...] = ()
     position: tuple[str, ...] = ()
+    coords: np.ndarray | None = field(default=None, repr=False)
+    unit_ids: tuple[str, ...] | None = field(default=None, repr=False)
 
     @property
     def shape(self) -> tuple[int, int, int]:
@@ -78,7 +85,10 @@ class TimesiftMatrix:
         """The representation restricted to a subset of its rows, in the order given."""
         index = np.asarray(index)
         return replace(self, values=self.values[index], bin_n=self.bin_n[index],
-                       units=tuple(np.asarray(self.units)[index]))
+                       units=tuple(np.asarray(self.units)[index]),
+                       coords=None if self.coords is None else self.coords[index],
+                       unit_ids=(None if self.unit_ids is None
+                                 else tuple(np.asarray(self.unit_ids)[index])))
 
     def __repr__(self) -> str:  # pragma: no cover - display only
         n_u, n_b, n_c = self.values.shape

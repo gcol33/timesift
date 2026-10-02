@@ -137,7 +137,8 @@ representation of the run.</p></dd>
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The coefficients maximise the penalised likelihood, by penalised iteratively reweighted least
 squares, and the smoothing parameters, one per column, minimise the unbiased risk estimator
-under presence-absence and the generalised cross-validation score under a squared-error head, by
+under presence-absence and a count head and the generalised cross-validation score under a
+squared-error head, by
 Newton's method with the exact derivatives (Wood 2008). <code>gamma</code> multiplies the charge each
 effective degree of freedom adds to that criterion, as mgcv's <code>gamma</code> does; above one it gives
 smoother fits. Over columns as alike as neighbouring weeks the criterion can have more than one

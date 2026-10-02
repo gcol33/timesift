@@ -111,7 +111,8 @@ run's control for this learner alone. What the head is trained toward is
 the response head's: its `loss` is the training objective and its
 `activation` the output transform, so a head registered with a
 squared-error loss and an identity activation trains the same encoders
-on a continuous response.
+on a continuous response, and one with a Poisson-deviance loss and an
+exponential activation trains them on a count.
 
 Every channel is standardised by its own centre and scale, computed over
 every unit and bin of the fitting units, so a static predictor appended

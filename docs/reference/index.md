@@ -73,7 +73,7 @@ your own goes through.
 - [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
   : Generalised additive model on the flattened representation
 - [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
-  : Bayesian logistic model with a spatial field, through tulpa
+  : Bayesian logistic model with a spatial field
 - [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)

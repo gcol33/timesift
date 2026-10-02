@@ -40,15 +40,16 @@ a score is defined.
 
 `spec` is a mapping with `prepare(y)`, returning the response a learner
 is fitted on; `activation`, the name of the output transform
-(`"sigmoid"` or `"identity"`); `loss`, the name of the training
-objective (`"binary_cross_entropy"` or `"squared_error"`); `metric`, the
-default metric name; and `cells(y, folds)`, returning the mask of
-scorable cells. Presence-absence with a joint multi-label head is what
-ships; an abundance or phenology response is a registration rather than
-a second fitting path. Every learner that ships reads `loss` and
-`activation` from here: the encoders train under the loss and predict
-through the activation, and the learners fitting one model per response
-take the family the loss names, logistic or Gaussian. The combiner
+(`"sigmoid"`, `"identity"` or `"exp"`); `loss`, the name of the training
+objective (`"binary_cross_entropy"`, `"squared_error"` or
+`"poisson_deviance"`); `metric`, the default metric name; and
+`cells(y, folds)`, returning the mask of scorable cells.
+Presence-absence with a joint multi-label head is what ships; an
+abundance or phenology response is a registration rather than a second
+fitting path. Every learner that ships reads `loss` and `activation`
+from here: the encoders train under the loss and predict through the
+activation, and the learners fitting one model per response take the
+family the loss names, logistic, Gaussian or Poisson. The combiner
 minimises the same loss. An optional `weights(y, fitting)` returns a
 `[unit, variable]` array of case weights every learner fits under, with
 `fitting` a boolean vector marking the rows the model is fitted on:

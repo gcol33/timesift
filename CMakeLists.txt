@@ -28,6 +28,8 @@ nanobind_add_module(_core NB_STATIC
   src/ts_additive.cpp
   src/ts_mars.cpp
   src/ts_fda.cpp
+  src/ts_hierarchical.cpp
+  src/ts_sparse.cpp
   src/ts_normal.cpp
   python/ts_py.cpp)
 
