@@ -191,15 +191,27 @@ class Resampling:
     folds: object = None
     by: object = None
     scale: bool = False
+    repeats: int = 1
 
 
-def cv(v: int = 10, seed: int = 1, strata: int = 5, by=None) -> Resampling:
+def _repeats(value) -> int:
+    n = _whole(value, "repeats")
+    if n < 1:
+        raise ValueError(f"`repeats` is one whole number of 1 or more, got {value!r}")
+    return n
+
+
+def cv(v: int = 10, seed: int = 1, strata: int = 5, by=None, repeats: int = 1) -> Resampling:
     """Hold out single targets, balanced within equal-count strata of the response.
 
     ``by`` stratifies on a numeric column of ``targets`` instead of the richness of the response.
+    ``repeats`` draws the split that many times, each with its own seed (``seed``, ``seed + 1``,
+    and so on). In ``timesift`` every repeat is a full run on its own fold map: a score stays one
+    fit's held-out score, the report averages a response's scores over folds and repeats, and the
+    combiner is fitted on the out-of-fold predictions of all the repeats together.
     """
     return Resampling(kind="cv", v=_whole(v, "v"), seed=seed, strata=_whole(strata, "strata"),
-                      by=by)
+                      by=by, repeats=_repeats(repeats))
 
 
 def block_cv(by, v: int = 4) -> Resampling:
@@ -225,14 +237,15 @@ def _block_resampling(kind: str, by, v: int, scale: bool) -> Resampling:
     return Resampling(kind=kind, v=_whole(v, "v"), seed=0, strata=1, by=by, scale=scale)
 
 
-def grouped_cv(group, v: int = 10, seed: int = 1) -> Resampling:
+def grouped_cv(group, v: int = 10, seed: int = 1, repeats: int = 1) -> Resampling:
     """Keep every target sharing a value of the ``group`` column in one fold.
 
     It is what repeated targets on the same unit need: two visits to a plot a fortnight apart are
     not two independent held-out units, and splitting them across folds scores a model on a unit
     it has already read.
     """
-    return Resampling(kind="grouped_cv", v=_whole(v, "v"), seed=seed, strata=1, group=group)
+    return Resampling(kind="grouped_cv", v=_whole(v, "v"), seed=seed, strata=1, group=group,
+                      repeats=_repeats(repeats))
 
 
 def as_resampling(x) -> Resampling:

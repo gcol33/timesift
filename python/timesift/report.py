@@ -73,7 +73,8 @@ def _header(fit) -> str:
     v = len(np.unique(align_folds(_field(fit, "folds"), y.units)))
     kind = "grouped" if getattr(_field(fit, "folds"), "grouped", False) else "random"
     return (f"timesift  {_plural(y.values.shape[0], 'target')}, "
-            f"{_plural(y.values.shape[1], 'response')}, {v}-fold {kind} CV, "
+            f"{_plural(y.values.shape[1], 'response')}, {v}-fold {kind} CV"
+            f"{f' repeated {fit.repeats} times' if getattr(fit, 'repeats', 1) > 1 else ''}, "
             f"{_field(fit, 'metric')}")
 
 

@@ -1785,13 +1785,13 @@ call site.
 | the encoders | `mlp()`, `cnn()`, `rescnn()` |
 | how an encoder is trained | `train_control()` |
 | fitting one learner on one representation | `fit_learner()` |
-| the resampling | `cv()` and `grouped_cv()` |
+| the resampling | `cv()` and `grouped_cv()`, and `block_cv()` and `env_cv()` for the spatial and environmental splits |
 | the fold map and the mask | `fold_map()` and `scorable_cells()` |
 | fitting across a set of grains | `grain_ladder()`, and `select_grain()` for the nested selection |
 | the combiner | `ensemble()`, `ensemble_fit()`, `ensemble_combine()` and `ensemble_weights()` |
 | how far an ensemble's members disagree | `ensemble_spread()`, and `predict(type = "spread")` on a run |
 | scoring held-out predictions | `score_predictions()`, on the cells the mask allows |
-| the metrics | `tss()`, `roc_auc()`, `average_precision()`, `kappa_score()`, `table_metric()` and `boyce_index()`, with `decision_threshold()` and `model_agreement()` beside them |
+| the metrics | `tss()`, `roc_auc()`, `average_precision()`, `kappa_score()`, `table_metric()`, `boyce_index()`, `regression_metric()` and `ordinal_metric()`, with `decision_threshold()` and `model_agreement()` beside them |
 | the cut a fit applies | `decision_threshold()` given a fit in place of the response, one cut per response learned from a candidate's out-of-fold predictions |
 | two arms on matched cells | `paired_contrast()` |
 | every grain against a learner's best | `grain_contrasts()`, the mixed model of the per-cell scores and Dunnett's many-to-one comparisons off it |
@@ -1801,7 +1801,8 @@ call site.
 | folds of the inner cross-validation | `n_inner` |
 | the three artifacts | `write_folds()` and `read_folds()`, `write_response()` and `read_response()`, `write_cells()` and `read_cells()` |
 | the digest | `digest_array()`, exported |
-| the three registries | `register_learner()` and `learners()`, `register_metric()` and `metrics()`, `register_response()` and `responses()` |
+| the registries | `register_learner()` and `learners()`, `register_metric()` and `metrics()`, `register_response()` and `responses()`, `register_tuning()` and `tunings()` |
+| pseudo-absences | `pseudo_absences()`, the random, sre and disk strategies |
 | what a rare response weighs | `positive_weights()`, the case weights the shipped presence-absence head carries as its weights function and every learner that ships reads through the head |
 
 ### The same call does the same thing
@@ -2017,6 +2018,7 @@ call site.
 | the settings a candidate chose | the `settings` column of `candidates`, `NA` where the learner was not tuned | the `settings` column of `candidates`, an empty string there |
 | a map | `project()`, on `terra` rasters, returning a `SpatRaster` with a layer per response (`response.statistic` under a spread) | `project()`, on `xarray` grids, returning a `DataArray` over `response`, and `statistic` under a spread, and the two spatial dimensions |
 | the change in range | `range_change()`, a list of a `table` data frame and a `map` raster of the codes | `range_change()`, a `RangeChange` whose `table` is a list of rows and whose `map` is a `DataArray` |
+| the scores of a repeated resampling | `scores` and `cells` data frames with a `repeat` column | `scores` a mapping of arrays with a `repeat` array; `cells` without one |
 | a response curve | `response_curve()`, an S3 generic with a method on a run, a data frame in long form with a `plot()` method; the second predictor is `with =` | `response_curve()`, one function returning a `ResponseCurve` whose `prediction` is `[value, response]`; the second predictor is `with_=`, since `with` is a keyword |
 | the occlusion of an ensemble | `occlusion(fit, "ensemble", over = "channel")` | the same call, `occlusion(fit, "ensemble", over="channel")` |
 
@@ -2039,7 +2041,7 @@ is a function because it has none.
 |---|---|
 | `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
 | `Representation`, `Sift`, `Resampling`, `TimesiftSpec`, `Learner`, `TrainControl`, `TimesiftMatrix`, `TimesiftSet`, `Coverage`, `Response`, `Folds`, `Cells`, `Fit`, `Ladder`, `Selection`, `Timesift`, `Stack`, `EnsembleSpec`, `Simulation` | the types. R attaches a class attribute to a list or an array and the constructor is the only door to it; a Python dataclass is the type itself, and a user annotating a function or building one by hand reaches it by name. |
-| `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `SPREAD_STATISTICS`, `PRESENCE_ABSENCE` | the grain, statistic and spread vocabularies as tuples, and the shipped head as the mapping `register_response()` takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through `responses()` on both sides. |
+| `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `SPREAD_STATISTICS`, `PRESENCE_ABSENCE`, `CONTINUOUS`, `ABUNDANCE`, `ORDINAL` | the grain, statistic and spread vocabularies as tuples, and the shipped heads as the mappings `register_response()` takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through `responses()` on both sides. |
 
 Models are the one thing neither side promises. A fit in torch and a fit in libtorch cannot be
 byte-identical, and the encoders match module for module rather than number for number.

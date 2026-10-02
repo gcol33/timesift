@@ -2,6 +2,14 @@
 
 ## New
 
+* `cv(repeats = )` and `grouped_cv(repeats = )` draw the outer split several times, each with its
+  own seed, as biomod2's `nb.rep` does. `timesift()` makes the run once per repeat: a score stays
+  one fit's held-out score, `scores` and `cells` carry a `repeat` column and every repeat's folds
+  under numbers of their own, a response is averaged over its folds and its repeats, `estimate`
+  is read off all the repeats' held-out predictions, and the stack is fitted on the repeats'
+  out-of-fold predictions together. `oof` is a target's mean prediction over the repeats, and the
+  models, the per-fold fits and `folds` are the first repeat's. Both languages.
+
 * `pseudo_absences()` draws units where a response is zero from a pool of background units, by
   `bm_PseudoAbsences()`'s strategies: `"random"`, `"sre"` (outside the envelope of the presences)
   and `"disk"` (a distance band from the nearest presence, planar or on the sphere), with

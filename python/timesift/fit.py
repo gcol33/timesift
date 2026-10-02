@@ -15,7 +15,7 @@ is read on folds neither the choice nor the weights saw.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -31,8 +31,8 @@ from .select import column_names, select_columns
 # A candidate is named for the learner and the representation it pairs, and the ensemble reads the
 # pair back out of that name, so the two share one separator rather than agreeing on one.
 from .stack import SEPARATOR, run_ensemble
-from .specs import (Representation, Sift, TimesiftSpec, _needs_target_time, as_sift,
-                    build_representation, expand_sift, grains, resolve_folds, target_labels)
+from .specs import (Representation, Sift, TimesiftSpec, _needs_target_time, as_resampling,
+                    as_sift, build_representation, expand_sift, grains, resolve_folds, target_labels)
 
 __all__ = ["Timesift", "timesift"]
 
@@ -77,6 +77,7 @@ class Timesift:
     fold_weights: list | None = None
     predictions: dict | None = None
     choice: str | None = None
+    repeats: int = 1
 
     def representation_of(self, candidate: str) -> str:
         """Which representation a candidate reads."""
@@ -175,7 +176,7 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
              static=None, models=None, sift=None, ensemble=True, resampling=None, inner=5,
              rule: str = "argmax", response: str = "presence_absence", metric=None,
              control=None, keep_fits: bool = False, seed: int = 1,
-             verbose: bool = True) -> Timesift:
+             verbose: bool = True, refit: bool = True) -> Timesift:
     """Compare every learner across every representation, and estimate choosing among them.
 
     ``targets`` is one row per thing to predict and ``series`` is the long, time-stamped record
@@ -203,9 +204,31 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
     Columns of ``targets`` that are neither the response nor the identifier nor the anchor are
     ignored unless ``static`` names them: a predictor is never picked up because it happened to be
     in the table.
+
+    With ``repeats`` above one in ``resampling`` the run is made once per repeat: ``scores`` carries
+    a ``repeat`` array and every repeat's folds under numbers of their own, ``estimate`` is read off
+    all the repeats' held-out predictions, ``oof`` is a target's mean prediction over the repeats,
+    and the stack is fitted on the repeats' out-of-fold predictions together. The models, the
+    per-fold fits and ``folds`` are the first repeat's. ``refit`` says whether the candidates are
+    refitted on all targets at the end, which is what ``predict`` reads; a repeated resampling asks
+    it of its first run alone.
     """
     if rule not in RULES:
         raise ValueError(f"rule must be one of {RULES}, got {rule!r}")
+    drawn = as_resampling(resampling)
+    if drawn.repeats > 1:
+        runs = []
+        for r in range(drawn.repeats):
+            if verbose:
+                print(f"repeat {r + 1} of {drawn.repeats}")
+            runs.append(timesift(targets, series, y=y, x=x, id=id, time=time,
+                                 target_time=target_time, static=static, models=models,
+                                 sift=sift, ensemble=ensemble,
+                                 resampling=replace(drawn, seed=drawn.seed + r, repeats=1),
+                                 inner=inner, rule=rule, response=response, metric=metric,
+                                 control=control, keep_fits=keep_fits and r == 0, seed=seed,
+                                 verbose=verbose and r == 0, refit=r == 0))
+        return _combine_repeats(runs, run_ensemble(ensemble, response))
     spec = _resolve_spec(targets, series, y, x, id, time, target_time, static, response, metric)
     labels = target_labels(targets, spec)
     _check_rows(labels, spec)
@@ -317,13 +340,13 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
               "score": np.asarray(table["score"], dtype=float),
               "scorable": np.asarray(table["scorable"], dtype=bool)}
 
-    if verbose:
+    if verbose and refit:
         print(f"refitting every candidate on all {shape[0]} targets")
     fitted = {pair["candidate"]: fit_learner(pair["learner"],
                                              representations[pair["representation"]], y_mat,
                                              response=response, control=control,
                                              group=folds.group)
-              for pair in fitted_pairs}
+              for pair in fitted_pairs} if refit else {}
     stack, weights = _combine(ensemble, oof, y_mat, cells, folds, scores, verbose)
 
     estimate = predictions = None
@@ -402,6 +425,83 @@ def _run_choice(scores: dict, grain_of: list, ctx: dict) -> str:
                            scorer=_unused_scorer)
     grid = _join_candidates(candidates, lad.summary(), _inner_se(lad), -1)
     return _choose_candidate(grid, ctx["size"], ctx["rule"])["learner"]
+
+
+def _combine_repeats(runs: list, ensemble) -> Timesift:
+    """The runs of a repeated resampling read together.
+
+    The scores of a response are averaged over its folds and its repeats, which keeps a cell one
+    fit's held-out score and a response the replicate; the combiner is fitted on the out-of-fold
+    predictions of all the repeats at once.
+    """
+    total = len(runs)
+    first = runs[0]
+    units, variables = first.y.units, first.y.variables
+    width = int(max(run.folds.fold.max() for run in runs))
+    shift = [r * width for r in range(total)]
+
+    def cat(parts):
+        return np.concatenate(parts)
+
+    def shifted(table, k, s):
+        column = np.asarray(table[k])
+        return column + s if k == "fold" else column
+
+    scores = {k: cat([shifted(run.scores, k, s) for run, s in zip(runs, shift)])
+              for k in ("candidate", "variable", "fold", "score", "scorable")}
+    scores["repeat"] = cat([np.full(len(run.scores["fold"]), r + 1)
+                            for r, run in enumerate(runs)])
+    c = first.cells
+    cells = type(c)(**{field: cat([shifted(vars(run.cells), field, s)
+                                   for run, s in zip(runs, shift)])
+                       for field in ("variable", "fold", "n_occ", "pres_train", "abs_train",
+                                     "pres_test", "abs_test", "scorable")})
+    pooled_units = tuple(f"{u}@{r + 1}" for r in range(total) for u in units)
+    y_pool = Response(np.vstack([first.y.values] * total), pooled_units, variables)
+    f_pool = cat([run.folds.fold + s for run, s in zip(runs, shift)])
+    folds_pool = Folds(fold=f_pool, units=pooled_units)
+    levels = np.unique(f_pool)
+
+    names = list(first.oof)
+    oof_pool = {name: np.vstack([run.oof[name] for run in runs]) for name in names}
+    oof = {name: np.mean([run.oof[name] for run in runs], axis=0) for name in names}
+
+    stack = weights = None
+    if first.stack is not None:
+        stack, weights = _combine(ensemble, oof_pool, y_pool, cells, folds_pool, scores, False)
+
+    estimate = selected = inner = fold_weights = predictions = None
+    if first.estimate is not None:
+        score, metric_name = first.scorer, first.metric
+        predictions = {"selected": np.mean([run.predictions["selected"] for run in runs], axis=0)}
+        estimate = _run_estimate("selected", y_pool,
+                                 np.vstack([run.predictions["selected"] for run in runs]),
+                                 f_pool, levels, cells, first.response, score, metric_name)
+        if first.predictions.get("ensemble") is not None:
+            predictions["ensemble"] = np.mean([run.predictions["ensemble"] for run in runs],
+                                              axis=0)
+            estimate += _run_estimate("ensemble", y_pool,
+                                      np.vstack([run.predictions["ensemble"] for run in runs]),
+                                      f_pool, levels, cells, first.response, score, metric_name)
+
+        def tagged(rows_of):
+            return [dict(row, fold=row["fold"] + s, repeat=r + 1)
+                    for r, (run, s) in enumerate(zip(runs, shift)) for row in rows_of(run)]
+
+        selected = tagged(lambda run: run.selected)
+        if first.inner is not None:
+            inner = tagged(lambda run: run.inner)
+        if first.fold_weights is not None:
+            fold_weights = tagged(lambda run: run.fold_weights)
+
+    votes: dict = {}
+    for run in runs:
+        votes[run.choice] = votes.get(run.choice, 0) + 1
+    choice = max(votes, key=lambda name: (votes[name], -list(votes).index(name)))
+    return replace(first, scores=scores, oof=oof, stack=stack, weights=weights, cells=cells,
+                   estimate=estimate, selected=selected, inner=inner,
+                   fold_weights=fold_weights, predictions=predictions, choice=choice,
+                   repeats=total)
 
 
 def _unused_scorer(y, p):

@@ -45,7 +45,11 @@
 #'   representation, or a list of them. Defaults to `grains("auto")`.
 #' @param ensemble `TRUE` for the default stack, `FALSE` for none, or an [ensemble()] spec.
 #' @param resampling The outer split: [cv()], [grouped_cv()], a fold vector, or a [fold_map()]
-#'   result.
+#'   result. With `repeats` above one the run is made once per repeat: `scores` and `cells` carry
+#'   a `repeat` column and every repeat's folds under numbers of their own, `estimate` is read off
+#'   all the repeats' held-out predictions, `oof` is a target's mean prediction over the repeats,
+#'   and the stack is fitted on the repeats' out-of-fold predictions together. The models, the
+#'   per-fold fits and `folds` are the first repeat's.
 #' @param inner Number of inner folds the choice and the stack's weights are made on inside each
 #'   outer training set, a function of the outer training response returning a fold map for those
 #'   targets, or `NULL` to compare the candidates on the outer folds without an estimate. A count
@@ -58,6 +62,8 @@
 #'   Whichever it is, it travels with the fit and is what every later rescoring reads; a function is
 #'   reported as `<function>`. The estimate is also reported under every registered metric.
 #' @param control [train_control()], the training settings every neural learner reads.
+#' @param .refit Whether the candidates are refitted on all targets at the end, which is what
+#'   `predict()` reads. A repeated resampling asks it of its first run alone.
 #' @param keep_fits Keep every per-fold fitted candidate beside the refits.
 #' @param seed Seed for the inner splits. Each outer fold splits under `seed` plus its position.
 #' @param verbose Report each outer fold as it runs.
@@ -130,10 +136,14 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
                      models = NULL, sift = NULL, ensemble = TRUE,
                      resampling = cv(), inner = 5L, rule = c("argmax", "coarsest_adequate"),
                      response = "presence_absence", metric = NULL,
-                     control = train_control(), keep_fits = FALSE, seed = 1L, verbose = TRUE) {
+                     control = train_control(), keep_fits = FALSE, seed = 1L, verbose = TRUE,
+                     .refit = TRUE) {
   call <- match.call()
   rule <- match.arg(rule)
   env <- parent.frame()
+  if (inherits(resampling, "timesift_resampling") && resampling$repeats > 1L) {
+    return(.timesift_repeated(call, env, resampling, ensemble, response, verbose))
+  }
   if (!is.data.frame(targets)) {
     stop("`targets` must be a data frame, one row per prediction target, got ",
          class(targets)[1L], ".", call. = FALSE)
@@ -303,16 +313,19 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
   }))
   rownames(scores) <- NULL
 
-  if (verbose) {
-    message("refitting every candidate on all ", nrow(y_matrix), " targets")
+  models_out <- NULL
+  if (.refit) {
+    if (verbose) {
+      message("refitting every candidate on all ", nrow(y_matrix), " targets")
+    }
+    models_out <- stats::setNames(lapply(seq_len(n_cand), function(j) {
+      fit_learner(learners[[fitted$learner[j]]], built[[fitted$representation[j]]], y_matrix,
+                  response = response, control = control, group = group)
+    }), fitted$candidate)
+    grid$settings <- NA_character_
+    grid$settings[match(fitted$candidate, grid$candidate)] <-
+      vapply(models_out, .chosen_settings, character(1L), USE.NAMES = FALSE)
   }
-  models_out <- stats::setNames(lapply(seq_len(n_cand), function(j) {
-    fit_learner(learners[[fitted$learner[j]]], built[[fitted$representation[j]]], y_matrix,
-                response = response, control = control, group = group)
-  }), fitted$candidate)
-  grid$settings <- NA_character_
-  grid$settings[match(fitted$candidate, grid$candidate)] <-
-    vapply(models_out, .chosen_settings, character(1L), USE.NAMES = FALSE)
   stack <- if (stacking) {
     ensemble_fit(oof = oof, y = y_matrix, cells = cells, folds = folds, spec = ensemble,
                  scores = scores)

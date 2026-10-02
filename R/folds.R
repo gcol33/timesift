@@ -92,6 +92,11 @@ fold_map <- function(y, v = 10L, seed = 1L, strata = 5L, by = NULL, group = NULL
 #' @param v Number of folds.
 #' @param seed Random seed, fixed so the map is reproducible.
 #' @param strata Number of strata, or `1` for no stratification.
+#' @param repeats Number of times the split is drawn, each with its own seed (`seed`, `seed + 1`,
+#'   and so on). In [timesift()] every repeat is a full run on its own fold map: a score stays
+#'   one fit's held-out score, the report averages a response's scores over folds and repeats,
+#'   and the combiner is fitted on the out-of-fold predictions of all the repeats together.
+#'   `block_cv()` and `env_cv()` draw nothing, so repeat nothing.
 #' @param by What `cv()` stratifies on instead of the richness of the response: the name of a
 #'   numeric column of `targets`, or a vector with one value per target. For `block_cv()` and
 #'   `env_cv()`, the columns the blocks are cut on: names of columns of `targets`, or a numeric
@@ -109,8 +114,9 @@ fold_map <- function(y, v = 10L, seed = 1L, strata = 5L, by = NULL, group = NULL
 #' env_cv(c("elevation", "slope"), v = 5L)
 #'
 #' @export
-cv <- function(v = 10L, seed = 1L, strata = 5L, by = NULL) {
-  .resampling("cv", v = v, seed = seed, strata = strata, group = NULL, by = by)
+cv <- function(v = 10L, seed = 1L, strata = 5L, by = NULL, repeats = 1L) {
+  .resampling("cv", v = v, seed = seed, strata = strata, group = NULL, by = by,
+              repeats = repeats)
 }
 
 #' @rdname cv
@@ -135,26 +141,29 @@ env_cv <- function(by, v = 4L) {
 
 #' @rdname cv
 #' @export
-grouped_cv <- function(group, v = 10L, seed = 1L) {
+grouped_cv <- function(group, v = 10L, seed = 1L, repeats = 1L) {
   if (missing(group) || is.null(group)) {
     stop("`grouped_cv()` needs the grouping: a column of `targets`, or one value per target.",
          call. = FALSE)
   }
-  .resampling("grouped_cv", v = v, seed = seed, strata = 1L, group = group)
+  .resampling("grouped_cv", v = v, seed = seed, strata = 1L, group = group, repeats = repeats)
 }
 
-.resampling <- function(method, v, seed, strata, group, by = NULL, scale = FALSE) {
+.resampling <- function(method, v, seed, strata, group, by = NULL, scale = FALSE,
+                        repeats = 1L) {
+  .check_count(repeats, "repeats", 1L)
   if (!is.numeric(v) || length(v) != 1L || v < 2L) {
     stop("`v` must be a fold count of 2 or more, got ", .describe(v), ".", call. = FALSE)
   }
   structure(list(method = method, v = as.integer(v), seed = seed, strata = as.integer(strata),
-                 group = group, by = by, scale = scale),
+                 group = group, by = by, scale = scale, repeats = as.integer(repeats)),
             class = "timesift_resampling")
 }
 
 #' @export
 print.timesift_resampling <- function(x, ...) {
-  cat("<timesift resampling>", x$method, "in", .plural(x$v, "fold"), "\n")
+  cat("<timesift resampling>", x$method, "in", .plural(x$v, "fold"),
+      if (x$repeats > 1L) paste("repeated", x$repeats, "times"), "\n")
   if (identical(x$method, "grouped_cv")) {
     cat("grouped by:", if (is.character(x$group) && length(x$group) == 1L) x$group else
       paste(.plural(length(unique(x$group)), "group"), "given as a vector"), "\n")
@@ -224,6 +233,13 @@ print.timesift_resampling <- function(x, ...) {
          if (is.character(group)) group[1L] else class(group)[1L], "\".", call. = FALSE)
   }
   as.character(group)[tf$order]
+}
+
+# The `r`-th draw of a repeated split: the same split under the next seed, drawn once.
+.nth_repeat <- function(resampling, r) {
+  resampling$seed <- resampling$seed + r - 1L
+  resampling$repeats <- 1L
+  resampling
 }
 
 # What `cv(by = )` stratifies on, in the row order of the response.

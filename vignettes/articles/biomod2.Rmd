@@ -334,7 +334,8 @@ plot(rc)
 - **Folds.** One fold map is dealt once and read by every candidate and the ensemble. `cv()` deals
   units balanced on a stratifying value, `grouped_cv()` keeps units that share a group on one
   side of each split, and `block_cv()` and `env_cv()` hold out a block of space or of predictor
-  space. biomod2's `kfold` is `cv()`, `strat` is `cv(by = )`, `block` is `block_cv()`, `env` is
+  space. biomod2's `nb.rep` is `repeats =` on `cv()` and `grouped_cv()`: every repeat is a full run on its
+  own fold map, and a response is averaged over its folds and its repeats. biomod2's `kfold` is `cv()`, `strat` is `cv(by = )`, `block` is `block_cv()`, `env` is
   `env_cv()` and `user.defined` is a fold map passed as `resampling`.
 - **Scorable cells.** A response is scored only on folds whose held-out units hold both classes, and
   only fitted on training units that hold both. The mask follows from the response and the fold map

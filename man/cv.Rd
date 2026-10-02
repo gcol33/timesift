@@ -7,13 +7,13 @@
 \alias{grouped_cv}
 \title{How the folds are drawn}
 \usage{
-cv(v = 10L, seed = 1L, strata = 5L, by = NULL)
+cv(v = 10L, seed = 1L, strata = 5L, by = NULL, repeats = 1L)
 
 block_cv(by, v = 4L)
 
 env_cv(by, v = 4L)
 
-grouped_cv(group, v = 10L, seed = 1L)
+grouped_cv(group, v = 10L, seed = 1L, repeats = 1L)
 }
 \arguments{
 \item{v}{Number of folds.}
@@ -26,6 +26,12 @@ grouped_cv(group, v = 10L, seed = 1L)
 numeric column of \code{targets}, or a vector with one value per target. For \code{block_cv()} and
 \code{env_cv()}, the columns the blocks are cut on: names of columns of \code{targets}, or a numeric
 matrix with one row per target.}
+
+\item{repeats}{Number of times the split is drawn, each with its own seed (\code{seed}, \code{seed + 1},
+and so on). In \code{\link[=timesift]{timesift()}} every repeat is a full run on its own fold map: a score stays
+one fit's held-out score, the report averages a response's scores over folds and repeats,
+and the combiner is fitted on the out-of-fold predictions of all the repeats together.
+\code{block_cv()} and \code{env_cv()} draw nothing, so repeat nothing.}
 
 \item{group}{The grouping: the name of a column of \code{targets}, or a vector with one value per
 target.}

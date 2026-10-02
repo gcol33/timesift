@@ -25,7 +25,8 @@ timesift(
   control = train_control(),
   keep_fits = FALSE,
   seed = 1L,
-  verbose = TRUE
+  verbose = TRUE,
+  .refit = TRUE
 )
 }
 \arguments{
@@ -62,7 +63,11 @@ representation, or a list of them. Defaults to \code{grains("auto")}.}
 \item{ensemble}{\code{TRUE} for the default stack, \code{FALSE} for none, or an \code{\link[=ensemble]{ensemble()}} spec.}
 
 \item{resampling}{The outer split: \code{\link[=cv]{cv()}}, \code{\link[=grouped_cv]{grouped_cv()}}, a fold vector, or a \code{\link[=fold_map]{fold_map()}}
-result.}
+result. With \code{repeats} above one the run is made once per repeat: \code{scores} and \code{cells} carry
+a \code{repeat} column and every repeat's folds under numbers of their own, \code{estimate} is read off
+all the repeats' held-out predictions, \code{oof} is a target's mean prediction over the repeats,
+and the stack is fitted on the repeats' out-of-fold predictions together. The models, the
+per-fold fits and \code{folds} are the first repeat's.}
 
 \item{inner}{Number of inner folds the choice and the stack's weights are made on inside each
 outer training set, a function of the outer training response returning a fold map for those
@@ -86,6 +91,9 @@ reported as \verb{<function>}. The estimate is also reported under every registe
 \item{seed}{Seed for the inner splits. Each outer fold splits under \code{seed} plus its position.}
 
 \item{verbose}{Report each outer fold as it runs.}
+
+\item{.refit}{Whether the candidates are refitted on all targets at the end, which is what
+\code{predict()} reads. A repeated resampling asks it of its first run alone.}
 }
 \value{
 A \code{timesift} object, a list carrying:

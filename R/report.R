@@ -269,8 +269,9 @@ occlusion.timesift <- function(x, candidate, over = c("bin", "channel"), ...) {
 .run_header <- function(fit) {
   v <- length(unique(.as_folds(fit$folds, rownames(fit$y))))
   kind <- if (isTRUE(attr(fit$folds, "grouped"))) "grouped" else "random"
-  sprintf("timesift  %s, %s, %d-fold %s CV, %s", .plural(nrow(fit$y), "target"),
-          .plural(ncol(fit$y), "response"), v, kind, fit$metric)
+  repeated <- if (isTRUE(fit$repeats > 1L)) sprintf(" repeated %d times", fit$repeats) else ""
+  sprintf("timesift  %s, %s, %d-fold %s CV%s, %s", .plural(nrow(fit$y), "target"),
+          .plural(ncol(fit$y), "response"), v, kind, repeated, fit$metric)
 }
 
 # The per-fold models the run kept, rekeyed onto the arm label the occlusion reads them under. A

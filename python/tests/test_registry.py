@@ -46,8 +46,9 @@ def readings(n_unit=12, days=40, seed=5):
 def test_what_ships_is_registered_and_reachable_by_name():
     assert learners() == ["additive", "boosting", "cnn", "discriminant", "elasticnet", "envelope",
                           "forest", "mars", "maxnet", "mlp", "rescnn", "stepwise", "tree"]
-    assert metrics() == ["average_precision", "kappa", "kappa_youden", "roc_auc", "tss"]
-    assert responses() == ["presence_absence"]
+    assert {"average_precision", "kappa", "kappa_youden", "roc_auc", "tss", "accuracy", "ets",
+            "boyce"} <= set(metrics())
+    assert {"presence_absence", "continuous", "abundance", "ordinal"} <= set(responses())
     assert get_learner("stepwise").name == "stepwise"
 
 
@@ -76,7 +77,7 @@ def test_an_unknown_name_says_what_is_registered():
     with pytest.raises(KeyError, match="elasticnet"):
         get_learner("nope")
     with pytest.raises(KeyError, match="presence_absence"):
-        RESPONSES.get("abundance")
+        RESPONSES.get("phenology")
 
 
 def test_what_a_registration_must_carry():
