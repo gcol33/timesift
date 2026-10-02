@@ -30,7 +30,7 @@ utils::globalVariables("self")
       function(y, p) regression_metric(y, p, metric)
     }))
   }
-  for (name in c("rmse", "mse", "mae", "max_error")) {
+  for (name in c("rmse", "mse", "mae", "max_error", "poisson_deviance")) {
     register_metric(paste0("neg_", name), local({
       metric <- name
       function(y, p) -regression_metric(y, p, metric)

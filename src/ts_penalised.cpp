@@ -12,8 +12,8 @@
 // The elastic net by pathwise coordinate descent (Friedman, Hastie and Tibshirani 2010, "Regularization
 // paths for generalized linear models via coordinate descent", Journal of Statistical Software
 // 33(1)): the penalised objective is minimised one coefficient at a time by soft thresholding, at
-// each penalty of a descending path, starting from the solution at the penalty above. A binomial
-// response is fitted by iteratively reweighted least squares, one penalised quadratic per
+// each penalty of a descending path, starting from the solution at the penalty above. A binomial or
+// Poisson response is fitted by iteratively reweighted least squares, one penalised quadratic per
 // reweighting. The sequential strong rule (Tibshirani et al. 2012, "Strong rules for discarding
 // predictors in lasso-type problems", JRSSB 74:245-266) screens the columns offered at each
 // penalty, and the optimality condition is checked afterwards over the columns it left out.
@@ -22,7 +22,8 @@ namespace {
 
 // Constants of the numerical conventions the fixtures pin: the bound on a binomial linear
 // predictor, the floor under the mixing when the largest penalty is derived (it gives a ridge a
-// finite start), and the probability a held-out case is read at no closer than to zero or one.
+// finite start), and the probability a held-out case is read at no closer than to zero or one. The
+// bound on the linear predictor is read on a Poisson one as well, where it keeps the mean finite.
 constexpr double kLinkBound = 250.0;
 constexpr double kMixingFloor = 1e-3;
 constexpr double kHeldOutProbFloor = 1e-5;
@@ -98,6 +99,12 @@ void weighted_axpy(double* out, const double* a, const double* c, double b, std:
   for (; i < n; ++i) out[i] += b * a[i] * c[i];
 }
 
+// Twice the Poisson log likelihood's shortfall from the saturated model at one case:
+// `2 (y log(y / mu) - (y - mu))`, the logarithm taken as zero at `y = 0`.
+double poisson_unit_deviance(double y, double mu) {
+  return 2.0 * ((y > 0.0 ? y * std::log(y / mu) : 0.0) - (y - mu));
+}
+
 // log(1 + e^x) without overflow on either side.
 double softplus(double x) {
   if (x > 0.0) return x + std::log1p(std::exp(-x));
@@ -115,7 +122,7 @@ double softplus(double x) {
 // root is multiplied into every column and into the intercept's column: the quadratic then has
 // unit weight and a coordinate update reads only the column and the residual. A binomial fit's
 // weight moves with every reweighting, so its columns stay unweighted and its intercept column is
-// a column of ones.
+// a column of ones; so does a Poisson fit's.
 struct Standardised {
   std::size_t n = 0;
   std::size_t p = 0;
@@ -247,7 +254,8 @@ struct Solution {
 
 // One penalised weighted least squares problem: the quadratic's case weights, the residual already
 // multiplied by them, and each offered column's curvature. A binomial case whose fitted probability
-// is pinned at zero or one carries a gradient and no curvature. On weighted columns the case
+// is pinned at zero or one carries a gradient and no curvature; a Poisson case carries the fitted
+// mean as its curvature. On weighted columns the case
 // weights live in the design and `case_curvature` is not read.
 struct Quadratic {
   std::vector<double> case_curvature;
@@ -514,6 +522,9 @@ void check_response(const double* y, std::size_t n, Family family, double& low, 
     low = std::min(low, y[i]);
     high = std::max(high, y[i]);
   }
+  if (family == Family::poisson && low < 0.0) {
+    throw Error("a Poisson penalised fit takes a response of counts, none of them negative.");
+  }
   if (low == high) {
     throw Error(family == Family::binomial
                     ? "a binomial penalised fit was handed a response holding one outcome."
@@ -535,8 +546,10 @@ class PathFit {
     q_.column_curvature.assign(p, 0.0);
     if (family == Family::gaussian) {
       prepare_gaussian(y);
-    } else {
+    } else if (family == Family::binomial) {
       prepare_binomial(y, low, high);
+    } else {
+      prepare_poisson(y);
     }
   }
 
@@ -603,6 +616,31 @@ class PathFit {
     for (std::size_t i = 0; i < n_; ++i) {
       q_.case_curvature[i] = cw[i] * share * (1.0 - share);
       q_.residual[i] = cw[i] * (response_[i] - share);
+    }
+  }
+
+  // The null model of a Poisson response is the weighted mean count, with its log as the
+  // intercept; without an intercept the null mean is one. The quadratic at it is what the largest
+  // penalty is read off, as it is for the binomial response, with the mean as the curvature.
+  void prepare_poisson(const double* y) {
+    const std::vector<double>& cw = d_.case_weight;
+    response_.assign(y, y + n_);
+    double mean = 1.0;
+    if (spec_.intercept) {
+      mean = 0.0;
+      for (std::size_t i = 0; i < n_; ++i) mean += cw[i] * y[i];
+      if (!(mean > 0.0)) {
+        throw Error("a Poisson penalised fit was handed a response holding no count above zero.");
+      }
+      sol_.intercept = std::log(mean);
+    }
+    double dev = 0.0;
+    for (std::size_t i = 0; i < n_; ++i) dev += cw[i] * poisson_unit_deviance(y[i], mean);
+    null_deviance_ = dev;
+    reported_null_deviance_ = dev;
+    for (std::size_t i = 0; i < n_; ++i) {
+      q_.case_curvature[i] = cw[i] * mean;
+      q_.residual[i] = cw[i] * (response_[i] - mean);
     }
   }
 
@@ -690,12 +728,21 @@ class PathFit {
     for (std::size_t i = 0; i < n_; ++i) q_.residual[i] = target_[i] - eta_[i];
   }
 
-  // The binomial quadratic at the current coefficients: the working weights p(1 - p), and the
-  // residual y - p times the case weight. A probability within `prob_floor` of zero or one is
-  // pinned there and carries no curvature.
+  // The quadratic at the current coefficients. Binomial: the working weights p(1 - p), and the
+  // residual y - p times the case weight; a probability within `prob_floor` of zero or one is
+  // pinned there and carries no curvature. Poisson: the working weights are the mean, and the
+  // residual is y minus it times the case weight.
   void reweight() {
     predict_link();
     const std::vector<double>& cw = d_.case_weight;
+    if (family_ == Family::poisson) {
+      for (std::size_t i = 0; i < n_; ++i) {
+        const double mu = std::exp(std::min(std::max(eta_[i], -kLinkBound), kLinkBound));
+        q_.case_curvature[i] = cw[i] * mu;
+        q_.residual[i] = cw[i] * (response_[i] - mu);
+      }
+      return;
+    }
     for (std::size_t i = 0; i < n_; ++i) {
       const double link = std::min(std::max(eta_[i], -kLinkBound), kLinkBound);
       double prob = 1.0 / (1.0 + std::exp(-link));
@@ -717,12 +764,12 @@ class PathFit {
     return descent.run(passes_left_);
   }
 
-  // Reweighted least squares at one penalty. A step is settled when it moved nothing: the
+  // Reweighted least squares at one penalty, under the binomial or the Poisson family. A step is settled when it moved nothing: the
   // coefficients it started from against those it reached, over the nonzero columns and the
   // intercept, each weighted by its curvature, on the scale the descent stops at. The step ends
   // on the reweighting the next would open with, so the residual is current for the check that
   // follows.
-  bool fit_binomial(double lambda) {
+  bool fit_reweighted(double lambda) {
     for (int step = 1;; ++step) {
       const double intercept_from = sol_.intercept;
       for (std::size_t j : sol_.nonzero_ever) step_start_[j] = sol_.coef[j];
@@ -745,7 +792,7 @@ class PathFit {
   // The fit at one penalty, repeated while the optimality check finds columns the screen missed.
   bool fit_at(double lambda) {
     for (;;) {
-      if (gaussian() ? !descend(lambda) : !fit_binomial(lambda)) return false;
+      if (gaussian() ? !descend(lambda) : !fit_reweighted(lambda)) return false;
       if (!admit_violators(lambda)) return true;
       if (gaussian()) rebuild_gaussian_residual();
     }
@@ -754,6 +801,14 @@ class PathFit {
   double deviance() const {
     if (gaussian()) return dot(q_.residual.data(), q_.residual.data(), n_);
     const std::vector<double>& cw = d_.case_weight;
+    if (family_ == Family::poisson) {
+      double dev = 0.0;
+      for (std::size_t i = 0; i < n_; ++i) {
+        const double mu = std::exp(std::min(std::max(eta_[i], -kLinkBound), kLinkBound));
+        dev += cw[i] * poisson_unit_deviance(response_[i], mu);
+      }
+      return dev;
+    }
     double loglik = 0.0;
     for (std::size_t i = 0; i < n_; ++i) loglik += cw[i] * (response_[i] * eta_[i] - softplus(eta_[i]));
     return loglik * -2.0;
@@ -812,6 +867,7 @@ PenaltyPath PathFit::run() {
   out.null_deviance = reported_null_deviance_;
   out.family = family_;
   double previous_explained = -std::numeric_limits<double>::infinity();
+  std::vector<double> explained_by_point;
   double previous_lambda = top;
 
   for (std::size_t k = 0; k < path.size(); ++k) {
@@ -825,7 +881,8 @@ PenaltyPath PathFit::run() {
         throw Error(gaussian()
                         ? "a penalised fit did not settle at the first penalty of its path inside "
                           "its pass budget."
-                        : "a binomial penalised fit did not settle at the first penalty of its path.");
+                        : "a penalised fit under the binomial or Poisson family did not settle at "
+                          "the first penalty of its path.");
       }
       out.stalled = static_cast<std::int32_t>(k) + 1;
       break;
@@ -841,13 +898,23 @@ PenaltyPath PathFit::run() {
     const double explained = null_deviance_ > 0.0 ? 1.0 - deviance() / null_deviance_ : 0.0;
     record(out, lambda, nonzero, explained);
 
+    explained_by_point.push_back(explained);
     if (derived && static_cast<int>(k) + 1 >= spec_.min_lambda) {
       if (explained > spec_.dev_max) break;
       // A step that explains almost nothing more ends the path. The Gaussian family reads the
       // share gained relative to the deviance explained so far and the binomial one absolutely,
-      // the convention the fixtures pin.
-      const double enough = gaussian() ? spec_.fdev * std::fabs(explained) : spec_.fdev;
-      if (spec_.fdev > 0.0 && explained - previous_explained < enough) break;
+      // the convention the fixtures pin. The Poisson family reads the share gained over the last
+      // `min_lambda - 1` steps, relative to the deviance explained now, against ten times `fdev`.
+      if (spec_.fdev > 0.0) {
+        if (family_ == Family::poisson) {
+          const std::size_t span = static_cast<std::size_t>(spec_.min_lambda) - 1;
+          const double before = explained_by_point[k - span];
+          if ((explained - before) / explained < 10.0 * spec_.fdev) break;
+        } else {
+          const double enough = gaussian() ? spec_.fdev * std::fabs(explained) : spec_.fdev;
+          if (explained - previous_explained < enough) break;
+        }
+      }
     }
     previous_explained = explained;
     previous_lambda = lambda;
@@ -931,13 +998,14 @@ void run_shared(int workers, std::size_t count, const std::function<void()>& lea
   if (failure) std::rethrow_exception(failure);
 }
 
-// The deviance of one held-out case: squared error, or twice the binomial negative log likelihood
-// with the probability kept off zero and one.
+// The deviance of one held-out case: squared error, twice the binomial negative log likelihood
+// with the probability kept off zero and one, or the Poisson deviance of the predicted mean.
 double held_out_deviance(Family family, double y, double predicted) {
   if (family == Family::gaussian) {
     const double e = y - predicted;
     return e * e;
   }
+  if (family == Family::poisson) return poisson_unit_deviance(y, predicted);
   const double q = std::min(std::max(predicted, kHeldOutProbFloor), 1.0 - kHeldOutProbFloor);
   return -2.0 * (y * std::log(q) + (1.0 - y) * std::log(1.0 - q));
 }
@@ -947,11 +1015,18 @@ double held_out_deviance(Family family, double y, double predicted) {
 Family family_from_name(const std::string& name) {
   if (name == "gaussian") return Family::gaussian;
   if (name == "binomial") return Family::binomial;
-  throw Error("a penalised fit knows the gaussian and the binomial family, not '" + name + "'.");
+  if (name == "poisson") return Family::poisson;
+  throw Error("a penalised fit knows the gaussian, binomial and Poisson family, not '" + name +
+              "'.");
 }
 
 const char* family_name(Family f) {
-  return f == Family::gaussian ? "gaussian" : "binomial";
+  switch (f) {
+    case Family::gaussian: return "gaussian";
+    case Family::binomial: return "binomial";
+    case Family::poisson: return "poisson";
+  }
+  return "gaussian";
 }
 
 PenaltyPath penalised_path(const double* x, const double* y, const double* w, std::size_t n,
@@ -1001,10 +1076,10 @@ void penalised_predict(const PenaltyPath& path, double lambda, const double* x, 
   for (std::size_t j = 0; j < p; ++j) {
     if (beta[j] != 0.0) axpy(out, x + j * n, beta[j], n);
   }
-  if (path.family != Family::binomial) return;
+  if (path.family == Family::gaussian) return;
   for (std::size_t i = 0; i < n; ++i) {
     const double link = std::min(std::max(out[i], -kLinkBound), kLinkBound);
-    out[i] = 1.0 / (1.0 + std::exp(-link));
+    out[i] = path.family == Family::binomial ? 1.0 / (1.0 + std::exp(-link)) : std::exp(link);
   }
 }
 

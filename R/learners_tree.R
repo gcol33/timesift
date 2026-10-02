@@ -1,8 +1,9 @@
 #' Classification and regression tree on the flattened representation
 #'
 #' One tree per response, over every bin-by-channel column of the representation, grown under
-#' rpart's rules: the Gini index under a presence-absence head and the sum of squares under a head
-#' with a squared-error loss, a split only between two distinct values of a column, and the
+#' rpart's rules: the Gini index under a presence-absence head, the sum of squares under a head
+#' with a squared-error loss and the Poisson deviance under a count head, a split only between two
+#' distinct values of a column, and the
 #' cost-complexity bookkeeping that keeps a split only where it lowers the risk by at least `cp` of
 #' the root's. On the same columns, weights and folds the tree is the one rpart grows, split for
 #' split, and its complexity table the one rpart reports; the tree is grown by the core the Python
@@ -23,8 +24,14 @@
 #' `cp = 0.001`, `max_depth = 10` and five inner folds. A setting given explicitly beats either.
 #'
 #' The case weights are the response head's, [positive_weights()] under presence-absence. They
-#' weigh every class count and sum of squares the tree is grown on; `min_split` and `min_leaf`
-#' count observations, as rpart's do.
+#' weigh every class count, sum of squares and event count the tree is grown on; `min_split` and
+#' `min_leaf` count observations, as rpart's do.
+#'
+#' Under a count head a leaf predicts a rate, and the rate is shrunk towards the rate of the units
+#' the tree is grown on, as rpart's `method = "poisson"` shrinks it: the posterior mean of a gamma
+#' prior whose coefficient of variation is `shrink`. A split is chosen on the deviance of the
+#' unshrunk rates, and a subtree's risk, its complexity and the pruning's cross-validated error are
+#' read on the shrunk ones.
 #'
 #' @inheritParams elasticnet
 #' @param min_split Observations a node needs before a split of it is tried.
@@ -34,6 +41,8 @@
 #' @param prune How the grown tree is pruned: `"se_sum"`, `"one_se"`, `"min"` or `"none"`.
 #' @param n_inner Folds of the inner cross-validation the pruning reads.
 #' @param preset Whose defaults the settings left `NULL` take: `"package"` or `"bigboss"`.
+#' @param shrink Under a count head, the coefficient of variation of the gamma prior a leaf's rate
+#'   is shrunk by; `0` for no shrinkage. rpart's default is `1`.
 #' @param seed Seed for the inner cross-validation's fold draw.
 #'
 #' @return A [learner()].
@@ -45,15 +54,18 @@
 #' @export
 tree <- function(data = NULL, min_split = NULL, min_leaf = NULL, cp = NULL, max_depth = NULL,
                  prune = c("se_sum", "one_se", "min", "none"), n_inner = NULL,
-                 preset = c("package", "bigboss"), seed = 1L) {
+                 preset = c("package", "bigboss"), shrink = 1, seed = 1L) {
   prune <- match.arg(prune)
   preset <- match.arg(preset)
+  if (!is.numeric(shrink) || length(shrink) != 1L || is.na(shrink) || shrink < 0) {
+    stop("`shrink` is one number of zero or more, got ", .describe(shrink), ".", call. = FALSE)
+  }
   settings <- .tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner)
   learner(
     name = "tree",
     data = data, reads = "tabular", multi = "separate",
-    params = c(settings, list(prune = prune, seed = as.integer(seed))),
-    fit = function(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, seed, head,
+    params = c(settings, list(prune = prune, shrink = as.numeric(shrink), seed = as.integer(seed))),
+    fit = function(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, shrink, seed, head,
                    weights, group = NULL, ...) {
       family <- .head_family(head)
       m <- .flatten(x)
@@ -72,7 +84,7 @@ tree <- function(data = NULL, min_split = NULL, min_leaf = NULL, cp = NULL, max_
           n_fold <- length(labels)
         }
         grown <- .tree_fit(m, yj, weights[, j], family, min_split, min_leaf, cp, max_depth,
-                           fold, n_fold)
+                           fold, n_fold, shrink)
         at <- .tree_prune_cp(grown, prune)
         if (is.null(at)) grown else .tree_prune(grown, at)
       })

@@ -16,6 +16,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from counts import fixture_counts
 from timesift import Response, additive, fit_learner, grain_matrix
 from timesift._additive import additive_fit, additive_predict
 
@@ -43,6 +44,7 @@ def additive_input():
                      knots=np.asfortranarray([[float(r["v01"]), float(r["v02"])] for r in knots])),
         y=dict(y_binomial=np.array([float(r["y_binomial"]) for r in rows]),
                y_gaussian=np.array([float(r["y_gaussian"]) for r in rows]),
+               y_poisson=fixture_counts(FIXTURES, [r["unit"] for r in rows]),
                y=np.array([float(r["y"]) for r in knots])),
         w=np.array([float(r["w"]) for r in rows]))
 
@@ -52,7 +54,7 @@ def test_the_core_settles_where_mgcv_does(additive_input, row):
     x = additive_input["designs"][row["design"]]
     y = additive_input["y"][row["response"]]
     w = additive_input["w"] if row["weighted"] == "TRUE" else np.ones(len(y))
-    family = "gaussian" if row["response"] == "y_gaussian" else "binomial"
+    family = {"y_gaussian": "gaussian", "y_poisson": "poisson"}.get(row["response"], "binomial")
     fit = additive_fit(x, y, w, family, k=int(row["k"]), gamma=float(row["gamma"]))
     assert list(fit["converged"]) == [1]
     assert fit["score"][0] == pytest.approx(float(row["score"]), rel=float(row["score_tolerance"]))
@@ -168,8 +170,8 @@ def test_a_constant_response_is_predicted_its_mean():
 # and the penalty are read off the fit, each term's columns being its raw basis times its map and
 # its penalty a diagonal, and the problem is solved by a singular value decomposition of the
 # weighted design stacked on the root of the penalty, which takes no rank decision on the way.
-# Under the binomial family the solve is repeated at the working weights until the coefficients
-# stop moving. The R suite asserts the same.
+# Under the binomial and the Poisson family the solve is repeated at the working weights until the
+# coefficients stop moving. The R suite asserts the same.
 
 
 def model_columns(fit, x):
@@ -208,7 +210,8 @@ def exact_fit(fit, x, y, w, sp, gamma=1.0):
     pen = model_penalty(fit, sp)
     keep = np.setdiff1d(np.arange(int(fit["n_coef"])), np.asarray(fit["aliased"], dtype=int))
     xm, pen = xm[:, keep], pen[keep]
-    binomial = fit["family"] == "binomial"
+    family = fit["family"]
+    iterative = family != "gaussian"
     n = xm.shape[0]
 
     def solve_at(root, z):
@@ -219,36 +222,49 @@ def exact_fit(fit, x, y, w, sp, gamma=1.0):
         return beta, influence
 
     def deviance(mu):
-        if not binomial:
+        if family == "gaussian":
             return float(np.sum(w * (y - mu) ** 2))
         with np.errstate(divide="ignore", invalid="ignore"):
             a = np.where(y > 0, y * np.log(y / mu), 0.0)
+            if family == "poisson":
+                return float(2 * np.sum(w * (a - (y - mu))))
             b = np.where(y < 1, (1 - y) * np.log((1 - y) / (1 - mu)), 0.0)
         return float(2 * np.sum(w * (a + b)))
 
-    mu = (w * y + 0.5) / (w + 1) if binomial else y.copy()
-    eta = np.log(mu / (1 - mu)) if binomial else mu
+    def mean_of(eta):
+        return {"binomial": lambda: 1 / (1 + np.exp(-eta)), "poisson": lambda: np.exp(eta),
+                "gaussian": lambda: eta}[family]()
+
+    def weight_of(mu):
+        return {"binomial": lambda: w * mu * (1 - mu), "poisson": lambda: w * mu,
+                "gaussian": lambda: w}[family]()
+
+    def response_of(eta, mu):
+        return {"binomial": lambda: eta + (y - mu) / (mu * (1 - mu)),
+                "poisson": lambda: eta + (y - mu) / mu, "gaussian": lambda: y}[family]()
+
+    mu = {"binomial": lambda: (w * y + 0.5) / (w + 1), "poisson": lambda: y + 0.1,
+          "gaussian": lambda: y.copy()}[family]()
+    eta = {"binomial": lambda: np.log(mu / (1 - mu)), "poisson": lambda: np.log(mu),
+           "gaussian": lambda: mu}[family]()
     beta = None
-    for _ in range(500 if binomial else 1):
-        wt = w * mu * (1 - mu) if binomial else w
-        z = eta + (y - mu) / (mu * (1 - mu)) if binomial else y
-        nxt, influence = solve_at(np.sqrt(wt), z)
+    for _ in range(500 if iterative else 1):
+        nxt, influence = solve_at(np.sqrt(weight_of(mu)), response_of(eta, mu))
         if beta is not None:
             before = deviance(mu) + np.sum(pen * beta ** 2)
             for _ in range(40):
-                nmu = 1 / (1 + np.exp(-(xm @ nxt)))
-                if deviance(nmu) + np.sum(pen * nxt ** 2) <= before:
+                if deviance(mean_of(xm @ nxt)) + np.sum(pen * nxt ** 2) <= before:
                     break
                 nxt = (nxt + beta) / 2
         moved = np.inf if beta is None else np.max(np.abs(nxt - beta))
         beta = nxt
         eta = xm @ beta
-        mu = 1 / (1 + np.exp(-eta)) if binomial else eta
-        if not binomial or moved < 1e-11 * (1 + np.max(np.abs(beta))):
+        mu = mean_of(eta)
+        if not iterative or moved < 1e-11 * (1 + np.max(np.abs(beta))):
             break
-    if binomial:
+    if iterative:
         assert moved < 1e-8 * (1 + np.max(np.abs(beta))), "the reference's iteration did not settle"
-        _, influence = solve_at(np.sqrt(w * mu * (1 - mu)), eta + (y - mu) / (mu * (1 - mu)))
+        _, influence = solve_at(np.sqrt(weight_of(mu)), response_of(eta, mu))
     per_coef = np.zeros(int(fit["n_coef"]))
     per_coef[keep] = np.diag(influence)
     edf, first = [], 1
@@ -257,7 +273,7 @@ def exact_fit(fit, x, y, w, sp, gamma=1.0):
         first += int(size)
     tau = float(np.trace(influence))
     dev = deviance(mu)
-    score = (dev / n + 2 * gamma * tau / n - 1 if binomial else n * dev / (n - gamma * tau) ** 2)
+    score = (dev / n + 2 * gamma * tau / n - 1 if iterative else n * dev / (n - gamma * tau) ** 2)
     return mu, np.array(edf), score
 
 
@@ -276,7 +292,8 @@ def sp_patterns(m):
 @pytest.mark.parametrize("design,response,family,k,gamma", [
     ("weekly", "y_binomial", "binomial", 10, 1.0),
     ("all", "y_gaussian", "gaussian", 5, 1.4),
-    ("few", "y_binomial", "binomial", 5, 1.0)])
+    ("few", "y_binomial", "binomial", 5, 1.0),
+    ("late", "y_poisson", "poisson", 5, 1.0)])
 def test_a_fit_at_given_smoothing_parameters_is_the_exact_penalised_solve(
         additive_input, design, response, family, k, gamma):
     x, y, w = additive_input["designs"][design], additive_input["y"][response], additive_input["w"]

@@ -83,10 +83,10 @@ extern "C" SEXP _timesift_ts_penalised_coef_(SEXP lambda, SEXP a0, SEXP beta, SE
   END_CPP11
 }
 // ts_r.cpp
-cpp11::list ts_tree_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, int min_split, int min_leaf, double cp, int max_depth, cpp11::sexp fold, int n_fold);
-extern "C" SEXP _timesift_ts_tree_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP min_split, SEXP min_leaf, SEXP cp, SEXP max_depth, SEXP fold, SEXP n_fold) {
+cpp11::list ts_tree_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, int min_split, int min_leaf, double cp, int max_depth, double shrink, cpp11::sexp fold, int n_fold);
+extern "C" SEXP _timesift_ts_tree_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP min_split, SEXP min_leaf, SEXP cp, SEXP max_depth, SEXP shrink, SEXP fold, SEXP n_fold) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_tree_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(min_split), cpp11::as_cpp<cpp11::decay_t<int>>(min_leaf), cpp11::as_cpp<cpp11::decay_t<double>>(cp), cpp11::as_cpp<cpp11::decay_t<int>>(max_depth), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<int>>(n_fold)));
+    return cpp11::as_sexp(ts_tree_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(min_split), cpp11::as_cpp<cpp11::decay_t<int>>(min_leaf), cpp11::as_cpp<cpp11::decay_t<double>>(cp), cpp11::as_cpp<cpp11::decay_t<int>>(max_depth), cpp11::as_cpp<cpp11::decay_t<double>>(shrink), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<int>>(n_fold)));
   END_CPP11
 }
 // ts_r.cpp
@@ -261,7 +261,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_reduce_lookbacks_",  (DL_FUNC) &_timesift_ts_reduce_lookbacks_,  12},
     {"_timesift_ts_stepwise_fit_",      (DL_FUNC) &_timesift_ts_stepwise_fit_,      11},
     {"_timesift_ts_stepwise_predict_",  (DL_FUNC) &_timesift_ts_stepwise_predict_,   4},
-    {"_timesift_ts_tree_fit_",          (DL_FUNC) &_timesift_ts_tree_fit_,          12},
+    {"_timesift_ts_tree_fit_",          (DL_FUNC) &_timesift_ts_tree_fit_,          13},
     {"_timesift_ts_tree_predict_",      (DL_FUNC) &_timesift_ts_tree_predict_,       4},
     {"_timesift_ts_tree_prune_",        (DL_FUNC) &_timesift_ts_tree_prune_,         2},
     {NULL, NULL, 0}

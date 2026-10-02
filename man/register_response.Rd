@@ -13,12 +13,13 @@ responses()
 \item{name}{Name the response is asked for by.}
 
 \item{spec}{A list with elements \code{prepare(y)}, returning the numeric matrix a learner is fitted
-on; \code{activation}, the name of the output transform (\code{"sigmoid"} or \code{"identity"}); \code{loss}, the
-name of the training objective (\code{"binary_cross_entropy"} or \code{"squared_error"}); \code{metric}, the
+on; \code{activation}, the name of the output transform (\code{"sigmoid"}, \code{"identity"} or \code{"exp"});
+\code{loss}, the name of the training objective (\code{"binary_cross_entropy"}, \code{"squared_error"} or
+\code{"poisson_deviance"}); \code{metric}, the
 default metric name; and \code{cells(y, folds)}, returning the mask of scorable cells. Every
 learner that ships reads \code{loss} and \code{activation} from here: the encoders train under the loss
 and predict through the activation, and the learners fitting one model per response take the
-family the loss names, logistic or Gaussian. The combiner minimises the same loss. An
+family the loss names, logistic, Gaussian or Poisson. The combiner minimises the same loss. An
 optional \code{weights(y, fitting)} returns a \verb{[unit, variable]} matrix of case weights every
 learner fits under, with \code{fitting} a logical vector marking the rows the model is fitted on:
 whatever the head reads off the response, it reads off those rows, and it weights every row,

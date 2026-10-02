@@ -18,7 +18,8 @@ stepwise_fixture <- function() {
   r <- utils::read.csv(file.path(dir, "maxnet_response.csv"), stringsAsFactors = FALSE)
   r <- r[match(d$unit, r$unit), ]
   list(x = x, w = d$w,
-       y = list(y_binomial = d$y_binomial, y_8 = r$y_8, y_12 = r$y_12, y_gaussian = d$y_gaussian),
+       y = list(y_binomial = d$y_binomial, y_8 = r$y_8, y_12 = r$y_12, y_gaussian = d$y_gaussian,
+                y_poisson = fixture_counts(dir, d$unit)),
        cases = utils::read.csv(file.path(dir, "stepwise_cases.csv"), stringsAsFactors = FALSE),
        predict = utils::read.csv(file.path(dir, "stepwise_predict.csv"),
                                  stringsAsFactors = FALSE))
@@ -28,7 +29,7 @@ stepwise_case_fit <- function(fx, row) {
   x <- if (isTRUE(row$duplicate)) cbind(fx$x, fx$x[, 1L]) else fx$x
   y <- fx$y[[row$response]]
   w <- if (isTRUE(row$weighted)) fx$w else rep(1, length(y))
-  family <- if (row$response == "y_gaussian") "gaussian" else "binomial"
+  family <- switch(row$response, y_gaussian = "gaussian", y_poisson = "poisson", "binomial")
   list(x = x, fit = .stepwise_fit(x, y, w, family, max_terms = row$max_terms,
                                   degree = row$degree, direction = row$direction,
                                   terms = row$terms))
@@ -106,6 +107,8 @@ test_that("stepwise refuses settings it has no search for", {
   expect_error(stepwise(degree = 1.5), "whole number")
   x <- matrix(1:6, ncol = 1L)
   expect_error(.stepwise_fit(x, c(0, 1, 2, 0, 1, 0), rep(1, 6L), "binomial"), "zero and one")
+  expect_error(.stepwise_fit(x, c(0, 1, -2, 0, 1, 0), rep(1, 6L), "poisson"),
+               "none of them negative")
   expect_error(.stepwise_fit(x, c(0, 1, 1, 0, 1, 0), c(1, 1, 0, 1, 1, 1), "binomial"),
                "positive weights")
   f <- .stepwise_fit(x, c(0, 1, 1, 0, 1, 0), rep(1, 6L), "binomial")

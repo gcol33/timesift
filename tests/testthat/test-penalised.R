@@ -17,23 +17,25 @@ penalised_input <- function(dir) {
   held <- c("unit", "y_gaussian", "y_binomial", "w", "fold")
   x <- as.matrix(d[, setdiff(names(d), held), drop = FALSE])
   rownames(x) <- d$unit
-  list(x = x, gaussian = d$y_gaussian, binomial = d$y_binomial, w = d$w, fold = d$fold)
+  list(x = x, gaussian = d$y_gaussian, binomial = d$y_binomial,
+       poisson = fixture_counts(dir, d$unit), w = d$w, fold = d$fold)
 }
 
 # The objective both descents minimise, on the scale the reference states it: the mean deviance
-# halved for a Gaussian family and the mean negative log likelihood for a binomial one, plus the
-# penalty.
+# halved for a Gaussian family and the mean negative log likelihood for a binomial or a Poisson one,
+# the Poisson one without its `log(y!)`, plus the penalty.
 penalised_objective <- function(x, y, w, family, alpha, lambda, a0, beta) {
   wn <- w / sum(w)
   eta <- a0 + as.numeric(x %*% beta)
-  fit <- if (family == "gaussian") sum(wn * (y - eta)^2) / 2 else
-    -sum(wn * (y * eta - log1p(exp(eta))))
+  fit <- switch(family,
+                gaussian = sum(wn * (y - eta)^2) / 2,
+                binomial = -sum(wn * (y * eta - log1p(exp(eta)))),
+                poisson = -sum(wn * (y * eta - exp(eta))))
   fit + lambda * (alpha * sum(abs(beta)) + (1 - alpha) / 2 * sum(beta^2))
 }
 
 penalised_case <- function(input, row) {
-  list(y = if (row$family == "binomial") input$binomial else input$gaussian,
-       w = if (row$weighted) input$w else rep(1, nrow(input$x)))
+  list(y = input[[row$family]], w = if (row$weighted) input$w else rep(1, nrow(input$x)))
 }
 
 test_that("the design the penalised fixtures carry is a representation", {
@@ -140,7 +142,8 @@ test_that("the penalised core says what it cannot fit rather than fitting someth
                "one outcome")
   expect_error(.penalised_path(input$x, input$gaussian, w, "binomial", 0.5), "zero and one")
   expect_error(.penalised_path(input$x, rep(2, nrow(input$x)), w, "gaussian", 0.5), "one value")
-  expect_error(.penalised_path(input$x, input$binomial, w, "poisson", 0.5), "gaussian")
+  expect_error(.penalised_path(input$x, input$binomial, w, "gamma", 0.5), "Poisson")
+  expect_error(.penalised_path(input$x, -input$gaussian, w, "poisson", 0.5), "none of them negative")
   expect_error(.penalised_path(input$x, input$binomial, w, "binomial", 2), "between zero and one")
   expect_error(.penalised_path(input$x, input$binomial, -w, "binomial", 0.5), "negative")
   expect_error(.penalised_cv(input$x, input$binomial, w, "binomial", 0.5, rep(0L, nrow(input$x)),

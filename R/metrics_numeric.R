@@ -10,7 +10,13 @@
   rmse = function(y, p) sqrt(mean((y - p)^2)),
   mse = function(y, p) mean((y - p)^2),
   mae = function(y, p) mean(abs(y - p)),
-  max_error = function(y, p) max(abs(y - p))
+  max_error = function(y, p) max(abs(y - p)),
+  poisson_deviance = function(y, p) {
+    if (any(p < 0) || any(p == 0 & y > 0)) {
+      return(NA_real_)
+    }
+    mean(2 * (ifelse(y > 0, y * log(y / p), 0) - (y - p)))
+  }
 )
 
 #' A metric of a numeric response and its predictions
@@ -25,11 +31,12 @@
 #' | `"mse"` | `mean(e^2)` |
 #' | `"mae"` | `mean(abs(e))` |
 #' | `"max_error"` | `max(abs(e))` |
+#' | `"poisson_deviance"` | `mean(2 (y log(y / p) - (y - p)))`, the logarithm taken as zero at `y = 0`; `NA` where a prediction is negative or is zero beside a count above zero |
 #'
-#' A comparison across candidates reads the highest score as the best, so the four errors are
-#' registered under the names `neg_rmse`, `neg_mse`, `neg_mae` and `neg_max_error` with their sign
-#' reversed, and `r_squared` and `pearson` under their own names. A cell holding a prediction that
-#' is not a number scores `NA`.
+#' A comparison across candidates reads the highest score as the best, so the five errors are
+#' registered under the names `neg_rmse`, `neg_mse`, `neg_mae`, `neg_max_error` and
+#' `neg_poisson_deviance` with their sign reversed, and `r_squared` and `pearson` under their own
+#' names. A cell holding a prediction that is not a number scores `NA`.
 #'
 #' @param y Observed values.
 #' @param p Predictions for the same units, in the same order.
@@ -148,7 +155,7 @@ ordinal_metric <- function(y, p, metric = names(.ordinal_metrics)) {
   structure(out, class = c("timesift_cells", "data.frame"))
 }
 
-.numeric_head <- function(check, metric) {
+.numeric_head <- function(check, metric, activation = "identity", loss = "squared_error") {
   list(
     prepare = function(y) {
       y <- .as_response(y)
@@ -158,15 +165,17 @@ ordinal_metric <- function(y, p, metric = names(.ordinal_metrics)) {
       check(y)
       y
     },
-    activation = "identity",
-    loss = "squared_error",
+    activation = activation,
+    loss = loss,
     metric = metric,
     cells = .numeric_cells
   )
 }
 
-# The heads for a numeric response. All three are fitted under squared error through an identity
-# output; they differ in what the response may hold and in the metric a comparison reads.
+# The heads for a numeric response. The continuous, abundance and ordinal ones are fitted under
+# squared error through an identity output, and differ in what the response may hold and in the
+# metric a comparison reads. The count head is fitted under the Poisson deviance through an
+# exponential output, and is read by the same deviance.
 .numeric_heads <- function() {
   list(
     continuous = .numeric_head(function(y) invisible(NULL), "r_squared"),
@@ -179,6 +188,11 @@ ordinal_metric <- function(y, p, metric = names(.ordinal_metrics)) {
       if (any(y != round(y))) {
         stop("an ordinal response holds whole-number classes.", call. = FALSE)
       }
-    }, "ordinal_f1")
+    }, "ordinal_f1"),
+    count = .numeric_head(function(y) {
+      if (any(y < 0) || any(y != round(y))) {
+        stop("a count response holds whole numbers of zero or more.", call. = FALSE)
+      }
+    }, "neg_poisson_deviance", activation = "exp", loss = "poisson_deviance")
   )
 }

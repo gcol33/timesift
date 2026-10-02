@@ -6,11 +6,11 @@
 # another machine, which is what every other fitted object in the package is.
 
 .tree_fit <- function(x, y, w, family, min_split, min_leaf, cp, max_depth, fold = NULL,
-                      n_fold = 0L) {
+                      n_fold = 0L, shrink = 1) {
   ts_tree_fit_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x), family,
                as.integer(min_split), as.integer(min_leaf), as.numeric(cp),
-               as.integer(max_depth), if (is.null(fold)) NULL else as.integer(fold),
-               as.integer(n_fold))
+               as.integer(max_depth), as.numeric(shrink),
+               if (is.null(fold)) NULL else as.integer(fold), as.integer(n_fold))
 }
 
 .tree_prune <- function(tree, cp) {

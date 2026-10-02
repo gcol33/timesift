@@ -1348,8 +1348,8 @@ Mars mars_fit(const double* x, const double* y, const double* w, std::size_t n, 
     const double* src = bxw.data() + static_cast<std::size_t>(chosen[c]) * n;
     for (std::size_t i = 0; i < n; ++i) basis[i + c * n] = src[i] / std::sqrt(wt[i]);
   }
-  if (spec.family == Family::binomial) {
-    const Glm g = glm_fit(basis.data(), n, k, y, w, Family::binomial, spec.epsilon, spec.max_iter);
+  if (spec.family != Family::gaussian) {
+    const Glm g = glm_fit(basis.data(), n, k, y, w, spec.family, spec.epsilon, spec.max_iter);
     fit.beta = g.beta;
     fit.converged = g.converged;
   } else {
@@ -1397,7 +1397,7 @@ void mars_predict(const Mars& fit, const double* x, std::size_t n, std::size_t p
   for (std::size_t i = 0; i < n; ++i) {
     double eta = 0.0;
     for (std::size_t c = 0; c < k; ++c) eta += basis[i + c * n] * fit.beta[c];
-    out[i] = fit.family == Family::binomial ? logit_linkinv(eta) : eta;
+    out[i] = linkinv(fit.family, eta);
   }
 }
 

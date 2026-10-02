@@ -182,9 +182,10 @@ def _head_weights(head, y: np.ndarray, fitting=None) -> np.ndarray:
 
 
 # The family a learner fitting one model per response fits under is read off the response head's
-# loss, so a head registered with a squared-error loss reaches the same learners as a
-# presence-absence one and each fits the model that loss names.
-FAMILIES = {"binary_cross_entropy": "binomial", "squared_error": "gaussian"}
+# loss, so a head registered with a squared-error or a Poisson-deviance loss reaches the same
+# learners as a presence-absence one and each fits the model that loss names.
+FAMILIES = {"binary_cross_entropy": "binomial", "squared_error": "gaussian",
+            "poisson_deviance": "poisson"}
 
 
 def _family(head) -> str:
@@ -382,10 +383,19 @@ def _squared_error(torch):
     return loss
 
 
+def _poisson_deviance(torch):
+    def loss(out, target, weight):
+        nll = torch.nn.functional.poisson_nll_loss(out, target, log_input=True, reduction="none")
+        return torch.mean(weight * nll)
+    return loss
+
+
 TORCH_LOSSES = {"binary_cross_entropy": _binary_cross_entropy,
-                "squared_error": _squared_error}
+                "squared_error": _squared_error,
+                "poisson_deviance": _poisson_deviance}
 TORCH_ACTIVATIONS = {"sigmoid": lambda torch, out: torch.sigmoid(out),
-                     "identity": lambda torch, out: out}
+                     "identity": lambda torch, out: out,
+                     "exp": lambda torch, out: torch.exp(out)}
 
 
 def _objective(head):
@@ -705,7 +715,8 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, s="lambda.min", n_
 
     There is no discrete selection step: the penalty path uses every column and shrinks, and
     nothing about the model is decided outside the fold it is fitted in. The family is the
-    response head's: logistic under a binary cross-entropy loss, linear under a squared-error
+    response head's: logistic under a binary cross-entropy loss, log-linear under a
+    Poisson-deviance one, linear under a squared-error
     one, and so are the case weights, :func:`~timesift.response.positive_weights` under
     presence-absence, which every learner that ships fits under.
 
@@ -778,7 +789,8 @@ def _elasticnet_predict(model, x):
 def forest(data=None, trees=None, mtry=None, min_node=None, balance=False, preset="package",
            seed=1, threads=1) -> Learner:
     """One random forest per variable, over every bin-by-channel column: a probability forest
-    under a presence-absence head and a regression forest under a head with a squared-error loss.
+    under a presence-absence head and a regression forest under a head with a squared-error loss
+    or a count head, a count being cut on its variance and a leaf reporting its mean.
     Trees split on one column at a time and pay nothing for columns that carry nothing, so a forest
     reads a wide tabular representation without a penalty path and without a selection step.
 
@@ -853,7 +865,8 @@ def boosting(data=None, trees=None, depth=None, shrinkage=None, min_leaf=None, s
              colsample=None, newton=False, lambda_=None, gamma=None, n_inner=None,
              preset="package", seed=1, threads=1) -> Learner:
     """One boosted model per variable, over every bin-by-channel column: a logistic model under a
-    presence-absence head and a squared-error one under a head with a squared-error loss. The score
+    presence-absence head, a squared-error one under a head with a squared-error loss and a Poisson
+    one with a log link under a count head. The score
     starts at the log-odds of the weighted share of presences, or the weighted mean, and each tree
     is fitted to the loss's gradient at the current score and added to it scaled by ``shrinkage``.
     Each tree is grown on a subsample of the units drawn without replacement, and reads a subsample
@@ -1064,14 +1077,15 @@ def _maxnet_predict(model, x):
 
 
 def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prune="se_sum",
-         n_inner=None, preset="package", seed=1) -> Learner:
+         n_inner=None, preset="package", shrink=1.0, seed=1) -> Learner:
     """One classification or regression tree per variable, over every bin-by-channel column,
-    grown under rpart's rules: the Gini index under a presence-absence head and the sum of squares
-    under a head with a squared-error loss, a split only between two distinct values of a column,
-    and the cost-complexity bookkeeping that keeps a split only where it lowers the risk by at
-    least ``cp`` of the root's. On the same columns, weights and folds the tree is the one rpart
-    grows, split for split, and its complexity table the one rpart reports; the tree is grown by
-    the core the R package calls, so the two languages grow it identically.
+    grown under rpart's rules: the Gini index under a presence-absence head, the sum of squares
+    under a head with a squared-error loss and the Poisson deviance under a count head, a split
+    only between two distinct values of a column, and the cost-complexity bookkeeping that keeps a
+    split only where it lowers the risk by at least ``cp`` of the root's. On the same columns,
+    weights and folds the tree is the one rpart grows, split for split, and its complexity table
+    the one rpart reports; the tree is grown by the core the R package calls, so the two languages
+    grow it identically.
 
     The grown tree is pruned back by an inner cross-validation. Its folds are dealt for each
     response and stratified on it, as the elastic net's are, and ``prune`` names the rule that
@@ -1089,16 +1103,24 @@ def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prun
     folds. A setting given explicitly beats either.
 
     The case weights are the response head's, :func:`~timesift.response.positive_weights` under
-    presence-absence. They weigh every class count and sum of squares the tree is grown on;
-    ``min_split`` and ``min_leaf`` count observations, as rpart's do.
+    presence-absence. They weigh every class count, sum of squares and event count the tree is
+    grown on; ``min_split`` and ``min_leaf`` count observations, as rpart's do.
+
+    Under a count head a leaf predicts a rate, and the rate is shrunk towards the rate of the
+    units the tree is grown on, as rpart's ``method = "poisson"`` shrinks it: the posterior mean
+    of a gamma prior whose coefficient of variation is ``shrink``, ``0`` for none and rpart's
+    default ``1``. A split is chosen on the deviance of the unshrunk rates, and a subtree's risk,
+    its complexity and the pruning's cross-validated error are read on the shrunk ones.
     """
     from ._tree import PRUNE_RULES
     if prune not in PRUNE_RULES:
         raise ValueError(f"`prune` is one of {', '.join(PRUNE_RULES)}, got {prune!r}.")
+    if isinstance(shrink, bool) or not isinstance(shrink, (int, float)) or not shrink >= 0:
+        raise ValueError(f"`shrink` is one number of zero or more, got {shrink!r}.")
     settings = _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner)
     return Learner(name="tree", fit=_tree_fit, predict=_tree_predict, data=data,
                    reads="tabular", multi="separate",
-                   params=dict(settings, prune=prune, seed=int(seed)))
+                   params=dict(settings, prune=prune, shrink=float(shrink), seed=int(seed)))
 
 
 def _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner) -> dict:
@@ -1123,8 +1145,8 @@ def _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner) -> dict:
     return out
 
 
-def _tree_fit(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, seed, head, variables,
-              group=None, **_):
+def _tree_fit(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, shrink, seed, head,
+              variables, group=None, **_):
     from ._tree import tree_fit, tree_prune, tree_prune_cp
     family = _family(head)
     m = flatten(x)
@@ -1134,7 +1156,8 @@ def _tree_fit(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, seed, he
         if prune != "none":
             fold = _inner_folds(yj, n_inner, seed_j, group)
             n_fold = int(fold.max()) + 1
-        grown = tree_fit(design, yj, w, family, min_split, min_leaf, cp, max_depth, fold, n_fold)
+        grown = tree_fit(design, yj, w, family, min_split, min_leaf, cp, max_depth, fold, n_fold,
+                         shrink)
         at = tree_prune_cp(grown, prune)
         return grown if at is None else tree_prune(grown, at)
 
@@ -1152,7 +1175,8 @@ def stepwise(data=None, max_terms=3, degree=2, direction="forward", terms="colum
              threads=1) -> Learner:
     """One generalised linear model per variable, its terms chosen by Akaike's criterion over every
     bin-by-channel column. The family is the response head's: logistic under a binary
-    cross-entropy loss, Gaussian under a squared-error one, and so are the case weights.
+    cross-entropy loss, Gaussian under a squared-error one and Poisson under a Poisson-deviance
+    one, and so are the case weights.
 
     ``terms`` says what one term is. Under ``"column"`` it is a column's orthogonal polynomial of
     degree ``degree``, so a column enters with its curvature at once and can be non-monotone in the
@@ -1271,7 +1295,9 @@ def mars(data=None, degree=1, penalty=None, nk=None, thresh=0.001, minspan=0, en
     least, and keeps the subset of least generalised cross-validation, which charges ``penalty``
     per knot. Under a binary cross-entropy head the kept terms are refitted as a logistic model, as
     earth's ``glm = list(family = binomial)`` refits them, and the prediction is its probability;
-    under a squared-error head they are refitted by least squares.
+    under a count head they are refitted as a Poisson model with a log link, as earth's
+    ``glm = list(family = poisson)`` refits them, and the prediction is its mean count; under a
+    squared-error head they are refitted by least squares.
 
     The defaults are earth's, which biomod2 uses under its default and ``"bigboss"`` option sets
     alike: degree one, ``penalty`` 2 (3 above degree one), ``thresh=0.001``,

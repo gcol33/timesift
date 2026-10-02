@@ -11,7 +11,8 @@
 //
 // Recursive partitioning (Breiman, Friedman, Olshen and Stone 1984): a node is cut at the midpoint
 // between two distinct values of one column, the cut lowering most the Gini index of the weighted
-// class counts under a binomial family or the weighted sum of squares under a Gaussian one. A node
+// class counts under a binomial family, the weighted sum of squares under a Gaussian one or the
+// Poisson deviance of the unshrunk rates under a Poisson one. A node
 // is split only where it holds `min_split` observations and each child keeps `min_leaf`, and a
 // split is kept only where cost-complexity pruning finds it lowers the risk by at least `cp` of
 // the root's. The complexity table carries the cross-validated error of every pruned subtree, with
@@ -27,6 +28,8 @@ struct TreeSpec {
   double cp = 0.01;      // a split is kept where it lowers the risk by at least this share of
                          // the root's
   int max_depth = 30;    // the root is depth 0
+  double shrink = 1.0;   // a Poisson leaf's rate is shrunk towards the response's own rate, by the
+                         // gamma prior of this coefficient of variation; 0 for no shrinkage
 };
 
 // A fitted tree, its nodes depth first, left before right. A node's number is 1 at the root and
@@ -41,9 +44,10 @@ struct Tree {
   std::vector<std::int32_t> right;
   std::vector<std::int32_t> n;           // observations in the node
   std::vector<double> weight;            // their summed case weight
-  std::vector<double> risk;              // weighted misclassification, or weighted sum of squares
+  std::vector<double> risk;              // weighted misclassification, weighted sum of squares, or
+                                         // Poisson deviance
   std::vector<double> complexity;        // on the scale of the root's risk
-  std::vector<double> value;             // the probability of a 1, or the mean
+  std::vector<double> value;             // the probability of a 1, the mean, or the rate
   double root_risk = 0.0;
 
   // The complexity table: one row per distinct complexity, largest first, each on the scale of
@@ -56,7 +60,8 @@ struct Tree {
 };
 
 // Throws Error for an empty design, a non-finite value, a negative weight, and a binomial
-// response other than 0 or 1. `fold` is one 0-based fold index per observation, or null for no
+// response other than 0 or 1, a negative count and a count response without one count above zero.
+// `fold` is one 0-based fold index per observation, or null for no
 // cross-validation.
 Tree tree_fit(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
               Family family, const TreeSpec& spec, const std::int32_t* fold,
@@ -108,8 +113,8 @@ struct Forest {
 };
 
 // Throws Error for an empty design, a non-finite value, a negative weight, a binomial response
-// other than 0 or 1, `mtry` outside 1 to `p`, and `balance` on a Gaussian family or on a response
-// one class of which weighs nothing.
+// other than 0 or 1, a negative count, `mtry` outside 1 to `p`, and `balance` on a Gaussian or a
+// Poisson family or on a response one class of which weighs nothing.
 Forest forest_fit(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
                   Family family, const ForestSpec& spec);
 
@@ -121,8 +126,8 @@ void forest_predict(const Forest& forest, const double* x, std::size_t n, std::s
 // reimplementation of the generator can be checked against this one output for output.
 void forest_stream(std::uint32_t seed, std::uint32_t tree, std::size_t n, std::uint32_t* out);
 
-// Gradient boosted trees. The score starts at the log-odds of the weighted share of ones, or the
-// weighted mean, and each tree is fitted to the loss's gradient at the current score and added to
+// Gradient boosted trees. The score starts at the log-odds of the weighted share of ones, the
+// weighted mean, or the log of the weighted mean count, and each tree is fitted to the loss's gradient at the current score and added to
 // it scaled by `shrinkage`. Each tree is grown on a subsample of the observations drawn without
 // replacement, and reads a subsample of the columns.
 //
@@ -136,7 +141,8 @@ void forest_stream(std::uint32_t seed, std::uint32_t tree, std::size_t n, std::u
 //
 // Where folds are given, the fit is repeated on each fold's complement with the fold held out, and
 // the number of trees kept is the one of least held-out deviance summed over the folds, each
-// fold's weighted by how many observations it holds, as gbm's `cv.folds` chooses it.
+// fold's weighted by how many observations it holds, as gbm's `cv.folds` chooses it. A count
+// response is boosted under the Poisson deviance with the log link.
 struct BoostSpec {
   int trees = 100;
   int depth = 1;
@@ -162,12 +168,13 @@ struct Boosted {
 };
 
 // Throws Error for an empty design, a non-finite value, a negative weight, a binomial response
-// other than 0 or 1 or holding one class alone, and settings outside their range.
+// other than 0 or 1 or holding one class alone, a negative count, and settings outside their range.
 Boosted boost_fit(const double* x, const double* y, const double* w, std::size_t n,
                   std::size_t p, Family family, const BoostSpec& spec, const std::int32_t* fold,
                   std::int32_t n_fold);
 
-// The score of each row, through the logistic function under a binomial family.
+// The score of each row, through the logistic function under a binomial family and the exponential
+// under a Poisson one.
 void boost_predict(const Boosted& model, const double* x, std::size_t n, std::size_t p,
                    double* out);
 

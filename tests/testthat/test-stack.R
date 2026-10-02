@@ -537,3 +537,47 @@ test_that("every combination lands on the numbers the contract pins", {
     }
   }
 })
+
+test_that("the combiner under a count response lands on the numbers the contract pins", {
+  dir <- fixture_dir()
+  skip_if(is.null(dir), "fixtures not found")
+  read <- function(file) {
+    utils::read.csv(file.path(dir, file), stringsAsFactors = FALSE, check.names = FALSE,
+                    na.strings = "NA")
+  }
+  response <- read("ensemble_count_response.csv")
+  y <- matrix(response$y, ncol = 1L, dimnames = list(response$id, "count"))
+  folds <- stats::setNames(response$fold, response$id)
+  cells <- .numeric_cells(y, folds)
+  long <- read("ensemble_count_oof.csv")
+  oof <- lapply(split(long, factor(long$candidate, unique(long$candidate))), function(d) {
+    matrix(d$p[match(response$id, d$id)], ncol = 1L, dimnames = dimnames(y))
+  })
+  score <- .metrics_reg$get("neg_poisson_deviance")
+  scores <- do.call(rbind, lapply(names(oof), function(nm) {
+    out <- .score_arm(nm, nm, y, oof[[nm]], folds, sort(unique(folds)), cells, score)
+    data.frame(candidate = nm, variable = out$variable, fold = out$fold, score = out$score,
+               scorable = out$scorable, stringsAsFactors = FALSE)
+  }))
+  cases <- read("ensemble_count_cases.csv")
+  weights <- read("ensemble_count_weights.csv")
+  expected <- read("ensemble_count_predict.csv")
+  tol <- 1e-9
+  for (i in seq_len(nrow(cases))) {
+    row <- cases[i, ]
+    st <- ensemble_fit(oof, y, cells, folds, ensemble(row$method, scope = row$scope,
+                                                      response = "count"), scores)
+    expect_identical(st$loss, "poisson_deviance", info = row$case)
+    w <- weights[weights$case == row$case, ]
+    expect_identical(names(st$weights), w$member, info = row$case)
+    expect_equal(unname(st$weights), w$weight, tolerance = tol, info = row$case)
+    e <- expected[expected$case == row$case, ]
+    p <- ensemble_combine(st, oof)
+    s <- ensemble_spread(st, oof, alpha = 0.1)
+    expect_equal(unname(p[e$id, 1L]), e$combined, tolerance = tol, info = row$case)
+    for (stat in c("sd", "lower", "upper")) {
+      expect_equal(unname(s[e$id, 1L, stat]), e[[stat]], tolerance = tol,
+                   info = paste(row$case, stat))
+    }
+  }
+})

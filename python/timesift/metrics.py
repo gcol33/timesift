@@ -196,6 +196,14 @@ def _pearson(y, p):
     return float(np.corrcoef(y, p)[0, 1]) if y.std() > 0 and p.std() > 0 else float("nan")
 
 
+def _poisson_deviance(y, p):
+    if (p < 0).any() or ((p == 0) & (y > 0)).any():
+        return float("nan")
+    with np.errstate(divide="ignore", invalid="ignore"):
+        saturated = np.where(y > 0, y * np.log(y / p), 0.0)
+    return float(np.mean(2.0 * (saturated - (y - p))))
+
+
 REGRESSION_METRICS = {
     "r_squared": _r_squared,
     "pearson": _pearson,
@@ -203,6 +211,7 @@ REGRESSION_METRICS = {
     "mse": lambda y, p: float(np.mean((y - p) ** 2)),
     "mae": lambda y, p: float(np.mean(np.abs(y - p))),
     "max_error": lambda y, p: float(np.max(np.abs(y - p))),
+    "poisson_deviance": _poisson_deviance,
 }
 
 
@@ -210,9 +219,11 @@ def regression_metric(y, p, metric: str) -> float:
     """A metric of a numeric response and its predictions, as biomod2 reads an abundance model.
 
     ``metric`` is ``r_squared`` (``1 - sum(e**2) / sum((y - mean(y))**2)``, NaN where ``y`` is
-    constant), ``pearson``, ``rmse``, ``mse``, ``mae`` or ``max_error``. A comparison reads the
-    highest score as the best, so the four errors are registered as ``neg_rmse``, ``neg_mse``,
-    ``neg_mae`` and ``neg_max_error`` with their sign reversed.
+    constant), ``pearson``, ``rmse``, ``mse``, ``mae``, ``max_error`` or ``poisson_deviance``
+    (``mean(2 (y log(y / p) - (y - p)))``, the logarithm taken as zero at ``y = 0``, NaN where a
+    prediction is negative or is zero beside a count above zero). A comparison reads the highest
+    score as the best, so the five errors are registered as ``neg_rmse``, ``neg_mse``,
+    ``neg_mae``, ``neg_max_error`` and ``neg_poisson_deviance`` with their sign reversed.
     """
     if metric not in REGRESSION_METRICS:
         raise ValueError(f"metric must be one of {tuple(REGRESSION_METRICS)}, got {metric!r}")

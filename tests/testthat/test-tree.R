@@ -13,7 +13,8 @@ tree_fixture <- function() {
   held <- c("unit", "y_gaussian", "y_binomial", "w", "fold")
   x <- as.matrix(d[, setdiff(names(d), held), drop = FALSE])
   counts <- utils::read.csv(file.path(dir, "tree_weights.csv"), stringsAsFactors = FALSE)
-  list(x = x, binomial = d$y_binomial, gaussian = d$y_gaussian, fold = d$fold,
+  list(x = x, binomial = d$y_binomial, gaussian = d$y_gaussian,
+       poisson = fixture_counts(dir, d$unit), fold = d$fold,
        count = counts$count[match(d$unit, counts$unit)],
        cases = utils::read.csv(file.path(dir, "tree_cases.csv"), stringsAsFactors = FALSE),
        nodes = utils::read.csv(file.path(dir, "tree_nodes.csv"), stringsAsFactors = FALSE),
@@ -22,10 +23,10 @@ tree_fixture <- function() {
 }
 
 tree_case_fit <- function(fx, row) {
-  y <- if (row$family == "binomial") fx$binomial else fx$gaussian
+  y <- fx[[row$family]]
   w <- if (row$weights == "counts") fx$count else rep(1, nrow(fx$x))
   .tree_fit(fx$x, y, w, row$family, row$min_split, row$min_leaf, row$cp, row$max_depth,
-            fx$fold, 5L)
+            fx$fold, 5L, row$shrink)
 }
 
 test_that("the tree core grows rpart's tree node for node", {
@@ -98,6 +99,10 @@ test_that("the tree core refuses what it cannot grow on", {
   x <- matrix(c(1, 2, 3, 4), ncol = 1L)
   expect_error(.tree_fit(x, c(0, 1, 0, 2), rep(1, 4), "binomial", 2L, 1L, 0, 30L),
                "0 and 1 alone")
+  expect_error(.tree_fit(x, c(0, 1, -2, 2), rep(1, 4), "poisson", 2L, 1L, 0, 30L),
+               "zero or more")
+  expect_error(.tree_fit(x, c(0, 0, 0, 0), rep(1, 4), "poisson", 2L, 1L, 0, 30L),
+               "one count above zero")
   expect_error(.tree_fit(x, c(0, 1, NA, 1), rep(1, 4), "binomial", 2L, 1L, 0, 30L),
                "finite values")
   expect_error(.tree_fit(x, c(0, 1, 0, 1), c(1, -1, 1, 1), "binomial", 2L, 1L, 0, 30L),

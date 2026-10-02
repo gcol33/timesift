@@ -5,10 +5,11 @@
 #' and shrinks, and the penalty itself is chosen by an inner cross-validation on the fitting units,
 #' so nothing about the model is decided outside the fold it is fitted in.
 #'
-#' The family is the response head's: a binary cross-entropy loss fits a logistic model and a
-#' squared-error loss a linear one, so the learner is the same under a presence-absence head and
-#' under a continuous one. So are the case weights: the head's `weights`, [positive_weights()]
-#' for presence-absence, are what every learner that ships fits under.
+#' The family is the response head's: a binary cross-entropy loss fits a logistic model, a
+#' squared-error loss a linear one and a Poisson-deviance loss a log-linear one, so the learner is
+#' the same under a presence-absence head, a continuous one and a count one. So are the case
+#' weights: the head's `weights`, [positive_weights()] for presence-absence, are what every learner
+#' that ships fits under.
 #'
 #' The inner folds are dealt for each response and stratified on it, so a rare outcome is spread
 #' over them as evenly as its count allows. A presence-absence response whose inner training sets
@@ -113,8 +114,8 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
 #'
 #' One generalised linear model per variable, its terms chosen by Akaike's criterion over every
 #' bin-by-channel column. The family is the response head's: logistic under a binary cross-entropy
-#' loss, Gaussian under a squared-error one. So are the case weights, so a rare response weighs here
-#' what it weighs in every other learner.
+#' loss, Gaussian under a squared-error one and Poisson under a Poisson-deviance one. So are the
+#' case weights, so a rare response weighs here what it weighs in every other learner.
 #'
 #' `terms` says what one term is. Under `"column"` it is a column's orthogonal polynomial of degree
 #' `degree`, so a column enters with its curvature at once and can be non-monotone in the reading

@@ -379,7 +379,8 @@ def numeric_cells(y: Response, folds) -> Cells:
                  scorable=(a_train >= 2) & (a_test >= 2))
 
 
-def _numeric_head(check, metric: str) -> dict:
+def _numeric_head(check, metric: str, activation: str = "identity",
+                  loss: str = "squared_error") -> dict:
     def prepare(y):
         y = as_response(y)
         if not np.isfinite(y.values).all():
@@ -387,7 +388,7 @@ def _numeric_head(check, metric: str) -> dict:
         check(y.values)
         return y
 
-    return dict(prepare=prepare, activation="identity", loss="squared_error", metric=metric,
+    return dict(prepare=prepare, activation=activation, loss=loss, metric=metric,
                 cells=numeric_cells)
 
 
@@ -401,11 +402,20 @@ def _check_ordinal(v):
         raise ValueError("an ordinal response holds whole-number classes")
 
 
-# The heads for a numeric response. All three are fitted under squared error through an identity
-# output; they differ in what the response may hold and in the metric a comparison reads.
+def _check_count(v):
+    if (v < 0).any() or (v != np.round(v)).any():
+        raise ValueError("a count response holds whole numbers of zero or more")
+
+
+# The heads for a numeric response. The continuous, abundance and ordinal ones are fitted under
+# squared error through an identity output, and differ in what the response may hold and in the
+# metric a comparison reads. The count head is fitted under the Poisson deviance through an
+# exponential output, and is read by the same deviance.
 CONTINUOUS = _numeric_head(lambda v: None, "r_squared")
 ABUNDANCE = _numeric_head(_check_abundance, "r_squared")
 ORDINAL = _numeric_head(_check_ordinal, "ordinal_f1")
+COUNT = _numeric_head(_check_count, "neg_poisson_deviance", activation="exp",
+                      loss="poisson_deviance")
 
 
 def positive_weights(y, cap: float = 50.0, fitting=None) -> np.ndarray:

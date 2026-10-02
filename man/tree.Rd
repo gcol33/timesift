@@ -13,6 +13,7 @@ tree(
   prune = c("se_sum", "one_se", "min", "none"),
   n_inner = NULL,
   preset = c("package", "bigboss"),
+  shrink = 1,
   seed = 1L
 )
 }
@@ -34,6 +35,9 @@ representation of the run.}
 
 \item{preset}{Whose defaults the settings left \code{NULL} take: \code{"package"} or \code{"bigboss"}.}
 
+\item{shrink}{Under a count head, the coefficient of variation of the gamma prior a leaf's rate
+is shrunk by; \code{0} for no shrinkage. rpart's default is \code{1}.}
+
 \item{seed}{Seed for the inner cross-validation's fold draw.}
 }
 \value{
@@ -41,8 +45,9 @@ A \code{\link[=learner]{learner()}}.
 }
 \description{
 One tree per response, over every bin-by-channel column of the representation, grown under
-rpart's rules: the Gini index under a presence-absence head and the sum of squares under a head
-with a squared-error loss, a split only between two distinct values of a column, and the
+rpart's rules: the Gini index under a presence-absence head, the sum of squares under a head
+with a squared-error loss and the Poisson deviance under a count head, a split only between two
+distinct values of a column, and the
 cost-complexity bookkeeping that keeps a split only where it lowers the risk by at least \code{cp} of
 the root's. On the same columns, weights and folds the tree is the one rpart grows, split for
 split, and its complexity table the one rpart reports; the tree is grown by the core the Python
@@ -64,8 +69,14 @@ and ten inner folds. \code{"bigboss"} is biomod2's tuned option set: \code{min_s
 \code{cp = 0.001}, \code{max_depth = 10} and five inner folds. A setting given explicitly beats either.
 
 The case weights are the response head's, \code{\link[=positive_weights]{positive_weights()}} under presence-absence. They
-weigh every class count and sum of squares the tree is grown on; \code{min_split} and \code{min_leaf}
-count observations, as rpart's do.
+weigh every class count, sum of squares and event count the tree is grown on; \code{min_split} and
+\code{min_leaf} count observations, as rpart's do.
+
+Under a count head a leaf predicts a rate, and the rate is shrunk towards the rate of the units
+the tree is grown on, as rpart's \code{method = "poisson"} shrinks it: the posterior mean of a gamma
+prior whose coefficient of variation is \code{shrink}. A split is chosen on the deviance of the
+unshrunk rates, and a subtree's risk, its complexity and the pruning's cross-validated error are
+read on the shrunk ones.
 }
 \examples{
 tree()

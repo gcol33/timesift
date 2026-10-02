@@ -12,7 +12,8 @@ forest_fixture <- function() {
   held <- c("unit", "y_gaussian", "y_binomial", "w", "fold")
   counts <- utils::read.csv(file.path(dir, "tree_weights.csv"), stringsAsFactors = FALSE)
   list(x = as.matrix(d[, setdiff(names(d), held), drop = FALSE]), binomial = d$y_binomial,
-       gaussian = d$y_gaussian, count = counts$count[match(d$unit, counts$unit)],
+       gaussian = d$y_gaussian, poisson = fixture_counts(dir, d$unit),
+       count = counts$count[match(d$unit, counts$unit)],
        cases = utils::read.csv(file.path(dir, "forest_cases.csv"), stringsAsFactors = FALSE,
                                colClasses = c(seed = "numeric")),
        nodes = utils::read.csv(file.path(dir, "forest_nodes.csv"), stringsAsFactors = FALSE,
@@ -24,7 +25,7 @@ forest_fixture <- function() {
 }
 
 forest_case_fit <- function(fx, row) {
-  y <- if (row$family == "binomial") fx$binomial else fx$gaussian
+  y <- fx[[row$family]]
   w <- if (row$weights == "counts") fx$count else rep(1, nrow(fx$x))
   .forest_fit(fx$x, y, w, row$family, row$trees, row$mtry, row$min_leaf, row$balance == 1L,
               row$seed)
@@ -126,6 +127,8 @@ test_that("the forest core refuses what it cannot grow on", {
                "between 1 and the 1 columns")
   expect_error(.forest_fit(x, c(0, 1, 0, 1), rep(0, 4), "binomial", 2L, 1L, 1L, FALSE, 1),
                "sum to more than zero")
+  expect_error(.forest_fit(x, c(0, 1, -2, 1), rep(1, 4), "poisson", 2L, 1L, 1L, FALSE, 1),
+               "zero or more")
   fit <- .forest_fit(x, c(0, 0, 1, 1), rep(1, 4), "binomial", 2L, 1L, 1L, FALSE, 1)
   expect_error(.forest_predict(fit, matrix(NA_real_, 1L, 1L)), "finite values")
 })

@@ -26,8 +26,9 @@
 // The coefficients at given smoothing parameters are the penalised likelihood's maximum, by
 // penalised iteratively reweighted least squares (Wood 2017, Generalized Additive Models, 2nd ed.,
 // sec. 6.1) over a Householder QR of the weighted design stacked on the root of the penalty. The
-// smoothing parameters minimise the unbiased risk estimator under the binomial family and the
-// generalised cross-validation score under the Gaussian one (Wood 2008, Journal of the Royal
+// smoothing parameters minimise the unbiased risk estimator under the binomial and the Poisson
+// family, whose scale is known, and the generalised cross-validation score under the Gaussian one
+// (Wood 2008, Journal of the Royal
 // Statistical Society B 70:495-518), by Newton's method on their logarithms with the exact
 // gradient and Hessian, each obtained by differentiating the penalised likelihood's score
 // equations implicitly. That is mgcv's `gam(method = "GCV.Cp")` with `s(x)` per column, which is
@@ -88,7 +89,8 @@ struct Additive {
 };
 
 // `x` [n, p] column-major; `y` and `w` [n, r] column-major, one response and its positive case
-// weights per column, the response zero and one under the binomial family.
+// weights per column, the response zero and one under the binomial family and a count under the
+// Poisson one.
 Additive additive_fit(const double* x, std::size_t n, std::size_t p, const double* y,
                       const double* w, std::size_t r, const AdditiveSpec& spec);
 

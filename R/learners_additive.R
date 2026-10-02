@@ -10,12 +10,13 @@
 #'
 #' The coefficients maximise the penalised likelihood, by penalised iteratively reweighted least
 #' squares, and the smoothing parameters, one per column, minimise the unbiased risk estimator
-#' under presence-absence and the generalised cross-validation score under a squared-error head, by
-#' Newton's method with the exact derivatives (Wood 2008). `gamma` multiplies the charge each
-#' effective degree of freedom adds to that criterion, as mgcv's `gamma` does; above one it gives
-#' smoother fits. Over columns as alike as neighbouring weeks the criterion can have more than one
-#' local minimum; the one the search settles in then depends on where it starts, and mgcv, starting
-#' from a rule of its own parametrisation, can settle in another.
+#' under presence-absence and a count head and the generalised cross-validation score under a
+#' squared-error head, by Newton's method with the exact derivatives (Wood 2008). `gamma`
+#' multiplies the charge each effective degree of freedom adds to that criterion, as mgcv's `gamma`
+#' does; above one it gives smoother fits. Over columns as alike as neighbouring weeks the
+#' criterion can have more than one local minimum; the one the search settles in then depends on
+#' where it starts, and mgcv, starting from a rule of its own parametrisation, can settle in
+#' another.
 #'
 #' The defaults are mgcv's, which biomod2 passes unchanged: `k = 10` and a criterion charge of one.
 #' Above `max_knots` distinct values, the radial functions are centred on that many of them, drawn

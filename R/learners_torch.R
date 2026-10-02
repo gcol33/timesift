@@ -25,7 +25,8 @@
 #' control for this learner alone. What the head is trained toward is the response head's: its
 #' `loss` is the training objective and its `activation` the output transform, so a head registered
 #' with a squared-error loss and an identity activation trains the same encoders on a continuous
-#' response.
+#' response, and one with a Poisson-deviance loss and an exponential activation trains them on a
+#' count.
 #'
 #' Every channel is standardised by its own centre and scale, computed over every unit and bin of
 #' the fitting units, so a static predictor appended as a channel sits on the same footing as a
@@ -131,12 +132,18 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   },
   squared_error = function(torch) {
     function(out, target, weight) (weight * (out - target)$pow(2))$mean()
+  },
+  poisson_deviance = function(torch) {
+    function(out, target, weight) {
+      (weight * torch$nnf_poisson_nll_loss(out, target, log_input = TRUE, reduction = "none"))$mean()
+    }
   }
 )
 
 .torch_activations <- list(
   sigmoid = function(torch, out) torch$torch_sigmoid(out),
-  identity = function(torch, out) out
+  identity = function(torch, out) out,
+  exp = function(torch, out) torch$torch_exp(out)
 )
 
 .torch_objective <- function(head) {

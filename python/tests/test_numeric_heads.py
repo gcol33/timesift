@@ -5,7 +5,8 @@ import pytest
 
 import timesift as ts
 from timesift import (boosting, discriminant, elasticnet, ensemble, envelope, fit_learner, forest,
-                      grains, mars, maxnet, ordinal_metric, regression_metric, timesift, tree)
+                      grains, mars, maxnet, ordinal_metric, regression_metric, stepwise, timesift,
+                      tree)
 from timesift.registry import RESPONSES
 from timesift.representation import grain_matrix
 from timesift.response import Folds, Response, fold_map, numeric_cells
@@ -26,10 +27,10 @@ def numeric_data(n=50, seed=5):
 
 
 def test_the_heads_and_metrics_of_a_numeric_response_are_registered():
-    assert {"continuous", "abundance", "ordinal"} <= set(ts.responses())
+    assert {"continuous", "abundance", "ordinal", "count"} <= set(ts.responses())
     assert {"r_squared", "pearson", "neg_rmse", "neg_mse", "neg_mae", "neg_max_error",
-            "ordinal_accuracy", "ordinal_recall", "ordinal_precision", "ordinal_f1"} <= set(
-                ts.metrics())
+            "neg_poisson_deviance", "ordinal_accuracy", "ordinal_recall", "ordinal_precision",
+            "ordinal_f1"} <= set(ts.metrics())
     for h, metric in (("continuous", "r_squared"), ("abundance", "r_squared"),
                       ("ordinal", "ordinal_f1")):
         head = RESPONSES.get(h)
@@ -122,3 +123,106 @@ def test_the_learners_that_need_presences_and_absences_refuse_a_numeric_head():
     for learner in (elasticnet(), forest(trees=20), boosting(trees=20), tree(), mars()):
         fit = fit_learner(learner, x, y, response="continuous")
         assert np.corrcoef(fit.predict(x)[:, 0], height)[0, 1] > 0.8, learner.name
+
+
+# ---- a count response ------------------------------------------------------------------------
+
+def count_data(n=80, seed=5):
+    rng = np.random.default_rng(seed)
+    t = np.datetime64("2021-09-01T00:00:00", "s") + np.arange(24 * 90) * np.timedelta64(1, "h")
+    units = [f"p{i:02d}" for i in range(n)]
+    warmth = rng.normal(size=n)
+    value = np.concatenate([w + rng.normal(0, 0.5, len(t)) for w in warmth])
+    readings = {"plot": [u for u in units for _ in range(len(t))], "time": list(t) * n,
+                "value": list(value)}
+    x = grain_matrix({"id": readings["plot"], "time": readings["time"], "value": readings["value"]},
+                     "id", "time", "value", grain="week")
+    rate = np.exp(0.8 + 0.7 * warmth)
+    count = rng.poisson(rate).astype(float)
+    return x, readings, units, rate, count, Response(count[:, None], tuple(units), ("count",))
+
+
+def poisson_deviance_of(y, p):
+    y, p = np.asarray(y, dtype=float), np.asarray(p, dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        saturated = np.where(y > 0, y * np.log(y / p), 0.0)
+    return float(np.mean(2 * (saturated - (y - p))))
+
+
+def test_the_count_head_names_the_poisson_deviance_and_an_exponential_output():
+    head = RESPONSES.get("count")
+    assert head["loss"] == "poisson_deviance" and head["activation"] == "exp"
+    assert head["metric"] == "neg_poisson_deviance"
+
+
+def test_the_poisson_deviance_reads_counts_and_refuses_a_mean_outside_its_support():
+    y = [0, 1, 2, 5, 3, 0]
+    p = [0.5, 1.2, 1.8, 4.2, 3.5, 0.2]
+    assert regression_metric(y, p, "poisson_deviance") == pytest.approx(poisson_deviance_of(y, p))
+    assert regression_metric([1, 2, 3], [1, 2, 3], "poisson_deviance") == pytest.approx(0)
+    assert regression_metric([0, 2], [0, 2], "poisson_deviance") == pytest.approx(0)
+    assert np.isfinite(regression_metric([0, 0, 2, 1], [0, 0.4, 1.5, 1.5], "poisson_deviance"))
+    assert np.isnan(regression_metric([0, 0, 2, 1], [0, 0.4, 0, 1.5], "poisson_deviance"))
+    assert np.isnan(regression_metric([1, 2], [1, -1], "poisson_deviance"))
+    assert (ts.resolve_metric("neg_poisson_deviance")[0](y, p)
+            == pytest.approx(-poisson_deviance_of(y, p)))
+
+
+def test_the_count_head_refuses_a_response_it_cannot_hold():
+    def with_values(v):
+        return Response(np.asarray(v, dtype=float), ("a", "b", "c"), ("a",))
+
+    prepare = RESPONSES.get("count")["prepare"]
+    with pytest.raises(ValueError, match="whole numbers of zero or more"):
+        prepare(with_values([[1.0], [-2.0], [3.0]]))
+    with pytest.raises(ValueError, match="whole numbers of zero or more"):
+        prepare(with_values([[1.0], [2.5], [3.0]]))
+    with pytest.raises(ValueError, match="finite"):
+        prepare(with_values([[1.0], [np.nan], [3.0]]))
+    assert prepare(with_values([[0.0], [1.0], [7.0]])).values.ravel().tolist() == [0.0, 1.0, 7.0]
+
+
+def test_each_learner_that_fits_a_family_fits_a_count_under_the_poisson_one():
+    x, _, _, rate, count, y = count_data()
+    for learner in (elasticnet(), forest(trees=30), boosting(trees=30),
+                    boosting(trees=30, newton=True, depth=2), tree(), stepwise(), mars(),
+                    ts.additive(k=5)):
+        fit = fit_learner(learner, x, y, response="count")
+        p = fit.predict(x)[:, 0]
+        assert (p > 0).all(), learner.name
+        assert np.corrcoef(p, rate)[0, 1] > 0.5, learner.name
+        assert poisson_deviance_of(count, p) < poisson_deviance_of(count, np.full(len(p), count.mean()))
+    assert fit_learner(elasticnet(), x, y, response="count").model["models"][0]["family"] == "poisson"
+
+
+def test_the_learners_that_need_presences_and_absences_refuse_a_count_head():
+    x, _, _, _, _, y = count_data(n=40)
+    for learner in (discriminant(), envelope(), maxnet()):
+        with pytest.raises(ValueError, match="poisson_deviance"):
+            fit_learner(learner, x, y, response="count")
+
+
+def test_a_poisson_shrinkage_reaches_the_tree_only_through_a_count_head():
+    x, _, _, _, _, y = count_data(n=60)
+    tight = fit_learner(tree(shrink=0), x, y, response="count").predict(x)
+    loose = fit_learner(tree(shrink=1), x, y, response="count").predict(x)
+    assert not np.allclose(tight, loose)
+    with pytest.raises(ValueError, match="zero or more"):
+        tree(shrink=-1)
+
+
+def test_a_run_under_the_count_head_is_scored_by_the_poisson_deviance_and_stacked():
+    x, readings, units, rate, count, y = count_data()
+    targets = {"plot": units, "count": count.tolist()}
+    run = timesift(targets, readings, y="count", id="plot", time="time", x="value",
+                   response="count",
+                   models=[elasticnet(squares=False), forest(trees=30)], sift=grains("week"),
+                   resampling=fold_map(y, v=4, seed=2), inner=None, ensemble=ensemble("stack"),
+                   verbose=False)
+    assert run.metric == "neg_poisson_deviance"
+    scored = np.asarray(run.scores["score"], dtype=float)[np.asarray(run.scores["scorable"])]
+    assert np.isfinite(scored).all() and (scored < 0).all()
+    assert run.stack.loss == "poisson_deviance"
+    assert sum(run.stack.weights.values()) == pytest.approx(1.0)
+    p = run.predict(targets, readings)
+    assert (p > 0).all() and np.corrcoef(p[:, 0], rate)[0, 1] > 0.5

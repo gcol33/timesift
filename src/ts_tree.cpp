@@ -93,11 +93,32 @@ void sort_keyed(Keyed* a, int n) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// A node's prediction and the two impurities (Breiman et al. 1984, sections 4.3 and 8.3)
+// A node's prediction and the three impurities (Breiman et al. 1984, sections 4.3 and 8.3; for
+// counts, Therneau and Atkinson's "An introduction to recursive partitioning using the RPART
+// routines", on the Poisson deviance)
+
+// What a node is cut on and what it predicts. Two classes are cut on the Gini index and a node
+// predicts the share of ones; a continuous response is cut on the weighted sum of squares and a
+// node predicts its mean; a count is cut on the Poisson deviance and a node predicts a rate. A
+// leaf's rate is shrunk towards the rate of the units the tree is grown on, the posterior mean of a
+// gamma prior of coefficient of variation `shrink` centred on it: with `a = 1 / shrink^2` and
+// `b = a / rate`, a node holding events `S` over exposure `W` predicts `(S + a) / (W + b)`. No
+// shrinkage, `a = b = 0`, predicts `S / W`. The tree grown on a cross-validation fold's units
+// takes its prior from those units.
+struct Criterion {
+  enum class Kind { classify, squares, count };
+  Kind kind = Kind::squares;
+  double prior_shape = 0.0;
+  double prior_rate = 0.0;
+
+  bool classify() const { return kind == Kind::classify; }
+  bool count() const { return kind == Kind::count; }
+};
 
 // What a node predicts and its risk on its own observations. Between two classes that is the weight
 // of each, the class of the larger (class 0 on a tie) and the weight the other class puts on it;
-// for a mean it is the weighted mean and the weighted sum of squares about it.
+// for a mean it is the weighted mean and the weighted sum of squares about it; for a count it is the
+// shrunk rate and the Poisson deviance of the node's observations about it.
 struct Fit {
   double risk = 0.0;
   double mean = 0.0;
@@ -106,9 +127,27 @@ struct Fit {
   int label = 0;
 };
 
-Fit summarise(const double* y, const double* w, int n, bool classify) {
+// Twice the Poisson log likelihood's shortfall from the saturated model at one observation of
+// weight `w`: `2 w (y log(y / rate) - (y - rate))`, the logarithm taken as zero at `y = 0`.
+double count_deviance(double y, double w, double rate) {
+  const double saturated = y > 0.0 ? y * std::log(y / rate) : 0.0;
+  return 2.0 * w * (saturated - (y - rate));
+}
+
+Fit summarise(const double* y, const double* w, int n, const Criterion& criterion) {
   Fit fit;
-  if (classify) {
+  if (criterion.count()) {
+    double events = 0.0;
+    double exposure = 0.0;
+    for (int i = 0; i < n; ++i) {
+      events += y[i] * w[i];
+      exposure += w[i];
+    }
+    fit.mean = (events + criterion.prior_shape) / (exposure + criterion.prior_rate);
+    for (int i = 0; i < n; ++i) fit.risk += count_deviance(y[i], w[i], fit.mean);
+    return fit;
+  }
+  if (criterion.classify()) {
     for (int i = 0; i < n; ++i) {
       if (y[i] == 0.0) {
         fit.weight0 += w[i];
@@ -134,16 +173,18 @@ Fit summarise(const double* y, const double* w, int n, bool classify) {
   return fit;
 }
 
-// The value a node reports: the weighted share of ones, or the mean.
-double reported(const Fit& fit, bool classify) {
-  if (!classify) return fit.mean;
+// The value a node reports: the weighted share of ones, the mean, or the rate.
+double reported(const Fit& fit, const Criterion& criterion) {
+  if (!criterion.classify()) return fit.mean;
   const double total = fit.weight0 + fit.weight1;
   return total > 0 ? fit.weight1 / total : 0.0;
 }
 
-// The loss of the node's prediction on one observation: a misclassification, or the squared error.
-double loss_at(const Fit& fit, double y, bool classify) {
-  if (classify) return static_cast<int>(y) == fit.label ? 0.0 : 1.0;
+// The loss of the node's prediction on one observation: a misclassification, the squared error, or
+// the Poisson deviance.
+double loss_at(const Fit& fit, double y, const Criterion& criterion) {
+  if (criterion.classify()) return static_cast<int>(y) == fit.label ? 0.0 : 1.0;
+  if (criterion.count()) return count_deviance(y, 1.0, fit.mean);
   const double d = y - fit.mean;
   return d * d;
 }
@@ -267,9 +308,65 @@ Cut scan_squares(const double* x, const double* y, const double* w, int n, int e
   return cut;
 }
 
-Cut best_cut(const double* x, const double* y, const double* w, int n, int edge, bool classify,
-             double risk) {
-  return classify ? scan_gini(x, y, w, n, edge) : scan_squares(x, y, w, n, edge, risk);
+// `s log(s / t)` of a node holding events `s` over exposure `t`, which is zero for a node without
+// events.
+double event_term(double s, double t) { return s > 0.0 ? s * std::log(s / t) : 0.0; }
+
+// The same scan under the Poisson deviance of the unshrunk rates. A node's deviance is
+// `2 (sum y log y - S log(S / W))`, so the reduction a cut makes is
+// `2 (S_l log(S_l / W_l) + S_r log(S_r / W_r) - S log(S / W))`; the gain is that reduction as a
+// share of the parent's risk `risk`, and the values below the cut go to the side of the lower rate.
+Cut scan_counts(const double* x, const double* y, const double* w, int n, int edge,
+                double risk) {
+  double right_events = 0.0;
+  double right_weight = 0.0;
+  for (int i = 0; i < n; ++i) {
+    right_events += y[i] * w[i];
+    right_weight += w[i];
+  }
+  const double whole = event_term(right_events, right_weight);
+  double left_events = 0.0;
+  double left_weight = 0.0;
+  int left_count = 0;
+  int right_count = n;
+
+  double largest = 0.0;
+  int after = 0;
+  bool below_left = true;
+  for (int i = 0; right_count > edge; ++i) {
+    left_weight += w[i];
+    right_weight -= w[i];
+    ++left_count;
+    --right_count;
+    const double moved = y[i] * w[i];
+    left_events += moved;
+    right_events -= moved;
+    if (x[i + 1] == x[i] || left_count < edge) continue;
+    const double reduction = 2.0 * (event_term(left_events, left_weight) +
+                                    event_term(right_events, right_weight) - whole);
+    if (reduction > largest) {
+      largest = reduction;
+      after = i;
+      below_left = left_events * right_weight < right_events * left_weight;
+    }
+  }
+  Cut cut;
+  cut.gain = risk > 0.0 ? largest / risk : 0.0;
+  if (cut.gain > 0) {
+    cut.below_left = below_left;
+    cut.threshold = (x[after] + x[after + 1]) / 2;
+  }
+  return cut;
+}
+
+Cut best_cut(const double* x, const double* y, const double* w, int n, int edge,
+             const Criterion& criterion, double risk) {
+  switch (criterion.kind) {
+    case Criterion::Kind::classify: return scan_gini(x, y, w, n, edge);
+    case Criterion::Kind::count: return scan_counts(x, y, w, n, edge, risk);
+    case Criterion::Kind::squares: break;
+  }
+  return scan_squares(x, y, w, n, edge, risk);
 }
 
 // Whether a gain is a real one rather than rounding: above 1e-10 of the largest gain seen so far,
@@ -348,9 +445,9 @@ struct CpRow {
 class CartBuilder {
  public:
   CartBuilder(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
-              bool classify, const TreeSpec& spec)
+              const Criterion& criterion, const TreeSpec& spec)
       : x_(x), y_(y), w_(w), n_(static_cast<int>(n)), p_(static_cast<int>(p)),
-        classify_(classify), min_split_(spec.min_split), min_leaf_(spec.min_leaf),
+        criterion_(criterion), min_split_(spec.min_split), min_leaf_(spec.min_leaf),
         deepest_((1LL << spec.max_depth) - 1), cp_share_(spec.cp), order_(n * p), goes_left_(n),
         spill_(n), column_x_(n), column_y_(n), column_w_(n), node_y_(n), node_w_(n) {
     std::vector<Keyed> keyed(n);
@@ -371,7 +468,7 @@ class CartBuilder {
     auto root = std::make_unique<CartNode>();
     double total = 0.0;
     for (int r = 0; r < n_; ++r) total += w_[r];
-    root->fit = summarise(y_, w_, n_, classify_);
+    root->fit = summarise(y_, w_, n_, criterion_);
     root->count = n_;
     root->weight = total;
     root->cp = root->fit.risk;
@@ -416,7 +513,7 @@ class CartBuilder {
         node_w_[i - begin] = w_[r];
         total += w_[r];
       }
-      node.fit = summarise(node_y_.data(), node_w_.data(), end - begin, classify_);
+      node.fit = summarise(node_y_.data(), node_w_.data(), end - begin, criterion_);
       node.count = end - begin;
       node.weight = total;
       bound = std::min(node.fit.risk, node.cp);
@@ -481,7 +578,7 @@ class CartBuilder {
       if (k == 0 || column_x_[0] == column_x_[k - 1]) continue;
       choice.offer(floor_, v,
                    best_cut(column_x_.data(), column_y_.data(), column_w_.data(), k, min_leaf_,
-                            classify_, risk));
+                            criterion_, risk));
     }
     return choice.rule();
   }
@@ -565,6 +662,7 @@ class CartBuilder {
   // and each held-out observation's loss read at the geometric midpoint of every row's interval.
   void cross_validate(const std::int32_t* fold, int n_fold, std::vector<CpRow>& table) {
     const double alpha_whole = alpha_;
+    const Criterion criterion_whole = criterion_;
     const std::size_t rows = table.size();
     std::vector<double> probe(rows);
     probe[0] = 10 * table[0].cp;
@@ -596,6 +694,11 @@ class CartBuilder {
         weight += w_[r];
         ++kept;
       }
+      if (criterion_.count() && criterion_.prior_shape > 0.0) {
+        double events = 0.0;
+        for (int i = 0; i < kept; ++i) events += node_y_[i] * node_w_[i];
+        criterion_.prior_rate = events > 0.0 ? criterion_.prior_shape * weight / events : 0.0;
+      }
       const double shrink = weight / previous;
       for (double& c : probe) c *= shrink;
       alpha_ *= shrink;
@@ -603,7 +706,7 @@ class CartBuilder {
 
       CartNode root;
       root.count = kept;
-      root.fit = summarise(node_y_.data(), node_w_.data(), kept, classify_);
+      root.fit = summarise(node_y_.data(), node_w_.data(), kept, criterion_);
       root.cp = root.fit.risk;
       grow(root, 1, 0, kept);
       cap_complexity(root, root.cp);
@@ -615,7 +718,7 @@ class CartBuilder {
             const double v = x_[r + static_cast<std::size_t>(at->rule.column) * n_];
             at = at->rule.sends_left(v) ? at->left.get() : at->right.get();
           }
-          const double loss = loss_at(at->fit, y_[r], classify_);
+          const double loss = loss_at(at->fit, y_[r], criterion_);
           table[c].xrisk += loss * w_[r];
           table[c].xstd += loss * loss * w_[r];
         }
@@ -623,6 +726,7 @@ class CartBuilder {
     }
     for (CpRow& row : table) row.xstd = std::sqrt(row.xstd - row.xrisk * row.xrisk / total);
     alpha_ = alpha_whole;
+    criterion_ = criterion_whole;
   }
 
   const double* x_;
@@ -630,7 +734,7 @@ class CartBuilder {
   const double* w_;
   int n_;
   int p_;
-  bool classify_;
+  Criterion criterion_;
   int min_split_;
   int min_leaf_;
   long long deepest_;
@@ -650,8 +754,8 @@ class CartBuilder {
 
 // Writes the node and, where it keeps its split, its subtree into `out`, depth first and left
 // before right.
-void write_node(const CartNode& node, long long id, double scale, double alpha, bool classify,
-                Tree& out) {
+void write_node(const CartNode& node, long long id, double scale, double alpha,
+                const Criterion& criterion, Tree& out) {
   const std::size_t at = out.number.size();
   const bool split = node.left && node.cp > alpha;
   out.number.push_back(static_cast<std::int32_t>(id));
@@ -659,7 +763,7 @@ void write_node(const CartNode& node, long long id, double scale, double alpha, 
   out.weight.push_back(node.weight);
   out.risk.push_back(node.fit.risk);
   out.complexity.push_back(node.cp * scale);
-  out.value.push_back(reported(node.fit, classify));
+  out.value.push_back(reported(node.fit, criterion));
   out.column.push_back(split ? node.rule.column : -1);
   out.threshold.push_back(split ? node.rule.threshold : 0.0);
   out.less_left.push_back(split && node.rule.below_left ? 1 : 0);
@@ -667,9 +771,9 @@ void write_node(const CartNode& node, long long id, double scale, double alpha, 
   out.right.push_back(-1);
   if (!split) return;
   out.left[at] = static_cast<std::int32_t>(out.number.size());
-  write_node(*node.left, 2 * id, scale, alpha, classify, out);
+  write_node(*node.left, 2 * id, scale, alpha, criterion, out);
   out.right[at] = static_cast<std::int32_t>(out.number.size());
-  write_node(*node.right, 2 * id + 1, scale, alpha, classify, out);
+  write_node(*node.right, 2 * id + 1, scale, alpha, criterion, out);
 }
 
 // Copies node `i` of `from` into `out`, and its subtree where its complexity lies above `cp`.
@@ -730,9 +834,9 @@ struct Bootstrap {
 // at a node is sorted afresh, ties kept in the node's order, and every drawn row weighs one.
 class ForestTree {
  public:
-  ForestTree(const double* x, const double* y, std::size_t n, std::size_t p, bool classify,
-             const ForestSpec& spec)
-      : x_(x), y_(y), n_(n), p_(p), classify_(classify), min_leaf_(spec.min_leaf),
+  ForestTree(const double* x, const double* y, std::size_t n, std::size_t p,
+             const Criterion& criterion, const ForestSpec& spec)
+      : x_(x), y_(y), n_(n), p_(p), criterion_(criterion), min_leaf_(spec.min_leaf),
         mtry_(static_cast<std::size_t>(spec.mtry)) {}
 
   detail::Nodes grow(const Bootstrap& boot, std::uint32_t seed, std::uint32_t tree) {
@@ -770,8 +874,8 @@ class ForestTree {
         ys[i] = y_[held[i]];
         pure = pure && ys[i] == ys[0];
       }
-      const Fit fit = summarise(ys.data(), ones.data(), k, classify_);
-      out.add_leaf(reported(fit, classify_));
+      const Fit fit = summarise(ys.data(), ones.data(), k, criterion_);
+      out.add_leaf(reported(fit, criterion_));
       if (k < 2 * min_leaf_ || pure) continue;
 
       // The node's columns, drawn from an arrangement of the column indices the tree keeps from
@@ -783,7 +887,7 @@ class ForestTree {
         if (sorted.x[0] == sorted.x[k - 1]) continue;
         choice.offer(floor, v,
                      best_cut(sorted.x.data(), sorted.y.data(), ones.data(), k, min_leaf_,
-                              classify_, fit.risk));
+                              criterion_, fit.risk));
       }
       if (!choice.rule()) continue;
       const Rule rule = *choice.rule();
@@ -846,7 +950,7 @@ class ForestTree {
   const double* y_;
   std::size_t n_;
   std::size_t p_;
-  bool classify_;
+  Criterion criterion_;
   int min_leaf_;
   std::size_t mtry_;
 };
@@ -874,8 +978,12 @@ Tree tree_fit(const double* x, const double* y, const double* w, std::size_t n, 
     if (family == Family::binomial && y[i] != 0.0 && y[i] != 1.0) {
       throw Error("a tree on a binomial response reads 0 and 1 alone.");
     }
+    if (family == Family::poisson && y[i] < 0.0) {
+      throw Error("a tree on a count response reads values of zero or more.");
+    }
   }
   if (!(total > 0)) throw Error("a tree's case weights sum to more than zero.");
+  if (!(spec.shrink >= 0.0)) throw Error("a tree's `shrink` is zero or more.");
   const bool cross = fold != nullptr && n_fold > 1;
   if (cross) {
     for (std::size_t i = 0; i < n; ++i) {
@@ -885,8 +993,20 @@ Tree tree_fit(const double* x, const double* y, const double* w, std::size_t n, 
     }
   }
 
-  const bool classify = family == Family::binomial;
-  CartBuilder builder(x, y, w, n, p, classify, spec);
+  Criterion criterion;
+  if (family == Family::binomial) {
+    criterion.kind = Criterion::Kind::classify;
+  } else if (family == Family::poisson) {
+    criterion.kind = Criterion::Kind::count;
+    double events = 0.0;
+    for (std::size_t i = 0; i < n; ++i) events += y[i] * w[i];
+    if (!(events > 0.0)) throw Error("a tree on a count response needs one count above zero.");
+    if (spec.shrink > 0.0) {
+      criterion.prior_shape = 1.0 / (spec.shrink * spec.shrink);
+      criterion.prior_rate = criterion.prior_shape * total / events;
+    }
+  }
+  CartBuilder builder(x, y, w, n, p, criterion, spec);
   std::vector<CpRow> table;
   const std::unique_ptr<CartNode> root = builder.build(fold, cross ? n_fold : 0, table);
 
@@ -894,7 +1014,7 @@ Tree tree_fit(const double* x, const double* y, const double* w, std::size_t n, 
   out.family = family;
   out.root_risk = root->fit.risk;
   const double scale = root->fit.risk > 0 ? 1 / root->fit.risk : 1.0;
-  write_node(*root, 1, scale, builder.alpha(), classify, out);
+  write_node(*root, 1, scale, builder.alpha(), criterion, out);
   const bool validated = cross && root->left != nullptr;
   for (const CpRow& row : table) {
     out.cp.push_back(row.cp * scale);
@@ -942,7 +1062,16 @@ Forest forest_fit(const double* x, const double* y, const double* w, std::size_t
   detail::check_finite(x, n * p, "a forest", "design");
   detail::check_finite(y, n, "a forest", "response");
   detail::check_finite(w, n, "a forest", "weights");
+  if (family == Family::poisson) {
+    for (std::size_t i = 0; i < n; ++i) {
+      if (y[i] < 0.0) throw Error("a forest on a count response reads values of zero or more.");
+    }
+  }
+  // A forest cuts a continuous response on its variance and a count on it too, a leaf holding the
+  // mean count of its draws.
   const bool classify = family == Family::binomial;
+  Criterion criterion;
+  if (classify) criterion.kind = Criterion::Kind::classify;
   if (spec.balance && !classify) {
     throw Error("a balanced forest draws from each class, and reads a binomial response.");
   }
@@ -985,7 +1114,7 @@ Forest forest_fit(const double* x, const double* y, const double* w, std::size_t
   const std::size_t trees = static_cast<std::size_t>(spec.trees);
   std::vector<detail::Nodes> grown(trees);
   detail::run_tasks(trees, spec.threads, [&](std::size_t t) {
-    ForestTree builder(x, y, n, p, classify, spec);
+    ForestTree builder(x, y, n, p, criterion, spec);
     grown[t] = builder.grow(boot, spec.seed, static_cast<std::uint32_t>(t));
   });
 

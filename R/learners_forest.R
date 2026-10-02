@@ -2,10 +2,10 @@
 #'
 #' One forest per response, over every bin-by-channel column of the representation: a probability
 #' forest under a presence-absence head and a regression forest under a head with a squared-error
-#' loss. Trees split on one column at a time and pay nothing for columns that carry nothing, so a
-#' forest reads a wide tabular representation without a penalty path and without a selection step,
-#' and it finds an interaction between two bins that a linear model would need the product term
-#' for.
+#' loss or a count head, a count being cut on its variance and a leaf reporting its mean. Trees
+#' split on one column at a time and pay nothing for columns that carry nothing, so a forest reads
+#' a wide tabular representation without a penalty path and without a selection step, and it finds
+#' an interaction between two bins that a linear model would need the product term for.
 #'
 #' Each tree is grown on a bootstrap draw of the units, as many draws as there are units, and each
 #' node is split on the best of `mtry` columns drawn for it, by the Gini index or the sum of squares

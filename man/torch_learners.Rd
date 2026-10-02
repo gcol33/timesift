@@ -84,7 +84,8 @@ The three constructors carry architecture. How that architecture is trained is
 control for this learner alone. What the head is trained toward is the response head's: its
 \code{loss} is the training objective and its \code{activation} the output transform, so a head registered
 with a squared-error loss and an identity activation trains the same encoders on a continuous
-response.
+response, and one with a Poisson-deviance loss and an exponential activation trains them on a
+count.
 
 Every channel is standardised by its own centre and scale, computed over every unit and bin of
 the fitting units, so a static predictor appended as a channel sits on the same footing as a

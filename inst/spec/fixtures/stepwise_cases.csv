@@ -12,3 +12,8 @@ oracle_forward,oracle,y_binomial,forward,column,2,3,FALSE,FALSE,2:0 11:0 1:0,7,7
 oracle_forward_weighted,oracle,y_binomial,forward,column,2,3,TRUE,FALSE,2:0 5:0 11:0,7,117.240370661611,TRUE,3,1e-09,1e-08
 oracle_forward_12_weighted,oracle,y_12,forward,column,2,Inf,TRUE,FALSE,5:0 6:0 9:0 8:0 11:0 2:0 7:0,15,30.1426614749939,TRUE,7,1e-09,1e-08
 oracle_forward_gaussian_weighted,oracle,y_gaussian,forward,column,2,6,TRUE,FALSE,2:0 10:0 8:0 5:0 3:0 9:0,13,40.0214653491538,TRUE,6,1e-09,1e-08
+mass_both_poisson,MASS,y_poisson,both,power,2,Inf,FALSE,FALSE,2:1 7:2 10:1 10:2 1:1 3:2 3:1,8,63.7322467002947,TRUE,9,1e-09,1e-08
+mass_forward_poisson_weighted,MASS,y_poisson,forward,power,2,Inf,TRUE,FALSE,2:1 10:1 7:2 10:2 1:1 2:2 3:2 3:1,9,100.723532766682,TRUE,8,1e-09,1e-08
+mass_backward_poisson,MASS,y_poisson,backward,power,2,Inf,FALSE,FALSE,1:2 2:1 3:1 3:2 7:2 10:1 10:2,8,63.7395433315081,TRUE,15,1e-09,1e-08
+glm_none_poisson,glm,y_poisson,none,power,2,Inf,FALSE,FALSE,1:1 1:2 2:1 2:2 3:1 3:2 4:1 4:2 5:1 5:2 6:1 6:2 7:1 7:2 8:1 8:2 9:1 9:2 10:1 10:2 11:1 11:2,23,58.6534629429072,TRUE,0,1e-09,1e-08
+oracle_forward_poisson_weighted,oracle,y_poisson,forward,column,2,5,TRUE,FALSE,3:0 10:0 2:0 1:0 7:0,11,100.461661192417,TRUE,5,1e-09,1e-08

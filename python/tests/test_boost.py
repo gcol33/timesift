@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from counts import fixture_counts
 from timesift import Response, boosting, fit_learner, grain_matrix
 from timesift._tree import boost_fit, boost_predict
 from timesift.learners import _boost_settings, flatten
@@ -43,6 +44,7 @@ def boost_input():
         x=np.asfortranarray([[float(r[c]) for c in columns] for r in rows]),
         binomial=np.array([float(r["y_binomial"]) for r in rows]),
         gaussian=np.array([float(r["y_gaussian"]) for r in rows]),
+        poisson=fixture_counts(FIXTURES, [r["unit"] for r in rows]),
         fold=np.array([int(r["fold"]) for r in rows], dtype=np.int32),
         weights=dict(flat=np.ones(n), counts=np.array([counts[r["unit"]] for r in rows]),
                      random=np.array([random[r["unit"]] for r in rows])))

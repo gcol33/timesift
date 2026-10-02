@@ -27,7 +27,8 @@ their squares, with the penalty chosen by an inner cross-validation on the fitti
 
 There is no discrete selection step: the penalty path uses every column and shrinks, and
 nothing about the model is decided outside the fold it is fitted in. The family is the
-response head's: logistic under a binary cross-entropy loss, linear under a squared-error
+response head's: logistic under a binary cross-entropy loss, log-linear under a
+Poisson-deviance one, linear under a squared-error
 one, and so are the case weights, `timesift.response.positive_weights` under
 presence-absence, which every learner that ships fits under.
 
@@ -72,7 +73,8 @@ stepwise(
 
 One generalised linear model per variable, its terms chosen by Akaike's criterion over every
 bin-by-channel column. The family is the response head's: logistic under a binary
-cross-entropy loss, Gaussian under a squared-error one, and so are the case weights.
+cross-entropy loss, Gaussian under a squared-error one and Poisson under a Poisson-deviance
+one, and so are the case weights.
 
 `terms` says what one term is. Under `"column"` it is a column's orthogonal polynomial of
 degree `degree`, so a column enters with its curvature at once and can be non-monotone in the
@@ -108,17 +110,19 @@ tree(
     prune='se_sum',
     n_inner=None,
     preset='package',
+    shrink=1.0,
     seed=1,
 )
 ```
 
 One classification or regression tree per variable, over every bin-by-channel column,
-grown under rpart's rules: the Gini index under a presence-absence head and the sum of squares
-under a head with a squared-error loss, a split only between two distinct values of a column,
-and the cost-complexity bookkeeping that keeps a split only where it lowers the risk by at
-least `cp` of the root's. On the same columns, weights and folds the tree is the one rpart
-grows, split for split, and its complexity table the one rpart reports; the tree is grown by
-the core the R package calls, so the two languages grow it identically.
+grown under rpart's rules: the Gini index under a presence-absence head, the sum of squares
+under a head with a squared-error loss and the Poisson deviance under a count head, a split
+only between two distinct values of a column, and the cost-complexity bookkeeping that keeps a
+split only where it lowers the risk by at least `cp` of the root's. On the same columns,
+weights and folds the tree is the one rpart grows, split for split, and its complexity table
+the one rpart reports; the tree is grown by the core the R package calls, so the two languages
+grow it identically.
 
 The grown tree is pruned back by an inner cross-validation. Its folds are dealt for each
 response and stratified on it, as the elastic net's are, and `prune` names the rule that
@@ -136,8 +140,14 @@ option set: `min_split=5`, `min_leaf=5`, `cp=0.001`, `max_depth=10` and five inn
 folds. A setting given explicitly beats either.
 
 The case weights are the response head's, `timesift.response.positive_weights` under
-presence-absence. They weigh every class count and sum of squares the tree is grown on;
-`min_split` and `min_leaf` count observations, as rpart's do.
+presence-absence. They weigh every class count, sum of squares and event count the tree is
+grown on; `min_split` and `min_leaf` count observations, as rpart's do.
+
+Under a count head a leaf predicts a rate, and the rate is shrunk towards the rate of the
+units the tree is grown on, as rpart's `method = "poisson"` shrinks it: the posterior mean
+of a gamma prior whose coefficient of variation is `shrink`, `0` for none and rpart's
+default `1`. A split is chosen on the deviance of the unshrunk rates, and a subtree's risk,
+its complexity and the pruning's cross-validated error are read on the shrunk ones.
 
 ## `forest()`
 
@@ -155,7 +165,8 @@ forest(
 ```
 
 One random forest per variable, over every bin-by-channel column: a probability forest
-under a presence-absence head and a regression forest under a head with a squared-error loss.
+under a presence-absence head and a regression forest under a head with a squared-error loss
+or a count head, a count being cut on its variance and a leaf reporting its mean.
 Trees split on one column at a time and pay nothing for columns that carry nothing, so a forest
 reads a wide tabular representation without a penalty path and without a selection step.
 
@@ -203,7 +214,8 @@ boosting(
 ```
 
 One boosted model per variable, over every bin-by-channel column: a logistic model under a
-presence-absence head and a squared-error one under a head with a squared-error loss. The score
+presence-absence head, a squared-error one under a head with a squared-error loss and a Poisson
+one with a log link under a count head. The score
 starts at the log-odds of the weighted share of presences, or the weighted mean, and each tree
 is fitted to the loss's gradient at the current score and added to it scaled by `shrinkage`.
 Each tree is grown on a subsample of the units drawn without replacement, and reads a subsample
@@ -352,7 +364,9 @@ The pruning pass removes terms one at a time, each time the one whose loss raise
 least, and keeps the subset of least generalised cross-validation, which charges `penalty`
 per knot. Under a binary cross-entropy head the kept terms are refitted as a logistic model, as
 earth's `glm = list(family = binomial)` refits them, and the prediction is its probability;
-under a squared-error head they are refitted by least squares.
+under a count head they are refitted as a Poisson model with a log link, as earth's
+`glm = list(family = poisson)` refits them, and the prediction is its mean count; under a
+squared-error head they are refitted by least squares.
 
 The defaults are earth's, which biomod2 uses under its default and `"bigboss"` option sets
 alike: degree one, `penalty` 2 (3 above degree one), `thresh=0.001`,

@@ -14,7 +14,7 @@ boost_fixture <- function() {
   counts <- utils::read.csv(file.path(dir, "tree_weights.csv"), stringsAsFactors = FALSE)
   random <- utils::read.csv(file.path(dir, "boost_weights.csv"), stringsAsFactors = FALSE)
   list(x = as.matrix(d[, setdiff(names(d), held), drop = FALSE]), binomial = d$y_binomial,
-       gaussian = d$y_gaussian, fold = d$fold,
+       gaussian = d$y_gaussian, poisson = fixture_counts(dir, d$unit), fold = d$fold,
        weights = list(flat = rep(1, nrow(d)), counts = counts$count[match(d$unit, counts$unit)],
                       random = random$weight[match(d$unit, random$unit)]),
        cases = utils::read.csv(file.path(dir, "boost_cases.csv"), stringsAsFactors = FALSE,
@@ -86,6 +86,10 @@ test_that("the boosting core refuses what it cannot fit", {
                args$subsample, args$colsample, args$newton, args$lambda, args$gamma, args$seed)
   }
   expect_error(fit(c(0, 1, 0, 2)), "0 and 1 alone")
+  expect_error(.boost_fit(x, c(0, 1, -2, 2), rep(1, 4), "poisson", 2L, 1L, 0.1, 1, 1, 1, FALSE,
+                          0, 0, 1), "zero or more")
+  expect_error(.boost_fit(x, c(0, 0, 0, 0), rep(1, 4), "poisson", 2L, 1L, 0.1, 1, 1, 1, FALSE,
+                          0, 0, 1), "count above zero")
   expect_error(fit(c(0, 1, NA, 1)), "finite values")
   expect_error(fit(c(0, 1, 0, 1), c(1, -1, 1, 1)), "zero or more")
   expect_error(fit(c(0, 1, 0, 1), c(1, 0, 1, 0)), "both classes")

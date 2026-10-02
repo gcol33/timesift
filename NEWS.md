@@ -2,6 +2,20 @@
 
 ## New
 
+* A count response. `response = "count"` is whole numbers of zero or more, fitted under the Poisson
+  deviance through a log link and an exponential output, and read by `neg_poisson_deviance`
+  (`regression_metric(y, p, "poisson_deviance")`). Every core that follows a head's loss takes the
+  family: the penalised fit (glmnet's `family = "poisson"`), the stepwise search and the MARS
+  refit (`glm(family = poisson)`, MASS's `stepAIC()` with the Poisson likelihood, earth's
+  `glm = list(family = poisson)`), the additive model (mgcv's `gam(family = poisson)`, whose scale is
+  known, so the criterion is the unbiased risk estimator), the tree (rpart's `method = "poisson"`,
+  with the gamma shrinkage of a leaf's rate as `tree(shrink = )`) and the boosted trees (gbm's
+  `poisson` distribution, and xgboost's `count:poisson` under `newton = TRUE`). A forest cuts a
+  count on its variance and a leaf holds the mean count, the encoders train under the deviance, and
+  the combiner minimises it. `maxnet()`, `envelope()` and `discriminant()` refuse a count head as
+  they refuse any numeric one. Both languages, pinned core by core in the fixtures, with the
+  response in `count_response.csv`.
+
 * `cv(repeats = )` and `grouped_cv(repeats = )` draw the outer split several times, each with its
   own seed, as biomod2's `nb.rep` does. `timesift()` makes the run once per repeat: a score stays
   one fit's held-out score, `scores` and `cells` carry a `repeat` column and every repeat's folds

@@ -37,6 +37,15 @@ namespace {
 constexpr double kMinSecondOrderGain = 1e-6;
 constexpr double kMinCurvature = 1e-16;
 
+// A Poisson fit's safeguards. The log link makes the loss's curvature the mean itself, which a
+// second-order step can overshoot by orders of magnitude, so xgboost's count objective inflates the
+// hessian by the exponential of a step bound and caps every leaf's step at it; the bound is its
+// default of 0.7. A first-order leaf is gbm's: the step is the log of the ratio of events to
+// expected events, set to -1 where a leaf holds no event and to 0 where it holds no exposure, and
+// kept within 19 of the linear predictor's range in the leaf so no mean overflows.
+constexpr double kPoissonStepBound = 0.7;
+constexpr double kPoissonLinkBound = 19.0;
+
 // What a set of rows brings to a split. For a first-order tree `first` is the weighted working
 // response and `second` the weight; for a second-order tree they are the gradient and the hessian.
 struct Moments {
@@ -140,8 +149,8 @@ TreeTable first_trees(const TreeTable& all, std::size_t keep) {
 class BoostRun {
  public:
   BoostRun(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
-           bool binomial, const BoostSpec& spec)
-      : x_(x), y_(y), w_(w), n_(n), p_(p), binomial_(binomial), spec_(spec) {}
+           Family family, const BoostSpec& spec)
+      : x_(x), y_(y), w_(w), n_(n), p_(p), family_(family), spec_(spec) {}
 
   // Fits on the rows `train` and, where `held` holds any, records the held-out deviance after
   // each tree. `model` numbers the fit among those of one call; with a tree's index it picks the
@@ -197,7 +206,7 @@ class BoostRun {
   }
 
   // Copies the fit's responses and weights and returns the starting score: the log-odds of the
-  // weighted share of ones, or the weighted mean.
+  // weighted share of ones, the weighted mean, or the log of the weighted mean count.
   double start(const std::vector<int>& train) {
     const std::size_t m = train.size();
     y_fit_.resize(m);
@@ -210,7 +219,7 @@ class BoostRun {
       ones += w_fit_[k] * y_fit_[k];
       total += w_fit_[k];
     }
-    if (binomial_) {
+    if (family_ == Family::binomial) {
       if (!(ones > 0) || !(total - ones > 0)) {
         throw Error("boosting on a binomial response needs weight on both classes in every fit, "
                     "and one fit has weight on one alone.");
@@ -218,6 +227,13 @@ class BoostRun {
       return std::log(ones / (total - ones));
     }
     if (!(total > 0)) throw Error("boosting's case weights sum to more than zero in every fit.");
+    if (family_ == Family::poisson) {
+      if (!(ones > 0)) {
+        throw Error("boosting on a count response needs a count above zero in every fit, and "
+                    "one fit has none.");
+      }
+      return std::log(ones / total);
+    }
     return ones / total;
   }
 
@@ -241,24 +257,40 @@ class BoostRun {
   // What each row brings to the next tree. A first-order tree fits the negative gradient of the
   // loss, weighted; a second-order tree reads the gradient and the hessian, each weighted.
   void working_response(const std::vector<double>& score) {
+    score_ = &score;
     for (std::size_t k = 0; k < score.size(); ++k) {
       const double y = y_fit_[k];
       const double w = w_fit_[k];
       if (spec_.newton) {
-        if (binomial_) {
+        if (family_ == Family::binomial) {
           const double prob = 1.0 / (1.0 + std::exp(-score[k]));
           first_[k] = (prob - y) * w;
           second_[k] = std::max(prob * (1.0 - prob), kMinCurvature) * w;
+        } else if (family_ == Family::poisson) {
+          const double mean = std::exp(score[k]);
+          first_[k] = (mean - y) * w;
+          second_[k] = mean * std::exp(kPoissonStepBound) * w;
         } else {
           first_[k] = (score[k] - y) * w;
           second_[k] = w;
         }
       } else {
-        residual_[k] = binomial_ ? y - 1.0 / (1.0 + std::exp(-score[k])) : y - score[k];
+        residual_[k] = mean_residual(y, score[k]);
         first_[k] = w * residual_[k];
         second_[k] = w;
       }
     }
+  }
+
+  // The negative gradient of the loss at a score: `y - p` for the binomial deviance, `y - exp(f)`
+  // for the Poisson one, and `y - f` for squared error.
+  double mean_residual(double y, double score) const {
+    switch (family_) {
+      case Family::binomial: return y - 1.0 / (1.0 + std::exp(-score));
+      case Family::poisson: return y - std::exp(score);
+      case Family::gaussian: break;
+    }
+    return y - score;
   }
 
   // The bag's moments, every row placed in the root's frontier slot.
@@ -406,6 +438,25 @@ class BoostRun {
     if (spec_.gamma > 0) prune(0);
   }
 
+  // What a node holding gradient `G` and hessian `H` is worth to a second-order tree:
+  // `G^2 / (H + lambda)`, the loss it removes at its Newton step (Chen and Guestrin 2016, eq. 6,
+  // without the halving). Where a step is capped, as a Poisson one is, it is what the capped step
+  // removes: `-(2 G w + (H + lambda) w^2)` at the step `w`.
+  double second_order_gain(const Moments& m, double lambda) const {
+    if (family_ != Family::poisson) return m.first * m.first / (m.second + lambda);
+    const double w = capped_step(m.first, m.second, lambda);
+    return -(2.0 * m.first * w + (m.second + lambda) * w * w);
+  }
+
+  // The Newton step `-G / (H + lambda)` of a second-order leaf, held within the bound of a Poisson
+  // fit.
+  double capped_step(double gradient, double hessian, double lambda) const {
+    const double d = hessian + lambda;
+    const double step = d == 0 ? 0.0 : -gradient / d;
+    if (family_ != Family::poisson) return step;
+    return std::min(std::max(step, -kPoissonStepBound), kPoissonStepBound);
+  }
+
   // The second-order gain of a cut (Chen and Guestrin 2016, eq. 7, without the halving and the
   // complexity term): `G_L^2 / (H_L + lambda) + G_R^2 / (H_R + lambda) - G^2 / (H + lambda)`, with
   // at least `min_leaf` of hessian on each side.
@@ -428,9 +479,9 @@ class BoostRun {
           above.second = f.total.second - below.second;
           above.rows = f.total.rows - below.rows;
           if (below.second >= min_leaf && above.second >= min_leaf) {
-            const double gain = below.first * below.first / (below.second + lambda) +
-                                above.first * above.first / (above.second + lambda) -
-                                f.total.first * f.total.first / (f.total.second + lambda);
+            const double gain = second_order_gain(below, lambda) +
+                                second_order_gain(above, lambda) -
+                                second_order_gain(f.total, lambda);
             if (gain > f.best.gain) {
               f.best = Division{gain, v, 0.5 * (f.previous + xk), below, above};
             }
@@ -464,9 +515,9 @@ class BoostRun {
   // step scaled by the shrinkage, and the leaf every training row of the fit falls into.
   //
   // A leaf's step is one Newton step on the loss over the bagged rows in it (Friedman 2001,
-  // section 4.5): `sum w r / sum w p (1 - p)` for the binomial deviance, the mean of the working
-  // response for squared error, and `-G / (H + lambda)` for a second-order tree. Its sums are taken
-  // in row order.
+  // section 4.5): `sum w r / sum w p (1 - p)` for the binomial deviance, `log(sum w y / sum w mu)`
+  // for the Poisson one, the mean of the working response for squared error, and `-G / (H + lambda)`
+  // for a second-order tree. Its sums are taken in row order.
   detail::Nodes lay_out(std::vector<int>& leaf) {
     detail::Nodes out;
     struct Pending {
@@ -494,6 +545,8 @@ class BoostRun {
     const std::size_t size = out.column.size();
     std::vector<double> num(size, 0.0);
     std::vector<double> den(size, 0.0);
+    std::vector<double> highest(size, -HUGE_VAL);
+    std::vector<double> lowest(size, HUGE_VAL);
     for (std::size_t k = 0; k < leaf.size(); ++k) {
       std::size_t node = 0;
       while (out.column[node] >= 0) {
@@ -506,10 +559,16 @@ class BoostRun {
       if (spec_.newton) {
         num[node] += first_[k];
         den[node] += second_[k];
-      } else if (binomial_) {
+      } else if (family_ == Family::binomial) {
         const double r = residual_[k];
         num[node] += first_[k];
         den[node] += w_fit_[k] * (y_fit_[k] - r) * (1 - y_fit_[k] + r);
+      } else if (family_ == Family::poisson) {
+        const double f = (*score_)[k];
+        num[node] += w_fit_[k] * y_fit_[k];
+        den[node] += w_fit_[k] * std::exp(f);
+        highest[node] = std::max(highest[node], f);
+        lowest[node] = std::min(lowest[node], f);
       }
     }
     for (std::size_t i = 0; i < size; ++i) {
@@ -519,10 +578,19 @@ class BoostRun {
       }
       double step;
       if (spec_.newton) {
-        const double d = den[i] + spec_.lambda;
-        step = d == 0 ? 0.0 : -num[i] / d;
-      } else if (binomial_) {
+        step = capped_step(num[i], den[i], spec_.lambda);
+      } else if (family_ == Family::binomial) {
         step = den[i] == 0 ? 0.0 : num[i] / den[i];
+      } else if (family_ == Family::poisson) {
+        if (num[i] == 0.0) {
+          step = -1.0;
+        } else {
+          step = den[i] == 0.0 ? 0.0 : std::log(num[i] / den[i]);
+        }
+        if (highest[i] >= lowest[i]) {
+          step = std::min(step, kPoissonLinkBound - highest[i]);
+          step = std::max(step, -kPoissonLinkBound - lowest[i]);
+        }
       } else {
         step = out.value[i];
       }
@@ -532,7 +600,8 @@ class BoostRun {
   }
 
   // Adds the new tree to the held-out rows' scores and returns their weighted mean deviance: the
-  // binomial deviance, or the squared error.
+  // binomial deviance, the Poisson deviance without its saturated term, which no tree changes, or
+  // the squared error.
   double score_held(const detail::Nodes& table, const std::vector<int>& held,
                     std::vector<double>& score) const {
     double loglik = 0.0;
@@ -543,14 +612,16 @@ class BoostRun {
                                               table.less_left.data(), table.left.data(),
                                               table.right.data(), x_, r, n_, p_)];
       const double f = score[i];
-      if (binomial_) {
+      if (family_ == Family::binomial) {
         loglik += w_[r] * (y_[r] * f - std::log(1.0 + std::exp(f)));
+      } else if (family_ == Family::poisson) {
+        loglik += w_[r] * (y_[r] * f - std::exp(f));
       } else {
         loglik += w_[r] * (y_[r] - f) * (y_[r] - f);
       }
       weight += w_[r];
     }
-    return binomial_ ? -2 * loglik / weight : loglik / weight;
+    return family_ == Family::gaussian ? loglik / weight : -2 * loglik / weight;
   }
 
   const double* x_;
@@ -558,10 +629,11 @@ class BoostRun {
   const double* w_;
   std::size_t n_;
   std::size_t p_;
-  bool binomial_;
+  Family family_;
   BoostSpec spec_;
 
   const std::vector<int>* rows_ = nullptr;
+  const std::vector<double>* score_ = nullptr;
   std::vector<double> y_fit_, w_fit_;
   std::vector<int> sorted_;
   std::vector<double> residual_, first_, second_;
@@ -597,11 +669,13 @@ Boosted boost_fit(const double* x, const double* y, const double* w, std::size_t
   detail::check_finite(x, n * p, "boosting", "design");
   detail::check_finite(y, n, "boosting", "response");
   detail::check_finite(w, n, "boosting", "weights");
-  const bool binomial = family == Family::binomial;
   for (std::size_t i = 0; i < n; ++i) {
     if (w[i] < 0) throw Error("boosting's case weights are zero or more.");
-    if (binomial && y[i] != 0.0 && y[i] != 1.0) {
+    if (family == Family::binomial && y[i] != 0.0 && y[i] != 1.0) {
       throw Error("boosting on a binomial response reads 0 and 1 alone.");
+    }
+    if (family == Family::poisson && y[i] < 0.0) {
+      throw Error("boosting on a count response reads values of zero or more.");
     }
   }
   const bool cross = fold != nullptr && n_fold > 1;
@@ -629,7 +703,7 @@ Boosted boost_fit(const double* x, const double* y, const double* w, std::size_t
   std::vector<TreeTable> tables(fits);
   std::vector<std::vector<double>> deviance(fits);
   detail::run_tasks(fits, spec.threads, [&](std::size_t f) {
-    BoostRun fit(x, y, w, n, p, binomial, spec);
+    BoostRun fit(x, y, w, n, p, family, spec);
     fit.run(train[f], held[f], static_cast<std::uint32_t>(f), &init[f], &tables[f], &deviance[f]);
   });
 
@@ -660,11 +734,14 @@ Boosted boost_fit(const double* x, const double* y, const double* w, std::size_t
 void boost_predict(const Boosted& model, const double* x, std::size_t n, std::size_t p,
                    double* out) {
   const std::size_t trees = detail::table_trees(model.trees);
-  const bool binomial = model.family == Family::binomial;
   for (std::size_t i = 0; i < n; ++i) {
     double f = model.init;
     for (std::size_t t = 0; t < trees; ++t) f += detail::table_value(model.trees, t, x, i, n, p);
-    out[i] = binomial ? 1.0 / (1.0 + std::exp(-f)) : f;
+    switch (model.family) {
+      case Family::binomial: out[i] = 1.0 / (1.0 + std::exp(-f)); break;
+      case Family::poisson: out[i] = std::exp(f); break;
+      case Family::gaussian: out[i] = f; break;
+    }
   }
 }
 

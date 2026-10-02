@@ -261,19 +261,26 @@ grid of 100 cuts. `table_metric()` reads it at the cut of the `rule` given, `"yo
 so the statistics are comparable at one operating point. Every name is a registered metric, so
 `grain_ladder(metric = "csi")` reads it.
 
-## Abundance, ordinal and continuous responses
+## Abundance, ordinal, continuous and count responses
 
-biomod2 4.3 also models abundances and ordinal classes. The response head decides what a response
-is, and three ship beside presence-absence: `response = "continuous"` for any real number,
-`"abundance"` for a non-negative one, and `"ordinal"` for whole-number classes. All three are
-fitted under squared error through an identity output, so every learner but the three above and
-the combiner read them unchanged. `r_squared` is what a continuous or abundance comparison reads
-by default, and `regression_metric()` carries biomod2's `RMSE`, `MSE`, `MAE` and `Max_error`
-(registered as `neg_rmse`, `neg_mse`, `neg_mae` and `neg_max_error`, since the highest score is the
-best). `ordinal_metric()` carries `Accuracy`, `Recall`, `Precision` and `F1`, each prediction being
-read as the observed class nearest to it. A multiclass response is one presence-absence column
-per class. A count under a Poisson loss is not shipped: the penalised, tree, boosting and
-stepwise cores would each need that family.
+biomod2 4.3 also models abundances, ordinal classes and counts. The response head decides what a
+response is, and four ship beside presence-absence: `response = "continuous"` for any real number,
+`"abundance"` for a non-negative one, `"ordinal"` for whole-number classes and `"count"` for whole
+numbers of zero or more. The first three are fitted under squared error through an identity output,
+so every learner but the three above and the combiner read them unchanged. `r_squared` is what a
+continuous or abundance comparison reads by default, and `regression_metric()` carries biomod2's
+`RMSE`, `MSE`, `MAE` and `Max_error` (registered as `neg_rmse`, `neg_mse`, `neg_mae` and
+`neg_max_error`, since the highest score is the best). `ordinal_metric()` carries `Accuracy`,
+`Recall`, `Precision` and `F1`, each prediction being read as the observed class nearest to it. A
+multiclass response is one presence-absence column per class.
+
+A count is fitted under the Poisson deviance through a log link and an exponential output, and a
+comparison reads `neg_poisson_deviance`, the mean deviance with its sign reversed. The elastic
+net, the stepwise search, MARS, the additive model, the tree and the boosted trees each fit the
+Poisson family on their own core, pinned against glmnet, MASS and `glm()`, earth, mgcv, rpart and
+gbm or xgboost's `count:poisson`. The forest cuts a count on its variance, the networks train
+under the deviance and the combiner minimises it. A tree shrinks a leaf's rate towards the rate of
+the units it is grown on, as rpart does, and `tree(shrink = 0)` takes the shrinkage away.
 
 ## Maps
 

@@ -44,8 +44,8 @@ ts_penalised_coef_ <- function(lambda, a0, beta, family, at) {
   .Call(`_timesift_ts_penalised_coef_`, lambda, a0, beta, family, at)
 }
 
-ts_tree_fit_ <- function(x, y, w, n, p, family, min_split, min_leaf, cp, max_depth, fold, n_fold) {
-  .Call(`_timesift_ts_tree_fit_`, x, y, w, n, p, family, min_split, min_leaf, cp, max_depth, fold, n_fold)
+ts_tree_fit_ <- function(x, y, w, n, p, family, min_split, min_leaf, cp, max_depth, shrink, fold, n_fold) {
+  .Call(`_timesift_ts_tree_fit_`, x, y, w, n, p, family, min_split, min_leaf, cp, max_depth, shrink, fold, n_fold)
 }
 
 ts_tree_prune_ <- function(tree, cp) {

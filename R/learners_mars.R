@@ -14,8 +14,9 @@
 #' residuals least, and keeps the subset of least generalised cross-validation, which charges
 #' `penalty` for each knot. Under a presence-absence head the kept terms are refitted as a logistic
 #' model, as earth's `glm = list(family = binomial)` refits them and biomod2 asks it to, and the
-#' prediction is that model's probability; under a squared-error head they are refitted by least
-#' squares.
+#' prediction is that model's probability; under a count head they are refitted as a Poisson model
+#' with a log link, as earth's `glm = list(family = poisson)` refits them, and the prediction is its
+#' mean count; under a squared-error head they are refitted by least squares.
 #'
 #' The defaults are earth's own, which biomod2 uses under its default option set and under
 #' `"bigboss"` alike: degree one, `penalty = 2`, `thresh = 0.001`, `nk = min(200, max(20, 2 p)) + 1`

@@ -27,14 +27,15 @@ def _design(x) -> np.ndarray:
 
 
 def tree_fit(x, y, w, family, min_split, min_leaf, cp, max_depth, fold=None,
-             n_fold=0) -> dict:
+             n_fold=0, shrink=1.0) -> dict:
     """One tree grown under rpart's rules, with its complexity table, and that table's
-    cross-validated error where ``fold`` gives one 0-based fold index per unit."""
+    cross-validated error where ``fold`` gives one 0-based fold index per unit. ``shrink`` is the
+    coefficient of variation of the gamma prior a Poisson leaf's rate is shrunk by."""
     return _core.tree_fit(_design(x), np.ascontiguousarray(y, dtype=np.float64),
                           np.ascontiguousarray(w, dtype=np.float64), family, int(min_split),
                           int(min_leaf), float(cp), int(max_depth),
                           None if fold is None else np.ascontiguousarray(fold, dtype=np.int32),
-                          int(n_fold))
+                          int(n_fold), float(shrink))
 
 
 def tree_prune(tree: dict, cp: float) -> dict:

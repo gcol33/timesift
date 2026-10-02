@@ -41,6 +41,19 @@ def _clamp(p: np.ndarray) -> np.ndarray:
     return np.clip(p, CLAMP, 1.0 - CLAMP)
 
 
+# A Poisson loss is unbounded where a combined mean reaches zero, so it is read no closer than the
+# machine epsilon, which is the floor the R side reads it at.
+def _floor_mean(p: np.ndarray) -> np.ndarray:
+    return np.maximum(p, np.finfo(np.float64).eps)
+
+
+def _poisson_value(p: np.ndarray, y: np.ndarray) -> float:
+    """The mean of ``2 (y log(y / p) - (y - p))``, the logarithm taken as zero at ``y = 0``."""
+    with np.errstate(divide="ignore", invalid="ignore"):
+        saturated = np.where(y > 0, y * np.log(y / p), 0.0)
+    return float(np.mean(2 * (saturated - (y - p))))
+
+
 # A loss reaches the solver as its value and its derivative in the combined prediction, both
 # averaged over the cells, so the solver is the same forty lines whatever the response head is.
 STACK_LOSSES = {
@@ -53,6 +66,10 @@ STACK_LOSSES = {
         range=(-np.inf, np.inf),
         value=lambda p, y: float(np.mean((p - y) ** 2)),
         gradient=lambda p, y: 2 * (p - y) / len(y)),
+    "poisson_deviance": dict(
+        range=(0.0, np.inf),
+        value=lambda p, y: _poisson_value(_floor_mean(p), y),
+        gradient=lambda p, y: 2 * (1 - y / _floor_mean(p)) / len(y)),
 }
 
 

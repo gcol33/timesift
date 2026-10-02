@@ -477,12 +477,13 @@ timesift::Tree take_tree(const cpp11::list& tree) {
 [[cpp11::register]]
 cpp11::list ts_tree_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
                          std::string family, int min_split, int min_leaf, double cp,
-                         int max_depth, cpp11::sexp fold, int n_fold) {
+                         int max_depth, double shrink, cpp11::sexp fold, int n_fold) {
   timesift::TreeSpec spec;
   spec.min_split = min_split;
   spec.min_leaf = min_leaf;
   spec.cp = cp;
   spec.max_depth = max_depth;
+  spec.shrink = shrink;
   const std::vector<std::int32_t> which = take_folds(fold);
   const timesift::Tree tree = timesift::tree_fit(
       REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),

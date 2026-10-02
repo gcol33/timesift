@@ -475,8 +475,21 @@ ensemble_weights <- function(fit) {
     range = c(-Inf, Inf),
     value = function(p, y) mean((p - y)^2),
     gradient = function(p, y) 2 * (p - y) / length(y)
+  ),
+  poisson_deviance = list(
+    range = c(0, Inf),
+    value = function(p, y) {
+      p <- .floor_mean(p)
+      mean(2 * (ifelse(y > 0, y * log(y / p), 0) - (y - p)))
+    },
+    gradient = function(p, y) {
+      p <- .floor_mean(p)
+      2 * (1 - y / p) / length(y)
+    }
   )
 )
+
+.floor_mean <- function(p) pmax(p, .Machine$double.eps)
 
 .clamp_unit <- function(p) pmin(pmax(p, 1e-7), 1 - 1e-7)
 

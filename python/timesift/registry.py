@@ -137,19 +137,20 @@ def register_response(name: str, spec: dict, overwrite: bool = False):
     """Register a response head: what the values being predicted are and where a score is defined.
 
     ``spec`` is a mapping with ``prepare(y)``, returning the response a learner is fitted on;
-    ``activation``, the name of the output transform (``"sigmoid"`` or ``"identity"``); ``loss``,
-    the name of the training objective (``"binary_cross_entropy"`` or ``"squared_error"``);
-    ``metric``, the default metric name; and ``cells(y, folds)``, returning the mask of scorable
-    cells. Presence-absence with a joint multi-label head is what ships; an abundance or
-    phenology response is a registration rather than a second fitting path. Every learner that
-    ships reads ``loss`` and ``activation`` from here: the encoders train under the loss and
-    predict through the activation, and the learners fitting one model per response take the
-    family the loss names, logistic or Gaussian. The combiner minimises the same loss. An
-    optional ``weights(y, fitting)`` returns a ``[unit, variable]`` array of case weights every
-    learner fits under, with ``fitting`` a boolean vector marking the rows the model is fitted
-    on: whatever the head reads off the response, it reads off those rows, and it weights every
-    row, so an encoder's inner validation loss is weighted as its fit is. The shipped head's is
-    :func:`~timesift.response.positive_weights`, and a head without one fits unweighted.
+    ``activation``, the name of the output transform (``"sigmoid"``, ``"identity"`` or ``"exp"``);
+    ``loss``, the name of the training objective (``"binary_cross_entropy"``, ``"squared_error"``
+    or ``"poisson_deviance"``); ``metric``, the default metric name; and ``cells(y, folds)``,
+    returning the mask of scorable cells. Presence-absence with a joint multi-label head is what
+    ships; an abundance or phenology response is a registration rather than a second fitting
+    path. Every learner that ships reads ``loss`` and ``activation`` from here: the encoders train
+    under the loss and predict through the activation, and the learners fitting one model per
+    response take the family the loss names, logistic, Gaussian or Poisson. The combiner minimises
+    the same loss. An optional ``weights(y, fitting)`` returns a ``[unit, variable]`` array of
+    case weights every learner fits under, with ``fitting`` a boolean vector marking the rows the
+    model is fitted on: whatever the head reads off the response, it reads off those rows, and it
+    weights every row, so an encoder's inner validation loss is weighted as its fit is. The
+    shipped head's is :func:`~timesift.response.positive_weights`, and a head without one fits
+    unweighted.
     """
     missing = [f for f in RESPONSE_FIELDS if f not in spec]
     if missing:

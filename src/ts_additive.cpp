@@ -642,6 +642,44 @@ struct Design {
 };
 
 // ---------------------------------------------------------------------------------------------
+// The families. A binomial and a Poisson response each run under their canonical link, so the
+// working weight is the variance function times the case weight, and the scale is known: the
+// criterion is the unbiased risk estimator and the penalised fit is iterated. A Gaussian response
+// is one least-squares solve and its scale is estimated, which is the generalised cross-validation
+// score.
+
+// The mean the first working response is built from: the response pulled half a trial towards one
+// half under the binomial family, and a tenth above zero under the Poisson one.
+double starting_mean(Family family, double y, double w) {
+  switch (family) {
+    case Family::binomial: return (w * y + 0.5) / (w + 1.0);
+    case Family::poisson: return y + 0.1;
+    case Family::gaussian: break;
+  }
+  return y;
+}
+
+// The linear predictor at a mean, the canonical link's.
+double canonical_link(Family family, double mu) {
+  switch (family) {
+    case Family::binomial: return std::log(mu / (1.0 - mu));
+    case Family::poisson: return std::log(mu);
+    case Family::gaussian: break;
+  }
+  return mu;
+}
+
+// The working weight of one case at its mean.
+double working_weight_of(Family family, double w, double mu) {
+  switch (family) {
+    case Family::binomial: return w * mu * (1.0 - mu);
+    case Family::poisson: return w * mu;
+    case Family::gaussian: break;
+  }
+  return w;
+}
+
+// ---------------------------------------------------------------------------------------------
 // The fit at given smoothing parameters.
 
 class Response {
@@ -650,8 +688,8 @@ class Response {
   // smooths, at once; each writes its own slot.
   Response(const Design& design, const double* y, const double* w, Family family, double gamma,
            const AdditiveSpec& spec, int workers)
-      : g_(design), y_(y), w_(w), binomial_(family == Family::binomial), gamma_(gamma),
-        spec_(spec), workers_(workers) {}
+      : g_(design), y_(y), w_(w), family_(family), gamma_(gamma), spec_(spec),
+        workers_(workers) {}
 
   struct State {
     std::vector<double> beta, eta, mu;
@@ -663,19 +701,25 @@ class Response {
     bool settled = true;   // the inner fit met `epsilon`
   };
 
-  double mean(double eta) const { return binomial_ ? logit_linkinv(eta) : eta; }
+  // A response whose scale is known is fitted by iterating the penalised least squares, and its
+  // smoothing parameters are chosen by the unbiased risk estimator.
+  bool known_scale() const { return family_ != Family::gaussian; }
+
+  double mean(double eta) const { return linkinv(family_, eta); }
 
   double deviance(const std::vector<double>& mu) const {
     double dev = 0.0;
     for (std::size_t i = 0; i < g_.n; ++i) {
-      if (binomial_) {
-        const double y = y_[i];
+      const double y = y_[i];
+      if (family_ == Family::binomial) {
         double t = 0.0;
         if (y > 0.0) t += y * std::log(y / mu[i]);
         if (y < 1.0) t += (1.0 - y) * std::log((1.0 - y) / (1.0 - mu[i]));
         dev += 2.0 * w_[i] * t;
+      } else if (family_ == Family::poisson) {
+        dev += 2.0 * w_[i] * ((y > 0.0 ? y * std::log(y / mu[i]) : 0.0) - (y - mu[i]));
       } else {
-        const double r = y_[i] - mu[i];
+        const double r = y - mu[i];
         dev += w_[i] * r * r;
       }
     }
@@ -705,7 +749,19 @@ class Response {
   }
 
   double working_weight(std::size_t i, double mu) const {
-    return binomial_ ? w_[i] * mu * (1.0 - mu) : w_[i];
+    return working_weight_of(family_, w_[i], mu);
+  }
+
+  // The working response of a case: the linear predictor plus the residual over the mean's
+  // derivative, which under the canonical link is the variance function; the response itself under
+  // the Gaussian family.
+  double working_response(std::size_t i, double eta, double mu) const {
+    switch (family_) {
+      case Family::binomial: return eta + (y_[i] - mu) / (mu * (1.0 - mu));
+      case Family::poisson: return eta + (y_[i] - mu) / mu;
+      case Family::gaussian: break;
+    }
+    return y_[i];
   }
 
   // The penalised weighted least-squares step at the means `mu`: the coefficients, and in `r`
@@ -719,8 +775,7 @@ class Response {
     for (std::size_t i = 0; i < n; ++i) {
       const double wi = working_weight(i, mu[i]);
       root[i] = std::sqrt(wi);
-      const double z = binomial_ ? eta[i] + (y_[i] - mu[i]) / (mu[i] * (1.0 - mu[i])) : y_[i];
-      b[i] = root[i] * z;
+      b[i] = root[i] * working_response(i, eta[i], mu[i]);
     }
     for (std::size_t c = 0; c < q; ++c) {
       const double* xc = g_.x.data() + c * n;
@@ -760,8 +815,8 @@ class Response {
     std::vector<double> beta;
     if (start.empty()) {
       for (std::size_t i = 0; i < n; ++i) {
-        mu[i] = binomial_ ? (w_[i] * y_[i] + 0.5) / (w_[i] + 1.0) : y_[i];
-        eta[i] = binomial_ ? std::log(mu[i] / (1.0 - mu[i])) : mu[i];
+        mu[i] = starting_mean(family_, y_[i], w_[i]);
+        eta[i] = canonical_link(family_, mu[i]);
       }
     } else {
       beta = start;
@@ -769,7 +824,7 @@ class Response {
       previous = deviance(mu) + penalty_of(beta, lambda);
     }
     st.settled = false;
-    const int steps = binomial_ ? spec_.max_irls : 1;
+    const int steps = known_scale() ? spec_.max_irls : 1;
     for (int it = 0; it < steps; ++it) {
       std::vector<double> next = solve(eta, mu, lambda, r);
       std::vector<double> next_eta, next_mu;
@@ -787,12 +842,12 @@ class Response {
       eta = std::move(next_eta);
       mu = std::move(next_mu);
       previous = pdev;
-      if (!binomial_ || small) {
+      if (!known_scale() || small) {
         st.settled = true;
         break;
       }
     }
-    if (binomial_) solve(eta, mu, lambda, r);  // the triangle at the coefficients reached
+    if (known_scale()) solve(eta, mu, lambda, r);  // the triangle at the coefficients reached
     st.beta = std::move(beta);
     st.eta = std::move(eta);
     st.mu = std::move(mu);
@@ -811,12 +866,12 @@ class Response {
     return st;
   }
 
-  // The unbiased risk estimator `D / n + 2 gamma tau / n - 1` under the binomial family, whose
-  // scale is one, and the generalised cross-validation score `n D / (n - gamma tau)^2` under the
-  // Gaussian one.
+  // The unbiased risk estimator `D / n + 2 gamma tau / n - 1` under the binomial and the Poisson
+  // family, whose scale is one, and the generalised cross-validation score
+  // `n D / (n - gamma tau)^2` under the Gaussian one.
   double criterion(double dev, double tau) const {
     const double n = static_cast<double>(g_.n);
-    if (binomial_) return dev / n + 2.0 * gamma_ * tau / n - 1.0;
+    if (known_scale()) return dev / n + 2.0 * gamma_ * tau / n - 1.0;
     const double delta = n - gamma_ * tau;
     return n * dev / (delta * delta);
   }
@@ -832,10 +887,13 @@ class Response {
     for (std::size_t i = 0; i < n; ++i) {
       const double mu = st.mu[i];
       wt[i] = working_weight(i, mu);
-      if (binomial_) {
+      if (family_ == Family::binomial) {
         const double v = mu * (1.0 - mu);
         c1[i] = w_[i] * v * (1.0 - 2.0 * mu);
         c2[i] = w_[i] * v * (1.0 - 6.0 * mu + 6.0 * mu * mu);
+      } else if (family_ == Family::poisson) {
+        c1[i] = w_[i] * mu;
+        c2[i] = w_[i] * mu;
       }
       res[i] = w_[i] * (y_[i] - mu);
     }
@@ -879,7 +937,7 @@ class Response {
       ej[j] = times(bj[j]);
       // L_j = H^-1 H_j, H_j = X' diag(c1 eta_j) X + lambda_j S_j, and Q_j its first part.
       double trg = 0.0;
-      if (binomial_) {
+      if (known_scale()) {
         std::vector<double> v(n);
         for (std::size_t i = 0; i < n; ++i) v[i] = c1[i] * ej[j][i];
         qj[j] = multiply(hi, weighted_cross(v), q, q, q);
@@ -910,7 +968,7 @@ class Response {
       std::vector<double> rhs(q, 0.0);
       std::vector<double> v(n);
       for (std::size_t i = 0; i < n; ++i) v[i] = c1[i] * ej[j][i] * ej[k][i];
-      if (binomial_) {
+      if (known_scale()) {
         for (std::size_t c = 0; c < q; ++c) rhs[c] = dot(g_.x.data() + c * n, v.data(), n);
       }
       for (std::size_t c : g_.columns[k]) rhs[c] += lambda[k] * g_.d[c] * bj[j][c];
@@ -932,7 +990,7 @@ class Response {
         ub += u * db[i];
       }
       double t = trace_product(lj[k], lnj[j], q) + trace_product(lj[j], lnj[k], q) - ub + ua;
-      if (binomial_) t -= trace_product(lj[j], qj[k], q) + trace_product(lj[k], qj[j], q);
+      if (known_scale()) t -= trace_product(lj[j], qj[k], q) + trace_product(lj[k], qj[j], q);
       if (j == k) {
         double s = 0.0;
         for (std::size_t c : g_.columns[j]) s += g_.d[c] * nhi[c + c * q];
@@ -945,7 +1003,7 @@ class Response {
     const double nn = static_cast<double>(n);
     g.assign(m, 0.0);
     h.assign(m * m, 0.0);
-    if (binomial_) {
+    if (known_scale()) {
       for (std::size_t j = 0; j < m; ++j) g[j] = dj[j] / nn + 2.0 * gamma_ * tj[j] / nn;
       for (std::size_t a = 0; a < m * m; ++a) h[a] = dh[a] / nn + 2.0 * gamma_ * th[a] / nn;
     } else {
@@ -1039,7 +1097,7 @@ class Response {
   const Design& g_;
   const double* y_;
   const double* w_;
-  bool binomial_;
+  Family family_;
   double gamma_;
   const AdditiveSpec& spec_;
   int workers_;
@@ -1069,16 +1127,14 @@ ResponseFit fit_response(const Design& design, const double* y, const double* w,
                          const AdditiveSpec& spec, int workers) {
   const Response resp(design, y, w, spec.family, spec.gamma, spec, workers);
   const std::size_t m = design.smooths, n = design.n;
-  const bool binomial = spec.family == Family::binomial;
   std::vector<double> rho(m, 0.0);
   for (std::size_t j = 0; j < m && spec.sp.empty(); ++j) {
     double kd = 0.0, sd = 0.0;
     for (std::size_t c : design.columns[j]) {
       const double* xc = design.x.data() + c * n;
       for (std::size_t i = 0; i < n; ++i) {
-        const double mu = binomial ? (w[i] * y[i] + 0.5) / (w[i] + 1.0) : 0.0;
-        const double wi = binomial ? w[i] * mu * (1.0 - mu) : w[i];
-        kd += wi * xc[i] * xc[i];
+        const double mu = starting_mean(spec.family, y[i], w[i]);
+        kd += working_weight_of(spec.family, w[i], mu) * xc[i] * xc[i];
       }
       sd += design.d[c];
     }
@@ -1205,6 +1261,9 @@ Additive additive_fit(const double* x, std::size_t n, std::size_t p, const doubl
     if (!(w[i] > 0.0)) throw Error("an additive model's case weights are positive.");
     if (spec.family == Family::binomial && (y[i] < 0.0 || y[i] > 1.0)) {
       throw Error("a binomial additive model's response lies in [0, 1].");
+    }
+    if (spec.family == Family::poisson && y[i] < 0.0) {
+      throw Error("a Poisson additive model's response is a count of zero or more.");
     }
   }
 
@@ -1392,8 +1451,7 @@ void additive_predict(const Additive& fit, const double* x, std::size_t n, std::
     }
     at += term.size;
   }
-  const bool binomial = fit.family == Family::binomial;
-  for (std::size_t i = 0; i < n * r; ++i) out[i] = binomial ? logit_linkinv(eta[i]) : eta[i];
+  for (std::size_t i = 0; i < n * r; ++i) out[i] = linkinv(fit.family, eta[i]);
 }
 
 }  // namespace timesift

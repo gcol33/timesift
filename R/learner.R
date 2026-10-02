@@ -502,10 +502,11 @@ as.matrix.timesift_matrix <- function(x, ...) {
 }
 
 # The family a learner fitting one model per response fits under is read off the response head's
-# loss, so a head registered with a squared-error loss reaches the same learners as a
-# presence-absence one and each fits the model that loss names.
+# loss, so a head registered with a squared-error or a Poisson-deviance loss reaches the same
+# learners as a presence-absence one and each fits the model that loss names.
 .head_family <- function(head) {
-  families <- c(binary_cross_entropy = "binomial", squared_error = "gaussian")
+  families <- c(binary_cross_entropy = "binomial", squared_error = "gaussian",
+                poisson_deviance = "poisson")
   if (!is.character(head$loss) || !head$loss %in% names(families)) {
     stop("a learner fitting one model per response has no family for the ",
          .describe(head$loss), " loss. It knows ", paste(names(families), collapse = " and "),

@@ -92,40 +92,70 @@ double logit_slope(double eta) {
 // `y log(y / mu)`, taken as zero at `y = 0`.
 double y_log_y_over(double y, double mu) { return y != 0.0 ? y * std::log(y / mu) : 0.0; }
 
+// The Poisson mean and its derivative under the log link are the same number, held off zero.
+double log_linkinv(double eta) { return std::max(std::exp(eta), DBL_EPSILON); }
+
 // A family under its link: the mean as a function of the linear predictor, the mean's derivative,
 // the link itself, the variance function, and the deviance (McCullagh & Nelder 1989, ch. 2 and 4).
 class Model {
  public:
-  Model(Family family, Link link)
-      : binomial_(family == Family::binomial), probit_(link == Link::probit) {}
+  Model(Family family, Link link) : family_(family), probit_(link == Link::probit) {}
 
   double mean(double eta) const {
-    if (!binomial_) return eta;
-    return probit_ ? probit_linkinv(eta) : logit_linkinv(eta);
+    switch (family_) {
+      case Family::binomial: return probit_ ? probit_linkinv(eta) : logit_linkinv(eta);
+      case Family::poisson: return log_linkinv(eta);
+      case Family::gaussian: break;
+    }
+    return eta;
   }
 
   double slope(double eta) const {
-    if (!binomial_) return 1.0;
-    return probit_ ? std::max(detail::dnorm(eta), DBL_EPSILON) : logit_slope(eta);
+    switch (family_) {
+      case Family::binomial:
+        return probit_ ? std::max(detail::dnorm(eta), DBL_EPSILON) : logit_slope(eta);
+      case Family::poisson: return log_linkinv(eta);
+      case Family::gaussian: break;
+    }
+    return 1.0;
   }
 
   double link(double mu) const {
-    if (!binomial_) return mu;
-    return probit_ ? detail::qnorm(mu) : std::log(mu / (1.0 - mu));
+    switch (family_) {
+      case Family::binomial: return probit_ ? detail::qnorm(mu) : std::log(mu / (1.0 - mu));
+      case Family::poisson: return std::log(mu);
+      case Family::gaussian: break;
+    }
+    return mu;
   }
 
-  double variance(double mu) const { return binomial_ ? mu * (1.0 - mu) : 1.0; }
+  double variance(double mu) const {
+    switch (family_) {
+      case Family::binomial: return mu * (1.0 - mu);
+      case Family::poisson: return mu;
+      case Family::gaussian: break;
+    }
+    return 1.0;
+  }
 
-  // The starting means: the response itself for the gaussian family, and for the binomial one the
-  // response pulled half a trial towards one half, so that no start sits at zero or one.
+  // The starting means: the response itself for the gaussian family, for the binomial one the
+  // response pulled half a trial towards one half, so that no start sits at zero or one, and for
+  // the Poisson one the response plus a tenth, so that no start sits at zero.
   void start(const double* y, const double* w, std::size_t n, double* eta, double* mu) const {
     for (std::size_t i = 0; i < n; ++i) {
-      if (binomial_) {
-        eta[i] = link((w[i] * y[i] + 0.5) / (w[i] + 1.0));
-        mu[i] = mean(eta[i]);
-      } else {
-        eta[i] = y[i];
-        mu[i] = y[i];
+      switch (family_) {
+        case Family::binomial:
+          eta[i] = link((w[i] * y[i] + 0.5) / (w[i] + 1.0));
+          mu[i] = mean(eta[i]);
+          break;
+        case Family::poisson:
+          mu[i] = y[i] + 0.1;
+          eta[i] = link(mu[i]);
+          break;
+        case Family::gaussian:
+          eta[i] = y[i];
+          mu[i] = y[i];
+          break;
       }
     }
   }
@@ -133,18 +163,25 @@ class Model {
   double deviance(const double* y, const double* mu, const double* w, std::size_t n) const {
     double d = 0.0;
     for (std::size_t i = 0; i < n; ++i) {
-      if (binomial_) {
-        d += 2.0 * w[i] * (y_log_y_over(y[i], mu[i]) + y_log_y_over(1.0 - y[i], 1.0 - mu[i]));
-      } else {
-        const double r = y[i] - mu[i];
-        d += w[i] * r * r;
+      switch (family_) {
+        case Family::binomial:
+          d += 2.0 * w[i] * (y_log_y_over(y[i], mu[i]) + y_log_y_over(1.0 - y[i], 1.0 - mu[i]));
+          break;
+        case Family::poisson:
+          d += 2.0 * w[i] * (y_log_y_over(y[i], mu[i]) - (y[i] - mu[i]));
+          break;
+        case Family::gaussian: {
+          const double r = y[i] - mu[i];
+          d += w[i] * r * r;
+          break;
+        }
       }
     }
     return d;
   }
 
  private:
-  bool binomial_;
+  Family family_;
   bool probit_;
 };
 
@@ -154,6 +191,15 @@ double logit_linkinv(double eta) {
   const double t = eta < -kLogitBound ? DBL_EPSILON
                                       : (eta > kLogitBound ? 1.0 / DBL_EPSILON : std::exp(eta));
   return t / (1.0 + t);
+}
+
+double linkinv(Family family, double eta) {
+  switch (family) {
+    case Family::binomial: return logit_linkinv(eta);
+    case Family::poisson: return log_linkinv(eta);
+    case Family::gaussian: break;
+  }
+  return eta;
 }
 
 double probit_linkinv(double eta) {

@@ -5,3 +5,5 @@ binomial_balance,binomial,counts,3,4,1,1,13
 binomial_bagged,binomial,flat,3,22,1,0,14
 gaussian_flat,gaussian,flat,3,7,5,0,15
 gaussian_counts,gaussian,counts,3,7,3,0,4294967295
+poisson_flat,poisson,flat,3,7,5,0,16
+poisson_counts,poisson,counts,3,7,3,0,17

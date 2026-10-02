@@ -46,7 +46,8 @@ SECTIONS = (
              "computed with no model involved.",
         names=("cv", "grouped_cv", "block_cv", "env_cv", "Resampling", "as_resampling", "resolve_folds", "fold_map",
                "scorable_cells", "align_folds", "as_response", "Response", "Folds", "Cells",
-               "PRESENCE_ABSENCE", "CONTINUOUS", "ABUNDANCE", "ORDINAL", "positive_weights"),
+               "PRESENCE_ABSENCE", "CONTINUOUS", "ABUNDANCE", "ORDINAL", "COUNT",
+               "positive_weights"),
     ),
     dict(
         slug="python-fitting",

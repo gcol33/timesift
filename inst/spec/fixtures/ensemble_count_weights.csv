@@ -1,0 +1,13 @@
+case,member,weight
+stack,good / week,0.796191836726
+stack,noisy / week,0.0893577873298
+stack,flat / week,3.35882774119e-14
+stack,biased / week,0.114450375944
+mean,good / week,0.25
+mean,noisy / week,0.25
+mean,flat / week,0.25
+mean,biased / week,0.25
+median,good / week,0.25
+median,noisy / week,0.25
+median,flat / week,0.25
+median,biased / week,0.25

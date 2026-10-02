@@ -16,6 +16,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from counts import fixture_counts
 from timesift import Response, fit_learner, grain_matrix, mars
 from timesift._mars import mars_fit, mars_predict
 
@@ -38,13 +39,14 @@ def mars_input():
         x=np.asfortranarray([[float(r[c]) for c in columns] for r in rows]),
         w=np.array([float(r["w"]) for r in rows]),
         y=dict(y_binomial=np.array([float(r["y_binomial"]) for r in rows]),
-               y_gaussian=np.array([float(r["y_gaussian"]) for r in rows])))
+               y_gaussian=np.array([float(r["y_gaussian"]) for r in rows]),
+               y_poisson=fixture_counts(FIXTURES, [r["unit"] for r in rows])))
 
 
 def case_fit(mars_input, row):
     y = mars_input["y"][row["response"]]
     w = mars_input["w"] if row["weighted"] == "TRUE" else np.ones(len(y))
-    family = "gaussian" if row["response"] == "y_gaussian" else "binomial"
+    family = {"y_gaussian": "gaussian", "y_poisson": "poisson"}.get(row["response"], "binomial")
     return mars_fit(mars_input["x"], y, w, family, degree=int(row["degree"]),
                     minspan=int(row["minspan"]), endspan=int(row["endspan"]),
                     fast_k=int(row["fast_k"]), prune=row["prune"] == "TRUE",

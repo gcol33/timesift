@@ -28,13 +28,14 @@ The statistics biomod2 reads an abundance model by. With \code{e = y - p}:
    \code{"mse"} \tab \code{mean(e^2)} \cr
    \code{"mae"} \tab \code{mean(abs(e))} \cr
    \code{"max_error"} \tab \code{max(abs(e))} \cr
+   \code{"poisson_deviance"} \tab \verb{mean(2 (y log(y / p) - (y - p)))}, the logarithm taken as zero at \code{y = 0}; \code{NA} where a prediction is negative or is zero beside a count above zero \cr
 }
 
 
-A comparison across candidates reads the highest score as the best, so the four errors are
-registered under the names \code{neg_rmse}, \code{neg_mse}, \code{neg_mae} and \code{neg_max_error} with their sign
-reversed, and \code{r_squared} and \code{pearson} under their own names. A cell holding a prediction that
-is not a number scores \code{NA}.
+A comparison across candidates reads the highest score as the best, so the five errors are
+registered under the names \code{neg_rmse}, \code{neg_mse}, \code{neg_mae}, \code{neg_max_error} and
+\code{neg_poisson_deviance} with their sign reversed, and \code{r_squared} and \code{pearson} under their own
+names. A cell holding a prediction that is not a number scores \code{NA}.
 }
 \examples{
 y <- c(1, 2, 3, 4)

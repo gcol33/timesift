@@ -14,7 +14,9 @@ mars_fixture <- function() {
   held <- c("unit", "y_gaussian", "y_binomial", "w", "fold")
   x <- as.matrix(d[, setdiff(names(d), held), drop = FALSE])
   x <- x[, !endsWith(colnames(x), "^2"), drop = FALSE]
-  list(x = x, w = d$w, y = list(y_binomial = d$y_binomial, y_gaussian = d$y_gaussian),
+  list(x = x, w = d$w,
+       y = list(y_binomial = d$y_binomial, y_gaussian = d$y_gaussian,
+                y_poisson = fixture_counts(dir, d$unit)),
        cases = utils::read.csv(file.path(dir, "mars_cases.csv"), stringsAsFactors = FALSE),
        coef = utils::read.csv(file.path(dir, "mars_coef.csv"), stringsAsFactors = FALSE),
        predict = utils::read.csv(file.path(dir, "mars_predict.csv"), stringsAsFactors = FALSE))
@@ -23,7 +25,7 @@ mars_fixture <- function() {
 mars_case_fit <- function(fx, row) {
   y <- fx$y[[row$response]]
   w <- if (isTRUE(row$weighted)) fx$w else rep(1, length(y))
-  family <- if (row$response == "y_gaussian") "gaussian" else "binomial"
+  family <- switch(row$response, y_gaussian = "gaussian", y_poisson = "poisson", "binomial")
   .mars_fit(fx$x, y, w, family, degree = row$degree, minspan = row$minspan,
             endspan = row$endspan, fast_k = row$fast_k, prune = isTRUE(row$prune),
             nprune = if (is.na(row$nprune)) NULL else row$nprune)

@@ -20,7 +20,8 @@ additive_fixture <- function() {
   list(designs = list(weekly = x[, 1:4], first = x[, 1:3], late = x[, 5:8], all = x,
                       few = unname(as.matrix(few[, -1L])),
                       knots = unname(as.matrix(knots[, c("v01", "v02")]))),
-       y = list(y_binomial = d$y_binomial, y_gaussian = d$y_gaussian, y = knots$y),
+       y = list(y_binomial = d$y_binomial, y_gaussian = d$y_gaussian,
+                y_poisson = fixture_counts(dir, d$unit), y = knots$y),
        w = d$w, cases = read("additive_cases.csv"), predict = read("additive_predict.csv"))
 }
 
@@ -28,7 +29,7 @@ additive_case_fit <- function(fx, row) {
   x <- fx$designs[[row$design]]
   y <- fx$y[[row$response]]
   w <- if (isTRUE(row$weighted)) fx$w else rep(1, length(y))
-  family <- if (row$response == "y_gaussian") "gaussian" else "binomial"
+  family <- switch(row$response, y_gaussian = "gaussian", y_poisson = "poisson", "binomial")
   list(x = x, fit = .additive_fit(x, y, w, family, k = row$k, gamma = row$gamma))
 }
 
@@ -106,6 +107,7 @@ test_that("the additive model refuses settings it has no fit for", {
   expect_error(additive(threads = 0), "whole number")
   x <- matrix(stats::rnorm(60), 20)
   expect_error(.additive_fit(x, rep(0:1, 10), c(-1, rep(1, 19)), "binomial"), "positive")
+  expect_error(.additive_fit(x, c(-1, rep(1, 19)), rep(1, 20), "poisson"), "count of zero or more")
   expect_error(.additive_fit(x, rep(0:1, 10), rep(1, 20), "binomial"), "more than the 20 units")
   f <- .additive_fit(x[, 1, drop = FALSE], rep(0:1, 10), rep(1, 20), "binomial", k = 5L)
   expect_error(.additive_predict(f, x), "fitted on 1 columns")
@@ -147,7 +149,7 @@ test_that("the learner fits under both heads, round trips, and a constant respon
 # The design and the penalty are read off the fit, each term's columns being its raw basis times
 # its map and its penalty a diagonal, and the problem is solved by a singular value decomposition
 # of the weighted design stacked on the root of the penalty, which takes no rank decision on the
-# way. Under the binomial family the solve is repeated at the working weights until the
+# way. Under the binomial and the Poisson family the solve is repeated at the working weights until the
 # coefficients stop moving. The core is asserted to land on the same coefficients, fitted means,
 # effective degrees of freedom and criterion, at smoothing parameters spread over sixteen orders of
 # magnitude: a solve that loses the directions a column's penalty holds, because another column's
@@ -193,7 +195,8 @@ additive_exact <- function(f, x, y, w, sp, gamma = 1) {
   keep <- setdiff(seq_len(f$n_coef), f$aliased + 1L)
   xm <- xm[, keep, drop = FALSE]
   pen <- pen[keep]
-  binomial <- f$family == "binomial"
+  family <- f$family
+  iterative <- family != "gaussian"
   n <- nrow(xm)
   solve_at <- function(root, z) {
     a <- rbind(root * xm, diag(sqrt(pen), length(pen)))
@@ -202,26 +205,28 @@ additive_exact <- function(f, x, y, w, sp, gamma = 1) {
          influence = s$v %*% (t(s$u[seq_len(n), , drop = FALSE]) / s$d) %*% (root * xm))
   }
   deviance <- function(mu) {
-    if (binomial) {
-      2 * sum(w * (ifelse(y > 0, y * log(y / mu), 0) +
-                   ifelse(y < 1, (1 - y) * log((1 - y) / (1 - mu)), 0)))
-    } else {
-      sum(w * (y - mu)^2)
-    }
+    switch(family,
+           binomial = 2 * sum(w * (ifelse(y > 0, y * log(y / mu), 0) +
+                                   ifelse(y < 1, (1 - y) * log((1 - y) / (1 - mu)), 0))),
+           poisson = 2 * sum(w * (ifelse(y > 0, y * log(y / mu), 0) - (y - mu))),
+           gaussian = sum(w * (y - mu)^2))
   }
   penalised <- function(beta, mu) deviance(mu) + sum(pen * beta^2)
-  mu <- if (binomial) (w * y + 0.5) / (w + 1) else y
-  eta <- if (binomial) stats::qlogis(mu) else mu
+  mean_of <- function(eta) switch(family, binomial = stats::plogis(eta), poisson = exp(eta), eta)
+  weight_of <- function(mu) switch(family, binomial = w * mu * (1 - mu), poisson = w * mu, w)
+  response_of <- function(eta, mu) {
+    switch(family, binomial = eta + (y - mu) / (mu * (1 - mu)), poisson = eta + (y - mu) / mu, y)
+  }
+  mu <- switch(family, binomial = (w * y + 0.5) / (w + 1), poisson = y + 0.1, y)
+  eta <- switch(family, binomial = stats::qlogis(mu), poisson = log(mu), mu)
   beta <- NULL
-  for (i in seq_len(if (binomial) 500L else 1L)) {
-    wt <- if (binomial) w * mu * (1 - mu) else w
-    z <- if (binomial) eta + (y - mu) / (mu * (1 - mu)) else y
-    sol <- solve_at(sqrt(wt), z)
+  for (i in seq_len(if (iterative) 500L else 1L)) {
+    sol <- solve_at(sqrt(weight_of(mu)), response_of(eta, mu))
     next_beta <- sol$beta
     if (!is.null(beta)) {
       before <- penalised(beta, mu)
       for (h in 1:40) {
-        next_mu <- stats::plogis(drop(xm %*% next_beta))
+        next_mu <- mean_of(drop(xm %*% next_beta))
         if (penalised(next_beta, next_mu) <= before) break
         next_beta <- (next_beta + beta) / 2
       }
@@ -229,12 +234,12 @@ additive_exact <- function(f, x, y, w, sp, gamma = 1) {
     moved <- if (is.null(beta)) Inf else max(abs(next_beta - beta))
     beta <- next_beta
     eta <- drop(xm %*% beta)
-    mu <- if (binomial) stats::plogis(eta) else eta
-    if (!binomial || moved < 1e-11 * (1 + max(abs(beta)))) break
+    mu <- mean_of(eta)
+    if (!iterative || moved < 1e-11 * (1 + max(abs(beta)))) break
   }
-  if (binomial) {
+  if (iterative) {
     expect_lt(moved, 1e-8 * (1 + max(abs(beta))))
-    sol <- solve_at(sqrt(w * mu * (1 - mu)), eta + (y - mu) / (mu * (1 - mu)))
+    sol <- solve_at(sqrt(weight_of(mu)), response_of(eta, mu))
   }
   dev <- deviance(mu)
   per_coef <- numeric(f$n_coef)
@@ -244,7 +249,7 @@ additive_exact <- function(f, x, y, w, sp, gamma = 1) {
     sum(per_coef[first + seq_len(f$term_size[t]) - 1L])
   }, numeric(1L))
   tau <- sum(diag(sol$influence))
-  score <- if (binomial) dev / n + 2 * gamma * tau / n - 1 else n * dev / (n - gamma * tau)^2
+  score <- if (iterative) dev / n + 2 * gamma * tau / n - 1 else n * dev / (n - gamma * tau)^2
   list(mu = mu, edf = edf, score = score)
 }
 
@@ -263,7 +268,8 @@ test_that("a fit at given smoothing parameters is the exact penalised solve, wha
   cases <- list(
     list(design = "weekly", response = "y_binomial", family = "binomial", k = 10L, gamma = 1),
     list(design = "all", response = "y_gaussian", family = "gaussian", k = 5L, gamma = 1.4),
-    list(design = "few", response = "y_binomial", family = "binomial", k = 5L, gamma = 1))
+    list(design = "few", response = "y_binomial", family = "binomial", k = 5L, gamma = 1),
+    list(design = "late", response = "y_poisson", family = "poisson", k = 5L, gamma = 1))
   for (cs in cases) {
     x <- fx$designs[[cs$design]]
     y <- fx$y[[cs$response]]

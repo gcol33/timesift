@@ -410,12 +410,14 @@ NB_MODULE(_core, m) {
 
   m.def("tree_fit",
         [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int min_split,
-           int min_leaf, double cp, int max_depth, std::optional<ConstI32> fold, int n_fold) {
+           int min_leaf, double cp, int max_depth, std::optional<ConstI32> fold, int n_fold,
+           double shrink) {
           timesift::TreeSpec spec;
           spec.min_split = min_split;
           spec.min_leaf = min_leaf;
           spec.cp = cp;
           spec.max_depth = max_depth;
+          spec.shrink = shrink;
           return give(timesift::tree_fit(
               x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
               timesift::family_from_name(family), spec,
@@ -423,7 +425,7 @@ NB_MODULE(_core, m) {
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("min_split"),
         nb::arg("min_leaf"), nb::arg("cp"), nb::arg("max_depth"), nb::arg("fold") = nb::none(),
-        nb::arg("n_fold") = 0);
+        nb::arg("n_fold") = 0, nb::arg("shrink") = 1.0);
 
   m.def("tree_prune",
         [](const nb::dict& tree, double cp) {

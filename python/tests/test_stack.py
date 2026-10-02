@@ -646,3 +646,61 @@ def test_every_combination_lands_on_the_numbers_the_contract_pins():
             got = [p[i, j], *s[i, j]]
             want = [number(r[k]) for k in ("combined", "mean", "sd", "cv", "lower", "upper")]
             assert got == pytest.approx(want, rel=tol, abs=1e-9, nan_ok=True), (case["case"], r)
+
+
+def test_the_combiner_under_a_count_response_lands_on_the_numbers_the_contract_pins():
+    from timesift.metrics import regression_metric
+    from timesift.response import Folds, numeric_cells
+    response = rows("ensemble_count_response.csv")
+    units = tuple(r["id"] for r in response)
+    y = Response(np.array([[float(r["y"])] for r in response]), units, ("count",))
+    folds = Folds(fold=np.array([int(r["fold"]) for r in response]), units=units)
+    cells = numeric_cells(y, folds)
+    oof = {}
+    for row in rows("ensemble_count_oof.csv"):
+        oof.setdefault(row["candidate"], []).append(float(row["p"]))
+    oof = {k: np.array(v).reshape(-1, 1) for k, v in oof.items()}
+    scores = score_table(oof, y, folds, cells,
+                         score=lambda obs, p: -regression_metric(obs, p, "poisson_deviance"))
+    weights, expected = rows("ensemble_count_weights.csv"), rows("ensemble_count_predict.csv")
+    tol = 1e-9
+    for case in rows("ensemble_count_cases.csv"):
+        spec = ensemble(method=case["method"], scope=case["scope"], response="count")
+        st = ensemble_fit(oof, y, cells, folds, spec, scores)
+        assert st.loss == "poisson_deviance"
+        w = [r for r in weights if r["case"] == case["case"]]
+        assert st.members == tuple(r["member"] for r in w), case["case"]
+        for r in w:
+            assert st.weights[r["member"]] == pytest.approx(float(r["weight"]), rel=tol, abs=tol)
+        p = ensemble_combine(st, oof)
+        s = ensemble_spread(st, oof, alpha=0.1)
+        for r in (r for r in expected if r["case"] == case["case"]):
+            i = units.index(r["id"])
+            got = [p[i, 0], s[i, 0][1], s[i, 0][3], s[i, 0][4]]
+            want = [number(r[k]) for k in ("combined", "sd", "lower", "upper")]
+            assert got == pytest.approx(want, rel=tol, abs=tol, nan_ok=True), (case["case"], r)
+
+
+def test_the_poisson_deviance_loss_is_the_one_a_count_head_is_trained_under():
+    loss = stack_loss("count")
+    assert loss is stack_loss("count") and loss["range"] == (0.0, np.inf)
+    y = np.array([0.0, 1.0, 2.0, 5.0, 3.0, 0.0, 4.0, 2.0])
+    p = np.array([0.4, 1.3, 1.9, 4.1, 3.6, 0.3, 3.2, 2.4])
+    with np.errstate(divide="ignore", invalid="ignore"):
+        saturated = np.where(y > 0, y * np.log(y / p), 0.0)
+    assert loss["value"](p, y) == pytest.approx(np.mean(2 * (saturated - (y - p))))
+    step = 1e-6
+    numeric = np.array([(loss["value"](p + step * e, y) - loss["value"](p - step * e, y)) / (2 * step)
+                        for e in np.eye(len(p))])
+    np.testing.assert_allclose(loss["gradient"](p, y), numeric, rtol=1e-6, atol=1e-9)
+    # A mean at zero is read at the machine epsilon, so the value stays finite.
+    assert np.isfinite(loss["value"](np.r_[0.0, p[1:]], y))
+    # The solver reaches the weights an exhaustive search over the simplex reaches.
+    rng = np.random.default_rng(8)
+    pm = np.column_stack([p * np.exp(rng.normal(0, 0.1, 8)), p * np.exp(rng.normal(0, 0.4, 8)),
+                          np.full(8, y.mean())])
+    w = simplex_weights(pm, y, loss)
+    grid = [(a, b, 1 - a - b) for a in np.linspace(0, 1, 101) for b in np.linspace(0, 1, 101)
+            if a + b <= 1 + 1e-12]
+    best = min(loss["value"](pm @ np.array(g), y) for g in grid)
+    assert loss["value"](pm @ w, y) <= best + 1e-9

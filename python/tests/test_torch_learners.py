@@ -339,3 +339,15 @@ def test_the_encoders_fit_under_the_heads_weight(temporary_response):
                         response="unweighted_test").predict(x)
     assert not np.allclose(weighted, plain)
     assert weighted[:3].mean() > plain[:3].mean()
+
+
+def test_the_encoders_train_under_the_poisson_deviance_and_predict_a_positive_mean():
+    from test_numeric_heads import count_data, poisson_deviance_of
+    x, _, _, rate, count, y = count_data(n=60)
+    fit = fit_learner(mlp(epochs=60, learning_rate=0.01, seed=3, val_frac=0), x, y,
+                      response="count")
+    p = fit.predict(x)[:, 0]
+    assert fit.model["activation"] == "exp"
+    assert (p > 0).all()
+    assert np.corrcoef(p, rate)[0, 1] > 0.5
+    assert poisson_deviance_of(count, p) < poisson_deviance_of(count, np.full(len(p), count.mean()))

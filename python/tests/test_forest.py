@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from counts import fixture_counts
 from oracle import oracle_stream
 from timesift import Response, fit_learner, forest, grain_matrix
 from timesift.learners import _forest_settings, flatten
@@ -42,6 +43,7 @@ def forest_input():
         x=np.asfortranarray([[float(r[c]) for c in columns] for r in rows]),
         binomial=np.array([float(r["y_binomial"]) for r in rows]),
         gaussian=np.array([float(r["y_gaussian"]) for r in rows]),
+        poisson=fixture_counts(FIXTURES, [r["unit"] for r in rows]),
         count=np.array([counts[r["unit"]] for r in rows], dtype=float))
 
 

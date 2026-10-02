@@ -37,7 +37,7 @@ from .report import (candidate_table, ensemble_weights, occlusion, procedure_tab
 from .representation import (DAY_LEVEL_STATS, GRAINS, STATS, Coverage, TimesiftMatrix,
                              TimesiftSet, bind_channels, calendar_channels, coverage,
                              grain_matrix, lookback_matrix, timesift_set)
-from .response import (ABUNDANCE, CONTINUOUS, ORDINAL, PRESENCE_ABSENCE, Cells, Folds, Response, align_folds, as_response,
+from .response import (ABUNDANCE, CONTINUOUS, COUNT, ORDINAL, PRESENCE_ABSENCE, Cells, Folds, Response, align_folds, as_response,
                        fold_map, positive_weights, scorable_cells)
 from .plot import plot
 from .select import column_names, select_columns
@@ -68,7 +68,7 @@ for _name in TABLE_METRICS:
     register_metric(_name, lambda y, p, _name=_name: table_metric(y, p, _name))
 for _name in ("r_squared", "pearson"):
     register_metric(_name, lambda y, p, _name=_name: regression_metric(y, p, _name))
-for _name in ("rmse", "mse", "mae", "max_error"):
+for _name in ("rmse", "mse", "mae", "max_error", "poisson_deviance"):
     register_metric("neg_" + _name, lambda y, p, _name=_name: -regression_metric(y, p, _name))
 for _name in ORDINAL_METRICS:
     register_metric("ordinal_" + _name, lambda y, p, _name=_name: ordinal_metric(y, p, _name))
@@ -77,6 +77,7 @@ register_response("presence_absence", PRESENCE_ABSENCE)
 register_response("continuous", CONTINUOUS)
 register_response("abundance", ABUNDANCE)
 register_response("ordinal", ORDINAL)
+register_response("count", COUNT)
 
 for _name, _grid in default_grids().items():
     register_tuning(_name, _grid)
@@ -98,7 +99,7 @@ register_learner("rescnn", rescnn)
 __all__ = [
     "Cells", "Coverage", "DAY_LEVEL_STATS", "EnsembleSpec", "Fit", "Folds",
     "GRAINS",
-    "ABUNDANCE", "CONTINUOUS", "Ladder", "Learner", "ORDINAL", "PRESENCE_ABSENCE", "RangeChange", "ResponseCurve", "Representation", "Resampling", "Response",
+    "ABUNDANCE", "CONTINUOUS", "COUNT", "Ladder", "Learner", "ORDINAL", "PRESENCE_ABSENCE", "RangeChange", "ResponseCurve", "Representation", "Resampling", "Response",
     "SPREAD_STATISTICS", "STATS",
     "Selection", "Sift", "Simulation", "Stack", "Timesift", "TimesiftMatrix", "Tuned", "TimesiftSet", "TimesiftSpec",
     "TrainControl", "additive", "align_folds", "as_resampling", "as_response", "as_sift", "auto_grains",

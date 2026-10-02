@@ -24,7 +24,7 @@
 // R matrix already is and what a Fortran-ordered NumPy array already is.
 namespace timesift {
 
-enum class Family { gaussian, binomial };
+enum class Family { gaussian, binomial, poisson };
 
 Family family_from_name(const std::string& name);
 const char* family_name(Family f);
@@ -100,7 +100,7 @@ PenaltyCV penalised_cv(const double* x, const double* y, const double* w, std::s
 void penalised_coef(const PenaltyPath& path, double lambda, double* a0, double* beta);
 
 // The response at one penalty: the linear predictor for a Gaussian family, the probability for a
-// binomial one.
+// binomial one, the mean count for a Poisson one.
 void penalised_predict(const PenaltyPath& path, double lambda, const double* x, std::size_t n,
                        double* out);
 

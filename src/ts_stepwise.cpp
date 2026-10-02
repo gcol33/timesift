@@ -209,6 +209,12 @@ class Scorer {
          const StepwiseSpec& spec)
       : y_(y), w_(w), n_(n), catalogue_(catalogue), spec_(spec) {
     for (std::size_t i = 0; i < n; ++i) sum_log_w_ += std::log(w[i]);
+    if (spec.family == Family::poisson) {
+      for (std::size_t i = 0; i < n; ++i) {
+        const double ylogy = y[i] > 0.0 ? y[i] * std::log(y[i]) : 0.0;
+        saturated_ += w[i] * (ylogy - y[i] - std::lgamma(y[i] + 1.0));
+      }
+    }
   }
 
   Scored score(const std::vector<std::size_t>& terms) const {
@@ -229,11 +235,14 @@ class Scorer {
 
  private:
   // `-2 log L + 2 rank`. For a 0/1 response the saturated log-likelihood is zero, so the first
-  // part is the deviance; for the gaussian family it is the likelihood at the maximum-likelihood
-  // variance under the prior weights, whose estimate counts as one more parameter.
+  // part is the deviance; for a count it is the deviance less twice the saturated log-likelihood
+  // `sum w (y log y - y - log y!)`; for the gaussian family it is the likelihood at the
+  // maximum-likelihood variance under the prior weights, whose estimate counts as one more
+  // parameter.
   double criterion(const Glm& g) const {
     const double penalty = 2.0 * static_cast<double>(g.rank);
     if (spec_.family == Family::binomial) return g.deviance + penalty;
+    if (spec_.family == Family::poisson) return g.deviance - 2.0 * saturated_ + penalty;
     const double nd = static_cast<double>(n_);
     return nd * (std::log(g.deviance / nd * 2.0 * kPi) + 1.0) + 2.0 - sum_log_w_ + penalty;
   }
@@ -244,6 +253,7 @@ class Scorer {
   const std::vector<Term>& catalogue_;
   const StepwiseSpec& spec_;
   double sum_log_w_ = 0.0;
+  double saturated_ = 0.0;
 };
 
 // One step's alternatives to the model as it stands: dropping the term at a position of the model,
@@ -303,6 +313,9 @@ Stepwise stepwise_fit(const double* x, const double* y, const double* w, std::si
     if (!(w[i] > 0.0)) throw Error("a stepwise fit reads positive weights.");
     if (spec.family == Family::binomial && y[i] != 0.0 && y[i] != 1.0) {
       throw Error("a binomial stepwise fit reads a response of zero and one.");
+    }
+    if (spec.family == Family::poisson && y[i] < 0.0) {
+      throw Error("a Poisson stepwise fit reads a response of counts, none of them negative.");
     }
   }
 
@@ -406,7 +419,7 @@ void stepwise_predict(const Stepwise& fit, const double* x, std::size_t n, std::
     }
   }
   for (std::size_t i = 0; i < n; ++i) {
-    out[i] = fit.family == Family::binomial ? logit_linkinv(eta[i]) : eta[i];
+    out[i] = linkinv(fit.family, eta[i]);
   }
 }
 

@@ -1,9 +1,10 @@
 #' Gradient boosted trees on the flattened representation
 #'
 #' One boosted model per response, over every bin-by-channel column of the representation: a
-#' logistic model under a presence-absence head and a squared-error one under a head with a
-#' squared-error loss. The score starts at the log-odds of the weighted share of presences, or the
-#' weighted mean, and each tree is fitted to the loss's gradient at the current score and added to
+#' logistic model under a presence-absence head, a squared-error one under a head with a
+#' squared-error loss and a Poisson one with a log link under a count head. The score starts at the
+#' log-odds of the weighted share of presences, the weighted mean, or the log of the weighted mean
+#' count, and each tree is fitted to the loss's gradient at the current score and added to
 #' it scaled by `shrinkage`. Each tree is grown on a subsample of the units drawn without
 #' replacement, and reads a subsample of the columns.
 #'

@@ -634,6 +634,9 @@ NUMERIC_CASES <- list(
   constant_y = list(y = c(3, 3, 3, 3), p = c(2, 3, 4, 5)),
   constant_p = list(y = c(1, 2, 3, 4), p = c(2, 2, 2, 2)),
   noisy = list(y = c(1, 2, 3, 4, 5, 6), p = c(1.2, 1.7, 3.4, 3.5, 5.3, 6.4)),
+  counts = list(y = c(0, 1, 2, 5, 3, 0), p = c(0.5, 1.2, 1.8, 4.2, 3.5, 0.2)),
+  counts_zero_mean = list(y = c(0, 0, 2, 1), p = c(0, 0.4, 0, 1.5)),
+  counts_zero_ok = list(y = c(0, 0, 2, 1), p = c(0, 0.4, 1.5, 1.5)),
   ordinal_mixed = list(y = c(1, 1, 2, 2, 3, 3, 3), p = c(1.2, 2.4, 2, 1.4, 2.8, 3.4, 2.2)),
   ordinal_tie = list(y = c(1, 2, 3, 3), p = c(1.5, 2.5, 3.5, 2.5)),
   ordinal_gap = list(y = c(0, 0, 2, 2, 5), p = c(0.4, 1.1, 1.9, 3.6, 4.9))
@@ -861,6 +864,101 @@ write_fixture(
 )
 cat("wrote", length(ens_fits), "combiner cases\n")
 
+# ---- the combiner under a count response
+# Four candidates' out-of-fold means for 60 counts, none of them drawn: the counts are a Poisson's
+# quantiles at a low-discrepancy sequence and the candidates are the rate under a deterministic
+# wobble, so every random stream is where it was. `good` follows the rate closely, `noisy` wobbles
+# on it, `flat` is the grand mean and `biased` reads three tenths low, each on the week grain. The weights the combiner
+# minimises the Poisson deviance with are asserted against a search over the simplex that shares
+# nothing with the solver, so the fixture pins the minimum and not the path to it.
+cnt_i <- 1:60
+cnt_units <- sprintf("c%02d", cnt_i)
+cnt_rate <- exp(0.2 + 1.1 * sin(0.7 * cnt_i))
+cnt_y <- matrix(stats::qpois((cnt_i * 0.6180339887498949 + 0.1) %% 1, cnt_rate), ncol = 1L,
+                dimnames = list(cnt_units, "count"))
+cnt_oof <- lapply(list(
+  `good / week` = cnt_rate * exp(0.15 * sin(1.3 * cnt_i)),
+  `noisy / week` = cnt_rate * exp(0.6 * cos(2.1 * cnt_i)),
+  `flat / week` = rep(mean(cnt_y), 60L),
+  `biased / week` = 0.7 * cnt_rate), function(p) {
+  matrix(round(p, 6), ncol = 1L, dimnames = dimnames(cnt_y))
+})
+cnt_fold <- stats::setNames(rep_len(1:5, 60L), cnt_units)
+cnt_cells <- timesift:::.numeric_cells(cnt_y, cnt_fold)
+write_fixture(
+  data.frame(id = cnt_units, y = as.numeric(cnt_y), fold = as.integer(cnt_fold),
+             stringsAsFactors = FALSE),
+  "ensemble_count_response.csv"
+)
+write_fixture(
+  do.call(rbind, lapply(names(cnt_oof), function(nm) {
+    data.frame(candidate = nm, id = cnt_units, p = sprintf("%.6f", as.numeric(cnt_oof[[nm]])),
+               stringsAsFactors = FALSE)
+  })),
+  "ensemble_count_oof.csv"
+)
+cnt_score <- timesift:::.metrics_reg$get("neg_poisson_deviance")
+cnt_scores <- do.call(rbind, lapply(names(cnt_oof), function(nm) {
+  out <- .score_arm(nm, nm, cnt_y, cnt_oof[[nm]], cnt_fold, sort(unique(cnt_fold)), cnt_cells,
+                    cnt_score)
+  data.frame(candidate = nm, variable = out$variable, fold = out$fold, score = out$score,
+             scorable = out$scorable, stringsAsFactors = FALSE)
+}))
+CNT_CASES <- list(stack = ensemble("stack", response = "count"),
+                  mean = ensemble("mean", response = "count"),
+                  median = ensemble("median", response = "count"))
+cnt_fits <- lapply(CNT_CASES, function(s) {
+  ensemble_fit(cnt_oof, cnt_y, cnt_cells, cnt_fold, s, cnt_scores)
+})
+# The independent search: the loss in the softmax of free coordinates, from the corners and the
+# centre of the simplex, by a derivative-free simplex of its own. Every start must land on the
+# weights the combiner fitted, to the solver's resolution.
+cnt_P <- vapply(cnt_oof, as.numeric, numeric(60L))
+cnt_loss <- function(w) {
+  p <- pmax(as.numeric(cnt_P %*% w), .Machine$double.eps)
+  mean(2 * (ifelse(cnt_y > 0, cnt_y * log(cnt_y / p), 0) - (cnt_y - p)))
+}
+cnt_soft <- function(z) exp(c(z, 0)) / sum(exp(c(z, 0)))
+cnt_best <- Inf
+for (start in list(c(0, 0, 0), c(4, 0, 0), c(0, 4, 0), c(0, 0, 4), c(-4, -4, -4))) {
+  r <- stats::optim(start, function(z) cnt_loss(cnt_soft(z)), method = "Nelder-Mead",
+                    control = list(reltol = 1e-14, maxit = 5000L))
+  cnt_best <- min(cnt_best, r$value)
+}
+cnt_stacked <- cnt_loss(cnt_fits$stack$weights)
+if (cnt_stacked > cnt_best + 1e-7) {
+  stop("the combiner's weights under the Poisson deviance reach ", format(cnt_stacked, digits = 12),
+       " where a search over the simplex reaches ", format(cnt_best, digits = 12), ".",
+       call. = FALSE)
+}
+write_fixture(
+  do.call(rbind, lapply(names(cnt_fits), function(nm) {
+    st <- cnt_fits[[nm]]
+    data.frame(case = nm, member = names(st$weights), weight = ens_number(st$weights),
+               stringsAsFactors = FALSE)
+  })),
+  "ensemble_count_weights.csv"
+)
+write_fixture(
+  do.call(rbind, lapply(names(cnt_fits), function(nm) {
+    p <- ensemble_combine(cnt_fits[[nm]], cnt_oof)
+    s <- ensemble_spread(cnt_fits[[nm]], cnt_oof, alpha = 0.1)
+    data.frame(case = nm, id = rownames(p), combined = ens_number(as.numeric(p)),
+               sd = ens_number(as.numeric(s[, , "sd"])),
+               lower = ens_number(as.numeric(s[, , "lower"])),
+               upper = ens_number(as.numeric(s[, , "upper"])), stringsAsFactors = FALSE)
+  })),
+  "ensemble_count_predict.csv"
+)
+write_fixture(
+  data.frame(case = names(CNT_CASES),
+             method = vapply(CNT_CASES, function(s) s$method, character(1L)),
+             scope = vapply(CNT_CASES, function(s) s$scope, character(1L)),
+             stringsAsFactors = FALSE),
+  "ensemble_count_cases.csv"
+)
+cat("wrote", length(cnt_fits), "count combiner cases\n")
+
 # ---------------------------------------------------------------------------------------------
 # The penalised fit.
 #
@@ -887,15 +985,18 @@ PEN_THRESH <- 1e-14
 # fixture both implementations had to reproduce a failure to match.
 PEN_MAXIT <- 1e7
 # The objective both implementations minimise, on glmnet's own scale: the mean deviance halved
-# for a Gaussian family and the mean negative log likelihood for a binomial one, plus the penalty.
+# for a Gaussian family and the mean negative log likelihood for a binomial or a Poisson one, the
+# Poisson one without its `log(y!)`, plus the penalty.
 # It is what the fixture pins tightly. A coefficient is not: two nearly identical columns split
 # one coefficient between them differently in any two descents, and the split is not determined
 # to the precision the fit is, so that is asserted at a looser tolerance beside this one.
 pen_objective <- function(x, y, w, family, alpha, lambda, a0, beta) {
   wn <- w / sum(w)
   eta <- a0 + as.numeric(x %*% beta)
-  fit <- if (family == "gaussian") sum(wn * (y - eta)^2) / 2 else
-    -sum(wn * (y * eta - log1p(exp(eta))))
+  fit <- switch(family,
+                gaussian = sum(wn * (y - eta)^2) / 2,
+                binomial = -sum(wn * (y * eta - log1p(exp(eta)))),
+                poisson = -sum(wn * (y * eta - exp(eta))))
   fit + lambda * (alpha * sum(abs(beta)) + (1 - alpha) / 2 * sum(beta^2))
 }
 
@@ -928,6 +1029,12 @@ pen_y_binomial <- as.numeric(pen_sim$y[, 1L])
 # The continuous case is the driver the response was generated from, which is a real function of
 # the record rather than a second draw beside it.
 pen_y_gaussian <- round(as.numeric(pen_sim$driver[, 1L]), 6)
+# The count case is the same driver read as a rate, `exp(0.4 + 0.6 z)` for `z` the driver in
+# standard units, and the counts are that Poisson's quantiles at a low-discrepancy sequence rather
+# than a draw, so no random stream is advanced and every other fixture is as it was.
+pen_rate <- exp(0.4 + 0.6 * as.numeric(scale(pen_y_gaussian)))
+pen_y_poisson <- stats::qpois((seq_len(PEN_N) * 0.6180339887498949 + 0.25) %% 1, pen_rate)
+pen_y <- list(gaussian = pen_y_gaussian, binomial = pen_y_binomial, poisson = pen_y_poisson)
 set.seed(20260918L)
 pen_w <- round(stats::runif(PEN_N, 0.3, 3), 6)
 pen_fold <- sample(rep_len(0:4, PEN_N))
@@ -941,8 +1048,10 @@ pen_input$y_binomial <- pen_y_binomial
 pen_input$w <- sprintf("%.12g", pen_w)
 pen_input$fold <- pen_fold
 write_fixture(pen_input, "penalised_input.csv")
+write_fixture(data.frame(unit = pen_units, y_poisson = pen_y_poisson, stringsAsFactors = FALSE),
+              "count_response.csv")
 
-PEN_CASES <- do.call(rbind, lapply(c("gaussian", "binomial"), function(family) {
+PEN_CASES <- do.call(rbind, lapply(c("gaussian", "binomial", "poisson"), function(family) {
   do.call(rbind, lapply(c(1, 0.5, 0), function(alpha) {
     do.call(rbind, lapply(c(FALSE, TRUE), function(weighted) {
       data.frame(case = sprintf("%s_a%02d_%s", family, round(alpha * 10),
@@ -957,11 +1066,30 @@ pen_path_rows <- list()
 pen_cv_rows <- list()
 for (i in seq_len(nrow(PEN_CASES))) {
   row <- PEN_CASES[i, ]
-  y <- if (row$family == "binomial") pen_y_binomial else pen_y_gaussian
+  y <- pen_y[[row$family]]
   w <- if (row$weighted) pen_w else rep(1, PEN_N)
   fit <- settled(glmnet::glmnet(pen_x, y, family = row$family, alpha = row$alpha, weights = w,
                                 control = list(thresh = PEN_THRESH, maxit = PEN_MAXIT)))
   beta <- as.matrix(fit$beta)
+  # A Poisson path that ends on the rule that stops it, rather than at its last penalty, ends on
+  # a comparison of the deviance explained over the last four steps, relative to the deviance
+  # explained now, with ten times glmnet's `fdev`. glmnet's Newton iteration settles at a
+  # tolerance of its own, so a comparison that close to the threshold could fall either side of
+  # it from one implementation to the next. A reference whose length hangs on that is refused.
+  if (row$family == "poisson") {
+    full <- settled(glmnet::glmnet(pen_x, y, family = row$family, alpha = row$alpha, weights = w,
+                                   control = list(thresh = PEN_THRESH, maxit = PEN_MAXIT,
+                                                  fdev = 0)))
+    stopped <- length(fit$lambda)
+    if (stopped < length(full$lambda)) {
+      r <- full$dev.ratio
+      share <- vapply(c(stopped - 1L, stopped), function(m) (r[m] - r[m - 4L]) / r[m], numeric(1L))
+      if (min(abs(share / 1e-4 - 1)) < 1e-3) {
+        stop("the ", row$case, " path ends within a thousandth of the threshold that stops it; ",
+             "it is not a reference.", call. = FALSE)
+      }
+    }
+  }
   # The path's first point is left out. glmnet fits it at a penalty of 9.9e35 and reports it
   # under the largest penalty that leaves every coefficient at zero, which is the same fit for
   # any mixing above zero and is not the same fit for a ridge, where nothing is ever exactly
@@ -1104,20 +1232,29 @@ tree_count <- sample(1:4, PEN_N, replace = TRUE)
 write_fixture(data.frame(unit = pen_units, count = tree_count, stringsAsFactors = FALSE),
               "tree_weights.csv")
 
-TREE_CASES <- do.call(rbind, lapply(c("binomial", "gaussian"), function(family) {
+TREE_CASES <- do.call(rbind, lapply(c("binomial", "gaussian", "poisson"), function(family) {
   do.call(rbind, lapply(c("flat", "counts"), function(weights) {
     rbind(
       data.frame(case = sprintf("%s_%s_package", family, weights), family = family,
                  weights = weights, min_split = 20L, min_leaf = 7L, cp = 0.01, max_depth = 30L,
-                 stringsAsFactors = FALSE),
+                 shrink = 1, stringsAsFactors = FALSE),
       data.frame(case = sprintf("%s_%s_bigboss", family, weights), family = family,
                  weights = weights, min_split = 5L, min_leaf = 5L, cp = 0.001, max_depth = 10L,
-                 stringsAsFactors = FALSE),
+                 shrink = 1, stringsAsFactors = FALSE),
       data.frame(case = sprintf("%s_%s_deep", family, weights), family = family,
                  weights = weights, min_split = 4L, min_leaf = 2L, cp = 0, max_depth = 4L,
-                 stringsAsFactors = FALSE))
+                 shrink = 1, stringsAsFactors = FALSE))
   }))
 }))
+# A Poisson leaf's rate is shrunk towards the response's own rate, by a gamma prior of coefficient
+# of variation `shrink`: rpart's default of one, none, and a tighter prior.
+TREE_CASES <- rbind(
+  TREE_CASES,
+  data.frame(case = c("poisson_flat_unshrunk", "poisson_counts_unshrunk",
+                      "poisson_flat_tight", "poisson_counts_tight"),
+             family = "poisson", weights = c("flat", "counts", "flat", "counts"),
+             min_split = 5L, min_leaf = 5L, cp = 0.001, max_depth = 10L,
+             shrink = c(0, 0, 0.5, 0.5), stringsAsFactors = FALSE))
 write_fixture(TREE_CASES, "tree_cases.csv")
 
 tree_nodes <- list()
@@ -1125,12 +1262,14 @@ tree_tables <- list()
 tree_predictions <- list()
 for (i in seq_len(nrow(TREE_CASES))) {
   row <- TREE_CASES[i, ]
-  y <- if (row$family == "binomial") pen_y_binomial else pen_y_gaussian
+  y <- pen_y[[row$family]]
   w <- if (row$weights == "counts") tree_count else rep(1, PEN_N)
   d <- data.frame(y = if (row$family == "binomial") factor(y, levels = c(0, 1)) else y,
                   tree_x, check.names = TRUE)
   fit <- rpart::rpart(y ~ ., data = d, weights = w,
-                      method = if (row$family == "binomial") "class" else "anova",
+                      method = switch(row$family, binomial = "class", gaussian = "anova",
+                                      poisson = "poisson"),
+                      parms = if (row$family == "poisson") list(shrink = row$shrink),
                       control = rpart::rpart.control(minsplit = row$min_split,
                                                      minbucket = row$min_leaf, cp = row$cp,
                                                      maxdepth = row$max_depth, maxcompete = 0L,
@@ -1185,14 +1324,14 @@ cat("wrote the tree reference\n")
 source("tests/testthat/helper-oracle-forest.R")
 FOREST_CASES <- data.frame(
   case = c("binomial_flat", "binomial_counts", "binomial_balance", "binomial_bagged",
-           "gaussian_flat", "gaussian_counts"),
-  family = c(rep("binomial", 4L), rep("gaussian", 2L)),
-  weights = c("flat", "counts", "counts", "flat", "flat", "counts"),
+           "gaussian_flat", "gaussian_counts", "poisson_flat", "poisson_counts"),
+  family = c(rep("binomial", 4L), rep("gaussian", 2L), rep("poisson", 2L)),
+  weights = c("flat", "counts", "counts", "flat", "flat", "counts", "flat", "counts"),
   trees = 3L,
-  mtry = c(4L, 4L, 4L, ncol(tree_x), 7L, 7L),
-  min_leaf = c(1L, 2L, 1L, 1L, 5L, 3L),
-  balance = c(FALSE, FALSE, TRUE, FALSE, FALSE, FALSE),
-  seed = c(11, 12, 13, 14, 15, 4294967295),
+  mtry = c(4L, 4L, 4L, ncol(tree_x), 7L, 7L, 7L, 7L),
+  min_leaf = c(1L, 2L, 1L, 1L, 5L, 3L, 5L, 3L),
+  balance = c(FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE),
+  seed = c(11, 12, 13, 14, 15, 4294967295, 16, 17),
   stringsAsFactors = FALSE)
 write_fixture(transform(FOREST_CASES, seed = sprintf("%.0f", seed),
                         balance = as.integer(balance)), "forest_cases.csv")
@@ -1201,7 +1340,7 @@ forest_nodes <- list()
 forest_predictions <- list()
 for (i in seq_len(nrow(FOREST_CASES))) {
   row <- FOREST_CASES[i, ]
-  y <- if (row$family == "binomial") pen_y_binomial else pen_y_gaussian
+  y <- pen_y[[row$family]]
   w <- if (row$weights == "counts") tree_count else rep(1, PEN_N)
   grown <- oracle_forest(tree_x, y, w, row$family, row$trees, row$mtry, row$min_leaf,
                          row$balance, row$seed)
@@ -1280,6 +1419,26 @@ BOOST_CASES <- data.frame(
   cv = c(0L, 0L, 0L, 0L, 1L, 1L, rep(0L, 6L)),
   seed = c(rep(1, 10L), 7, 4294967295),
   stringsAsFactors = FALSE)
+# The Poisson cases: gbm's poisson distribution for the first-order trees, its cross-validation
+# included, and xgboost's `count:poisson` for the second-order ones.
+BOOST_CASES <- rbind(BOOST_CASES, data.frame(
+  case = c("gbm_poisson_flat", "gbm_poisson_counts", "gbm_poisson_cv", "xgboost_poisson_random",
+           "xgboost_poisson_gamma"),
+  reference = c(rep("gbm", 3L), rep("xgboost", 2L)),
+  family = "poisson",
+  weights = c("flat", "counts", "flat", "random", "random"),
+  newton = c(0L, 0L, 0L, 1L, 1L),
+  trees = c(50L, 40L, 60L, 20L, 20L),
+  depth = c(2L, 3L, 2L, 3L, 2L),
+  shrinkage = c(0.1, 0.1, 0.1, 0.3, 0.3),
+  min_leaf = c(5, 3, 5, 1, 1),
+  subsample = 1,
+  colsample = 1,
+  lambda = c(0, 0, 0, 1, 2),
+  gamma = c(0, 0, 0, 0, 0.5),
+  cv = c(0L, 0L, 1L, 0L, 0L),
+  seed = 1,
+  stringsAsFactors = FALSE))
 write_fixture(transform(BOOST_CASES, seed = sprintf("%.0f", seed)), "boost_cases.csv")
 
 boost_x <- tree_x
@@ -1294,10 +1453,10 @@ boost_predictions <- list()
 boost_cv <- list()
 for (i in seq_len(nrow(BOOST_CASES))) {
   row <- BOOST_CASES[i, ]
-  y <- if (row$family == "binomial") pen_y_binomial else pen_y_gaussian
+  y <- pen_y[[row$family]]
   w <- switch(row$weights, flat = rep(1, PEN_N), counts = tree_count, random = boost_weight)
   if (row$reference == "gbm") {
-    dist <- if (row$family == "binomial") "bernoulli" else "gaussian"
+    dist <- switch(row$family, binomial = "bernoulli", gaussian = "gaussian", poisson = "poisson")
     n_trees <- row$trees
     if (row$cv == 1L) {
       folds <- sort(unique(pen_fold))
@@ -1318,8 +1477,8 @@ for (i in seq_len(nrow(BOOST_CASES))) {
   } else if (row$reference == "xgboost") {
     dm <- xgboost::xgb.DMatrix(boost_x, label = y, weight = w)
     fit <- xgboost::xgb.train(
-      params = list(objective = if (row$family == "binomial") "binary:logistic" else
-                      "reg:squarederror",
+      params = list(objective = switch(row$family, binomial = "binary:logistic",
+                                       gaussian = "reg:squarederror", poisson = "count:poisson"),
                     tree_method = "exact", max_depth = row$depth, eta = row$shrinkage,
                     lambda = row$lambda, gamma = row$gamma, min_child_weight = row$min_leaf,
                     nthread = 1),
@@ -1531,7 +1690,7 @@ if (!requireNamespace("MASS", quietly = TRUE)) {
   stop("the stepwise fixtures are MASS's own search, so it has to be installed to regenerate ",
        "them.", call. = FALSE)
 }
-sw_y <- c(mx_y, list(y_gaussian = pen_y_gaussian))
+sw_y <- c(mx_y, list(y_gaussian = pen_y_gaussian, y_poisson = pen_y_poisson))
 sw_case <- function(case, reference, response, direction, terms = "power", degree = 2L,
                     max_terms = Inf, weighted = FALSE, duplicate = FALSE) {
   data.frame(case = case, reference = reference, response = response, direction = direction,
@@ -1555,7 +1714,13 @@ SW_CASES <- rbind(
   sw_case("oracle_forward_12_weighted", "oracle", "y_12", "forward", terms = "column",
           weighted = TRUE),
   sw_case("oracle_forward_gaussian_weighted", "oracle", "y_gaussian", "forward",
-          terms = "column", max_terms = 6, weighted = TRUE))
+          terms = "column", max_terms = 6, weighted = TRUE),
+  sw_case("mass_both_poisson", "MASS", "y_poisson", "both"),
+  sw_case("mass_forward_poisson_weighted", "MASS", "y_poisson", "forward", weighted = TRUE),
+  sw_case("mass_backward_poisson", "MASS", "y_poisson", "backward"),
+  sw_case("glm_none_poisson", "glm", "y_poisson", "none"),
+  sw_case("oracle_forward_poisson_weighted", "oracle", "y_poisson", "forward", terms = "column",
+          max_terms = 5, weighted = TRUE))
 
 sw_design <- function(duplicate) if (duplicate) cbind(mx_x, mx_x[, 1L]) else mx_x
 sw_names <- function(x) sprintf("v%02d", seq_len(ncol(x)))
@@ -1580,15 +1745,15 @@ for (i in seq_len(nrow(SW_CASES))) {
   x <- sw_design(row$duplicate)
   y <- sw_y[[row$response]]
   w <- if (row$weighted) pen_w else rep(1, length(y))
-  gaussian <- row$response == "y_gaussian"
-  family <- if (gaussian) stats::gaussian() else stats::binomial()
+  family_name <- switch(row$response, y_gaussian = "gaussian", y_poisson = "poisson", "binomial")
+  family <- switch(family_name, gaussian = stats::gaussian(), poisson = stats::poisson(),
+                   binomial = stats::binomial())
   df <- stats::setNames(as.data.frame(x), sw_names(x))
   out <- stats::setNames(as.data.frame(x * 1.01), sw_names(x))
   df$y <- y
   df$w <- w
   if (row$reference == "oracle") {
-    f <- oracle_forward_aic(x, y, row$max_terms, row$degree, if (gaussian) "gaussian" else
-                              "binomial", w)
+    f <- oracle_forward_aic(x, y, row$max_terms, row$degree, family_name, w)
     chosen <- sprintf("%d:0", f$columns)
     fitted <- oracle_predict_forward(f, x)
     fitted_out <- oracle_predict_forward(f, x * 1.01)
@@ -1657,8 +1822,11 @@ MARS_CASES <- rbind(
   mars_case("gaussian_degree2", "y_gaussian", degree = 2L),
   mars_case("gaussian_weighted_degree2", "y_gaussian", weighted = TRUE, degree = 2L),
   mars_case("gaussian_nprune", "y_gaussian", nprune = 5L),
-  mars_case("gaussian_spans", "y_gaussian", minspan = 3L, endspan = 5L, fast_k = 0L))
-mars_y <- list(y_binomial = pen_y_binomial, y_gaussian = pen_y_gaussian)
+  mars_case("gaussian_spans", "y_gaussian", minspan = 3L, endspan = 5L, fast_k = 0L),
+  mars_case("poisson", "y_poisson"),
+  mars_case("poisson_weighted", "y_poisson", weighted = TRUE),
+  mars_case("poisson_degree2", "y_poisson", degree = 2L))
+mars_y <- list(y_binomial = pen_y_binomial, y_gaussian = pen_y_gaussian, y_poisson = pen_y_poisson)
 mars_term_key <- function(dirs, cuts) {
   k <- which(dirs != 0)
   if (!length(k)) return("1")
@@ -1670,7 +1838,7 @@ mars_pred <- list()
 for (i in seq_len(nrow(MARS_CASES))) {
   row <- MARS_CASES[i, ]
   y <- mars_y[[row$response]]
-  binomial <- row$response == "y_binomial"
+  refit <- switch(row$response, y_binomial = stats::binomial, y_poisson = stats::poisson)
   df <- mx_frame(mx_x)
   df$y <- y
   args <- list(formula = y ~ ., data = df, degree = row$degree, minspan = row$minspan,
@@ -1678,13 +1846,13 @@ for (i in seq_len(nrow(MARS_CASES))) {
                pmethod = if (row$prune) "backward" else "none")
   if (!is.na(row$nprune)) args$nprune <- row$nprune
   if (row$weighted) args$weights <- pen_w
-  if (binomial) args$glm <- list(family = stats::binomial)
+  if (!is.null(refit)) args$glm <- list(family = refit)
   e <- suppressWarnings(do.call(earth::earth, args))
   forward <- vapply(seq_len(nrow(e$dirs)), function(t) mars_term_key(e$dirs[t, ], e$cuts[t, ]),
                     character(1L))
-  coef <- if (binomial) e$glm.coefficients[, 1L] else e$coefficients[, 1L]
+  coef <- if (!is.null(refit)) e$glm.coefficients[, 1L] else e$coefficients[, 1L]
   fitted_out <- as.numeric(stats::predict(e, newdata = mx_frame(mx_x * 1.01),
-                                          type = if (binomial) "response" else "link"))
+                                          type = if (!is.null(refit)) "response" else "link"))
   mars_rows[[i]] <- data.frame(row, n_forward = length(forward), termcond = e$termcond,
                                forward = paste(forward, collapse = " "),
                                selected = paste(sort(e$selected.terms), collapse = " "),
@@ -1808,7 +1976,10 @@ AD_CASES <- rbind(
   ad_case("all_k5", design = "all", response = "y_gaussian", k = 5L),
   ad_case("gamma", design = "all", response = "y_gaussian", k = 5L, gamma = 1.4),
   ad_case("few", design = "few"),
-  ad_case("knots", design = "knots", response = "y", weighted = FALSE))
+  ad_case("knots", design = "knots", response = "y", weighted = FALSE),
+  ad_case("poisson", design = "late", response = "y_poisson", k = 5L),
+  ad_case("poisson_unweighted", design = "late", response = "y_poisson", weighted = FALSE),
+  ad_case("poisson_first", design = "first", response = "y_poisson", k = 5L))
 ad_tight <- mgcv::gam.control(epsilon = 1e-13, mgcv.tol = 1e-15, maxit = 500L,
                               newton = list(conv.tol = 1e-13, maxNstep = 5, maxSstep = 2,
                                             maxHalf = 60))
@@ -1820,7 +1991,7 @@ for (i in seq_len(nrow(AD_CASES))) {
               all = unname(mx_x), few = ad_few, knots = as.matrix(ad_knot[, c("v01", "v02")]))
   colnames(x) <- sprintf("v%02d", seq_len(ncol(x)))
   y <- switch(row$response, y_binomial = pen_y_binomial, y_gaussian = pen_y_gaussian,
-              y = ad_knot$y)
+              y_poisson = pen_y_poisson, y = ad_knot$y)
   w <- if (row$weighted) pen_w else rep(1, nrow(x))
   distinct <- apply(x, 2L, function(v) length(unique(v)))
   terms <- vapply(seq_len(ncol(x)), function(j) {
@@ -1830,7 +2001,8 @@ for (i in seq_len(nrow(AD_CASES))) {
     else sprintf("s(%s, k = %d)", v, row$k)
   }, character(1L))
   f <- stats::as.formula(paste("y ~ 1 +", paste(terms, collapse = " + ")))
-  family <- if (row$response == "y_gaussian") stats::gaussian() else stats::binomial()
+  family <- switch(row$response, y_gaussian = stats::gaussian(), y_poisson = stats::poisson(),
+                   stats::binomial())
   g <- suppressWarnings(mgcv::gam(f, family = family, data = data.frame(y = y, x), weights = w,
                                   method = "GCV.Cp", gamma = row$gamma, control = ad_tight))
   # A criterion with more than one local minimum has no one reference: which of them a search
@@ -1841,7 +2013,7 @@ for (i in seq_len(nrow(AD_CASES))) {
     r <- tryCatch(suppressWarnings(mgcv::gam(f, family = family, data = data.frame(y = y, x),
                                              weights = w, method = "GCV.Cp", gamma = row$gamma,
                                              in.out = list(sp = rep(sp0, length(g$sp)),
-                                                           scale = if (identical(family$family, "binomial")) 1 else g$scale))),
+                                                           scale = if (family$family %in% c("binomial", "poisson")) 1 else g$scale))),
                   error = function(e) NULL)
     if (!is.null(r) && abs(r$gcv.ubre - g$gcv.ubre) > 1e-6 * (1 + abs(g$gcv.ubre))) {
       stop("the ", row$case, " case's criterion has more than one local minimum: from smoothing ",

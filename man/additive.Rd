@@ -33,7 +33,8 @@ over the units, beside one intercept.
 \details{
 The coefficients maximise the penalised likelihood, by penalised iteratively reweighted least
 squares, and the smoothing parameters, one per column, minimise the unbiased risk estimator
-under presence-absence and the generalised cross-validation score under a squared-error head, by
+under presence-absence and a count head and the generalised cross-validation score under a
+squared-error head, by
 Newton's method with the exact derivatives (Wood 2008). \code{gamma} multiplies the charge each
 effective degree of freedom adds to that criterion, as mgcv's \code{gamma} does; above one it gives
 smoother fits. Over columns as alike as neighbouring weeks the criterion can have more than one

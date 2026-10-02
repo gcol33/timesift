@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from counts import fixture_counts
 from timesift import Response, feature_matrix, fit_learner, grain_matrix, stepwise
 from timesift._stepwise import stepwise_fit, stepwise_predict
 
@@ -41,7 +42,8 @@ def stepwise_input():
         y=dict(y_binomial=np.array([float(r["y_binomial"]) for r in rows]),
                y_8=np.array([float(thin[r["unit"]]["y_8"]) for r in rows]),
                y_12=np.array([float(thin[r["unit"]]["y_12"]) for r in rows]),
-               y_gaussian=np.array([float(r["y_gaussian"]) for r in rows])))
+               y_gaussian=np.array([float(r["y_gaussian"]) for r in rows]),
+               y_poisson=fixture_counts(FIXTURES, [r["unit"] for r in rows])))
 
 
 @pytest.mark.parametrize("row", read_rows("stepwise_cases.csv"), ids=lambda r: r["case"])
@@ -51,7 +53,7 @@ def test_the_cores_search_chooses_the_terms_mass_glm_and_the_r_oracle_choose(ste
         x = np.asfortranarray(np.column_stack([x, x[:, 0]]))
     y = stepwise_input["y"][row["response"]]
     w = stepwise_input["w"] if row["weighted"] == "TRUE" else np.ones(len(y))
-    family = "gaussian" if row["response"] == "y_gaussian" else "binomial"
+    family = {"y_gaussian": "gaussian", "y_poisson": "poisson"}.get(row["response"], "binomial")
     fit = stepwise_fit(x, y, w, family, max_terms=float(row["max_terms"]),
                        degree=int(row["degree"]), direction=row["direction"], terms=row["terms"])
     chosen = " ".join(f"{c + 1}:{p}" for c, p in zip(fit["term_column"], fit["term_power"]))

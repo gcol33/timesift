@@ -9,12 +9,13 @@
 # number without complaint, where the binomial family reads one as a fractional count of
 # successes. The criterion is read off the deviance, see `oracle_glm_aic()`.
 oracle_glm_family <- function(family) {
-  switch(family, binomial = stats::quasibinomial(), gaussian = stats::gaussian())
+  switch(family, binomial = stats::quasibinomial(), gaussian = stats::gaussian(),
+         poisson = stats::poisson())
 }
 
 # Akaike's criterion of a forward-search fit. For a 0/1 response the saturated log-likelihood is
 # zero, so the criterion is the weighted deviance plus twice the rank, which is what the binomial
-# family reports for unweighted data; the Gaussian family reports its own.
+# family reports for unweighted data; the Gaussian and the Poisson family report their own.
 oracle_glm_aic <- function(fit, family) {
   if (identical(family, "binomial")) fit$deviance + 2 * fit$rank else fit$aic
 }

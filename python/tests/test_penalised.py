@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from counts import fixture_counts
 from timesift import Response, elasticnet, fit_learner, grain_matrix
 from timesift.penalised import (penalised_coef, penalised_cv, penalised_path, penalised_predict)
 
@@ -37,24 +38,29 @@ def penalised_input():
         x=np.asfortranarray([[float(r[c]) for c in columns] for r in rows]),
         gaussian=np.array([float(r["y_gaussian"]) for r in rows]),
         binomial=np.array([float(r["y_binomial"]) for r in rows]),
+        poisson=fixture_counts(FIXTURES, [r["unit"] for r in rows]),
         w=np.array([float(r["w"]) for r in rows]),
         fold=np.array([int(r["fold"]) for r in rows], dtype=np.int32))
 
 
 def case_response(data, row):
-    y = data["binomial"] if row["family"] == "binomial" else data["gaussian"]
+    y = data[row["family"]]
     w = data["w"] if row["weighted"] == "TRUE" else np.ones(len(y))
     return y, w
 
 
 def objective(x, y, w, family, alpha, lam, a0, beta):
     """The objective both descents minimise, on the scale the reference states it: the mean
-    deviance halved for a Gaussian family and the mean negative log likelihood for a binomial
-    one, plus the penalty."""
+    deviance halved for a Gaussian family and the mean negative log likelihood for a binomial or a
+    Poisson one, the Poisson one without its ``log(y!)``, plus the penalty."""
     wn = w / w.sum()
     eta = a0 + x @ beta
-    fit = (np.sum(wn * (y - eta) ** 2) / 2 if family == "gaussian"
-           else -np.sum(wn * (y * eta - np.log1p(np.exp(eta)))))
+    if family == "gaussian":
+        fit = np.sum(wn * (y - eta) ** 2) / 2
+    elif family == "binomial":
+        fit = -np.sum(wn * (y * eta - np.log1p(np.exp(eta))))
+    else:
+        fit = -np.sum(wn * (y * eta - np.exp(eta)))
     return fit + lam * (alpha * np.abs(beta).sum() + (1 - alpha) / 2 * (beta ** 2).sum())
 
 
@@ -157,8 +163,10 @@ def test_the_penalised_core_says_what_it_cannot_fit(penalised_input):
         penalised_path(x, data["gaussian"], w, "binomial", 0.5)
     with pytest.raises(ValueError, match="one value"):
         penalised_path(x, np.full(n, 2.0), w, "gaussian", 0.5)
-    with pytest.raises(ValueError, match="gaussian"):
-        penalised_path(x, data["binomial"], w, "poisson", 0.5)
+    with pytest.raises(ValueError, match="Poisson"):
+        penalised_path(x, data["binomial"], w, "gamma", 0.5)
+    with pytest.raises(ValueError, match="none of them negative"):
+        penalised_path(x, -data["gaussian"], w, "poisson", 0.5)
     with pytest.raises(ValueError, match="between zero and one"):
         penalised_path(x, data["binomial"], w, "binomial", 2.0)
     with pytest.raises(ValueError, match="negative"):

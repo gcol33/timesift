@@ -21,11 +21,13 @@
 // the working response and weights, and the fit stops once the deviance's change relative to itself
 // falls below `epsilon`. The binomial family takes the logit link with the linear predictor held at
 // 30 either side, or the probit link held at the normal quantile of the machine epsilon, so neither
-// mean reaches zero or one. These are the conventions under which the fixtures pin the fits against
-// R's `glm()`.
+// mean reaches zero or one. The Poisson family takes the log link with the mean held at the machine
+// epsilon from below and starts from the response plus a tenth. These are the conventions under
+// which the fixtures pin the fits against R's `glm()`.
 namespace timesift {
 
-// `canonical` is the identity under the gaussian family and the logit under the binomial one.
+// `canonical` is the identity under the gaussian family, the logit under the binomial one and the
+// log under the Poisson one.
 enum class Link { canonical, probit };
 
 struct Glm {
@@ -42,6 +44,10 @@ Glm glm_fit(const double* x, std::size_t n, std::size_t q, const double* y, cons
 
 // The inverse logit, the linear predictor held at 30 either side.
 double logit_linkinv(double eta);
+
+// The mean a family's canonical link gives at a linear predictor: the predictor itself, its inverse
+// logit, or its exponential held off zero.
+double linkinv(Family family, double eta);
 
 // The inverse probit, the linear predictor held at the normal quantile of the machine epsilon
 // either side.

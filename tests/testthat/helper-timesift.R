@@ -11,6 +11,12 @@ fixture_dir <- function() {
   NULL
 }
 
+# The count response the Poisson fixtures are fitted to, read by unit rather than by position.
+fixture_counts <- function(dir, units) {
+  r <- utils::read.csv(file.path(dir, "count_response.csv"), stringsAsFactors = FALSE)
+  r$y_poisson[match(units, r$unit)]
+}
+
 # A synthetic record whose units differ by a level and by what one stretch of the calendar did,
 # so a test can ask a fitted model which of the two it read.
 sim_series <- function(n_unit = 40L, days = 120L, sd = 0.5, level = 2, seed = 1L,
