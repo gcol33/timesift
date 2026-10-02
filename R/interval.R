@@ -233,7 +233,12 @@
       theta_in <- theta_in + left
     }
   }
-  terms <- do.call(rbind, rows)
+  terms <- if (length(rows)) {
+    do.call(rbind, rows)
+  } else {
+    data.frame(repeat_ = integer(), fold = integer(), s_in = numeric(), s_out = numeric(),
+               b = numeric(), e_hat = numeric())
+  }
   names(terms)[names(terms) == "repeat_"] <- "repeat"
   theta_in <- theta_in / nrow(terms)
 

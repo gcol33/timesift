@@ -7,11 +7,14 @@ CMD
 CMake
 CUDA
 Chytrý
+Datta
 Dunnett's
 Friedman
 Friedman's
+Fuglstad
 Gini
 Hastie
+Hirzel
 Hochberg
 IANA
 IRLS
@@ -19,6 +22,7 @@ Kadmon
 LF
 Lanczos
 MARS
+Martino
 Massias
 MaxEnt
 MASS's
@@ -26,9 +30,12 @@ NVIDIA's
 NumPy
 ORCID
 Olshen
+Poisson
 PyPI
 R's
+Sarkka
 Schrankogel
+Solin
 SplitMix
 TSS
 Tibshirani
@@ -77,9 +84,11 @@ ndarray
 np
 numpy
 numpy's
+pruning's
 pytest
 randomForest
 randomForest's
+repeat's
 rescored
 rescores
 rescoring
@@ -94,6 +103,7 @@ scipy's
 scorable
 sift's
 str
+subtree's
 tidyselect
 tidyselect's
 unscorable

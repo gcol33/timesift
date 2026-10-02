@@ -181,7 +181,7 @@ hier_run <- function(spatial, ...) {
     data.frame(plot = p, t = days, v = stats::rnorm(length(days)))
   }))
   list(targets = targets, series = series,
-       fit = timesift(targets, series, y = dplyr::starts_with("s"), id = plot, time = t, ...,
+       fit = timesift(targets, series, y = tidyselect::starts_with("s"), id = plot, time = t, ...,
                       models = hierarchical(spatial = spatial), sift = grains("month"),
                       resampling = cv(v = 3L), inner = NULL, ensemble = FALSE, verbose = FALSE))
 }

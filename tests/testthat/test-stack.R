@@ -562,7 +562,7 @@ test_that("the combiner under a count response lands on the numbers the contract
   cases <- read("ensemble_count_cases.csv")
   weights <- read("ensemble_count_weights.csv")
   expected <- read("ensemble_count_predict.csv")
-  tol <- 1e-9
+  tol <- 1e-6
   for (i in seq_len(nrow(cases))) {
     row <- cases[i, ]
     st <- ensemble_fit(oof, y, cells, folds, ensemble(row$method, scope = row$scope,

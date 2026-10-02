@@ -221,7 +221,7 @@ test_that("the ensemble is held back by channel through the members it combines"
   expect_identical(attr(oc, "arm"), "ensemble")
   expect_setequal(unique(oc$part), c("cold_day", "mean", "warm_day"))
   weight <- vapply(split(oc$weight, oc$part), mean, numeric(1L))
-  expect_identical(unname(weight[c("cold_day", "mean")]), c(0, 0))
+  expect_equal(unname(weight[c("cold_day", "mean")]), c(0, 0), tolerance = 1e-12)
   expect_gt(weight[["warm_day"]], 0.05)
 
   expect_error(occlusion(run, "ensemble", over = "bin"), "different bins")

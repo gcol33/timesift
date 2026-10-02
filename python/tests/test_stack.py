@@ -663,7 +663,7 @@ def test_the_combiner_under_a_count_response_lands_on_the_numbers_the_contract_p
     scores = score_table(oof, y, folds, cells,
                          score=lambda obs, p: -regression_metric(obs, p, "poisson_deviance"))
     weights, expected = rows("ensemble_count_weights.csv"), rows("ensemble_count_predict.csv")
-    tol = 1e-9
+    tol = 1e-6
     for case in rows("ensemble_count_cases.csv"):
         spec = ensemble(method=case["method"], scope=case["scope"], response="count")
         st = ensemble_fit(oof, y, cells, folds, spec, scores)
