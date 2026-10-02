@@ -42,7 +42,7 @@
 #'   fit <- timesift(cells, y = c(sp1, sp2), id = cell, static = c(elev, slope),
 #'                   models = elasticnet(), ensemble = FALSE, inner = NULL,
 #'                   resampling = cv(v = 3), verbose = FALSE)
-#'   project(fit, static = static)
+#'   project(fit, static = static, candidate = "elasticnet / static")
 #' }
 #'
 #' @export
