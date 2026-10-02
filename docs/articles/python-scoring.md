@@ -49,6 +49,74 @@ kappa_score(y, p, rule: str = 'youden')
 
 Cohen’s kappa of a model’s decisions against the observed response.
 
+## `table_metric()`
+
+``` python
+table_metric(y, p, metric: str, rule: str = 'youden', threshold=None, perc: float = 0.9)
+```
+
+A metric of the two-by-two table of decisions against observations.
+
+`metric` is one of `pod`, `pofd`, `far`, `sr`, `accuracy`, `bias`, `or`,
+`orss`, `csi` and `ets`, biomod2’s evaluation statistics. The cut is the
+one `rule` of `decision_threshold` selects, or a `threshold` learned
+elsewhere, presence being predicted at `p >= cut`. A value the table
+does not define, a zero denominator, is NaN, as is a cell of one class.
+
+## `boyce_index()`
+
+``` python
+boyce_index(y, p, resolution: int = 100, width: float = 0.1)
+```
+
+The continuous Boyce index (Hirzel et al. 2006).
+
+A window of `width` times the range of the predictions slides over that
+range in `resolution + 1` equal steps. In each, the share of presences
+inside divided by the share of all units inside is the
+predicted-to-expected ratio, undefined where no unit falls inside, and
+the index is the Spearman correlation of that ratio with the window’s
+midpoint. The units of `p` are the background. The windows are closed at
+both ends and the ratio is not thinned of repeated values. NaN where the
+cell defines none, the predictions are all equal, the ratio is defined
+in fewer than three windows or takes one value.
+
+## `regression_metric()`
+
+``` python
+regression_metric(y, p, metric: str)
+```
+
+A metric of a numeric response and its predictions, as biomod2 reads an
+abundance model.
+
+`metric` is `r_squared` (`1 - sum(e**2) / sum((y - mean(y))**2)`, NaN
+where `y` is constant), `pearson`, `rmse`, `mse`, `mae` or `max_error`.
+A comparison reads the highest score as the best, so the four errors are
+registered as `neg_rmse`, `neg_mse`, `neg_mae` and `neg_max_error` with
+their sign reversed.
+
+## `ordinal_metric()`
+
+``` python
+ordinal_metric(y, p, metric: str)
+```
+
+A metric of ordinal classes, as biomod2 reads a model of an ordinal
+response.
+
+The response is a column of whole-number classes, the model predicts a
+number on the same scale, and each prediction is read as the observed
+class nearest to it, the lower class on a tie. With `m[i, j]` the units
+of observed class `j` predicted as class `i`, over the `k` classes
+observed in the cell: `accuracy` is `trace(m) / sum(m)`, `recall` the
+mean over the `k` classes of `m[j, j]` over the units of class `j`,
+`precision` the mean of `m[i, i]` over the units predicted as `i`, and
+`f1` is `2 P R / (P + R)` of the two means. A class with no unit, or in
+which nothing is predicted, adds zero to its mean. They are registered
+as `ordinal_accuracy`, `ordinal_recall`, `ordinal_precision` and
+`ordinal_f1`.
+
 ## `cohen_kappa()`
 
 ``` python
@@ -61,11 +129,20 @@ either order.
 ## `decision_threshold()`
 
 ``` python
-decision_threshold(y, p=None, rule: str = 'youden', candidate: str = 'ensemble')
+decision_threshold(
+    y,
+    p=None,
+    rule: str = 'youden',
+    candidate: str = 'ensemble',
+    perc: float = 0.9,
+)
 ```
 
 The probability cut a rule selects. Presence is predicted at
 `p >= threshold`.
+
+`"mpa"` is the minimum predicted area rule: the highest cut that still
+predicts presence at a share `perc` of the observed presences.
 
 Given a
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
@@ -220,6 +297,193 @@ Takes a `timesift.fit.timesift` run or a `timesift.ladder.grain_ladder`
 result, and the profile itself is one implementation either way. The
 models kept per fold are the ones read, so the profile is measured where
 the score was: on the units each model held out.
+
+## `response_curve()`
+
+``` python
+response_curve(
+    fit,
+    candidate: str = 'ensemble',
+    predictor=None,
+    with_=None,
+    fixed: str = 'mean',
+    n: int = 50,
+    spread: bool = False,
+)
+```
+
+Vary one predictor of a fitted candidate across the range it takes, the
+rest held fixed.
+
+A predictor is a cell of the representation the candidate reads: one
+statistic in one bin. Given as the name of a channel it is that
+statistic moved together in every bin, which is the way a column named
+in `static` is moved; given as `{"bin": ..., "channel": ...}` it is one
+cell, and a bare bin name is enough where the representation has a
+single channel. The reference is one made-up unit whose every cell holds
+the `fixed` summary (`"mean"`, `"median"`, `"min"` or `"max"`) of that
+cell over the targets; a cell that is the same for every target keeps
+its value. The curve is read off the model fitted on all targets.
+
+For the ensemble every member is moved the same way, a member that does
+not carry the predictor is held at the reference, and the members’
+predictions are combined by the stack; `spread` adds the members’
+standard deviation and interval. `with_` is a second predictor, and the
+prediction is then read over the grid of the two; it is `with` in R,
+which Python reserves.
+
+## `ResponseCurve`
+
+``` python
+ResponseCurve(
+    value,
+    variable,
+    prediction,
+    candidate,
+    predictor,
+    fixed,
+    value_with,
+    with_label,
+    sd,
+    lower,
+    upper,
+)
+```
+
+The prediction against the value of a predictor, or of two.
+
+`prediction` is `[value, response]`; with a second predictor `value` and
+`value_with` run over the grid of the two, the first fastest, as R’s
+table does. `sd`, `lower` and `upper` are the ensemble members’ spread
+at every value, and `None` where it was not asked.
+
+Attributes:
+
+- `value` - np.ndarray
+- `variable` - tuple\[str, …\]
+- `prediction` - np.ndarray
+- `candidate` - str
+- `predictor` - str
+- `fixed` - str
+- `value_with` - np.ndarray \| None
+- `with_label` - str \| None
+- `sd` - np.ndarray \| None
+- `lower` - np.ndarray \| None
+- `upper` - np.ndarray \| None
+
+## `project()`
+
+``` python
+project(
+    fit,
+    series=None,
+    static=None,
+    candidate: str = 'ensemble',
+    type: str = 'response',
+    chunk: int = 5000,
+    **kwargs,
+)
+```
+
+Predict one target per cell of a grid, each carrying the record of its
+own cell.
+
+This is `BIOMOD_Projection()` and `BIOMOD_EnsembleForecasting()`: a map
+is the fit applied to one target per cell, at the grain the fit reads.
+`series` is an `xarray.DataArray` with a `time` dimension and two
+spatial ones, or a mapping of the fit’s `x` column names to such;
+`static` is an `xarray.Dataset`, or a mapping of the fit’s `static`
+column names to `DataArray` over the two spatial dimensions. Every input
+shares one grid, and one set of instants. Cells are predicted in chunks
+of `chunk`, and a cell is predicted where every input holds a value at
+that cell: a cell with a missing reading anywhere is NaN in every layer.
+`candidate`, `type` and the other keywords are those of
+`Timesift.predict`.
+
+Returns an `xarray.DataArray` over `response` and the two spatial
+dimensions of the inputs; for `type="spread"` a `statistic` dimension as
+well.
+
+## `range_change()`
+
+``` python
+range_change(now, later, threshold=None)
+```
+
+How the range of each response changes between two maps.
+
+Counts the cells a response is lost from, kept in and gained, as
+`BIOMOD_RangeSize()` does, a cell being in the range where the response
+is predicted present. With `L` the cells lost, `K` kept, `G` gained and
+`A` absent in both: the current range is `L + K`, the later one `K + G`,
+`percent_loss` is `100 L / (L + K)`, `percent_gain` is `100 G / (L + K)`
+and `change` is `percent_gain - percent_loss`. A cell that is NaN in
+either map is left out of every count. `now` and `later` are
+`xarray.DataArray` with a `response` dimension, such as
+[`project()`](https://gillescolling.com/timesift/reference/project.md)
+returns, or arrays of cells by responses. `threshold` is None where the
+maps are already 0 and 1, and otherwise one cut per response, or one for
+all.
+
+## `RangeChange`
+
+``` python
+RangeChange(table, map, variables)
+```
+
+The change in range of each response: a `table` of counts, and the `map`
+of codes (-2 lost, -1 kept, 0 absent in both, 1 gained) of the shape of
+the inputs.
+
+Attributes:
+
+- `table` - list
+- `map` - np.ndarray
+- `variables` - tuple
+
+## `pseudo_absences()`
+
+``` python
+pseudo_absences(
+    pool,
+    presences,
+    n: int,
+    strategy: str = 'random',
+    id=None,
+    env=None,
+    quantile: float = 0.025,
+    coords=None,
+    dist_min: float = 0.0,
+    dist_max: float = np.inf,
+    lonlat: bool = False,
+    repeats: int = 1,
+    seed: int = 1,
+)
+```
+
+Draw pseudo-absences from a pool of background units.
+
+Presence-only records give a response of ones. A model needs units where
+the response is zero, and these are drawn from `pool`, a mapping of
+column to array of background units that carry the same columns as the
+targets. The strategies are `bm_PseudoAbsences()`’s: `"random"` admits
+any unit of the pool that is not a presence; `"sre"` a unit outside the
+envelope of the presences, the band between the `quantile` and
+`1 - quantile` quantiles of each of the `env` columns over the
+presences, a unit being outside where it leaves the band in at least one
+column; `"disk"` a unit whose distance to the nearest presence lies
+between `dist_min` and `dist_max`, both included, on the two `coords`
+columns, planar in the units of the coordinates or in metres from
+longitude and latitude in degrees where `lonlat` is true, on a sphere of
+radius 6371008.8 m.
+
+A presence is never its own absence: a unit of the pool whose `id` is
+one of the presences’ is not a candidate. The units a strategy admits
+are the same in both languages; which `n` of them are drawn depends on
+the language’s generator, as the folds of `fold_map` do. The result is a
+mapping of column to array holding the drawn rows of the pool, with
+`set` (the draw, from 1) and `pseudo` (true) added; draw `r` uses
+`seed + r - 1`.
 
 ## `simulate_records()`
 

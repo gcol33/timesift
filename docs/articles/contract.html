@@ -1222,17 +1222,107 @@ others. Both suites read the response and the fold map, recompute the
 mask, and assert it cell by cell. Both also write all three back and
 assert the bytes, which is what makes the file format a contract rather
 than a convention.</p>
-<p><code>metric_cases.csv</code> and <code>metrics.csv</code> hold ten
-<code>(y, p)</code> cases and the value of every threshold metric on
-each: <code>tss</code>, <code>roc_auc</code>,
-<code>average_precision</code>, <code>kappa</code> under both rules, and
-<code>decision_threshold</code> under all three. The cases are where the
-tie rule is the whole answer – every prediction tied, ties within a
+<p><code>metric_cases.csv</code> and <code>metrics.csv</code> hold
+eleven <code>(y, p)</code> cases and the value of every threshold metric
+on each: <code>tss</code>, <code>roc_auc</code>,
+<code>average_precision</code>, <code>kappa</code> under both rules,
+<code>decision_threshold</code> under all four rules and the ten table
+metrics at the Youden cut and <code>boyce</code>. The cases are where
+the tie rule is the whole answer – every prediction tied, ties within a
 class, ties across the classes, one presence, one absence, all
 presences, all absences, a perfect separation and a reversed one. A
 metric a case defines no value on is written <code>NA</code> rather than
 left out, so a suite that quietly skipped it fails rather than
 passes.</p>
+<p><code><a href="../reference/table_metric.html">table_metric()</a></code> reads a two-by-two table of decisions
+against observations, with <code>H</code> the hits, <code>F</code> the
+false alarms, <code>M</code> the misses, <code>C</code> the correct
+negatives and <code>n</code> their sum: <code>pod</code> is
+<code>H / (H + M)</code>, <code>pofd</code> <code>F / (F + C)</code>,
+<code>far</code> <code>F / (H + F)</code>, <code>sr</code>
+<code>H / (H + F)</code>, <code>accuracy</code>
+<code>(H + C) / n</code>, <code>bias</code>
+<code>(H + F) / (H + M)</code>, <code>or</code>
+<code>H C / (M F)</code>, <code>orss</code>
+<code>(H C - M F) / (H C + M F)</code>, <code>csi</code>
+<code>H / (H + M + F)</code> and <code>ets</code>
+<code>(H - h) / (H + M + F - h)</code> with
+<code>h = (H + M)(H + F) / n</code>. The cut is the one a rule of
+<code><a href="../reference/kappa_score.html">decision_threshold()</a></code> selects, or a <code>threshold</code>
+given, and presence is predicted at <code>p &gt;= cut</code>. A zero
+denominator is <code>NA</code>, so the odds ratio of a table with no
+miss or no false alarm is <code>NA</code> rather than infinite, and so
+is a cell of one class. The cut rule <code>"mpa"</code> is the highest
+cut that predicts presence at a share <code>perc</code> of the
+presences: the presences’ predictions sorted in decreasing order, the
+<code>ceiling(perc * k - 1e-9)</code>-th of the <code>k</code>.</p>
+<p><code><a href="../reference/boyce_index.html">boyce_index()</a></code> is the Spearman correlation, over the
+windows where it is defined, of the predicted-to-expected ratio with the
+window midpoint. With <code>lo</code> and <code>hi</code> the least and
+greatest prediction, the window width is
+<code>w = width (hi - lo)</code> and window
+<code>i = 0, ..., resolution</code> spans
+<code>[from_i, from_i + w]</code> with
+<code>from_i = lo + (hi - w - lo) i / resolution</code>, the last one
+closed at <code>hi</code>. The ratio is the share of presences inside
+divided by the share of all units inside, undefined where no unit is
+inside, and the result is <code>NA</code> where fewer than three windows
+define it or it takes one value. Both languages evaluate
+<code>from_i</code> in that order of operations, which is what makes
+their windows agree to the last place. <code>metric_cases.csv</code>
+carries a case of 25 units for it, the other cases being too small to
+hold a unit in most windows.</p>
+<p><code>blocks_input.csv</code> and <code>blocks.csv</code> hold 23
+units on three columns, with ties in two of them, and the block each
+unit lands in under five cuts: <code><a href="../reference/cv.html">block_cv()</a></code> on two columns
+into four, three and five blocks, on one column into two, and
+<code><a href="../reference/cv.html">env_cv()</a></code> on three scaled columns into four. A block is cut
+by halving. With <code>k</code> blocks to make from <code>n</code>
+units, the left part takes <code>k %/% 2</code> of the blocks and
+<code>floor((2 n (k %/% 2) + k) / (2 k))</code> of the units, the units
+being ordered by the column of widest range (the first on a tie in
+range) and by order of arrival where tied on it. Blocks are numbered in
+the order the halving makes them, left before right, and the fold of a
+unit is its block. <code><a href="../reference/cv.html">env_cv()</a></code> centres each column and divides
+by its standard deviation with <code>n - 1</code> first, and a column of
+no spread becomes zero. The resulting map is grouped by block, so a
+split drawn inside a fold keeps a block whole.</p>
+<p><code>numeric_metric_cases.csv</code> and
+<code>numeric_metrics.csv</code> hold eight <code>(y, p)</code> cases
+and the value of every metric of a numeric response and of ordinal
+classes on each. With <code>e = y - p</code>, <code>r_squared</code> is
+<code>1 - sum(e^2) / sum((y - mean(y))^2)</code>, <code>pearson</code>
+the correlation, <code>rmse</code>, <code>mse</code>, <code>mae</code>
+and <code>max_error</code> the root mean, the mean, the mean absolute
+and the greatest absolute of <code>e</code>; where <code>y</code> or
+<code>p</code> is constant the first two are <code>NA</code>, as is any
+metric where <code>p</code> holds a value that is not a number. For the
+ordinal metrics each prediction is read as the observed class nearest to
+it, the lower class on a tie, <code>m[i, j]</code> counts the units of
+observed class <code>j</code> read as class <code>i</code>, and with
+<code>k</code> the classes observed <code>accuracy</code> is
+<code>trace(m) / sum(m)</code>, <code>recall</code> is the sum of
+<code>m[j, j]</code> over the column sums, <code>precision</code> the
+sum of <code>m[i, i]</code> over the row sums, each over classes with a
+nonzero sum and divided by <code>k</code>, and <code>f1</code> is
+<code>2 P R / (P + R)</code> of the last two. The cells of a numeric
+head hold a cell scorable where each side of the split holds two
+distinct values.</p>
+<p><code>pa_pool.csv</code>, <code>pa_presences.csv</code> and
+<code>pa_candidates.csv</code> hold a pool of 36 units on a six-by-six
+grid of longitude and latitude, five presences of which four are in the
+pool, and for each of four strategies which units of the pool it admits:
+<code>random</code> every unit whose <code>id</code> is not a
+presence’s; <code>sre</code> those outside the band between the 0.1 and
+0.9 quantiles (Hyndman and Fan’s seventh definition) of each of two
+columns over the presences, outside where a unit leaves the band in at
+least one column and inside where it lies on a bound;
+<code>disk_planar</code> those whose Euclidean distance to the nearest
+presence in the coordinates’ units lies in <code>[0.5, 1]</code>; and
+<code>disk_lonlat</code> those whose haversine distance on a sphere of
+radius 6371008.8 m lies in <code>[30000, 70000]</code>. Which of the
+admitted units a draw picks is not pinned: it is the language’s
+generator.</p>
 <p><code>contrast_cells.csv</code> and <code>contrast.csv</code> hold a
 fixed table of per-cell scores for two arms, with cells one arm scored
 and the other did not, and the paired contrast read off it. No model is
@@ -3023,8 +3113,9 @@ unselected</td>
 <tr class="odd">
 <td>the resampling</td>
 <td>
-<code><a href="../reference/cv.html">cv()</a></code> and <code><a href="../reference/cv.html">grouped_cv()</a></code>
-</td>
+<code><a href="../reference/cv.html">cv()</a></code> and <code><a href="../reference/cv.html">grouped_cv()</a></code>, and
+<code><a href="../reference/cv.html">block_cv()</a></code> and <code><a href="../reference/cv.html">env_cv()</a></code> for the spatial and
+environmental splits</td>
 </tr>
 <tr class="even">
 <td>the fold map and the mask</td>
@@ -3060,7 +3151,9 @@ nested selection</td>
 <td>the metrics</td>
 <td>
 <code><a href="../reference/tss.html">tss()</a></code>, <code><a href="../reference/roc_auc.html">roc_auc()</a></code>,
-<code><a href="../reference/average_precision.html">average_precision()</a></code> and <code><a href="../reference/kappa_score.html">kappa_score()</a></code>, with
+<code><a href="../reference/average_precision.html">average_precision()</a></code>, <code><a href="../reference/kappa_score.html">kappa_score()</a></code>,
+<code><a href="../reference/table_metric.html">table_metric()</a></code>, <code><a href="../reference/boyce_index.html">boyce_index()</a></code>,
+<code><a href="../reference/regression_metric.html">regression_metric()</a></code> and <code><a href="../reference/ordinal_metric.html">ordinal_metric()</a></code>, with
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> and <code><a href="../reference/kappa_score.html">model_agreement()</a></code>
 beside them</td>
 </tr>
@@ -3117,14 +3210,21 @@ to representation</td>
 <code><a href="../reference/digest_array.html">digest_array()</a></code>, exported</td>
 </tr>
 <tr class="odd">
-<td>the three registries</td>
+<td>the registries</td>
 <td>
 <code><a href="../reference/register_learner.html">register_learner()</a></code> and <code><a href="../reference/register_learner.html">learners()</a></code>,
 <code><a href="../reference/register_metric.html">register_metric()</a></code> and <code><a href="../reference/register_metric.html">metrics()</a></code>,
-<code><a href="../reference/register_response.html">register_response()</a></code> and <code><a href="../reference/register_response.html">responses()</a></code>
+<code><a href="../reference/register_response.html">register_response()</a></code> and <code><a href="../reference/register_response.html">responses()</a></code>,
+<code><a href="../reference/register_tuning.html">register_tuning()</a></code> and <code><a href="../reference/register_tuning.html">tunings()</a></code>
 </td>
 </tr>
 <tr class="even">
+<td>pseudo-absences</td>
+<td>
+<code><a href="../reference/pseudo_absences.html">pseudo_absences()</a></code>, the random, sre and disk
+strategies</td>
+</tr>
+<tr class="odd">
 <td>what a rare response weighs</td>
 <td>
 <code><a href="../reference/positive_weights.html">positive_weights()</a></code>, the case weights the shipped
@@ -3540,6 +3640,77 @@ is a mapping of column to array; the first reading instant is
 <code>boosting(lambda_=)</code>, since <code>lambda</code> is a
 keyword</td>
 </tr>
+<tr class="even">
+<td>a tuned learner</td>
+<td>
+<code><a href="../reference/tune.html">tune()</a></code>, a learner whose fitted model is a
+<code>timesift_tuned</code> holding <code>model</code>,
+<code>chosen</code> and <code>table</code>
+</td>
+<td>
+<code><a href="../reference/tune.html">tune()</a></code>, a <code>Learner</code> whose fitted model is a
+<code>Tuned</code> holding the same three, <code>table</code> a list of
+rows</td>
+</tr>
+<tr class="odd">
+<td>the settings a candidate chose</td>
+<td>the <code>settings</code> column of <code>candidates</code>,
+<code>NA</code> where the learner was not tuned</td>
+<td>the <code>settings</code> column of <code>candidates</code>, an
+empty string there</td>
+</tr>
+<tr class="even">
+<td>a map</td>
+<td>
+<code><a href="../reference/project.html">project()</a></code>, on <code>terra</code> rasters, returning a
+<code>SpatRaster</code> with a layer per response
+(<code>response.statistic</code> under a spread)</td>
+<td>
+<code><a href="../reference/project.html">project()</a></code>, on <code>xarray</code> grids, returning a
+<code>DataArray</code> over <code>response</code>, and
+<code>statistic</code> under a spread, and the two spatial
+dimensions</td>
+</tr>
+<tr class="odd">
+<td>the change in range</td>
+<td>
+<code><a href="../reference/range_change.html">range_change()</a></code>, a list of a <code>table</code> data
+frame and a <code>map</code> raster of the codes</td>
+<td>
+<code><a href="../reference/range_change.html">range_change()</a></code>, a <code>RangeChange</code> whose
+<code>table</code> is a list of rows and whose <code>map</code> is a
+<code>DataArray</code>
+</td>
+</tr>
+<tr class="even">
+<td>the scores of a repeated resampling</td>
+<td>
+<code>scores</code> and <code>cells</code> data frames with a
+<code>repeat</code> column</td>
+<td>
+<code>scores</code> a mapping of arrays with a <code>repeat</code>
+array; <code>cells</code> without one</td>
+</tr>
+<tr class="odd">
+<td>a response curve</td>
+<td>
+<code><a href="../reference/response_curve.html">response_curve()</a></code>, an S3 generic with a method on a run,
+a data frame in long form with a <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> method; the second
+predictor is <code>with =</code>
+</td>
+<td>
+<code><a href="../reference/response_curve.html">response_curve()</a></code>, one function returning a
+<code>ResponseCurve</code> whose <code>prediction</code> is
+<code>[value, response]</code>; the second predictor is
+<code>with_=</code>, since <code>with</code> is a keyword</td>
+</tr>
+<tr class="even">
+<td>the occlusion of an ensemble</td>
+<td><code>occlusion(fit, "ensemble", over = "channel")</code></td>
+<td>the same call,
+<code>occlusion(fit, "ensemble", over="channel")</code>
+</td>
+</tr>
 </tbody>
 </table>
 <p>All of these are shapes rather than behaviours: a setting given to a
@@ -3636,10 +3807,11 @@ it by name.</td>
 <td>
 <code>GRAINS</code>, <code>STATS</code>,
 <code>DAY_LEVEL_STATS</code>, <code>SPREAD_STATISTICS</code>,
-<code>PRESENCE_ABSENCE</code>
+<code>PRESENCE_ABSENCE</code>, <code>CONTINUOUS</code>,
+<code>ABUNDANCE</code>, <code>ORDINAL</code>
 </td>
 <td>the grain, statistic and spread vocabularies as tuples, and the
-shipped head as the mapping <code><a href="../reference/register_response.html">register_response()</a></code> takes. R
+shipped heads as the mappings <code><a href="../reference/register_response.html">register_response()</a></code> takes. R
 holds the vocabularies unexported and prints them in the error that
 refuses a name; the head is reached through <code><a href="../reference/register_response.html">responses()</a></code> on
 both sides.</td>

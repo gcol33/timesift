@@ -505,6 +505,55 @@ back. A variable holding one value is predicted its mean and named in
 `unfitted`, and one whose smoothing parameter search stopped short of
 its tolerance is named in `stopped`.
 
+## `tune()`
+
+``` python
+tune(learner, grid: dict | None = None, metric=None, inner: int = 5, seed: int = 1)
+```
+
+A learner that searches `grid` on the units it is fitted on and fits the
+best setting.
+
+The search is a cross-validation inside those units, so in a run the
+outer folds never see it: each fold chooses from its own training units,
+and the score it is then read at is not selected on. biomod2’s
+`BIOMOD_Tuning()` searches a grid per algorithm by the same device.
+
+With `grid` left unset the learner is searched over the grid registered
+under its name by `register_tuning`, which for the learners that ship is
+the one `BIOMOD_Tuning()` searches: `mtry` of a forest from 1 to the
+smaller of 10 and the number of columns; `trees`, `depth` and
+`shrinkage` of a gbm-style boosting, `shrinkage` and `colsample` of the
+second-order one; `degree` and `nprune` of `mars`; `degree` of
+`discriminant`; `regmult` of `maxnet`; `quantile` of `envelope`; and the
+layer width of `mlp` at 2, 4, 6 and 8. biomod2’s weight decay is a
+training setting here, which the control holds.
+
+A learner’s settings are the ones it carries as `params`. `grid` names
+some of them and gives the values to try, and the grid is every
+combination, the first setting varying fastest as in R, so a tie between
+two combinations falls to the same one on both sides. A setting is
+scored by the mean over the responses of the mean over inner folds of
+`metric` on the cells a score is defined on. The inner folds keep the
+grouping the outer fold map keeps whole. What was chosen is on the
+fitted model as `chosen` and `table` and in the `settings` column of a
+run’s candidate table.
+
+## `Tuned`
+
+``` python
+Tuned(model, chosen, table)
+```
+
+What a tuned learner fitted: the model, the setting chosen, and every
+setting’s score.
+
+Attributes:
+
+- `model` - object
+- `chosen` - dict
+- `table` - list
+
 ## `mlp()`
 
 ``` python

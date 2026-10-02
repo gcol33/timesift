@@ -30,7 +30,8 @@ timesift(
   control = train_control(),
   keep_fits = FALSE,
   seed = 1L,
-  verbose = TRUE
+  verbose = TRUE,
+  .refit = TRUE
 )
 ```
 
@@ -112,7 +113,13 @@ timesift(
   [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md),
   a fold vector, or a
   [`fold_map()`](https://gillescolling.com/timesift/reference/fold_map.md)
-  result.
+  result. With `repeats` above one the run is made once per repeat:
+  `scores` and `cells` carry a `repeat` column and every repeat's folds
+  under numbers of their own, `estimate` is read off all the repeats'
+  held-out predictions, `oof` is a target's mean prediction over the
+  repeats, and the stack is fitted on the repeats' out-of-fold
+  predictions together. The models, the per-fold fits and `folds` are
+  the first repeat's.
 
 - inner:
 
@@ -160,6 +167,12 @@ timesift(
 - verbose:
 
   Report each outer fold as it runs.
+
+- .refit:
+
+  Whether the candidates are refitted on all targets at the end, which
+  is what [`predict()`](https://rdrr.io/r/stats/predict.html) reads. A
+  repeated resampling asks it of its first run alone.
 
 ## Value
 

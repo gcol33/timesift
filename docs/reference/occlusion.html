@@ -166,13 +166,19 @@ over thresholds frequently does not move at all.</p></dd>
 
 
 <dt id="arg-candidate">candidate<a class="anchor" aria-label="anchor" href="#arg-candidate"></a></dt>
-<dd><p>Name of the candidate to read, for a run.</p></dd>
+<dd><p>Name of the candidate to read, for a run, or <code>"ensemble"</code> for the combination
+the run fitted. The members of an ensemble read different bins, so the ensemble is held back
+by channel: a channel is withheld from every member that carries it, all of them shifted the
+same way, and the members' predictions are combined by the stack the run fitted.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A data frame of one row per held-back part and variable, carrying the mean weight over
-folds and the score with and without the part.</p>
+folds, the score with and without the part, and <code>importance</code>: one minus the correlation
+between the predictions with and without the part, which is how biomod2 scores a predictor
+and needs no response. Both are read on the cells the fit was scored on, and <code>importance</code> is
+<code>NA</code> where either set of predictions is constant.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -188,6 +194,9 @@ another. A channel that is the same for every unit, as <code><a href="calendar_c
 bin sits rather than what a unit read there, and is left in place.</p>
 <p>Read with <code>over = "channel"</code> the same machinery asks what each statistic of a grain carries,
 holding one channel back across the whole record instead of one bin across all channels.</p>
+<p>A column named in <code>static</code> is a channel of a representation built from a record, constant across
+its bins, so <code>over = "channel"</code> holds it back; where the run has no record the columns are the
+bins of one block and <code>over = "bin"</code> does.</p>
 <p>Reached through a <code><a href="timesift.html">timesift()</a></code> run rather than through a ladder, the profile reads the per-fold
 models the run was told to keep, so every bin is held back from a model that never saw the units
 it is rescored on. The candidate is named as <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> reports it.</p>

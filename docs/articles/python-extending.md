@@ -58,6 +58,29 @@ as its fit is. The shipped head’s is
 `timesift.response.positive_weights`, and a head without one fits
 unweighted.
 
+## `register_tuning()`
+
+``` python
+register_tuning(name: str, grid, overwrite: bool = False)
+```
+
+Register the grid a learner is tuned over when `tune` is given none.
+
+`name` is the learner’s, as it reports under. `grid` is a dict of the
+values to try, or a function of `(learner, x)` returning one, where `x`
+is the representation the learner is fitted on: the second form is for a
+grid that depends on the data, as the number of columns does, or on a
+setting the learner carries. The grids of the learners that ship are
+registered the same way.
+
+## `tunings()`
+
+``` python
+tunings()
+```
+
+The learners a grid is registered for.
+
 ## `learners()`
 
 ``` python

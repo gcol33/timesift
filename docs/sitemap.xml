@@ -23,6 +23,7 @@
 <url><loc>https://gillescolling.com/timesift/reference/average_precision.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/bind_channels.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/boosting.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/boyce_index.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/build_representation.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/calendar_channels.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/combine.html</loc></url>
@@ -55,16 +56,25 @@
 <url><loc>https://gillescolling.com/timesift/reference/maxnet.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/native.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/occlusion.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/ordinal_metric.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/paired_contrast.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/plot.timesift.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/plot.timesift_ladder.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/plot.timesift_range_change.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/plot.timesift_response_curve.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/plot.timesift_selection.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/positive_weights.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/predict.timesift.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/project.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/pseudo_absences.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/range_change.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/reexports.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/register_learner.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/register_metric.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/register_response.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/register_tuning.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/regression_metric.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/response_curve.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/roc_auc.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/scorable_cells.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/score_predictions.html</loc></url>
@@ -72,6 +82,7 @@
 <url><loc>https://gillescolling.com/timesift/reference/select_helpers.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/simulate_records.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/stepwise.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/table_metric.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/timesift-package.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/timesift.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/timesift_report.html</loc></url>
@@ -81,5 +92,6 @@
 <url><loc>https://gillescolling.com/timesift/reference/tree.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/tss.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/tss_inflation.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/tune.html</loc></url>
 </urlset>
 

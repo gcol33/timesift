@@ -307,10 +307,10 @@ fit_ca <- timesift(
 )
 subset(fit_ca$estimate, metric %in% c("roc_auc", "tss"), c(arm, metric, score, se))
 #>         arm  metric     score         se
-#> 4  selected roc_auc 0.7800964 0.01178032
-#> 5  selected     tss 0.5580208 0.01515674
-#> 9  ensemble roc_auc 0.7236305 0.03402524
-#> 10 ensemble     tss 0.4526556 0.05909692
+#> 24 selected roc_auc 0.7800964 0.01178032
+#> 26 selected     tss 0.5580208 0.01515674
+#> 50 ensemble roc_auc 0.7236305 0.03402524
+#> 52 ensemble     tss 0.4526556 0.05909692
 ```
 
 `EMcv` and `EMci` read the members of the ensemble side by side.
@@ -353,12 +353,121 @@ tss_inflation(sim$y, fold_map(sim$y, v = 5), skill = c(0.6, 0.9), replicates = 4
 
 [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
 returns the cuts a binary prediction uses, and `rule` picks the
-criterion: `"youden"` for TSS, `"kappa"`, or `"prevalence"`.
+criterion: `"youden"` for TSS, `"kappa"`, `"prevalence"` or `"mpa"`, the
+minimum predicted area cut that keeps `perc` of the presences.
+
+biomod2’s other evaluation statistics come from
+[`table_metric()`](https://gillescolling.com/timesift/reference/table_metric.md),
+which cuts the predictions by a rule and reads the table of decisions
+against observations:
+
+| biomod2 | `timesift` |
+|----|----|
+| `TSS`, `ROC`, `KAPPA` | [`tss()`](https://gillescolling.com/timesift/reference/tss.md), [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md), [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md) |
+| `POD`, `POFD`, `FAR`, `SR`, `ACCURACY`, `BIAS`, `OR`, `ORSS`, `CSI`, `ETS` | `table_metric(y, p, "pod")` and the same lower-case names |
+| `BOYCE` | [`boyce_index()`](https://gillescolling.com/timesift/reference/boyce_index.md) |
+| `MPA` | `decision_threshold(rule = "mpa")` |
+
+biomod2 reads each statistic at the cut that brings that statistic
+closest to its own optimum on a grid of 100 cuts.
+[`table_metric()`](https://gillescolling.com/timesift/reference/table_metric.md)
+reads it at the cut of the `rule` given, `"youden"` by default, so the
+statistics are comparable at one operating point. Every name is a
+registered metric, so `grain_ladder(metric = "csi")` reads it.
+
+## Abundance, ordinal and continuous responses
+
+biomod2 4.3 also models abundances and ordinal classes. The response
+head decides what a response is, and three ship beside presence-absence:
+`response = "continuous"` for any real number, `"abundance"` for a
+non-negative one, and `"ordinal"` for whole-number classes. All three
+are fitted under squared error through an identity output, so every
+learner but the three above and the combiner read them unchanged.
+`r_squared` is what a continuous or abundance comparison reads by
+default, and
+[`regression_metric()`](https://gillescolling.com/timesift/reference/regression_metric.md)
+carries biomod2’s `RMSE`, `MSE`, `MAE` and `Max_error` (registered as
+`neg_rmse`, `neg_mse`, `neg_mae` and `neg_max_error`, since the highest
+score is the best).
+[`ordinal_metric()`](https://gillescolling.com/timesift/reference/ordinal_metric.md)
+carries `Accuracy`, `Recall`, `Precision` and `F1`, each prediction
+being read as the observed class nearest to it. A multiclass response is
+one presence-absence column per class. A count under a Poisson loss is
+not shipped: the penalised, tree, boosting and stepwise cores would each
+need that family.
+
+## Maps
+
+`BIOMOD_Projection()` and `BIOMOD_EnsembleForecasting()` apply the fit
+to a stack of rasters.
+[`project()`](https://gillescolling.com/timesift/reference/project.md)
+applies it to one target per cell, each carrying the record of its own
+cell, and returns a raster with a layer per response. A map for a later
+period is the same call with the later record, and `BIOMOD_RangeSize()`
+is
+[`range_change()`](https://gillescolling.com/timesift/reference/range_change.md)
+on the two binary maps.
+
+``` r
+
+now <- project(fit, series = temperature_now, static = terrain, type = "binary")
+later <- project(fit, series = temperature_2050, static = terrain, type = "binary")
+range_change(now, later)$table
+```
+
+## Tuning
+
+`BIOMOD_Tuning()` searches a grid per algorithm.
+[`tune()`](https://gillescolling.com/timesift/reference/tune.md) wraps a
+learner so that it searches a grid of its own settings on the units it
+is fitted on, by cross-validation inside them, and fits the best. Inside
+a run each outer fold chooses from its own training units, so the score
+a tuned candidate is read at is not selected on. The settings it chose
+are in the candidate table.
+
+``` r
+
+timesift(targets, series, y = starts_with("sp"), id = plot, time = t, x = temp,
+         models = list(RF = tune(forest(), list(mtry = c(2, 5, 10), min_node = c(1, 5)))))
+```
+
+## Variable importance
+
+biomod2’s `bm_VariablesImportance()` permutes one predictor and reports
+one minus its correlation with the prediction made without the
+permutation.
+[`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md)
+does the same on the models a run kept per fold, on the units each held
+out, and reports it as `importance` beside the fall in score. A
+predictor is a bin of the representation, or with `over = "channel"` one
+statistic of it across the record, which is where a column named in
+`static` sits when the run has a record.
+`occlusion(fit, "ensemble", over = "channel")` reads the combination.
+
+## Response curves
+
+[`response_curve()`](https://gillescolling.com/timesift/reference/response_curve.md)
+is `bm_PlotResponseCurves()`: one predictor is moved across the range it
+takes while the others sit at their `fixed` summary (`"mean"`,
+`"median"`, `"min"` or `"max"`, as `fixed.var`), and a second predictor
+`with` gives the bivariate surface (`do.bivariate`). A predictor is a
+statistic of the representation, so the curve of `"warm_day"` is the
+prediction as the warmest day moves in every bin together.
+
+``` r
+
+rc <- response_curve(fit, "ensemble", "warm_day", spread = TRUE)
+plot(rc)
+```
 
 ## What differs from a biomod2 run
 
-- **Absences.** The learners read the absences they are given.
-  `timesift` draws no pseudo-absences.
+- **Absences.** The learners read the absences they are given, and
+  [`pseudo_absences()`](https://gillescolling.com/timesift/reference/pseudo_absences.md)
+  draws them from a pool of background units by biomod2’s `random`,
+  `sre` and `disk` strategies, with repeated draws, before the fit. A
+  drawn unit is a row of the targets like any other: it is not flagged
+  in the score, and a set of one’s own is the rows of the pool it names.
   [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md)
   offers both formulations: the default treats every unit as background,
   as biomod2’s `MAXNET` does, and `formulation = "absence"` reads the
@@ -366,9 +475,23 @@ criterion: `"youden"` for TSS, `"kappa"`, or `"prevalence"`.
 - **Folds.** One fold map is dealt once and read by every candidate and
   the ensemble.
   [`cv()`](https://gillescolling.com/timesift/reference/cv.md) deals
-  units balanced on a stratifying value and
+  units balanced on a stratifying value,
   [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md)
-  keeps units that share a group on one side of each split.
+  keeps units that share a group on one side of each split, and
+  [`block_cv()`](https://gillescolling.com/timesift/reference/cv.md) and
+  [`env_cv()`](https://gillescolling.com/timesift/reference/cv.md) hold
+  out a block of space or of predictor space. biomod2’s `nb.rep` is
+  `repeats =` on
+  [`cv()`](https://gillescolling.com/timesift/reference/cv.md) and
+  [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md):
+  every repeat is a full run on its own fold map, and a response is
+  averaged over its folds and its repeats. biomod2’s `kfold` is
+  [`cv()`](https://gillescolling.com/timesift/reference/cv.md), `strat`
+  is `cv(by = )`, `block` is
+  [`block_cv()`](https://gillescolling.com/timesift/reference/cv.md),
+  `env` is
+  [`env_cv()`](https://gillescolling.com/timesift/reference/cv.md) and
+  `user.defined` is a fold map passed as `resampling`.
 - **Scorable cells.** A response is scored only on folds whose held-out
   units hold both classes, and only fitted on training units that hold
   both. The mask follows from the response and the fold map and involves
@@ -380,13 +503,15 @@ criterion: `"youden"` for TSS, `"kappa"`, or `"prevalence"`.
   [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md),
   [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md))
   says so in its documentation.
-- **Presence-absence only for four algorithms.**
+- **Presence-absence only for three algorithms.**
   [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md),
-  [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md),
+  [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
+  and
   [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
-  and the logistic refit of
-  [`mars()`](https://gillescolling.com/timesift/reference/mars.md) need
-  a binary response. The other learners follow the head’s loss.
+  need a binary response and refuse a head fitted under squared error.
+  The other learners follow the head’s loss, and
+  [`mars()`](https://gillescolling.com/timesift/reference/mars.md) is
+  among them.
 - **Predictors.** The columns of a representation are the predictors,
   one per bin and channel, and a column of `targets` such as elevation
   reaches the model where `static` names it.

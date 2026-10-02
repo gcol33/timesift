@@ -6,16 +6,24 @@ defined on, computed with no model involved.
 ## `cv()`
 
 ``` python
-cv(v: int = 10, seed: int = 1, strata: int = 5)
+cv(v: int = 10, seed: int = 1, strata: int = 5, by=None, repeats: int = 1)
 ```
 
 Hold out single targets, balanced within equal-count strata of the
 response.
 
+`by` stratifies on a numeric column of `targets` instead of the richness
+of the response. `repeats` draws the split that many times, each with
+its own seed (`seed`, `seed + 1`, and so on). In `timesift` every repeat
+is a full run on its own fold map: a score stays one fit’s held-out
+score, the report averages a response’s scores over folds and repeats,
+and the combiner is fitted on the out-of-fold predictions of all the
+repeats together.
+
 ## `grouped_cv()`
 
 ``` python
-grouped_cv(group, v: int = 10, seed: int = 1)
+grouped_cv(group, v: int = 10, seed: int = 1, repeats: int = 1)
 ```
 
 Keep every target sharing a value of the `group` column in one fold.
@@ -24,10 +32,35 @@ It is what repeated targets on the same unit need: two visits to a plot
 a fortnight apart are not two independent held-out units, and splitting
 them across folds scores a model on a unit it has already read.
 
+## `block_cv()`
+
+``` python
+block_cv(by, v: int = 4)
+```
+
+Hold out a block of targets whole, the blocks cut on the columns `by` of
+`targets`.
+
+The units are split at the median of the column with the widest range,
+the lower share going to the left, and each part is cut again until
+there are `v` of them, so a block holds as many units as another to
+within one. Nothing is drawn. Under the nested selection the inner folds
+keep blocks whole too, so `inner` is at most `v - 1`. `by` is column
+names, or a numeric array with one row per target.
+
+## `env_cv()`
+
+``` python
+env_cv(by, v: int = 4)
+```
+
+As `block_cv`, on columns centred and scaled first: blocks of predictor
+space.
+
 ## `Resampling`
 
 ``` python
-Resampling(kind, v, seed, strata, group, folds)
+Resampling(kind, v, seed, strata, group, folds, by, scale, repeats)
 ```
 
 How the targets are split, named but not yet drawn.
@@ -40,6 +73,9 @@ Attributes:
 - `strata` - int
 - `group` - str \| None
 - `folds` - object
+- `by` - object
+- `scale` - bool
+- `repeats` - int
 
 ## `as_resampling()`
 
@@ -253,6 +289,24 @@ Whether one `(variable, fold)` cell admits a score.
 
 ``` python
 PRESENCE_ABSENCE = dict(prepare=lambda y: as_response(y).check_presence_absence(), activation='sigmoid', loss='binary_cross_entropy', metric='roc_auc', weights=lambda y, fitting: positive_weights(y, fitting=fitting), cells=lambda y, folds: scorable_cells(y, folds))
+```
+
+## `CONTINUOUS`
+
+``` python
+CONTINUOUS = _numeric_head(lambda v: None, 'r_squared')
+```
+
+## `ABUNDANCE`
+
+``` python
+ABUNDANCE = _numeric_head(_check_abundance, 'r_squared')
+```
+
+## `ORDINAL`
+
+``` python
+ORDINAL = _numeric_head(_check_ordinal, 'ordinal_f1')
 ```
 
 ## `positive_weights()`

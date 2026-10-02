@@ -14,7 +14,7 @@ predict(
   series = NULL,
   candidate = "ensemble",
   type = c("response", "binary", "spread"),
-  rule = c("youden", "kappa", "prevalence"),
+  rule = c("youden", "kappa", "prevalence", "mpa"),
   alpha = 0.05,
   ...
 )

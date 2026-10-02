@@ -9,17 +9,21 @@ One fold map read by everything that scores, and the cells a score is defined on
 ## `cv()`
 
 ```python
-cv(v: int = 10, seed: int = 1, strata: int = 5, by=None)
+cv(v: int = 10, seed: int = 1, strata: int = 5, by=None, repeats: int = 1)
 ```
 
 Hold out single targets, balanced within equal-count strata of the response.
 
 `by` stratifies on a numeric column of `targets` instead of the richness of the response.
+`repeats` draws the split that many times, each with its own seed (`seed`, `seed + 1`,
+and so on). In `timesift` every repeat is a full run on its own fold map: a score stays one
+fit's held-out score, the report averages a response's scores over folds and repeats, and the
+combiner is fitted on the out-of-fold predictions of all the repeats together.
 
 ## `grouped_cv()`
 
 ```python
-grouped_cv(group, v: int = 10, seed: int = 1)
+grouped_cv(group, v: int = 10, seed: int = 1, repeats: int = 1)
 ```
 
 Keep every target sharing a value of the `group` column in one fold.
@@ -53,7 +57,7 @@ As `block_cv`, on columns centred and scaled first: blocks of predictor space.
 ## `Resampling`
 
 ```python
-Resampling(kind, v, seed, strata, group, folds, by, scale)
+Resampling(kind, v, seed, strata, group, folds, by, scale, repeats)
 ```
 
 How the targets are split, named but not yet drawn.
@@ -68,6 +72,7 @@ Attributes:
 - `folds` - object
 - `by` - object
 - `scale` - bool
+- `repeats` - int
 
 ## `as_resampling()`
 

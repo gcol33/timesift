@@ -31,6 +31,7 @@ timesift(
     keep_fits: bool = False,
     seed: int = 1,
     verbose: bool = True,
+    refit: bool = True,
 )
 ```
 
@@ -62,6 +63,14 @@ Columns of `targets` that are neither the response nor the identifier nor the an
 ignored unless `static` names them: a predictor is never picked up because it happened to be
 in the table.
 
+With `repeats` above one in `resampling` the run is made once per repeat: `scores` carries
+a `repeat` array and every repeat's folds under numbers of their own, `estimate` is read off
+all the repeats' held-out predictions, `oof` is a target's mean prediction over the repeats,
+and the stack is fitted on the repeats' out-of-fold predictions together. The models, the
+per-fold fits and `folds` are the first repeat's. `refit` says whether the candidates are
+refitted on all targets at the end, which is what `predict` reads; a repeated resampling asks
+it of its first run alone.
+
 ## `Timesift`
 
 ```python
@@ -89,6 +98,7 @@ Timesift(
     fold_weights,
     predictions,
     choice,
+    repeats,
 )
 ```
 
@@ -123,6 +133,7 @@ Attributes:
 - `fold_weights` - list | None
 - `predictions` - dict | None
 - `choice` - str | None
+- `repeats` - int
 
 ### `representation_of()`
 

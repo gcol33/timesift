@@ -727,10 +727,10 @@ votes. A smaller run on one grain shows it:</p>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">fit_ca</span><span class="op">$</span><span class="va">estimate</span>, <span class="va">metric</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"roc_auc"</span>, <span class="st">"tss"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">arm</span>, <span class="va">metric</span>, <span class="va">score</span>, <span class="va">se</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;         arm  metric     score         se</span></span>
-<span><span class="co">#&gt; 4  selected roc_auc 0.7800964 0.01178032</span></span>
-<span><span class="co">#&gt; 5  selected     tss 0.5580208 0.01515674</span></span>
-<span><span class="co">#&gt; 9  ensemble roc_auc 0.7236305 0.03402524</span></span>
-<span><span class="co">#&gt; 10 ensemble     tss 0.4526556 0.05909692</span></span></code></pre></div>
+<span><span class="co">#&gt; 24 selected roc_auc 0.7800964 0.01178032</span></span>
+<span><span class="co">#&gt; 26 selected     tss 0.5580208 0.01515674</span></span>
+<span><span class="co">#&gt; 50 ensemble roc_auc 0.7236305 0.03402524</span></span>
+<span><span class="co">#&gt; 52 ensemble     tss 0.4526556 0.05909692</span></span></code></pre></div>
 <p><code>EMcv</code> and <code>EMci</code> read the members of the
 ensemble side by side. <code>type = "spread"</code> returns the weighted
 mean, the standard deviation, the coefficient of variation and an
@@ -764,8 +764,138 @@ folds the inflation at two population skills reads:</p>
 <span><span class="co">#&gt; 2   0.9 0.9520334 0.05203343 0.9296009 0.9743530         40</span></span></code></pre></div>
 <p><code><a href="../reference/kappa_score.html">decision_threshold()</a></code> returns the cuts a binary
 prediction uses, and <code>rule</code> picks the criterion:
-<code>"youden"</code> for TSS, <code>"kappa"</code>, or
-<code>"prevalence"</code>.</p>
+<code>"youden"</code> for TSS, <code>"kappa"</code>,
+<code>"prevalence"</code> or <code>"mpa"</code>, the minimum predicted
+area cut that keeps <code>perc</code> of the presences.</p>
+<p>biomod2’s other evaluation statistics come from
+<code><a href="../reference/table_metric.html">table_metric()</a></code>, which cuts the predictions by a rule and
+reads the table of decisions against observations:</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>biomod2</th>
+<th><code>timesift</code></th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>
+<code>TSS</code>, <code>ROC</code>, <code>KAPPA</code>
+</td>
+<td>
+<code><a href="../reference/tss.html">tss()</a></code>, <code><a href="../reference/roc_auc.html">roc_auc()</a></code>,
+<code><a href="../reference/kappa_score.html">kappa_score()</a></code>
+</td>
+</tr>
+<tr class="even">
+<td>
+<code>POD</code>, <code>POFD</code>, <code>FAR</code>,
+<code>SR</code>, <code>ACCURACY</code>, <code>BIAS</code>,
+<code>OR</code>, <code>ORSS</code>, <code>CSI</code>,
+<code>ETS</code>
+</td>
+<td>
+<code>table_metric(y, p, "pod")</code> and the same lower-case
+names</td>
+</tr>
+<tr class="odd">
+<td><code>BOYCE</code></td>
+<td><code><a href="../reference/boyce_index.html">boyce_index()</a></code></td>
+</tr>
+<tr class="even">
+<td><code>MPA</code></td>
+<td><code>decision_threshold(rule = "mpa")</code></td>
+</tr>
+</tbody>
+</table>
+<p>biomod2 reads each statistic at the cut that brings that statistic
+closest to its own optimum on a grid of 100 cuts.
+<code><a href="../reference/table_metric.html">table_metric()</a></code> reads it at the cut of the <code>rule</code>
+given, <code>"youden"</code> by default, so the statistics are
+comparable at one operating point. Every name is a registered metric, so
+<code>grain_ladder(metric = "csi")</code> reads it.</p>
+</div>
+<div class="section level2">
+<h2 id="abundance-ordinal-and-continuous-responses">Abundance, ordinal and continuous responses<a class="anchor" aria-label="anchor" href="#abundance-ordinal-and-continuous-responses"></a>
+</h2>
+<p>biomod2 4.3 also models abundances and ordinal classes. The response
+head decides what a response is, and three ship beside presence-absence:
+<code>response = "continuous"</code> for any real number,
+<code>"abundance"</code> for a non-negative one, and
+<code>"ordinal"</code> for whole-number classes. All three are fitted
+under squared error through an identity output, so every learner but the
+three above and the combiner read them unchanged. <code>r_squared</code>
+is what a continuous or abundance comparison reads by default, and
+<code><a href="../reference/regression_metric.html">regression_metric()</a></code> carries biomod2’s <code>RMSE</code>,
+<code>MSE</code>, <code>MAE</code> and <code>Max_error</code>
+(registered as <code>neg_rmse</code>, <code>neg_mse</code>,
+<code>neg_mae</code> and <code>neg_max_error</code>, since the highest
+score is the best). <code><a href="../reference/ordinal_metric.html">ordinal_metric()</a></code> carries
+<code>Accuracy</code>, <code>Recall</code>, <code>Precision</code> and
+<code>F1</code>, each prediction being read as the observed class
+nearest to it. A multiclass response is one presence-absence column per
+class. A count under a Poisson loss is not shipped: the penalised, tree,
+boosting and stepwise cores would each need that family.</p>
+</div>
+<div class="section level2">
+<h2 id="maps">Maps<a class="anchor" aria-label="anchor" href="#maps"></a>
+</h2>
+<p><code>BIOMOD_Projection()</code> and
+<code>BIOMOD_EnsembleForecasting()</code> apply the fit to a stack of
+rasters. <code><a href="../reference/project.html">project()</a></code> applies it to one target per cell, each
+carrying the record of its own cell, and returns a raster with a layer
+per response. A map for a later period is the same call with the later
+record, and <code>BIOMOD_RangeSize()</code> is
+<code><a href="../reference/range_change.html">range_change()</a></code> on the two binary maps.</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">now</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/project.html">project</a></span><span class="op">(</span><span class="va">fit</span>, series <span class="op">=</span> <span class="va">temperature_now</span>, static <span class="op">=</span> <span class="va">terrain</span>, type <span class="op">=</span> <span class="st">"binary"</span><span class="op">)</span></span>
+<span><span class="va">later</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/project.html">project</a></span><span class="op">(</span><span class="va">fit</span>, series <span class="op">=</span> <span class="va">temperature_2050</span>, static <span class="op">=</span> <span class="va">terrain</span>, type <span class="op">=</span> <span class="st">"binary"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/range_change.html">range_change</a></span><span class="op">(</span><span class="va">now</span>, <span class="va">later</span><span class="op">)</span><span class="op">$</span><span class="va">table</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="tuning">Tuning<a class="anchor" aria-label="anchor" href="#tuning"></a>
+</h2>
+<p><code>BIOMOD_Tuning()</code> searches a grid per algorithm.
+<code><a href="../reference/tune.html">tune()</a></code> wraps a learner so that it searches a grid of its
+own settings on the units it is fitted on, by cross-validation inside
+them, and fits the best. Inside a run each outer fold chooses from its
+own training units, so the score a tuned candidate is read at is not
+selected on. The settings it chose are in the candidate table.</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>, x <span class="op">=</span> <span class="va">temp</span>,</span>
+<span>         models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>RF <span class="op">=</span> <span class="fu"><a href="../reference/tune.html">tune</a></span><span class="op">(</span><span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mtry <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span>, min_node <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="variable-importance">Variable importance<a class="anchor" aria-label="anchor" href="#variable-importance"></a>
+</h2>
+<p>biomod2’s <code>bm_VariablesImportance()</code> permutes one
+predictor and reports one minus its correlation with the prediction made
+without the permutation. <code><a href="../reference/occlusion.html">occlusion()</a></code> does the same on the
+models a run kept per fold, on the units each held out, and reports it
+as <code>importance</code> beside the fall in score. A predictor is a
+bin of the representation, or with <code>over = "channel"</code> one
+statistic of it across the record, which is where a column named in
+<code>static</code> sits when the run has a record.
+<code>occlusion(fit, "ensemble", over = "channel")</code> reads the
+combination.</p>
+</div>
+<div class="section level2">
+<h2 id="response-curves">Response curves<a class="anchor" aria-label="anchor" href="#response-curves"></a>
+</h2>
+<p><code><a href="../reference/response_curve.html">response_curve()</a></code> is
+<code>bm_PlotResponseCurves()</code>: one predictor is moved across the
+range it takes while the others sit at their <code>fixed</code> summary
+(<code>"mean"</code>, <code>"median"</code>, <code>"min"</code> or
+<code>"max"</code>, as <code>fixed.var</code>), and a second predictor
+<code>with</code> gives the bivariate surface
+(<code>do.bivariate</code>). A predictor is a statistic of the
+representation, so the curve of <code>"warm_day"</code> is the
+prediction as the warmest day moves in every bin together.</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/response_curve.html">response_curve</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"ensemble"</span>, <span class="st">"warm_day"</span>, spread <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">rc</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="what-differs-from-a-biomod2-run">What differs from a biomod2 run<a class="anchor" aria-label="anchor" href="#what-differs-from-a-biomod2-run"></a>
@@ -773,7 +903,11 @@ prediction uses, and <code>rule</code> picks the criterion:
 <ul>
 <li>
 <strong>Absences.</strong> The learners read the absences they are
-given. <code>timesift</code> draws no pseudo-absences.
+given, and <code><a href="../reference/pseudo_absences.html">pseudo_absences()</a></code> draws them from a pool of
+background units by biomod2’s <code>random</code>, <code>sre</code> and
+<code>disk</code> strategies, with repeated draws, before the fit. A
+drawn unit is a row of the targets like any other: it is not flagged in
+the score, and a set of one’s own is the rows of the pool it names.
 <code><a href="../reference/maxnet.html">maxnet()</a></code> offers both formulations: the default treats every
 unit as background, as biomod2’s <code>MAXNET</code> does, and
 <code>formulation = "absence"</code> reads the absences as absences
@@ -781,8 +915,17 @@ under the response head’s case weights.</li>
 <li>
 <strong>Folds.</strong> One fold map is dealt once and read by every
 candidate and the ensemble. <code><a href="../reference/cv.html">cv()</a></code> deals units balanced on a
-stratifying value and <code><a href="../reference/cv.html">grouped_cv()</a></code> keeps units that share a
-group on one side of each split.</li>
+stratifying value, <code><a href="../reference/cv.html">grouped_cv()</a></code> keeps units that share a
+group on one side of each split, and <code><a href="../reference/cv.html">block_cv()</a></code> and
+<code><a href="../reference/cv.html">env_cv()</a></code> hold out a block of space or of predictor space.
+biomod2’s <code>nb.rep</code> is <code>repeats =</code> on
+<code><a href="../reference/cv.html">cv()</a></code> and <code><a href="../reference/cv.html">grouped_cv()</a></code>: every repeat is a full
+run on its own fold map, and a response is averaged over its folds and
+its repeats. biomod2’s <code>kfold</code> is <code><a href="../reference/cv.html">cv()</a></code>,
+<code>strat</code> is <code>cv(by = )</code>, <code>block</code> is
+<code><a href="../reference/cv.html">block_cv()</a></code>, <code>env</code> is <code><a href="../reference/cv.html">env_cv()</a></code> and
+<code>user.defined</code> is a fold map passed as
+<code>resampling</code>.</li>
 <li>
 <strong>Scorable cells.</strong> A response is scored only on folds
 whose held-out units hold both classes, and only fitted on training
@@ -795,11 +938,11 @@ cells.</li>
 learner that cannot use them (the background <code><a href="../reference/maxnet.html">maxnet()</a></code>,
 <code><a href="../reference/envelope.html">envelope()</a></code>) says so in its documentation.</li>
 <li>
-<strong>Presence-absence only for four algorithms.</strong>
-<code><a href="../reference/maxnet.html">maxnet()</a></code>, <code><a href="../reference/envelope.html">envelope()</a></code>,
-<code><a href="../reference/discriminant.html">discriminant()</a></code> and the logistic refit of
-<code><a href="../reference/mars.html">mars()</a></code> need a binary response. The other learners follow
-the head’s loss.</li>
+<strong>Presence-absence only for three algorithms.</strong>
+<code><a href="../reference/maxnet.html">maxnet()</a></code>, <code><a href="../reference/envelope.html">envelope()</a></code> and
+<code><a href="../reference/discriminant.html">discriminant()</a></code> need a binary response and refuse a head
+fitted under squared error. The other learners follow the head’s loss,
+and <code><a href="../reference/mars.html">mars()</a></code> is among them.</li>
 <li>
 <strong>Predictors.</strong> The columns of a representation are the
 predictors, one per bin and channel, and a column of

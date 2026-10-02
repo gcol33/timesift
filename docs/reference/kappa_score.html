@@ -89,22 +89,28 @@ where the two part company.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">kappa_score</span><span class="op">(</span><span class="va">y</span>, <span class="va">p</span>, rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"youden"</span>, <span class="st">"kappa"</span>, <span class="st">"prevalence"</span><span class="op">)</span><span class="op">)</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">kappa_score</span><span class="op">(</span><span class="va">y</span>, <span class="va">p</span>, rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"youden"</span>, <span class="st">"kappa"</span>, <span class="st">"prevalence"</span>, <span class="st">"mpa"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">decision_threshold</span><span class="op">(</span><span class="va">y</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Default S3 method</span></span>
-<span><span class="fu">decision_threshold</span><span class="op">(</span><span class="va">y</span>, <span class="va">p</span>, rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"youden"</span>, <span class="st">"kappa"</span>, <span class="st">"prevalence"</span><span class="op">)</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu">decision_threshold</span><span class="op">(</span></span>
+<span>  <span class="va">y</span>,</span>
+<span>  <span class="va">p</span>,</span>
+<span>  rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"youden"</span>, <span class="st">"kappa"</span>, <span class="st">"prevalence"</span>, <span class="st">"mpa"</span><span class="op">)</span>,</span>
+<span>  perc <span class="op">=</span> <span class="fl">0.9</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for class 'timesift'</span></span>
 <span><span class="fu">decision_threshold</span><span class="op">(</span></span>
 <span>  <span class="va">y</span>,</span>
 <span>  candidate <span class="op">=</span> <span class="st">"ensemble"</span>,</span>
-<span>  rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"youden"</span>, <span class="st">"kappa"</span>, <span class="st">"prevalence"</span><span class="op">)</span>,</span>
+<span>  rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"youden"</span>, <span class="st">"kappa"</span>, <span class="st">"prevalence"</span>, <span class="st">"mpa"</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">model_agreement</span><span class="op">(</span><span class="va">y</span>, <span class="va">p_a</span>, <span class="va">p_b</span>, rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"youden"</span>, <span class="st">"kappa"</span>, <span class="st">"prevalence"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">model_agreement</span><span class="op">(</span><span class="va">y</span>, <span class="va">p_a</span>, <span class="va">p_b</span>, rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"youden"</span>, <span class="st">"kappa"</span>, <span class="st">"prevalence"</span>, <span class="st">"mpa"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -121,11 +127,16 @@ where the two part company.</p>
 
 
 <dt id="arg-rule">rule<a class="anchor" aria-label="anchor" href="#arg-rule"></a></dt>
-<dd><p>Threshold rule: <code>"youden"</code>, <code>"kappa"</code> or <code>"prevalence"</code>.</p></dd>
+<dd><p>Threshold rule: <code>"youden"</code>, <code>"kappa"</code>, <code>"prevalence"</code> or <code>"mpa"</code>.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Ignored.</p></dd>
+
+
+<dt id="arg-perc">perc<a class="anchor" aria-label="anchor" href="#arg-perc"></a></dt>
+<dd><p>For <code>rule = "mpa"</code>, the share of presences the cut must keep, <code>0.9</code> by default.
+Where a rule is named without a call to <code>decision_threshold()</code> it takes that default.</p></dd>
 
 
 <dt id="arg-candidate">candidate<a class="anchor" aria-label="anchor" href="#arg-candidate"></a></dt>
@@ -151,7 +162,9 @@ differently, and how often each is the one that is right there.</p>
 threshold is part of the statistic. <code>"youden"</code> is the operating point <code><a href="tss.html">tss()</a></code> is defined at and
 inherits its selection bias; <code>"kappa"</code> maximises kappa itself and inherits the analogous bias;
 <code>"prevalence"</code> cuts at the observed presence rate, which selects nothing from the labels and is
-the rule to read an absolute level at.</p>
+the rule to read an absolute level at. <code>"mpa"</code> is the minimum predicted area rule: the highest cut
+that still predicts presence at a share <code>perc</code> of the observed presences, so the labels enter
+through the presences alone.</p>
 <p>Given a <code><a href="timesift.html">timesift()</a></code> fit, <code>decision_threshold()</code> learns one cut per response from a candidate's
 out-of-fold predictions of the fit's own targets, which is the cut <code>predict(type = "binary")</code>
 applies to new targets.</p>

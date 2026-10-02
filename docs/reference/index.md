@@ -18,6 +18,14 @@ that follows from it.
   : What a run found
 - [`predict(`*`<timesift>`*`)`](https://gillescolling.com/timesift/reference/predict.timesift.md)
   : Predict from a fitted timesift
+- [`project()`](https://gillescolling.com/timesift/reference/project.md)
+  : Project a fit onto rasters
+- [`range_change()`](https://gillescolling.com/timesift/reference/range_change.md)
+  : How the range of each response changes between two projections
+- [`plot(`*`<timesift_range_change>`*`)`](https://gillescolling.com/timesift/reference/plot.timesift_range_change.md)
+  : Draw the change in range
+- [`pseudo_absences()`](https://gillescolling.com/timesift/reference/pseudo_absences.md)
+  : Draw pseudo-absences from a pool of background units
 - [`plot(`*`<timesift>`*`)`](https://gillescolling.com/timesift/reference/plot.timesift.md)
   : Draw a run
 
@@ -77,6 +85,11 @@ your own goes through.
 - [`register_learner()`](https://gillescolling.com/timesift/reference/register_learner.md)
   [`learners()`](https://gillescolling.com/timesift/reference/register_learner.md)
   : Register a learner
+- [`tune()`](https://gillescolling.com/timesift/reference/tune.md) :
+  Tune a learner's settings on the training units
+- [`register_tuning()`](https://gillescolling.com/timesift/reference/register_tuning.md)
+  [`tunings()`](https://gillescolling.com/timesift/reference/register_tuning.md)
+  : Register the grid a learner is tuned over
 
 ## The split and the cells
 
@@ -84,6 +97,8 @@ One fold map read by everything that scores, and the cells a score is
 defined on, computed with no model involved.
 
 - [`cv()`](https://gillescolling.com/timesift/reference/cv.md)
+  [`block_cv()`](https://gillescolling.com/timesift/reference/cv.md)
+  [`env_cv()`](https://gillescolling.com/timesift/reference/cv.md)
   [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md) :
   How the folds are drawn
 - [`fold_map()`](https://gillescolling.com/timesift/reference/fold_map.md)
@@ -118,6 +133,14 @@ Weights fitted on the out-of-fold predictions alone.
   [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
   [`model_agreement()`](https://gillescolling.com/timesift/reference/kappa_score.md)
   : Cohen's kappa, and where two models disagree
+- [`table_metric()`](https://gillescolling.com/timesift/reference/table_metric.md)
+  : A metric of the two-by-two table of decisions
+- [`boyce_index()`](https://gillescolling.com/timesift/reference/boyce_index.md)
+  : The continuous Boyce index
+- [`regression_metric()`](https://gillescolling.com/timesift/reference/regression_metric.md)
+  : A metric of a numeric response and its predictions
+- [`ordinal_metric()`](https://gillescolling.com/timesift/reference/ordinal_metric.md)
+  : A metric of ordinal classes
 - [`score_predictions()`](https://gillescolling.com/timesift/reference/score_predictions.md)
   : Score held-out predictions on the cells the mask allows
 - [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md)
@@ -130,6 +153,10 @@ Weights fitted on the out-of-fold predictions alone.
   : What population skill a reported level is consistent with
 - [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md)
   : What part of the record a fitted model reads
+- [`response_curve()`](https://gillescolling.com/timesift/reference/response_curve.md)
+  : How a prediction responds to one predictor
+- [`plot(`*`<timesift_response_curve>`*`)`](https://gillescolling.com/timesift/reference/plot.timesift_response_curve.md)
+  : Draw a response curve
 
 ## The arrays themselves
 

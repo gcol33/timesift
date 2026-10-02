@@ -9,22 +9,28 @@ part company.
 ## Usage
 
 ``` r
-kappa_score(y, p, rule = c("youden", "kappa", "prevalence"))
+kappa_score(y, p, rule = c("youden", "kappa", "prevalence", "mpa"))
 
 decision_threshold(y, ...)
 
 # Default S3 method
-decision_threshold(y, p, rule = c("youden", "kappa", "prevalence"), ...)
+decision_threshold(
+  y,
+  p,
+  rule = c("youden", "kappa", "prevalence", "mpa"),
+  perc = 0.9,
+  ...
+)
 
 # S3 method for class 'timesift'
 decision_threshold(
   y,
   candidate = "ensemble",
-  rule = c("youden", "kappa", "prevalence"),
+  rule = c("youden", "kappa", "prevalence", "mpa"),
   ...
 )
 
-model_agreement(y, p_a, p_b, rule = c("youden", "kappa", "prevalence"))
+model_agreement(y, p_a, p_b, rule = c("youden", "kappa", "prevalence", "mpa"))
 ```
 
 ## Arguments
@@ -43,11 +49,17 @@ model_agreement(y, p_a, p_b, rule = c("youden", "kappa", "prevalence"))
 
 - rule:
 
-  Threshold rule: `"youden"`, `"kappa"` or `"prevalence"`.
+  Threshold rule: `"youden"`, `"kappa"`, `"prevalence"` or `"mpa"`.
 
 - ...:
 
   Ignored.
+
+- perc:
+
+  For `rule = "mpa"`, the share of presences the cut must keep, `0.9` by
+  default. Where a rule is named without a call to
+  `decision_threshold()` it takes that default.
 
 - candidate:
 
@@ -79,7 +91,9 @@ operating point
 defined at and inherits its selection bias; `"kappa"` maximises kappa
 itself and inherits the analogous bias; `"prevalence"` cuts at the
 observed presence rate, which selects nothing from the labels and is the
-rule to read an absolute level at.
+rule to read an absolute level at. `"mpa"` is the minimum predicted area
+rule: the highest cut that still predicts presence at a share `perc` of
+the observed presences, so the labels enter through the presences alone.
 
 Given a
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)

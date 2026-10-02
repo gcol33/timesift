@@ -141,7 +141,8 @@ and fitting across a set of grains on its own.</p>
 <span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>    keep_fits: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>,</span>
 <span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
 <span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a>    verbose: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
-<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a>    refit: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
+<span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a>)</span></code></pre></div>
 <p>Compare every learner across every representation, and estimate
 choosing among them.</p>
 <p><code>targets</code> is one row per thing to predict and
@@ -176,6 +177,16 @@ predictions.</p>
 identifier nor the anchor are ignored unless <code>static</code> names
 them: a predictor is never picked up because it happened to be in the
 table.</p>
+<p>With <code>repeats</code> above one in <code>resampling</code> the
+run is made once per repeat: <code>scores</code> carries a
+<code>repeat</code> array and every repeat’s folds under numbers of
+their own, <code>estimate</code> is read off all the repeats’ held-out
+predictions, <code>oof</code> is a target’s mean prediction over the
+repeats, and the stack is fitted on the repeats’ out-of-fold predictions
+together. The models, the per-fold fits and <code>folds</code> are the
+first repeat’s. <code>refit</code> says whether the candidates are
+refitted on all targets at the end, which is what <code>predict</code>
+reads; a repeated resampling asks it of its first run alone.</p>
 </div>
 <div class="section level2">
 <h2 id="timesift-1">
@@ -205,7 +216,8 @@ table.</p>
 <span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a>    fold_weights,</span>
 <span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>    predictions,</span>
 <span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>    choice,</span>
-<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>    repeats,</span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a>)</span></code></pre></div>
 <p>A fitted sift: every candidate’s out-of-fold predictions, their
 scores, and the combiner.</p>
 <p><code>candidates</code> and <code>scores</code> are tables held as
@@ -261,6 +273,8 @@ here was read where the score was.</p>
 <code>predictions</code> - dict | None</li>
 <li>
 <code>choice</code> - str | None</li>
+<li>
+<code>repeats</code> - int</li>
 </ul>
 <div class="section level3">
 <h3 id="representation_of">

@@ -820,15 +820,97 @@ recompute the mask, and assert it cell by cell. Both also write all
 three back and assert the bytes, which is what makes the file format a
 contract rather than a convention.
 
-`metric_cases.csv` and `metrics.csv` hold ten `(y, p)` cases and the
+`metric_cases.csv` and `metrics.csv` hold eleven `(y, p)` cases and the
 value of every threshold metric on each: `tss`, `roc_auc`,
-`average_precision`, `kappa` under both rules, and `decision_threshold`
-under all three. The cases are where the tie rule is the whole answer –
-every prediction tied, ties within a class, ties across the classes, one
+`average_precision`, `kappa` under both rules, `decision_threshold`
+under all four rules and the ten table metrics at the Youden cut and
+`boyce`. The cases are where the tie rule is the whole answer – every
+prediction tied, ties within a class, ties across the classes, one
 presence, one absence, all presences, all absences, a perfect separation
 and a reversed one. A metric a case defines no value on is written `NA`
 rather than left out, so a suite that quietly skipped it fails rather
 than passes.
+
+[`table_metric()`](https://gillescolling.com/timesift/reference/table_metric.md)
+reads a two-by-two table of decisions against observations, with `H` the
+hits, `F` the false alarms, `M` the misses, `C` the correct negatives
+and `n` their sum: `pod` is `H / (H + M)`, `pofd` `F / (F + C)`, `far`
+`F / (H + F)`, `sr` `H / (H + F)`, `accuracy` `(H + C) / n`, `bias`
+`(H + F) / (H + M)`, `or` `H C / (M F)`, `orss`
+`(H C - M F) / (H C + M F)`, `csi` `H / (H + M + F)` and `ets`
+`(H - h) / (H + M + F - h)` with `h = (H + M)(H + F) / n`. The cut is
+the one a rule of
+[`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+selects, or a `threshold` given, and presence is predicted at
+`p >= cut`. A zero denominator is `NA`, so the odds ratio of a table
+with no miss or no false alarm is `NA` rather than infinite, and so is a
+cell of one class. The cut rule `"mpa"` is the highest cut that predicts
+presence at a share `perc` of the presences: the presences’ predictions
+sorted in decreasing order, the `ceiling(perc * k - 1e-9)`-th of the
+`k`.
+
+[`boyce_index()`](https://gillescolling.com/timesift/reference/boyce_index.md)
+is the Spearman correlation, over the windows where it is defined, of
+the predicted-to-expected ratio with the window midpoint. With `lo` and
+`hi` the least and greatest prediction, the window width is
+`w = width (hi - lo)` and window `i = 0, ..., resolution` spans
+`[from_i, from_i + w]` with
+`from_i = lo + (hi - w - lo) i / resolution`, the last one closed at
+`hi`. The ratio is the share of presences inside divided by the share of
+all units inside, undefined where no unit is inside, and the result is
+`NA` where fewer than three windows define it or it takes one value.
+Both languages evaluate `from_i` in that order of operations, which is
+what makes their windows agree to the last place. `metric_cases.csv`
+carries a case of 25 units for it, the other cases being too small to
+hold a unit in most windows.
+
+`blocks_input.csv` and `blocks.csv` hold 23 units on three columns, with
+ties in two of them, and the block each unit lands in under five cuts:
+[`block_cv()`](https://gillescolling.com/timesift/reference/cv.md) on
+two columns into four, three and five blocks, on one column into two,
+and [`env_cv()`](https://gillescolling.com/timesift/reference/cv.md) on
+three scaled columns into four. A block is cut by halving. With `k`
+blocks to make from `n` units, the left part takes `k %/% 2` of the
+blocks and `floor((2 n (k %/% 2) + k) / (2 k))` of the units, the units
+being ordered by the column of widest range (the first on a tie in
+range) and by order of arrival where tied on it. Blocks are numbered in
+the order the halving makes them, left before right, and the fold of a
+unit is its block.
+[`env_cv()`](https://gillescolling.com/timesift/reference/cv.md) centres
+each column and divides by its standard deviation with `n - 1` first,
+and a column of no spread becomes zero. The resulting map is grouped by
+block, so a split drawn inside a fold keeps a block whole.
+
+`numeric_metric_cases.csv` and `numeric_metrics.csv` hold eight `(y, p)`
+cases and the value of every metric of a numeric response and of ordinal
+classes on each. With `e = y - p`, `r_squared` is
+`1 - sum(e^2) / sum((y - mean(y))^2)`, `pearson` the correlation,
+`rmse`, `mse`, `mae` and `max_error` the root mean, the mean, the mean
+absolute and the greatest absolute of `e`; where `y` or `p` is constant
+the first two are `NA`, as is any metric where `p` holds a value that is
+not a number. For the ordinal metrics each prediction is read as the
+observed class nearest to it, the lower class on a tie, `m[i, j]` counts
+the units of observed class `j` read as class `i`, and with `k` the
+classes observed `accuracy` is `trace(m) / sum(m)`, `recall` is the sum
+of `m[j, j]` over the column sums, `precision` the sum of `m[i, i]` over
+the row sums, each over classes with a nonzero sum and divided by `k`,
+and `f1` is `2 P R / (P + R)` of the last two. The cells of a numeric
+head hold a cell scorable where each side of the split holds two
+distinct values.
+
+`pa_pool.csv`, `pa_presences.csv` and `pa_candidates.csv` hold a pool of
+36 units on a six-by-six grid of longitude and latitude, five presences
+of which four are in the pool, and for each of four strategies which
+units of the pool it admits: `random` every unit whose `id` is not a
+presence’s; `sre` those outside the band between the 0.1 and 0.9
+quantiles (Hyndman and Fan’s seventh definition) of each of two columns
+over the presences, outside where a unit leaves the band in at least one
+column and inside where it lies on a bound; `disk_planar` those whose
+Euclidean distance to the nearest presence in the coordinates’ units
+lies in `[0.5, 1]`; and `disk_lonlat` those whose haversine distance on
+a sphere of radius 6371008.8 m lies in `[30000, 70000]`. Which of the
+admitted units a draw picks is not pinned: it is the language’s
+generator.
 
 `contrast_cells.csv` and `contrast.csv` hold a fixed table of per-cell
 scores for two arms, with cells one arm scored and the other did not,
@@ -2211,13 +2293,13 @@ the difference is recorded here rather than found at a call site.
 | the encoders | [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md) |
 | how an encoder is trained | [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md) |
 | fitting one learner on one representation | [`fit_learner()`](https://gillescolling.com/timesift/reference/fit_learner.md) |
-| the resampling | [`cv()`](https://gillescolling.com/timesift/reference/cv.md) and [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md) |
+| the resampling | [`cv()`](https://gillescolling.com/timesift/reference/cv.md) and [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md), and [`block_cv()`](https://gillescolling.com/timesift/reference/cv.md) and [`env_cv()`](https://gillescolling.com/timesift/reference/cv.md) for the spatial and environmental splits |
 | the fold map and the mask | [`fold_map()`](https://gillescolling.com/timesift/reference/fold_map.md) and [`scorable_cells()`](https://gillescolling.com/timesift/reference/scorable_cells.md) |
 | fitting across a set of grains | [`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md), and [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md) for the nested selection |
 | the combiner | [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md), [`ensemble_fit()`](https://gillescolling.com/timesift/reference/ensemble_fit.md), [`ensemble_combine()`](https://gillescolling.com/timesift/reference/ensemble_combine.md) and [`ensemble_weights()`](https://gillescolling.com/timesift/reference/ensemble_weights.md) |
 | how far an ensemble’s members disagree | [`ensemble_spread()`](https://gillescolling.com/timesift/reference/ensemble_spread.md), and `predict(type = "spread")` on a run |
 | scoring held-out predictions | [`score_predictions()`](https://gillescolling.com/timesift/reference/score_predictions.md), on the cells the mask allows |
-| the metrics | [`tss()`](https://gillescolling.com/timesift/reference/tss.md), [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md), [`average_precision()`](https://gillescolling.com/timesift/reference/average_precision.md) and [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md), with [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md) and [`model_agreement()`](https://gillescolling.com/timesift/reference/kappa_score.md) beside them |
+| the metrics | [`tss()`](https://gillescolling.com/timesift/reference/tss.md), [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md), [`average_precision()`](https://gillescolling.com/timesift/reference/average_precision.md), [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md), [`table_metric()`](https://gillescolling.com/timesift/reference/table_metric.md), [`boyce_index()`](https://gillescolling.com/timesift/reference/boyce_index.md), [`regression_metric()`](https://gillescolling.com/timesift/reference/regression_metric.md) and [`ordinal_metric()`](https://gillescolling.com/timesift/reference/ordinal_metric.md), with [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md) and [`model_agreement()`](https://gillescolling.com/timesift/reference/kappa_score.md) beside them |
 | the cut a fit applies | [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md) given a fit in place of the response, one cut per response learned from a candidate’s out-of-fold predictions |
 | two arms on matched cells | [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md) |
 | every grain against a learner’s best | [`grain_contrasts()`](https://gillescolling.com/timesift/reference/grain_contrasts.md), the mixed model of the per-cell scores and Dunnett’s many-to-one comparisons off it |
@@ -2227,7 +2309,8 @@ the difference is recorded here rather than found at a call site.
 | folds of the inner cross-validation | `n_inner` |
 | the three artifacts | [`write_folds()`](https://gillescolling.com/timesift/reference/artifacts.md) and [`read_folds()`](https://gillescolling.com/timesift/reference/artifacts.md), [`write_response()`](https://gillescolling.com/timesift/reference/artifacts.md) and [`read_response()`](https://gillescolling.com/timesift/reference/artifacts.md), [`write_cells()`](https://gillescolling.com/timesift/reference/artifacts.md) and [`read_cells()`](https://gillescolling.com/timesift/reference/artifacts.md) |
 | the digest | [`digest_array()`](https://gillescolling.com/timesift/reference/digest_array.md), exported |
-| the three registries | [`register_learner()`](https://gillescolling.com/timesift/reference/register_learner.md) and [`learners()`](https://gillescolling.com/timesift/reference/register_learner.md), [`register_metric()`](https://gillescolling.com/timesift/reference/register_metric.md) and [`metrics()`](https://gillescolling.com/timesift/reference/register_metric.md), [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) and [`responses()`](https://gillescolling.com/timesift/reference/register_response.md) |
+| the registries | [`register_learner()`](https://gillescolling.com/timesift/reference/register_learner.md) and [`learners()`](https://gillescolling.com/timesift/reference/register_learner.md), [`register_metric()`](https://gillescolling.com/timesift/reference/register_metric.md) and [`metrics()`](https://gillescolling.com/timesift/reference/register_metric.md), [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) and [`responses()`](https://gillescolling.com/timesift/reference/register_response.md), [`register_tuning()`](https://gillescolling.com/timesift/reference/register_tuning.md) and [`tunings()`](https://gillescolling.com/timesift/reference/register_tuning.md) |
+| pseudo-absences | [`pseudo_absences()`](https://gillescolling.com/timesift/reference/pseudo_absences.md), the random, sre and disk strategies |
 | what a rare response weighs | [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md), the case weights the shipped presence-absence head carries as its weights function and every learner that ships reads through the head |
 
 ### The same call does the same thing
@@ -2529,6 +2612,13 @@ the difference is recorded here rather than found at a call site.
 | drawing a ladder, a run or a selection | [`plot()`](https://rdrr.io/r/graphics/plot.default.html), a method on the base generic for each, on base graphics | [`plot()`](https://rdrr.io/r/graphics/plot.default.html), one function taking any of the three, on matplotlib |
 | a simulated record | a `timesift_simulation` list whose `readings` is a data frame | the `Simulation` dataclass, whose `readings` is a mapping of column to array; the first reading instant is `from_`, since `from` is a keyword |
 | boosting’s L2 penalty on a leaf | `boosting(lambda =)` | `boosting(lambda_=)`, since `lambda` is a keyword |
+| a tuned learner | [`tune()`](https://gillescolling.com/timesift/reference/tune.md), a learner whose fitted model is a `timesift_tuned` holding `model`, `chosen` and `table` | [`tune()`](https://gillescolling.com/timesift/reference/tune.md), a `Learner` whose fitted model is a `Tuned` holding the same three, `table` a list of rows |
+| the settings a candidate chose | the `settings` column of `candidates`, `NA` where the learner was not tuned | the `settings` column of `candidates`, an empty string there |
+| a map | [`project()`](https://gillescolling.com/timesift/reference/project.md), on `terra` rasters, returning a `SpatRaster` with a layer per response (`response.statistic` under a spread) | [`project()`](https://gillescolling.com/timesift/reference/project.md), on `xarray` grids, returning a `DataArray` over `response`, and `statistic` under a spread, and the two spatial dimensions |
+| the change in range | [`range_change()`](https://gillescolling.com/timesift/reference/range_change.md), a list of a `table` data frame and a `map` raster of the codes | [`range_change()`](https://gillescolling.com/timesift/reference/range_change.md), a `RangeChange` whose `table` is a list of rows and whose `map` is a `DataArray` |
+| the scores of a repeated resampling | `scores` and `cells` data frames with a `repeat` column | `scores` a mapping of arrays with a `repeat` array; `cells` without one |
+| a response curve | [`response_curve()`](https://gillescolling.com/timesift/reference/response_curve.md), an S3 generic with a method on a run, a data frame in long form with a [`plot()`](https://rdrr.io/r/graphics/plot.default.html) method; the second predictor is `with =` | [`response_curve()`](https://gillescolling.com/timesift/reference/response_curve.md), one function returning a `ResponseCurve` whose `prediction` is `[value, response]`; the second predictor is `with_=`, since `with` is a keyword |
+| the occlusion of an ensemble | `occlusion(fit, "ensemble", over = "channel")` | the same call, `occlusion(fit, "ensemble", over="channel")` |
 
 All of these are shapes rather than behaviours: a setting given to a
 learner beats the run’s control on both sides, the profile is one
@@ -2562,7 +2652,7 @@ which rebuilds them from the newtargets. \|
 |----|----|
 | `align_folds`, `as_response`, `as_resampling`, `get_learner`, `resolve_metric`, `cohen_kappa`, `auto_grains`, `expand_sift`, `resolve_folds`, `n_targets`, `target_labels`, `select_columns`, `column_names` | the helpers R keeps unexported: `.as_folds()`, `.as_response()`, `.as_learner()`, `.as_metric()`, `.kappa_table()`, `.auto_grains()` and `.select_columns()` do the same work by the same name, and `.as_fold_map()`, `.sift_specs()` and `.target_frame()` do what the last five do. A Python module namespace is flat, and anyone writing a learner or reading an artifact against this side reaches them. |
 | `Representation`, `Sift`, `Resampling`, `TimesiftSpec`, `Learner`, `TrainControl`, `TimesiftMatrix`, `TimesiftSet`, `Coverage`, `Response`, `Folds`, `Cells`, `Fit`, `Ladder`, `Selection`, `Timesift`, `Stack`, `EnsembleSpec`, `Simulation` | the types. R attaches a class attribute to a list or an array and the constructor is the only door to it; a Python dataclass is the type itself, and a user annotating a function or building one by hand reaches it by name. |
-| `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `SPREAD_STATISTICS`, `PRESENCE_ABSENCE` | the grain, statistic and spread vocabularies as tuples, and the shipped head as the mapping [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through [`responses()`](https://gillescolling.com/timesift/reference/register_response.md) on both sides. |
+| `GRAINS`, `STATS`, `DAY_LEVEL_STATS`, `SPREAD_STATISTICS`, `PRESENCE_ABSENCE`, `CONTINUOUS`, `ABUNDANCE`, `ORDINAL` | the grain, statistic and spread vocabularies as tuples, and the shipped heads as the mappings [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md) takes. R holds the vocabularies unexported and prints them in the error that refuses a name; the head is reached through [`responses()`](https://gillescolling.com/timesift/reference/register_response.md) on both sides. |
 
 Models are the one thing neither side promises. A fit in torch and a fit
 in libtorch cannot be byte-identical, and the encoders match module for

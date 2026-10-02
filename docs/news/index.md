@@ -4,6 +4,113 @@
 
 ### New
 
+- `cv(repeats = )` and `grouped_cv(repeats = )` draw the outer split
+  several times, each with its own seed, as biomod2’s `nb.rep` does.
+  [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+  makes the run once per repeat: a score stays one fit’s held-out score,
+  `scores` and `cells` carry a `repeat` column and every repeat’s folds
+  under numbers of their own, a response is averaged over its folds and
+  its repeats, `estimate` is read off all the repeats’ held-out
+  predictions, and the stack is fitted on the repeats’ out-of-fold
+  predictions together. `oof` is a target’s mean prediction over the
+  repeats, and the models, the per-fold fits and `folds` are the first
+  repeat’s. Both languages.
+
+- [`pseudo_absences()`](https://gillescolling.com/timesift/reference/pseudo_absences.md)
+  draws units where a response is zero from a pool of background units,
+  by `bm_PseudoAbsences()`’s strategies: `"random"`, `"sre"` (outside
+  the envelope of the presences) and `"disk"` (a distance band from the
+  nearest presence, planar or on the sphere), with repeated draws. The
+  units a strategy admits are the same in both languages and pinned in
+  `pa_candidates.csv`; which are drawn depends on the language’s
+  generator.
+
+- Three response heads for a numeric response: `"continuous"`,
+  `"abundance"` (not negative) and `"ordinal"` (whole-number classes),
+  fitted under squared error through an identity output by every learner
+  but
+  [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md),
+  [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
+  and
+  [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md).
+  [`regression_metric()`](https://gillescolling.com/timesift/reference/regression_metric.md)
+  carries biomod2’s `RMSE`, `MSE`, `MAE` and `Max_error` and `R^2` and
+  the correlation, and
+  [`ordinal_metric()`](https://gillescolling.com/timesift/reference/ordinal_metric.md)
+  its `Accuracy`, `Recall`, `Precision` and `F1`, all registered by
+  name. Both languages, pinned in `numeric_metrics.csv`.
+
+- [`project()`](https://gillescolling.com/timesift/reference/project.md)
+  applies a fit to one target per cell of a raster and returns the
+  prediction as a raster with a layer per response: `type = "binary"`
+  the binary map at the fit’s own cuts and `type = "spread"` the
+  ensemble’s disagreement, which is `BIOMOD_Projection()` and
+  `BIOMOD_EnsembleForecasting()`. Rasters are `terra` in R (in Suggests)
+  and `xarray` in Python (the `grid` extra).
+  [`range_change()`](https://gillescolling.com/timesift/reference/range_change.md)
+  counts the cells lost, kept and gained between two such maps, as
+  `BIOMOD_RangeSize()` does, and returns the map of codes.
+
+- [`tune()`](https://gillescolling.com/timesift/reference/tune.md) wraps
+  a learner so that, whenever it is fitted, it searches a grid of its
+  settings by cross-validation inside the units it is handed and fits
+  the best one. Inside a run each outer fold chooses from its own
+  training units. What was chosen is on the fitted model and in the new
+  `settings` column of the candidate table. This is biomod2’s
+  `BIOMOD_Tuning()`. Both languages. `tune(learner)` with no grid
+  searches the one registered for it, which for
+  [`forest()`](https://gillescolling.com/timesift/reference/forest.md),
+  [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md),
+  [`mars()`](https://gillescolling.com/timesift/reference/mars.md),
+  [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md),
+  [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md),
+  [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
+  and
+  [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
+  is the grid `BIOMOD_Tuning()` searches, and
+  [`register_tuning()`](https://gillescolling.com/timesift/reference/register_tuning.md)
+  adds a grid for a learner of one’s own.
+
+- [`response_curve()`](https://gillescolling.com/timesift/reference/response_curve.md)
+  varies one predictor of a fitted candidate across the range it takes
+  while the others are held at the mean, median, minimum or maximum of
+  their cells, and returns the prediction, as biomod2’s response curves
+  do. A predictor is a channel (moved in every bin, as a `static` column
+  is), a bin of a one-channel representation, or one cell; a second
+  predictor gives a surface, and for the ensemble `spread = TRUE` adds
+  the members’ standard deviation and interval.
+  [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws it.
+  Both languages.
+
+- [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md)
+  reports `importance` beside the fall in score: one minus the
+  correlation of the held-out predictions with and without the part,
+  which is biomod2’s variable importance and needs no response.
+  `occlusion(fit, "ensemble", over = "channel")` reads the ensemble,
+  withholding a channel from every member that carries it and combining
+  their predictions by the run’s stack. Both languages.
+
+- [`block_cv()`](https://gillescolling.com/timesift/reference/cv.md) and
+  [`env_cv()`](https://gillescolling.com/timesift/reference/cv.md) hold
+  a block of targets out whole, cut on columns of `targets` by halving
+  at the median of the widest column, in space or, on scaled columns, in
+  predictor space. Nothing is drawn, so R and Python return the same
+  blocks, pinned in `blocks.csv`. `cv(by = )` stratifies on a column of
+  `targets` instead of the richness of the response, which is biomod2’s
+  `strat` strategy.
+
+- [`table_metric()`](https://gillescolling.com/timesift/reference/table_metric.md)
+  reads biomod2’s evaluation statistics off the table of decisions
+  against observations: `pod`, `pofd`, `far`, `sr`, `accuracy`, `bias`,
+  `or`, `orss`, `csi` and `ets`, at the cut of any rule of
+  [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+  or at one given. Each is registered by name, so
+  `grain_ladder(metric = "csi")` reads it.
+  [`boyce_index()`](https://gillescolling.com/timesift/reference/boyce_index.md)
+  is the continuous Boyce index, registered as `"boyce"`, and
+  `decision_threshold(rule = "mpa", perc = )` is the minimum predicted
+  area cut. Both languages, pinned in `metrics.csv`.
+
 - [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
   fits a Bayesian logistic model through tulpa, with an optional
   nearest-neighbour or Hilbert-space Gaussian-process field over the

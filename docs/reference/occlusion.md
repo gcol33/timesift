@@ -87,12 +87,20 @@ occlusion(x, candidate, over = c("bin", "channel"), ...)
 
 - candidate:
 
-  Name of the candidate to read, for a run.
+  Name of the candidate to read, for a run, or `"ensemble"` for the
+  combination the run fitted. The members of an ensemble read different
+  bins, so the ensemble is held back by channel: a channel is withheld
+  from every member that carries it, all of them shifted the same way,
+  and the members' predictions are combined by the stack the run fitted.
 
 ## Value
 
 A data frame of one row per held-back part and variable, carrying the
-mean weight over folds and the score with and without the part.
+mean weight over folds, the score with and without the part, and
+`importance`: one minus the correlation between the predictions with and
+without the part, which is how biomod2 scores a predictor and needs no
+response. Both are read on the cells the fit was scored on, and
+`importance` is `NA` where either set of predictions is constant.
 
 ## Details
 
@@ -115,6 +123,11 @@ left in place.
 Read with `over = "channel"` the same machinery asks what each statistic
 of a grain carries, holding one channel back across the whole record
 instead of one bin across all channels.
+
+A column named in `static` is a channel of a representation built from a
+record, constant across its bins, so `over = "channel"` holds it back;
+where the run has no record the columns are the bins of one block and
+`over = "bin"` does.
 
 Reached through a
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)

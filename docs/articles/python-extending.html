@@ -171,31 +171,53 @@ weighted as its fit is. The shipped head’s is
 fits unweighted.</p>
 </div>
 <div class="section level2">
+<h2 id="register_tuning">
+<code>register_tuning()</code><a class="anchor" aria-label="anchor" href="#register_tuning"></a>
+</h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>register_tuning(name: <span class="bu">str</span>, grid, overwrite: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>)</span></code></pre></div>
+<p>Register the grid a learner is tuned over when <code>tune</code> is
+given none.</p>
+<p><code>name</code> is the learner’s, as it reports under.
+<code>grid</code> is a dict of the values to try, or a function of
+<code>(learner, x)</code> returning one, where <code>x</code> is the
+representation the learner is fitted on: the second form is for a grid
+that depends on the data, as the number of columns does, or on a setting
+the learner carries. The grids of the learners that ship are registered
+the same way.</p>
+</div>
+<div class="section level2">
+<h2 id="tunings">
+<code>tunings()</code><a class="anchor" aria-label="anchor" href="#tunings"></a>
+</h2>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>tunings()</span></code></pre></div>
+<p>The learners a grid is registered for.</p>
+</div>
+<div class="section level2">
 <h2 id="learners">
 <code>learners()</code><a class="anchor" aria-label="anchor" href="#learners"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>learners()</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>learners()</span></code></pre></div>
 <p>The learners registered under this session.</p>
 </div>
 <div class="section level2">
 <h2 id="metrics">
 <code>metrics()</code><a class="anchor" aria-label="anchor" href="#metrics"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>metrics()</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>metrics()</span></code></pre></div>
 <p>The metrics registered under this session.</p>
 </div>
 <div class="section level2">
 <h2 id="responses">
 <code>responses()</code><a class="anchor" aria-label="anchor" href="#responses"></a>
 </h2>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>responses()</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>responses()</span></code></pre></div>
 <p>The response heads registered under this session.</p>
 </div>
 <div class="section level2">
 <h2 id="get_learner">
 <code>get_learner()</code><a class="anchor" aria-label="anchor" href="#get_learner"></a>
 </h2>
-<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>get_learner(learner)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>get_learner(learner)</span></code></pre></div>
 <p>A <code>Learner</code>, whether it arrived as one or as the name of a
 registered one.</p>
 </div>
@@ -203,7 +225,7 @@ registered one.</p>
 <h2 id="resolve_metric">
 <code>resolve_metric()</code><a class="anchor" aria-label="anchor" href="#resolve_metric"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>resolve_metric(metric, default: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>resolve_metric(metric, default: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>)</span></code></pre></div>
 <p>The function that scores and the name a report prints, from either
 way a metric is given.</p>
 <p>A metric reaches a run as a registered name or as a function of
