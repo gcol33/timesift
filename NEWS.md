@@ -1,4 +1,4 @@
-# timesift (development version)
+# timesift 0.5.0
 
 ## New
 
