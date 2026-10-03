@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,9 +77,9 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="development version" id="timesift-development-version">timesift (development version)<a class="anchor" aria-label="anchor" href="#timesift-development-version"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.5.0" id="timesift-050">timesift 0.5.0<a class="anchor" aria-label="anchor" href="#timesift-050"></a></h2>
 <div class="section level3">
-<h3 id="new-development-version">New<a class="anchor" aria-label="anchor" href="#new-development-version"></a></h3>
+<h3 id="new-0-5-0">New<a class="anchor" aria-label="anchor" href="#new-0-5-0"></a></h3>
 <ul><li><p>A count response. <code>response = "count"</code> is whole numbers of zero or more, fitted under the Poisson deviance through a log link and an exponential output, and read by <code>neg_poisson_deviance</code> (<code>regression_metric(y, p, "poisson_deviance")</code>). Every core that follows a head’s loss takes the family: the penalised fit (glmnet’s <code>family = "poisson"</code>), the stepwise search and the MARS refit (<code>glm(family = poisson)</code>, MASS’s <code>stepAIC()</code> with the Poisson likelihood, earth’s <code>glm = list(family = poisson)</code>), the additive model (mgcv’s <code>gam(family = poisson)</code>, whose scale is known, so the criterion is the unbiased risk estimator), the tree (rpart’s <code>method = "poisson"</code>, with the gamma shrinkage of a leaf’s rate as <code>tree(shrink = )</code>) and the boosted trees (gbm’s <code>poisson</code> distribution, and xgboost’s <code>count:poisson</code> under <code>newton = TRUE</code>). A forest cuts a count on its variance and a leaf holds the mean count, the encoders train under the deviance, and the combiner minimises it. <code><a href="../reference/maxnet.html">maxnet()</a></code>, <code><a href="../reference/envelope.html">envelope()</a></code> and <code><a href="../reference/discriminant.html">discriminant()</a></code> refuse a count head as they refuse any numeric one. Both languages, pinned core by core in the fixtures, with the response in <code>count_response.csv</code>.</p></li>
 <li><p><code>cv(repeats = )</code> and <code>grouped_cv(repeats = )</code> draw the outer split several times, each with its own seed, as biomod2’s <code>nb.rep</code> does. <code><a href="../reference/timesift.html">timesift()</a></code> makes the run once per repeat: a score stays one fit’s held-out score, <code>scores</code> and <code>cells</code> carry a <code>repeat</code> column and every repeat’s folds under numbers of their own, a response is averaged over its folds and its repeats, <code>estimate</code> is read off all the repeats’ held-out predictions, and the stack is fitted on the repeats’ out-of-fold predictions together. <code>oof</code> is a target’s mean prediction over the repeats, and the models, the per-fold fits and <code>folds</code> are the first repeat’s. Both languages.</p></li>
 <li><p><code><a href="../reference/pseudo_absences.html">pseudo_absences()</a></code> draws units where a response is zero from a pool of background units, by <code>bm_PseudoAbsences()</code>’s strategies: <code>"random"</code>, <code>"sre"</code> (outside the envelope of the presences) and <code>"disk"</code> (a distance band from the nearest presence, planar or on the sphere), with repeated draws. The units a strategy admits are the same in both languages and pinned in <code>pa_candidates.csv</code>; which are drawn depends on the language’s generator.</p></li>
@@ -106,7 +106,7 @@
 <li><p><code><a href="../reference/stepwise.html">stepwise()</a></code> takes <code>direction = c("forward", "both", "backward", "none")</code> and <code>terms = c("column", "power")</code>. <code>"both"</code> and <code>"backward"</code> are MASS’s <code>stepAIC()</code> step for step, and <code>terms = "power"</code> makes each power of a column a term of its own, as biomod2’s quadratic formula writes them; <code>direction = "none"</code> with it is the model biomod2 fits as <code>GLM</code>, <code>x + I(x^2)</code> over every column. <code>max_terms = Inf</code> lifts the budget, and <code>threads</code> runs one step’s candidate fits at once. On the contract’s thirteen cases the core chooses MASS’s, <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code>’s and the R oracle’s terms, in the same order, with the deviance to about <code>1e-14</code>. The defaults are the forward search over column terms it always ran. Both languages.</p></li>
 </ul></div>
 <div class="section level3">
-<h3 id="changed-development-version">Changed<a class="anchor" aria-label="anchor" href="#changed-development-version"></a></h3>
+<h3 id="changed-0-5-0">Changed<a class="anchor" aria-label="anchor" href="#changed-0-5-0"></a></h3>
 <ul><li><p><code><a href="../reference/stepwise.html">stepwise()</a></code> runs on a new core, <code>src/ts_stepwise.cpp</code>, compiled into both languages: R’s <code>glm.fit</code> iteration over LINPACK’s <code>dqrdc2</code>, which sets the rank R reports, and MASS’s step rules. It replaces <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">stats::glm()</a></code> in R and a separate NumPy fitter in Python, which differed on what they refused: R took any fit that settled within 25 iterations, while Python also refused one whose fitted probabilities came within <code>1e-8</code> of zero or one. Both now refuse only a fit that has not settled, as R did. On the fixture’s design and on simulated records the core chooses the columns R’s <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> search chose, with predictions equal to about <code>1e-15</code>. A fit saved from an earlier version does not predict under this one; refit it.</p></li>
 <li><p>A <code><a href="../reference/stepwise.html">stepwise()</a></code> fit names every response whose final model did not settle in <code>stopped</code>.</p></li>
 <li><p>A <code>"weighted"</code> ensemble in Python gives every member the same weight where none scores above zero, as R’s always did, where it used to stop; <code>ensemble(metric =)</code> in Python now recomputes the scores it weighs and filters by, as R’s does, and a scope’s best candidate is the first offered among any on its score on both sides.</p></li>
@@ -141,7 +141,7 @@
 </ul></div>
 </div>
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.3.1" id="timesift-031">timesift 0.3.1<a class="anchor" aria-label="anchor" href="#timesift-031"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.3.1" id="timesift-031">timesift 0.3.1<a class="anchor" aria-label="anchor" href="#timesift-031"></a></h2><p class="text-muted">CRAN release: 2026-10-02</p>
 <div class="section level3">
 <h3 id="new-0-3-1">New<a class="anchor" aria-label="anchor" href="#new-0-3-1"></a></h3>
 <ul><li>

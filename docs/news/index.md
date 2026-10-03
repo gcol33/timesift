@@ -1,6 +1,6 @@
 # Changelog
 
-## timesift (development version)
+## timesift 0.5.0
 
 ### New
 
@@ -448,6 +448,8 @@
   ([\#82](https://github.com/gcol33/timesift/issues/82)).
 
 ## timesift 0.3.1
+
+CRAN release: 2026-10-02
 
 ### New
 
