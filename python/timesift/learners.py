@@ -25,8 +25,8 @@ from .representation import TimesiftMatrix
 from .response import fitting_rows
 
 __all__ = ["Fit", "Learner", "READS", "MULTI", "additive", "boosting", "cnn", "discriminant", "elasticnet",
-           "fit_learner", "envelope", "flatten", "hierarchical", "mars", "mlp", "rescnn", "forest",
-           "linear", "tree"]
+           "fit_learner", "envelope", "flatten", "hierarchical", "mars", "mlp", "perceptron", "rescnn",
+           "forest", "linear", "tree"]
 
 READS = ("tabular", "sequence")
 MULTI = ("joint", "separate")
@@ -431,6 +431,41 @@ def _objective(head):
 
 # ---- the training recipe ---------------------------------------------------------------------
 
+def _torch_optimizer(torch, net, cfg):
+    """The optimiser ``cfg`` names, at torch's own defaults besides the learning rate and the
+    weight decay."""
+    make = {"adamw": torch.optim.AdamW, "adam": torch.optim.Adam,
+            "sgd": torch.optim.SGD}[cfg.optimizer]
+    return make(net.parameters(), lr=cfg.learning_rate, weight_decay=cfg.weight_decay)
+
+
+def _torch_schedule(torch, opt, cfg):
+    """The learning-rate schedule ``cfg`` names; None holds the rate where it starts."""
+    if cfg.schedule == "cosine":
+        return torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.epochs)
+    if cfg.schedule == "plateau":
+        return torch.optim.lr_scheduler.ReduceLROnPlateau(
+            opt, mode="min", factor=cfg.plateau_factor, patience=cfg.plateau_patience)
+    return None
+
+
+def _step_schedule(sched, schedule, loss):
+    """One epoch's step of the schedule; a plateau reads the loss it was handed."""
+    if schedule == "cosine":
+        sched.step()
+    elif schedule == "plateau":
+        sched.step(loss)
+
+
+def _torch_penalty(torch, net, penalty, alpha):
+    """The penalty added to a batch's loss: ``penalty`` times the absolute weights' sum, weighed
+    by ``alpha``, and their norm, weighed by ``1 - alpha``, over every parameter of two or more
+    dimensions, so the weight matrices and kernels and not the biases or normalisation scales."""
+    terms = [alpha * w.abs().sum() + (1 - alpha) * torch.linalg.vector_norm(w)
+             for w in net.parameters() if w.dim() >= 2]
+    return penalty * torch.stack(terms).sum()
+
+
 def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head, group=None):
     torch = _torch()
     device = _resolve_device(cfg.device)
@@ -458,9 +493,8 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head, group=
 
     net = _torch_module(module)(in_ch=m.shape[1], in_len=m.shape[2],
                                 n_out=y.shape[1], **arch).to(device)
-    opt = torch.optim.AdamW(net.parameters(), lr=cfg.learning_rate,
-                            weight_decay=cfg.weight_decay)
-    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.epochs)
+    opt = _torch_optimizer(torch, net, cfg)
+    sched = _torch_schedule(torch, opt, cfg)
 
     best_loss, best_state, bad = float("inf"), None, 0
     # The schedule anneals until the averaging begins and is then held flat, and the epochs it
@@ -470,19 +504,25 @@ def _torch_fit(x: TimesiftMatrix, y: np.ndarray, module, arch, cfg, head, group=
     average, n_average = None, 0
     for epoch in range(1, cfg.epochs + 1):
         net.train()
+        batch_loss = []
         for b in _batches(rng.permutation(fit_idx), cfg.batch_size):
             idx = torch.tensor(b, dtype=torch.long, device=device)
             opt.zero_grad()
-            loss_fn(net(xt[idx]), yt[idx], wt[idx]).backward()
+            loss = loss_fn(net(xt[idx]), yt[idx], wt[idx])
+            if cfg.schedule == "plateau" and not len(val):
+                batch_loss.append(loss.item())
+            if cfg.penalty > 0:
+                loss = loss + _torch_penalty(torch, net, cfg.penalty, cfg.alpha)
+            loss.backward()
             opt.step()
-        if epoch < swa_from:
-            sched.step()
-        else:
+        if epoch >= swa_from:
             average, n_average = _accumulate(net, average, n_average)
             continue
+        vloss = (_torch_loss(net, loss_fn, xt, yt, wt, val, cfg.batch_size, device)
+                 if len(val) else None)
+        _step_schedule(sched, cfg.schedule, vloss if len(val) else float(np.mean(batch_loss)))
         if not len(val):
             continue
-        vloss = _torch_loss(net, loss_fn, xt, yt, wt, val, cfg.batch_size, device)
         if vloss < best_loss - 1e-4:
             best_loss, bad = vloss, 0
             best_state = _snapshot(net)
@@ -1403,6 +1443,104 @@ def _mars_fit(x, y, degree, penalty, max_terms, min_gain, minspan, endspan, fast
 def _mars_predict(model, x):
     from ._mars import mars_predict
     return _predict_columns(model["models"], flatten(x), mars_predict)
+
+
+def perceptron(data=None, hidden=None, decay=None, range=None, max_iter=None, skip=False,
+               abs_tol=1e-4, rel_tol=1e-8, preset="default", max_hessian=2.0, seed=1) -> Learner:
+    """One network per variable over every bin-by-channel column, fitted as the nnet package fits
+    it and as biomod2 fits ``ANN``. Each of ``hidden`` logistic units takes a bias and every
+    column, and the output takes a bias, every hidden unit and, with ``skip``, every column again.
+    The weights start uniform on ``[-range, range]`` and are fitted by the variable metric (BFGS)
+    method of Nash (1990), the minimiser nnet uses, on the response head's loss plus ``decay``
+    times the sum of the squared weights, biases included. The fit stops after ``max_iter``
+    iterations, when the objective falls below ``abs_tol``, or when an iteration lowers it by no
+    more than ``rel_tol`` of itself.
+
+    Under a presence-absence head the output is the logistic function of its sum and the loss the
+    cross-entropy, nnet's ``entropy = TRUE``; under a head with a squared-error loss the output is
+    the sum itself and the loss the sum of squares, nnet's ``linout = TRUE``; under a count head the
+    output is the exponential of the sum and the loss the Poisson deviance, which nnet does not
+    offer. biomod2 leaves nnet's own ``entropy = FALSE``, fitting a presence-absence response by
+    least squares on the logistic output; the learner fits the head's loss, as every learner does.
+
+    ``preset`` says whose defaults the settings left ``None`` take. ``"default"`` is what biomod2's
+    default option set fits: two hidden units, as biomod2 sets them, and nnet's own ``decay=0``,
+    ``range=0.7`` and ``max_iter=100``. ``"bigboss"`` is biomod2's tuned option set: five hidden
+    units, ``decay=0.1``, ``range=0.1`` and ``max_iter=200``. A setting given explicitly beats
+    either.
+
+    The network, its objective and the minimiser live in the core the R package calls, pinned
+    against nnet in the fixtures from the same starting weights, so the two languages fit the same
+    network. Neither scales the columns, as nnet does not, so a record read in its own units
+    saturates the hidden units sooner the wider its range. The minimiser holds an approximate
+    inverse Hessian of one number per pair of weights; a network that would need more than
+    ``max_hessian`` gigabytes for it is refused with the size. The case weights are the head's and
+    weigh each unit's term of the loss; under the shipped presence-absence head they are on, so a
+    default ``perceptron()`` is biomod2's ``ANN`` specification fitted under them, and a head
+    registered without ``weights`` fits it unweighted. A variable holding one value is predicted
+    its mean.
+    """
+    settings = _perceptron_settings(preset, hidden, decay, range, max_iter)
+    _whole(settings["hidden"], "hidden", 1)
+    for name, v in (("decay", settings["decay"]), ("range", settings["range"]),
+                    ("abs_tol", abs_tol), ("rel_tol", rel_tol)):
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not v >= 0:
+            raise ValueError(f"`{name}` is one number of zero or more, got {v!r}.")
+    if not isinstance(skip, (bool, np.bool_)):
+        raise ValueError(f"`skip` is True or False, got {skip!r}.")
+    if isinstance(max_hessian, bool) or not isinstance(max_hessian, (int, float)) \
+            or not max_hessian > 0:
+        raise ValueError(f"`max_hessian` is one positive number, got {max_hessian!r}.")
+    return Learner(name="perceptron", fit=_perceptron_fit, predict=_perceptron_predict, data=data,
+                   reads="tabular", multi="separate",
+                   params=dict(settings, skip=bool(skip), abs_tol=float(abs_tol),
+                               rel_tol=float(rel_tol), max_hessian=float(max_hessian),
+                               seed=int(seed)))
+
+
+def _perceptron_settings(preset, hidden, decay, range_, max_iter) -> dict:
+    """The settings a network is fitted under: those given, and the preset's for the rest."""
+    if preset == "bigboss":
+        base = dict(hidden=5, decay=0.1, range=0.1, max_iter=200)
+    elif preset == "default":
+        base = dict(hidden=2, decay=0.0, range=0.7, max_iter=100)
+    else:
+        raise ValueError(f'`preset` is "default" or "bigboss", got {preset!r}.')
+    given = dict(hidden=hidden, decay=decay, range=range_, max_iter=max_iter)
+    out = {k: base[k] if v is None else v for k, v in given.items()}
+    for k in ("hidden", "max_iter"):
+        _whole(out[k], k, 0)
+        out[k] = int(out[k])
+    return out
+
+
+def _perceptron_fit(x, y, hidden, decay, range, max_iter, skip, abs_tol, rel_tol, max_hessian,
+                    seed, head, variables, **_):
+    from ._perceptron import perceptron_fit
+    family = _family(head)
+    m = flatten(x)
+    n_weight = hidden * (m.shape[1] + 1) + hidden + 1 + (m.shape[1] if skip else 0)
+    need = n_weight * (n_weight + 1) / 2 * 8 / 2**30
+    if need > max_hessian:
+        raise ValueError(f"A network of {hidden} hidden units over {m.shape[1]} columns has "
+                         f"{n_weight} weights, and its approximate inverse Hessian would take "
+                         f"{need:.1f} GB, above `max_hessian = {max_hessian:g}`. A coarser grain or "
+                         "fewer hidden units shrinks it.")
+
+    def make(design, yj, seed_j, w):
+        return perceptron_fit(design, yj, w, family, hidden=hidden, decay=decay, range_=range,
+                              max_iter=max_iter, skip=skip, abs_tol=abs_tol, rel_tol=rel_tol,
+                              seed=seed_j)
+
+    models = _fit_columns(m, y, make, _variable_seeds(seed, variables), _head_weights(head, y))
+    return dict(models=models, n_col=m.shape[1], family=family,
+                stopped=[str(v) for v, f in zip(variables, models)
+                         if isinstance(f, dict) and not f["converged"]])
+
+
+def _perceptron_predict(model, x):
+    from ._perceptron import perceptron_predict
+    return _predict_columns(model["models"], flatten(x), perceptron_predict)
 
 
 def additive(data=None, k=10, gamma=1.0, max_knots=2000, threads=1) -> Learner:

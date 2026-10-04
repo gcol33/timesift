@@ -61,6 +61,7 @@ timesift/
     ts_envelope.h ts_envelope.cpp ts_stepwise.h ts_stepwise.cpp ts_glm.h ts_glm.cpp
     ts_mars.h ts_mars.cpp ts_fda.h ts_fda.cpp ts_normal.h ts_normal.cpp ts_internal.h
     ts_additive.h ts_additive.cpp
+    ts_perceptron.h ts_perceptron.cpp ts_quasi_newton.h ts_quasi_newton.cpp
     ts_r.cpp          the cpp11 wrapper; cpp11.cpp is generated
   R/                  R package source
   tests/testthat/     including helper-oracle.R, the pure-R implementation
@@ -175,8 +176,8 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   and the combiner minimises the loss. A fit that declares a `head` argument is handed the head,
   as one that declares `control` is handed the control; no learner holds a response of its own.
   Same for learners: `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `linear()`, `forest()`,
-  `tree()`, `boosting()`, `maxent()`, `envelope()`, `mars()`, `discriminant()`, `additive()` and
-  any user-supplied fit/predict pair go through one interface.
+  `tree()`, `boosting()`, `maxent()`, `envelope()`, `mars()`, `discriminant()`, `additive()`,
+  `perceptron()` and any user-supplied fit/predict pair go through one interface.
 - **A fitted encoder is a plain object.** Its weights are arrays and its device is the setting,
   not the resolved device; the network is rebuilt at prediction. `saveRDS()` and `pickle` round
   trip a fit, and a fit made on one machine predicts on another.
@@ -223,6 +224,12 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   against mgcv's criterion, degrees of freedom and fitted means in the fixtures, on cases where
   the criterion has one minimum: where it has several, mgcv's start reads its own
   parametrisation and the two searches can settle in different ones.
+- **So is the network.** `src/ts_perceptron.cpp` is a feed-forward network of one hidden layer
+  of logistic units (Ripley 1996), fitted by Nash's variable metric method (1990, Algorithm 21) in
+  `src/ts_quasi_newton.cpp`, so `perceptron()` is nnet's network and biomod2's `ANN`. From the
+  same starting weights it ends at nnet's weights to the bit, which takes nnet's order of
+  summation in the gradient; the fixtures are asserted at the spread a last-bit jitter of the
+  starting weights gives each case, since another platform's `exp()` moves the path that much.
 - **Every core is timesift's own code, written from the published method.** A reference package
   fixes the numbers a core must give, never its code: the structure, the decomposition and the
   names are ours, comments cite the paper, and the reference is named only where a comment states

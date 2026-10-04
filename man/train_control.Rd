@@ -9,6 +9,12 @@ train_control(
   batch_size = 64L,
   learning_rate = 0.001,
   weight_decay = 1e-04,
+  optimizer = c("adamw", "adam", "sgd"),
+  penalty = 0,
+  alpha = 0.5,
+  schedule = c("cosine", "constant", "plateau"),
+  plateau_factor = 0.1,
+  plateau_patience = 10L,
   early_stopping = Inf,
   val_frac = 0,
   device = "auto",
@@ -24,9 +30,32 @@ train_control(
 batches of at most this many as they divide into, of as equal a length as they can be, so no
 batch is a remainder of one.}
 
-\item{learning_rate}{Learning rate.}
+\item{learning_rate}{Learning rate, the one the schedule starts from.}
 
-\item{weight_decay}{AdamW weight decay.}
+\item{weight_decay}{The optimiser's weight decay: decoupled from the gradient under \code{"adamw"},
+and added to it as \code{weight_decay} times each parameter under \code{"adam"} and \code{"sgd"}, as torch's
+optimisers take it.}
+
+\item{optimizer}{\code{"adamw"}, \code{"adam"} or \code{"sgd"}, torch's optimisers at their own defaults besides
+the learning rate and the weight decay; \code{"sgd"} takes no momentum.}
+
+\item{penalty}{The weight of a penalty added to the loss of every batch:
+\code{penalty * (alpha * sum(abs(W)) + (1 - alpha) * sqrt(sum(W^2)))} summed over every weight matrix
+and kernel of the network, its biases and normalisation scales left out. This is cito's
+\code{lambda}, the penalty biomod2's \code{DNN} fits under. 0 adds nothing.}
+
+\item{alpha}{The share of the penalty on the absolute weights, as \code{elasticnet()} reads its
+\code{alpha}: 1 penalises the absolute weights alone and 0 the norm alone. cito's \code{alpha} is
+\code{1 - alpha}.}
+
+\item{schedule}{How the learning rate moves over the epochs: \code{"cosine"} anneals it to zero over
+the budget, \code{"constant"} holds it, and \code{"plateau"} multiplies it by \code{plateau_factor} once the
+loss has not improved for \code{plateau_patience} epochs, reading the validation loss where
+\code{val_frac} holds a set back and the epoch's mean training loss where it does not, as cito's
+\code{reduce_on_plateau} reads them. torch's own relative threshold of \code{1e-4} decides an improvement.}
+
+\item{plateau_factor, plateau_patience}{The factor a plateau multiplies the learning rate by, and
+the epochs without improvement that make one.}
 
 \item{early_stopping}{Epochs without an inner-validation improvement before training stops.
 Read only where \code{val_frac} holds a validation set back. \code{Inf}, the default, never stops: the
@@ -71,5 +100,9 @@ moves only the settings that were asked for: a learner given \code{train_control
 \examples{
 train_control()
 train_control(epochs = 200L, device = "cpu")
+# biomod2's tuned DNN, cito's adam with a penalty and a plateau schedule
+train_control(optimizer = "adam", learning_rate = 0.05, weight_decay = 0, penalty = 0.001,
+              alpha = 0, schedule = "plateau", plateau_patience = 7L, epochs = 150L,
+              batch_size = 100L, val_frac = 0.2, early_stopping = 14L)
 
 }

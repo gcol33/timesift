@@ -112,6 +112,14 @@ ts_mars_predict_ <- function(fit, newx, n, p) {
   .Call(`_timesift_ts_mars_predict_`, fit, newx, n, p)
 }
 
+ts_perceptron_fit_ <- function(x, y, w, n, p, family, hidden, skip, decay, range, max_iter, abs_tol, rel_tol, seed, start) {
+  .Call(`_timesift_ts_perceptron_fit_`, x, y, w, n, p, family, hidden, skip, decay, range, max_iter, abs_tol, rel_tol, seed, start)
+}
+
+ts_perceptron_predict_ <- function(fit, newx, n, p) {
+  .Call(`_timesift_ts_perceptron_predict_`, fit, newx, n, p)
+}
+
 ts_fda_fit_ <- function(x, y, w, n, p, degree, penalty, nk, thresh, prune, calibrate, threads) {
   .Call(`_timesift_ts_fda_fit_`, x, y, w, n, p, degree, penalty, nk, thresh, prune, calibrate, threads)
 }

@@ -128,6 +128,8 @@ earth’s multivariate adaptive regression splines over one,
 fits mda’s flexible discriminant analysis over one,
 [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
 fits mgcv’s generalised additive model over one,
+[`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md)
+fits nnet’s network of one hidden layer over one,
 [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
 fits a Bayesian logistic model with unit intercepts and a spatial field,
 and the `torch` encoders

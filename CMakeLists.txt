@@ -31,6 +31,8 @@ nanobind_add_module(_core NB_STATIC
   src/ts_hierarchical.cpp
   src/ts_sparse.cpp
   src/ts_normal.cpp
+  src/ts_quasi_newton.cpp
+  src/ts_perceptron.cpp
   python/ts_py.cpp)
 
 target_include_directories(_core PRIVATE src)

@@ -1,0 +1,8 @@
+case,response,weighted,hidden,decay,range,skip,max_iter,weight_tolerance,prediction_tolerance,value,stopped
+binomial,y_binomial,FALSE,2,0,0.7,FALSE,100,1e-10,1e-10,51.1490672888022,FALSE
+binomial_weighted,y_binomial,TRUE,2,0,0.7,FALSE,100,1e-06,1e-06,42.252554524396,FALSE
+binomial_bigboss,y_binomial,TRUE,5,0.1,0.1,FALSE,200,1e-06,1e-06,39.7364649477133,FALSE
+binomial_skip,y_binomial,TRUE,3,0.5,0.7,TRUE,100,1e-06,1e-06,63.9884289082695,FALSE
+binomial_stopped,y_binomial,FALSE,2,0.1,0.7,FALSE,5,1e-10,1e-10,51.476937464961,TRUE
+gaussian,y_gaussian,FALSE,2,1,0.7,FALSE,100,1e-08,1e-08,53.751317525148,FALSE
+gaussian_weighted_skip,y_gaussian,TRUE,2,1,0.7,TRUE,100,1e-04,1e-04,46.3409597643299,TRUE

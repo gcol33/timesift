@@ -2961,6 +2961,92 @@ to <code>6.2e-10</code>, <code>4.8e-7</code> and
 </div>
 </div>
 <div class="section level2">
+<h2 id="the-network">The network<a class="anchor" aria-label="anchor" href="#the-network"></a>
+</h2>
+<p><code><a href="../reference/perceptron.html">perceptron()</a></code> is one feed-forward network of one hidden
+layer per response, nnet’s model and biomod2’s <code>ANN</code>, over
+<code>src/ts_perceptron.cpp</code>, which both languages compile, fitted
+by the minimiser of <code>src/ts_quasi_newton.cpp</code>.</p>
+<ul>
+<li>
+<code>hidden</code> logistic units each take a bias and every
+column; the output takes a bias, every hidden unit and, with
+<code>skip</code>, every column. The logistic function is exactly 0
+below <code>-15</code> and exactly 1 above <code>15</code>, for the
+hidden units and for a logistic output alike.</li>
+<li>The weights are a vector ordered unit by unit: each hidden unit’s
+bias and then its columns, then the output’s bias, its hidden units and
+its skipped columns. Drawn, they are <code>(2u - 1) * range</code> for
+<code>u</code> the uniforms of stream 0 of the seed, the generator
+<strong>The forest</strong> defines, in that order.</li>
+<li>The objective is the sum over rows of the case weight times the
+row’s error, plus <code>decay</code> times the sum of the squared
+weights, biases included. Under the binomial family the output is
+logistic and the error
+<code>t log(t / y) + (1 - t) log((1 - t) / (1 - y))</code>, zero terms
+dropped and a probability below <code>1e-80</code> read as
+<code>1e-80</code>; under the Gaussian family the output is its sum and
+the error <code>(y - t)^2</code>; under the Poisson family the output is
+the exponential of its sum and the error
+<code>t log(t / y) - (t - y)</code>.</li>
+<li>The gradient starts every slope at <code>2 decay w</code> and adds
+the rows in order. A row’s error is carried back unweighted,
+<code>y - t</code> under the binomial and Poisson families and
+<code>2 (y - t)</code> under the Gaussian, through each hidden unit as
+<code>e v h (1 - h)</code>, and the row’s case weight multiplies the
+error where it enters a slope.</li>
+</ul>
+<p>The minimiser is Nash’s variable metric method (Compact Numerical
+Methods for Computers, 1990, Algorithm 21). From the identity, each
+iteration takes the direction <code>t = -B g</code> and a step of one,
+cut by <code>0.2</code> until the objective falls by at least
+<code>1e-4</code> times the step times <code>g't</code>, or until no
+coordinate of the trial point differs from the current one when both are
+added to <code>10</code>. An accepted step <code>s</code>, with
+<code>c</code> the change in gradient, updates <code>B</code> by
+<code>B += ((1 + c'Bc / s'c) s s' - (Bc) s' - s (Bc)') / s'c</code>
+where <code>s'c &gt; 0</code>, and resets it to the identity where not.
+A direction that is not downhill, or a search that cannot move, resets
+<code>B</code>; two in a row from the identity end the search. It also
+ends at an objective below <code>abs_tol</code>, at a fall of at most
+<code>rel_tol</code> times the objective plus <code>rel_tol</code>, or
+after <code>max_iter</code> gradients counting the first, and
+<code>B</code> is reset after <code>2 n</code> gradients without a
+reset. <code>B</code> is held as its lower triangle.</p>
+<div class="section level3">
+<h3 id="the-fixtures-10">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-10"></a>
+</h3>
+<p><code>perceptron_cases.csv</code> names seven nnet fits on the weekly
+columns maxnet’s fixtures read, under the binomial and Gaussian
+responses, with and without the fractional weights, at two, three and
+five hidden units, with and without skip-layer connections, and one
+stopped at five iterations. <code>perceptron_weights.csv</code> holds
+each case’s starting weights, drawn in the generator and rounded to
+twelve digits, and the weights nnet ends at;
+<code>perceptron_predict.csv</code> nnet’s predictions on the design
+scaled by <code>1.01</code>. Both suites start the core from the written
+weights.</p>
+</div>
+<div class="section level3">
+<h3 id="how-exactly-11">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-11"></a>
+</h3>
+<ul>
+<li>
+<strong>The core ends at nnet’s weights to the bit</strong> on the
+fixture design and on drawn ones, at the ends of paths of up to 200
+iterations.</li>
+<li>
+<strong>The tolerances are the paths’, not the core’s.</strong> A
+last-bit difference in a library’s <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code> is carried forward
+by the minimiser, so each case is asserted at a hundred times what its
+own end point moved when its starting weights were jittered in their
+last bit, from <code>1e-10</code> to <code>1e-4</code>. A case is chosen
+where that is small: on this design a network with little penalty on a
+path of a hundred iterations moved by up to percent.</li>
+</ul>
+</div>
+</div>
+<div class="section level2">
 <h2 id="the-hierarchical-model">The hierarchical model<a class="anchor" aria-label="anchor" href="#the-hierarchical-model"></a>
 </h2>
 <p><code><a href="../reference/hierarchical.html">hierarchical()</a></code> is one Bayesian logistic model per
@@ -3066,7 +3152,7 @@ split of the targets splits them with it.
 <code>timesift(coords = )</code> names the two columns, and a learner
 with a field refuses an array that carries none.</p>
 <div class="section level3">
-<h3 id="the-fixtures-10">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-10"></a>
+<h3 id="the-fixtures-11">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-11"></a>
 </h3>
 <p><code>hierarchical_input.csv</code> holds 60 targets in 20 units of
 three, and tulpa’s own fits of <code>y ~ x1 + x2</code> to it, at the
@@ -3093,7 +3179,7 @@ full matrices, at fixed hyperparameters, under every covariance, in both
 suites.</p>
 </div>
 <div class="section level3">
-<h3 id="how-exactly-11">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-11"></a>
+<h3 id="how-exactly-12">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-12"></a>
 </h3>
 <ul>
 <li>
@@ -3221,7 +3307,7 @@ fewer than two members carry weight. The array is
 both sides.</p>
 </div>
 <div class="section level3">
-<h3 id="the-fixtures-11">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-11"></a>
+<h3 id="the-fixtures-12">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-12"></a>
 </h3>
 <p><code>ensemble_oof.csv</code> holds five candidates’ out-of-fold
 predictions of the response fixture, rounded to six decimals, two of
@@ -3247,7 +3333,7 @@ loss is within <code>1e-7</code> of the least a derivative-free search
 over the simplex reaches from five starts.</p>
 </div>
 <div class="section level3">
-<h3 id="how-exactly-12">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-12"></a>
+<h3 id="how-exactly-13">How exactly<a class="anchor" aria-label="anchor" href="#how-exactly-13"></a>
 </h3>
 <p>Everything is asserted to <code>1e-10</code> relative, the count
 cases to <code>1e-9</code>. The file holds twelve significant digits,
@@ -3372,62 +3458,66 @@ or not at all</td>
 <td><code><a href="../reference/additive.html">additive()</a></code></td>
 </tr>
 <tr class="even">
+<td>the network of one hidden layer</td>
+<td><code><a href="../reference/perceptron.html">perceptron()</a></code></td>
+</tr>
+<tr class="odd">
 <td>the Bayesian logistic model with unit intercepts and a spatial
 field</td>
 <td><code><a href="../reference/hierarchical.html">hierarchical()</a></code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the encoders</td>
 <td>
 <code><a href="../reference/torch_learners.html">mlp()</a></code>, <code><a href="../reference/torch_learners.html">cnn()</a></code>, <code><a href="../reference/torch_learners.html">rescnn()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>how an encoder is trained</td>
 <td><code><a href="../reference/train_control.html">train_control()</a></code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>fitting one learner on one representation</td>
 <td><code><a href="../reference/fit_learner.html">fit_learner()</a></code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the resampling</td>
 <td>
 <code><a href="../reference/cv.html">cv()</a></code> and <code><a href="../reference/cv.html">grouped_cv()</a></code>, and
 <code><a href="../reference/cv.html">block_cv()</a></code> and <code><a href="../reference/cv.html">env_cv()</a></code> for the spatial and
 environmental splits</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the fold map and the mask</td>
 <td>
 <code><a href="../reference/fold_map.html">fold_map()</a></code> and <code><a href="../reference/scorable_cells.html">scorable_cells()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>fitting across a set of grains</td>
 <td>
 <code><a href="../reference/grain_ladder.html">grain_ladder()</a></code>, and <code><a href="../reference/select_grain.html">select_grain()</a></code> for the
 nested selection</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the combiner</td>
 <td>
 <code><a href="../reference/ensemble.html">ensemble()</a></code>, <code><a href="../reference/ensemble_fit.html">ensemble_fit()</a></code>,
 <code><a href="../reference/ensemble_combine.html">ensemble_combine()</a></code> and <code><a href="../reference/ensemble_weights.html">ensemble_weights()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>how far an ensemble’s members disagree</td>
 <td>
 <code><a href="../reference/ensemble_spread.html">ensemble_spread()</a></code>, and
 <code>predict(type = "spread")</code> on a run</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>scoring held-out predictions</td>
 <td>
 <code><a href="../reference/score_predictions.html">score_predictions()</a></code>, on the cells the mask allows</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the metrics</td>
 <td>
 <code><a href="../reference/tss.html">tss()</a></code>, <code><a href="../reference/roc_auc.html">roc_auc()</a></code>,
@@ -3437,46 +3527,46 @@ nested selection</td>
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> and <code><a href="../reference/kappa_score.html">model_agreement()</a></code>
 beside them</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the cut a fit applies</td>
 <td>
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> given a fit in place of the
 response, one cut per response learned from a candidate’s out-of-fold
 predictions</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>two arms on matched cells</td>
 <td><code><a href="../reference/paired_contrast.html">paired_contrast()</a></code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>every grain against a learner’s best</td>
 <td>
 <code><a href="../reference/grain_contrasts.html">grain_contrasts()</a></code>, the mixed model of the per-cell
 scores and Dunnett’s many-to-one comparisons off it</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>a record with a planted grain</td>
 <td>
 <code><a href="../reference/simulate_records.html">simulate_records()</a></code>, the vignette’s and the recovery
 tests’ generator</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the inflation of a self-selected threshold</td>
 <td>
 <code><a href="../reference/tss_inflation.html">tss_inflation()</a></code>, and <code><a href="../reference/implied_skill.html">implied_skill()</a></code> for
 the level it implies</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>a set of representations</td>
 <td>
 <code><a href="../reference/timesift_set.html">timesift_set()</a></code>, which reads as a mapping of grain name
 to representation</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>folds of the inner cross-validation</td>
 <td><code>n_inner</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the three artifacts</td>
 <td>
 <code><a href="../reference/artifacts.html">write_folds()</a></code> and <code><a href="../reference/artifacts.html">read_folds()</a></code>,
@@ -3484,12 +3574,12 @@ to representation</td>
 <code><a href="../reference/artifacts.html">write_cells()</a></code> and <code><a href="../reference/artifacts.html">read_cells()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the digest</td>
 <td>
 <code><a href="../reference/digest_array.html">digest_array()</a></code>, exported</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the registries</td>
 <td>
 <code><a href="../reference/register_learner.html">register_learner()</a></code> and <code><a href="../reference/register_learner.html">learners()</a></code>,
@@ -3498,13 +3588,13 @@ to representation</td>
 <code><a href="../reference/register_tuning.html">register_tuning()</a></code> and <code><a href="../reference/register_tuning.html">tunings()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>pseudo-absences</td>
 <td>
 <code><a href="../reference/pseudo_absences.html">pseudo_absences()</a></code>, the random, sre and disk
 strategies</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>what a rare response weighs</td>
 <td>
 <code><a href="../reference/positive_weights.html">positive_weights()</a></code>, the case weights the shipped

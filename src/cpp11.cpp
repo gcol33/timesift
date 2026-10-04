@@ -202,6 +202,20 @@ extern "C" SEXP _timesift_ts_mars_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p) 
   END_CPP11
 }
 // ts_r.cpp
+cpp11::list ts_perceptron_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, int hidden, bool skip, double decay, double range, int max_iter, double abs_tol, double rel_tol, int seed, cpp11::doubles start);
+extern "C" SEXP _timesift_ts_perceptron_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP hidden, SEXP skip, SEXP decay, SEXP range, SEXP max_iter, SEXP abs_tol, SEXP rel_tol, SEXP seed, SEXP start) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_perceptron_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(hidden), cpp11::as_cpp<cpp11::decay_t<bool>>(skip), cpp11::as_cpp<cpp11::decay_t<double>>(decay), cpp11::as_cpp<cpp11::decay_t<double>>(range), cpp11::as_cpp<cpp11::decay_t<int>>(max_iter), cpp11::as_cpp<cpp11::decay_t<double>>(abs_tol), cpp11::as_cpp<cpp11::decay_t<double>>(rel_tol), cpp11::as_cpp<cpp11::decay_t<int>>(seed), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(start)));
+  END_CPP11
+}
+// ts_r.cpp
+cpp11::doubles ts_perceptron_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p);
+extern "C" SEXP _timesift_ts_perceptron_predict_(SEXP fit, SEXP newx, SEXP n, SEXP p) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ts_perceptron_predict_(cpp11::as_cpp<cpp11::decay_t<cpp11::list>>(fit), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(newx), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p)));
+  END_CPP11
+}
+// ts_r.cpp
 cpp11::list ts_fda_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int degree, double penalty, int nk, double thresh, bool prune, bool calibrate, int threads);
 extern "C" SEXP _timesift_ts_fda_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP degree, SEXP penalty, SEXP nk, SEXP thresh, SEXP prune, SEXP calibrate, SEXP threads) {
   BEGIN_CPP11
@@ -273,6 +287,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_penalised_cv_",         (DL_FUNC) &_timesift_ts_penalised_cv_,         17},
     {"_timesift_ts_penalised_path_",       (DL_FUNC) &_timesift_ts_penalised_path_,       14},
     {"_timesift_ts_penalised_predict_",    (DL_FUNC) &_timesift_ts_penalised_predict_,     7},
+    {"_timesift_ts_perceptron_fit_",       (DL_FUNC) &_timesift_ts_perceptron_fit_,       15},
+    {"_timesift_ts_perceptron_predict_",   (DL_FUNC) &_timesift_ts_perceptron_predict_,    4},
     {"_timesift_ts_reduce_",               (DL_FUNC) &_timesift_ts_reduce_,               11},
     {"_timesift_ts_reduce_lookbacks_",     (DL_FUNC) &_timesift_ts_reduce_lookbacks_,     12},
     {"_timesift_ts_stepwise_fit_",         (DL_FUNC) &_timesift_ts_stepwise_fit_,         11},

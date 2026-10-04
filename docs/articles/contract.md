@@ -2250,6 +2250,75 @@ means, so the tolerance holds a parameter to about `1e-5`.
   `1e-8` in the fitted means, and across the three Poisson ones to
   `6.2e-10`, `4.8e-7` and `1.2e-7`.
 
+## The network
+
+[`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md)
+is one feed-forward network of one hidden layer per response, nnet’s
+model and biomod2’s `ANN`, over `src/ts_perceptron.cpp`, which both
+languages compile, fitted by the minimiser of `src/ts_quasi_newton.cpp`.
+
+- `hidden` logistic units each take a bias and every column; the output
+  takes a bias, every hidden unit and, with `skip`, every column. The
+  logistic function is exactly 0 below `-15` and exactly 1 above `15`,
+  for the hidden units and for a logistic output alike.
+- The weights are a vector ordered unit by unit: each hidden unit’s bias
+  and then its columns, then the output’s bias, its hidden units and its
+  skipped columns. Drawn, they are `(2u - 1) * range` for `u` the
+  uniforms of stream 0 of the seed, the generator **The forest**
+  defines, in that order.
+- The objective is the sum over rows of the case weight times the row’s
+  error, plus `decay` times the sum of the squared weights, biases
+  included. Under the binomial family the output is logistic and the
+  error `t log(t / y) + (1 - t) log((1 - t) / (1 - y))`, zero terms
+  dropped and a probability below `1e-80` read as `1e-80`; under the
+  Gaussian family the output is its sum and the error `(y - t)^2`; under
+  the Poisson family the output is the exponential of its sum and the
+  error `t log(t / y) - (t - y)`.
+- The gradient starts every slope at `2 decay w` and adds the rows in
+  order. A row’s error is carried back unweighted, `y - t` under the
+  binomial and Poisson families and `2 (y - t)` under the Gaussian,
+  through each hidden unit as `e v h (1 - h)`, and the row’s case weight
+  multiplies the error where it enters a slope.
+
+The minimiser is Nash’s variable metric method (Compact Numerical
+Methods for Computers, 1990, Algorithm 21). From the identity, each
+iteration takes the direction `t = -B g` and a step of one, cut by `0.2`
+until the objective falls by at least `1e-4` times the step times `g't`,
+or until no coordinate of the trial point differs from the current one
+when both are added to `10`. An accepted step `s`, with `c` the change
+in gradient, updates `B` by
+`B += ((1 + c'Bc / s'c) s s' - (Bc) s' - s (Bc)') / s'c` where
+`s'c > 0`, and resets it to the identity where not. A direction that is
+not downhill, or a search that cannot move, resets `B`; two in a row
+from the identity end the search. It also ends at an objective below
+`abs_tol`, at a fall of at most `rel_tol` times the objective plus
+`rel_tol`, or after `max_iter` gradients counting the first, and `B` is
+reset after `2 n` gradients without a reset. `B` is held as its lower
+triangle.
+
+### The fixtures
+
+`perceptron_cases.csv` names seven nnet fits on the weekly columns
+maxnet’s fixtures read, under the binomial and Gaussian responses, with
+and without the fractional weights, at two, three and five hidden units,
+with and without skip-layer connections, and one stopped at five
+iterations. `perceptron_weights.csv` holds each case’s starting weights,
+drawn in the generator and rounded to twelve digits, and the weights
+nnet ends at; `perceptron_predict.csv` nnet’s predictions on the design
+scaled by `1.01`. Both suites start the core from the written weights.
+
+### How exactly
+
+- **The core ends at nnet’s weights to the bit** on the fixture design
+  and on drawn ones, at the ends of paths of up to 200 iterations.
+- **The tolerances are the paths’, not the core’s.** A last-bit
+  difference in a library’s [`exp()`](https://rdrr.io/r/base/Log.html)
+  is carried forward by the minimiser, so each case is asserted at a
+  hundred times what its own end point moved when its starting weights
+  were jittered in their last bit, from `1e-10` to `1e-4`. A case is
+  chosen where that is small: on this design a network with little
+  penalty on a path of a hundred iterations moved by up to percent.
+
 ## The hierarchical model
 
 [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
@@ -2523,6 +2592,7 @@ the difference is recorded here rather than found at a call site.
 | multivariate adaptive regression splines | [`mars()`](https://gillescolling.com/timesift/reference/mars.md) |
 | flexible discriminant analysis | [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md) |
 | generalised additive models | [`additive()`](https://gillescolling.com/timesift/reference/additive.md) |
+| the network of one hidden layer | [`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md) |
 | the Bayesian logistic model with unit intercepts and a spatial field | [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md) |
 | the encoders | [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md), [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md) |
 | how an encoder is trained | [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md) |

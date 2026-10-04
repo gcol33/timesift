@@ -2120,3 +2120,71 @@ hi_nodes <- function(approx, file) {
 }
 hi_nodes("hsgp", "hierarchical_hsgp_nodes.csv")
 hi_nodes("nngp", "hierarchical_nngp_nodes.csv")
+
+# The one-hidden-layer network.
+#
+# nnet's own fits, which is what biomod2's `ANN` calls, on the weekly design the MARS fixtures read,
+# read back from its file. The starting weights are drawn here and written beside the fit, so both
+# suites start the core where nnet started: nnet's `entropy = TRUE` is the presence-absence case and
+# `linout = TRUE` the squared-error one. Each case carries the objective nnet ends at, whether it
+# stopped at `maxit`, the weights it ends at and its predictions on the design scaled by 1.01. The
+# core gives nnet's weights to the bit on this machine, but the minimiser's path carries a last-bit
+# difference in `exp()` forward, so each case's tolerance is a hundred times what its own end point
+# moved when its starting weights were jittered in their last bit, and a case is chosen where that
+# is small: on this design a network with little penalty on a path of a hundred iterations moved by
+# up to percent.
+if (!requireNamespace("nnet", quietly = TRUE)) {
+  stop("the network fixtures are the fits the nnet package gives, so it has to be installed to ",
+       "regenerate them.", call. = FALSE)
+}
+nn_input <- utils::read.csv(file.path(out_dir, "penalised_input.csv"), stringsAsFactors = FALSE,
+                            check.names = FALSE)
+nn_held <- c("unit", "y_gaussian", "y_binomial", "w", "fold")
+nn_x <- as.matrix(nn_input[, setdiff(names(nn_input), nn_held), drop = FALSE])
+nn_x <- unname(nn_x[, !endsWith(colnames(nn_x), "^2"), drop = FALSE])
+nn_case <- function(case, response, weighted = FALSE, hidden = 2L, decay = 0, range = 0.7,
+                    skip = FALSE, max_iter = 100L, weight_tolerance = 1e-6,
+                    prediction_tolerance = 1e-6) {
+  data.frame(case = case, response = response, weighted = weighted, hidden = hidden,
+             decay = decay, range = range, skip = skip, max_iter = max_iter,
+             weight_tolerance = weight_tolerance, prediction_tolerance = prediction_tolerance,
+             stringsAsFactors = FALSE)
+}
+NN_CASES <- rbind(
+  nn_case("binomial", "y_binomial", weight_tolerance = 1e-10, prediction_tolerance = 1e-10),
+  nn_case("binomial_weighted", "y_binomial", weighted = TRUE),
+  nn_case("binomial_bigboss", "y_binomial", weighted = TRUE, hidden = 5L, decay = 0.1,
+          range = 0.1, max_iter = 200L),
+  nn_case("binomial_skip", "y_binomial", weighted = TRUE, hidden = 3L, decay = 0.5, skip = TRUE),
+  nn_case("binomial_stopped", "y_binomial", decay = 0.1, max_iter = 5L, weight_tolerance = 1e-10,
+          prediction_tolerance = 1e-10),
+  nn_case("gaussian", "y_gaussian", decay = 1, weight_tolerance = 1e-8, prediction_tolerance = 1e-8),
+  nn_case("gaussian_weighted_skip", "y_gaussian", weighted = TRUE, decay = 1, skip = TRUE,
+          weight_tolerance = 1e-4, prediction_tolerance = 1e-4))
+nn_rows <- list()
+nn_weights <- list()
+nn_pred <- list()
+set.seed(20261004L)
+for (i in seq_len(nrow(NN_CASES))) {
+  row <- NN_CASES[i, ]
+  y <- nn_input[[row$response]]
+  w <- if (row$weighted) nn_input$w else rep(1, length(y))
+  n_weight <- row$hidden * (ncol(nn_x) + 1L) + row$hidden + 1L + if (row$skip) ncol(nn_x) else 0L
+  start <- round(stats::runif(n_weight, -row$range, row$range), 12)
+  f <- nnet::nnet(nn_x, y, weights = w, size = row$hidden, Wts = start, decay = row$decay,
+                  skip = row$skip, maxit = row$max_iter, abstol = 1e-4, reltol = 1e-8,
+                  entropy = row$response == "y_binomial", linout = row$response == "y_gaussian",
+                  trace = FALSE)
+  nn_rows[[i]] <- data.frame(row, value = sprintf("%.15g", f$value), stopped = f$convergence == 1L,
+                             stringsAsFactors = FALSE)
+  nn_weights[[i]] <- data.frame(case = row$case, index = seq_len(n_weight),
+                                start = sprintf("%.12g", start), fitted = sprintf("%.15g", f$wts),
+                                stringsAsFactors = FALSE)
+  nn_pred[[i]] <- data.frame(case = row$case, row = seq_len(nrow(nn_x)),
+                             fitted_out = sprintf("%.15g", as.numeric(stats::predict(f, nn_x * 1.01))),
+                             stringsAsFactors = FALSE)
+}
+write_fixture(do.call(rbind, nn_rows), "perceptron_cases.csv")
+write_fixture(do.call(rbind, nn_weights), "perceptron_weights.csv")
+write_fixture(do.call(rbind, nn_pred), "perceptron_predict.csv")
+cat("wrote", nrow(NN_CASES), "network cases\n")

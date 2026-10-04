@@ -12,7 +12,7 @@ Each algorithm is implemented once, in a compiled core that the R and
 the Python interface both call, so a model fitted from either language
 gives the same predictions. Each core reproduces the package biomod2
 itself calls (rpart, randomForest, gbm, xgboost, maxnet, MASS, earth,
-mda, mgcv), and the test fixtures check it against that package’s
+mda, mgcv, nnet), and the test fixtures check it against that package’s
 output. `timesift` calls neither biomod2 nor these packages when it fits
 a model.
 
@@ -34,28 +34,67 @@ variant of an algorithm is an argument of that constructor.
 | `MARS` | [`mars()`](https://gillescolling.com/timesift/reference/mars.md) | earth’s forward and pruning passes, refitted as a logistic model |
 | `FDA` | [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md) | mda’s `fda(method = mars)` with the probit recalibration biomod2 applies |
 | `SRE` | [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md) | `quantile = 0.025`, as `bm_SRE()` |
-| `ANN`, `DNN` | [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md) | a torch encoder with a joint head over all responses |
+| `ANN` | [`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md) | nnet’s network of one hidden layer, fitted by nnet’s BFGS |
+| `DNN` | [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md) | cito’s optimiser, penalty and schedule are [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md) settings |
 
-For `ANN` and `DNN` the table matches the network architecture, and the
-fitted networks differ. biomod2 fits `ANN` with nnet, which minimises an
-L2-penalised loss by BFGS, and `DNN` with cito, which uses a stochastic
-optimiser.
+[`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md)
+is nnet’s model and nnet’s fit: one layer of logistic hidden units,
+fitted by the variable metric (BFGS) method nnet uses, and from the same
+starting weights it ends at the same weights. It differs from biomod2’s
+`ANN` in two respects. biomod2 leaves nnet’s `entropy = FALSE`, which
+fits a presence-absence response by least squares on the logistic
+output;
+[`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md)
+fits the cross-entropy, because every learner fits the loss of the
+response head. The starting weights are drawn from the package’s own
+generator rather than from R’s. biomod2 sets two hidden units, which is
+the default, and `preset = "bigboss"` gives its tuned `size = 5`,
+`decay = 0.1`, `rang = 0.1` and `maxit = 200`. Neither nnet nor
+[`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md)
+scales the columns, so a record read in its own units, such as degrees,
+saturates the hidden units sooner the wider its range.
+
+biomod2’s `DNN` is cito’s `dnn()`, a fully connected network trained by
+a stochastic optimiser.
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
-trains with AdamW, whose weight decay penalises the weights differently,
-so the same architecture gives a comparable network but not the same
-one. In
-[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md),
-`hidden` sets the layer widths, `activation` the nonlinearity and
-`dropout` the regularisation. The training settings are arguments of
-[`train_control()`](https://gillescolling.com/timesift/reference/train_control.md),
-which
+builds the same network from `hidden`, `activation` and `dropout`, and
+[`train_control()`](https://gillescolling.com/timesift/reference/train_control.md)
+holds cito’s training settings: `optimizer`, `learning_rate`, `penalty`
+and `alpha` for cito’s `lambda` and `alpha`, and `schedule`. cito’s
+`alpha` weighs the norm of the weights and
+[`train_control()`](https://gillescolling.com/timesift/reference/train_control.md)’s
+weighs their absolute values, as
+[`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)’s
+does, so one is one minus the other. Any of these settings can be given
+to
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
-also accepts directly. biomod2’s tuned `ANN` (`size = 5`, `decay = 0.1`,
-`maxit = 200`) corresponds to
-`mlp(hidden = 5, epochs = 200, weight_decay = 0.1)`, and its tuned `DNN`
-(`hidden = c(100, 100)`, `activation = "selu"`, 150 epochs, batch size
-100) to
-`mlp(hidden = c(100, 100), activation = "selu", epochs = 150, batch_size = 100)`.
+directly. biomod2’s default `DNN` is cito’s defaults,
+
+``` r
+
+mlp(hidden = c(50L, 50L), activation = "selu", dropout = 0, optimizer = "sgd",
+    learning_rate = 0.01, weight_decay = 0, schedule = "constant", epochs = 100L)
+```
+
+and its tuned `DNN` is
+
+``` r
+
+mlp(hidden = c(100L, 100L), activation = "selu", dropout = 0,
+    optimizer = "adam", learning_rate = 0.05, weight_decay = 0,
+    penalty = 0.001, alpha = 0, schedule = "plateau", plateau_patience = 7L,
+    epochs = 150L, batch_size = 100L, val_frac = 0.2, early_stopping = 14L)
+```
+
+Three differences remain. cito’s default batch is a tenth of the fitting
+rows, where `batch_size` counts rows. biomod2 standardises each column
+for `DNN`, where
+[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
+standardises each channel across its bins. The tuned set ends a fit
+whose training loss is still above an intercept-only model’s after 30
+epochs (cito’s `burnin`), which
+[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
+does not do.
 
 biomod2 ships two option sets: its defaults and a tuned set called
 `"bigboss"`. Where the two differ, the learners offer both, as
@@ -108,6 +147,7 @@ models <- list(
   GAM = additive(data = grain("season"), k = 5L),
   MARS = mars(),
   FDA = discriminant(),
+  ANN = perceptron(),
   SRE = envelope(data = grain("season"))
 )
 ```
@@ -142,7 +182,7 @@ fit$candidates[c("candidate", "grain", "bins", "status")][1:6, ]
 #> 6  RF / season season    5 fitted
 ```
 
-The run fitted 29 candidates: nine learners at three grains each and the
+The run fitted 32 candidates: ten learners at three grains each and the
 two fixed learners at one. All of them were cross-validated on the same
 five outer folds and scored on the same cells, so their mean scores are
 directly comparable.
@@ -156,6 +196,7 @@ fit
 #> candidate                  mean    won  responses
 #> SRE / season              0.532      0  separate
 #> CTA / month               0.540      0  separate
+#> ANN / month               0.553      0  separate
 #> XGBOOST / month           0.569      0  separate
 #> XGBOOST / season          0.597      0  separate
 #> RF / month                0.600      0  separate
@@ -163,6 +204,8 @@ fit
 #> GBM / month               0.613      0  separate
 #> RFd / month               0.613      0  separate
 #> RF / season               0.616      0  separate
+#> ANN / season              0.617      0  separate
+#> ANN / week                0.619      0  separate
 #> RFd / season              0.621      0  separate
 #> GBM / season              0.624      0  separate
 #> MARS / season             0.636      0  separate
@@ -223,7 +266,7 @@ fmt <- BIOMOD_FormatingData(resp.var = y, expl.var = predictors,
                             resp.xy = xy, resp.name = "sp1")
 mod <- BIOMOD_Modeling(fmt, modeling.id = "all",
                        models = c("CTA", "RF", "GBM", "XGBOOST", "MAXNET", "GLM",
-                                  "GAM", "MARS", "FDA", "SRE"),
+                                  "GAM", "MARS", "FDA", "ANN", "SRE"),
                        CV.strategy = "kfold", CV.nb.rep = 1, CV.k = 5,
                        metric.eval = c("TSS", "ROC"))
 ens <- BIOMOD_EnsembleModeling(mod, models.chosen = "all",
@@ -238,7 +281,7 @@ fit <- timesift(targets, series, y = starts_with("sp"), id = plot_id, time = dat
                 learners = list(CTA = tree(), RF = forest(), GBM = boosting(),
                               XGBOOST = boosting(method = "xgboost"), MAXNET = maxent(),
                               GLM = linear(),
-                              MARS = mars(), FDA = discriminant()),
+                              MARS = mars(), FDA = discriminant(), ANN = perceptron()),
                 sift = grains("week", "month", "season"),
                 ensemble = ensemble("weighted", min_score = 0.5),
                 resampling = cv(v = 5))
@@ -251,7 +294,7 @@ import timesift as ts
 
 fit = ts.timesift(targets, series, y="sp_*", id="plot_id", time="datetime",
                   learners=[ts.tree(), ts.forest(), ts.boosting(method="xgboost"), ts.maxent(),
-                            ts.mars(), ts.discriminant()],
+                            ts.mars(), ts.discriminant(), ts.perceptron()],
                   sift=ts.grains("week", "month", "season"),
                   ensemble=ts.ensemble("weighted", min_score=0.5),
                   resampling=ts.cv(v=5))
@@ -331,8 +374,8 @@ dimnames(sp)[[3]]
 round(sp[1:3, 1, ], 3)
 #>             mean    sd    cv lower upper
 #> d001u00001 0.250 0.135 0.541 0.117 0.382
-#> d001u00002 0.220 0.216 0.984 0.007 0.432
-#> d001u00003 0.215 0.085 0.395 0.132 0.299
+#> d001u00002 0.220 0.216 0.984 0.008 0.431
+#> d001u00003 0.215 0.085 0.395 0.132 0.298
 ```
 
 With one target per map cell, the coefficient of variation gives an

@@ -14,6 +14,12 @@ train_control(
   batch_size = 64L,
   learning_rate = 0.001,
   weight_decay = 1e-04,
+  optimizer = c("adamw", "adam", "sgd"),
+  penalty = 0,
+  alpha = 0.5,
+  schedule = c("cosine", "constant", "plateau"),
+  plateau_factor = 0.1,
+  plateau_patience = 10L,
   early_stopping = Inf,
   val_frac = 0,
   device = "auto",
@@ -37,11 +43,49 @@ train_control(
 
 - learning_rate:
 
-  Learning rate.
+  Learning rate, the one the schedule starts from.
 
 - weight_decay:
 
-  AdamW weight decay.
+  The optimiser's weight decay: decoupled from the gradient under
+  `"adamw"`, and added to it as `weight_decay` times each parameter
+  under `"adam"` and `"sgd"`, as torch's optimisers take it.
+
+- optimizer:
+
+  `"adamw"`, `"adam"` or `"sgd"`, torch's optimisers at their own
+  defaults besides the learning rate and the weight decay; `"sgd"` takes
+  no momentum.
+
+- penalty:
+
+  The weight of a penalty added to the loss of every batch:
+  `penalty * (alpha * sum(abs(W)) + (1 - alpha) * sqrt(sum(W^2)))`
+  summed over every weight matrix and kernel of the network, its biases
+  and normalisation scales left out. This is cito's `lambda`, the
+  penalty biomod2's `DNN` fits under. 0 adds nothing.
+
+- alpha:
+
+  The share of the penalty on the absolute weights, as
+  [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+  reads its `alpha`: 1 penalises the absolute weights alone and 0 the
+  norm alone. cito's `alpha` is `1 - alpha`.
+
+- schedule:
+
+  How the learning rate moves over the epochs: `"cosine"` anneals it to
+  zero over the budget, `"constant"` holds it, and `"plateau"`
+  multiplies it by `plateau_factor` once the loss has not improved for
+  `plateau_patience` epochs, reading the validation loss where
+  `val_frac` holds a set back and the epoch's mean training loss where
+  it does not, as cito's `reduce_on_plateau` reads them. torch's own
+  relative threshold of `1e-4` decides an improvement.
+
+- plateau_factor, plateau_patience:
+
+  The factor a plateau multiplies the learning rate by, and the epochs
+  without improvement that make one.
 
 - early_stopping:
 
@@ -103,4 +147,8 @@ every other setting from the control the run was given.
 ``` r
 train_control()
 train_control(epochs = 200L, device = "cpu")
+# biomod2's tuned DNN, cito's adam with a penalty and a plateau schedule
+train_control(optimizer = "adam", learning_rate = 0.05, weight_decay = 0, penalty = 0.001,
+              alpha = 0, schedule = "plateau", plateau_patience = 7L, epochs = 150L,
+              batch_size = 100L, val_frac = 0.2, early_stopping = 14L)
 ```

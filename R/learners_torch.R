@@ -160,6 +160,45 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
 
 # ---- the training recipe -------------------------------------------------------------------
 
+# The optimiser `cfg` names, at torch's own defaults besides the learning rate and the weight decay.
+.torch_optimizer <- function(torch, net, cfg) {
+  make <- switch(cfg$optimizer, adamw = torch$optim_adamw, adam = torch$optim_adam,
+                 sgd = torch$optim_sgd)
+  make(net$parameters, lr = cfg$learning_rate, weight_decay = cfg$weight_decay)
+}
+
+# The learning-rate schedule `cfg` names; NULL holds the rate where it starts.
+.torch_schedule <- function(torch, opt, cfg) {
+  switch(cfg$schedule,
+         cosine = torch$lr_cosine_annealing(opt, T_max = cfg$epochs),
+         constant = NULL,
+         plateau = torch$lr_reduce_on_plateau(opt, mode = "min", factor = cfg$plateau_factor,
+                                              patience = cfg$plateau_patience))
+}
+
+# One epoch's step of the schedule; a plateau reads the loss it was handed.
+.step_schedule <- function(sched, schedule, loss) {
+  if (identical(schedule, "cosine")) {
+    sched$step()
+  } else if (identical(schedule, "plateau")) {
+    sched$step(loss)
+  }
+  invisible(NULL)
+}
+
+# The penalty added to a batch's loss: `penalty` times the absolute weights' sum, weighed by
+# `alpha`, and their norm, weighed by `1 - alpha`, over every parameter of two or more dimensions,
+# so the weight matrices and kernels and not the biases or normalisation scales.
+.torch_penalty <- function(torch, net, penalty, alpha) {
+  total <- NULL
+  for (w in net$parameters) {
+    if (w$dim() < 2L) next
+    term <- alpha * torch$torch_sum(torch$torch_abs(w)) + (1 - alpha) * torch$torch_norm(w, p = 2L)
+    total <- if (is.null(total)) term else total + term
+  }
+  penalty * total
+}
+
 .torch_fit <- function(x, y, module, arch, cfg, head, group = NULL) {
   torch <- .torch()
   device <- .torch_device(cfg$device)
@@ -194,9 +233,8 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   shape <- c(dim(m)[2L], dim(m)[3L], ncol(y))
   net <- .torch_build(module, shape, arch)
   net$to(device = device)
-  opt <- torch$optim_adamw(net$parameters, lr = cfg$learning_rate,
-                           weight_decay = cfg$weight_decay)
-  sched <- torch$lr_cosine_annealing(opt, T_max = cfg$epochs)
+  opt <- .torch_optimizer(torch, net, cfg)
+  sched <- .torch_schedule(torch, opt, cfg)
 
   best <- list(loss = Inf, state = NULL)
   bad <- 0L
@@ -204,23 +242,31 @@ rescnn <- function(data = NULL, channels = c(32L, 64L, 128L, 256L), blocks_per_s
   average <- list(state = NULL, n = 0L)
   for (epoch in seq_len(cfg$epochs)) {
     net$train()
+    batch_loss <- numeric(0)
     for (b in .batches(fit_idx, cfg$batch_size, shuffle = TRUE)) {
       idx <- .index(torch, b, device)
       opt$zero_grad()
       loss <- loss_fn(net(xt[idx, , ]), yt[idx, ], wt[idx, ])
+      if (cfg$schedule == "plateau" && !length(val)) {
+        batch_loss <- c(batch_loss, loss$item())
+      }
+      if (cfg$penalty > 0) {
+        loss <- loss + .torch_penalty(torch, net, cfg$penalty, cfg$alpha)
+      }
       loss$backward()
       opt$step()
     }
-    if (epoch < swa_from) {
-      sched$step()
-    } else {
+    if (epoch >= swa_from) {
       average <- .accumulate(net, average)
       next
     }
+    vloss <- if (length(val)) {
+      .torch_loss(torch, net, loss_fn, xt, yt, wt, val, cfg$batch_size, device)
+    }
+    .step_schedule(sched, cfg$schedule, if (length(val)) vloss else mean(batch_loss))
     if (!length(val)) {
       next
     }
-    vloss <- .torch_loss(torch, net, loss_fn, xt, yt, wt, val, cfg$batch_size, device)
     if (vloss < best$loss - 1e-4) {
       best <- list(loss = vloss, state = .snapshot(net))
       bad <- 0L

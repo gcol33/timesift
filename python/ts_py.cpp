@@ -16,6 +16,7 @@
 #include "ts_fda.h"
 #include "ts_hierarchical.h"
 #include "ts_mars.h"
+#include "ts_perceptron.h"
 #include "ts_maxnet.h"
 #include "ts_penalised.h"
 #include "ts_stepwise.h"
@@ -230,11 +231,11 @@ timesift::TreeTable take_table(const nb::dict& from) {
 
 NB_MODULE(_core, m) {
   m.doc() = "The binning, the reduction, the penalised fit, maxnet, the tree, the forest, the "
-            "boosted trees, the envelope, the stepwise model, MARS and the additive model, shared "
-            "with the R package "
+            "boosted trees, the envelope, the stepwise model, MARS, the additive model and the "
+            "one-hidden-layer network, shared with the R package "
             "as src/ts_core.cpp, src/ts_penalised.cpp, src/ts_maxnet.cpp, src/ts_tree.cpp, "
             "src/ts_boost.cpp, src/ts_envelope.cpp, src/ts_stepwise.cpp, src/ts_glm.cpp, "
-            "src/ts_mars.cpp and src/ts_additive.cpp.";
+            "src/ts_mars.cpp, src/ts_additive.cpp and src/ts_perceptron.cpp.";
 
   nb::register_exception_translator(
       [](const std::exception_ptr& p, void*) {
@@ -759,6 +760,56 @@ NB_MODULE(_core, m) {
           s.beta = take_field<double>(fit, "beta");
           std::vector<double> out(newx.shape(0));
           timesift::mars_predict(s, newx.data(), newx.shape(0), newx.shape(1), out.data());
+          return give(std::move(out));
+        },
+        nb::arg("fit"), nb::arg("newx"));
+
+  m.def("perceptron_fit",
+        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int hidden, bool skip,
+           double decay, double range, int max_iter, double abs_tol, double rel_tol, int seed,
+           ConstF64 start) {
+          timesift::PerceptronSpec spec;
+          spec.family = timesift::family_from_name(family);
+          spec.hidden = hidden;
+          spec.skip = skip;
+          spec.decay = decay;
+          spec.range = range;
+          spec.max_iter = max_iter;
+          spec.abs_tol = abs_tol;
+          spec.rel_tol = rel_tol;
+          spec.seed = static_cast<std::uint32_t>(seed);
+          const std::vector<double> init(start.data(), start.data() + start.shape(0));
+          timesift::Perceptron fit;
+          {
+            nb::gil_scoped_release release;
+            fit = timesift::perceptron_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
+                                           spec, init);
+          }
+          nb::dict out;
+          out["family"] = std::string(timesift::family_name(fit.family));
+          out["n_column"] = fit.n_column;
+          out["hidden"] = fit.hidden;
+          out["skip"] = fit.skip;
+          out["weights"] = give(std::move(fit.weights));
+          out["value"] = fit.value;
+          out["iterations"] = fit.iterations;
+          out["converged"] = fit.converged;
+          return out;
+        },
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("hidden"),
+        nb::arg("skip"), nb::arg("decay"), nb::arg("range"), nb::arg("max_iter"),
+        nb::arg("abs_tol"), nb::arg("rel_tol"), nb::arg("seed"), nb::arg("start"));
+
+  m.def("perceptron_predict",
+        [](const nb::dict& fit, ConstMat newx) {
+          timesift::Perceptron s;
+          s.family = timesift::family_from_name(nb::cast<std::string>(fit["family"]));
+          s.n_column = nb::cast<std::int32_t>(fit["n_column"]);
+          s.hidden = nb::cast<std::int32_t>(fit["hidden"]);
+          s.skip = nb::cast<bool>(fit["skip"]);
+          s.weights = take_field<double>(fit, "weights");
+          std::vector<double> out(newx.shape(0));
+          timesift::perceptron_predict(s, newx.data(), newx.shape(0), newx.shape(1), out.data());
           return give(std::move(out));
         },
         nb::arg("fit"), nb::arg("newx"));

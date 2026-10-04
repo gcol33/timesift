@@ -129,6 +129,9 @@ The arms that ship, how they are trained, and the interface a learner of your ow
 [`additive()`](python-learners.html#additive)
 : One additive model per variable, a smooth function of every bin-by-channel column, fitted as mgcv's `gam(y ~ s(x1) + s(x2) + ..., method = "GCV.Cp")` fits it and as biomod2 fits `GAM`. Each column enters as a thin plate regression spline of `k` basis functions (Wood 2003): a cubic radial function centred on each of the column's distinct values, reduced to its `k - 2` directions of greatest eigenvalue, together with the linear function, which the penalty on the spline's squared second derivative leaves free. Each smooth sums to zero over the units, beside one intercept.
 
+[`perceptron()`](python-learners.html#perceptron)
+: One network per variable over every bin-by-channel column, fitted as the nnet package fits it and as biomod2 fits `ANN`. Each of `hidden` logistic units takes a bias and every column, and the output takes a bias, every hidden unit and, with `skip`, every column again. The weights start uniform on `[-range, range]` and are fitted by the variable metric (BFGS) method of Nash (1990), the minimiser nnet uses, on the response head's loss plus `decay` times the sum of the squared weights, biases included. The fit stops after `max_iter` iterations, when the objective falls below `abs_tol`, or when an iteration lowers it by no more than `rel_tol` of itself.
+
 [`hierarchical()`](python-learners.html#hierarchical)
 : One Bayesian logistic model per response: a logistic regression on every bin-by-channel column of the representation, standardised so the prior on a coefficient means the same thing for each, optionally with an intercept for each unit and a Gaussian-process field over the targets' coordinates. A unit then carries what its own record says and what its neighbours' presences say, under the folds every other learner is scored on.
 

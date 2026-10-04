@@ -13,8 +13,26 @@
 #' @param batch_size Most targets per optimiser step. The fitting targets are cut into as few
 #'   batches of at most this many as they divide into, of as equal a length as they can be, so no
 #'   batch is a remainder of one.
-#' @param learning_rate Learning rate.
-#' @param weight_decay AdamW weight decay.
+#' @param learning_rate Learning rate, the one the schedule starts from.
+#' @param weight_decay The optimiser's weight decay: decoupled from the gradient under `"adamw"`,
+#'   and added to it as `weight_decay` times each parameter under `"adam"` and `"sgd"`, as torch's
+#'   optimisers take it.
+#' @param optimizer `"adamw"`, `"adam"` or `"sgd"`, torch's optimisers at their own defaults besides
+#'   the learning rate and the weight decay; `"sgd"` takes no momentum.
+#' @param penalty The weight of a penalty added to the loss of every batch:
+#'   `penalty * (alpha * sum(abs(W)) + (1 - alpha) * sqrt(sum(W^2)))` summed over every weight matrix
+#'   and kernel of the network, its biases and normalisation scales left out. This is cito's
+#'   `lambda`, the penalty biomod2's `DNN` fits under. 0 adds nothing.
+#' @param alpha The share of the penalty on the absolute weights, as `elasticnet()` reads its
+#'   `alpha`: 1 penalises the absolute weights alone and 0 the norm alone. cito's `alpha` is
+#'   `1 - alpha`.
+#' @param schedule How the learning rate moves over the epochs: `"cosine"` anneals it to zero over
+#'   the budget, `"constant"` holds it, and `"plateau"` multiplies it by `plateau_factor` once the
+#'   loss has not improved for `plateau_patience` epochs, reading the validation loss where
+#'   `val_frac` holds a set back and the epoch's mean training loss where it does not, as cito's
+#'   `reduce_on_plateau` reads them. torch's own relative threshold of `1e-4` decides an improvement.
+#' @param plateau_factor,plateau_patience The factor a plateau multiplies the learning rate by, and
+#'   the epochs without improvement that make one.
 #' @param early_stopping Epochs without an inner-validation improvement before training stops.
 #'   Read only where `val_frac` holds a validation set back. `Inf`, the default, never stops: the
 #'   whole budget is trained and the epoch with the lowest validation loss is restored.
@@ -41,10 +59,17 @@
 #' @examples
 #' train_control()
 #' train_control(epochs = 200L, device = "cpu")
+#' # biomod2's tuned DNN, cito's adam with a penalty and a plateau schedule
+#' train_control(optimizer = "adam", learning_rate = 0.05, weight_decay = 0, penalty = 0.001,
+#'               alpha = 0, schedule = "plateau", plateau_patience = 7L, epochs = 150L,
+#'               batch_size = 100L, val_frac = 0.2, early_stopping = 14L)
 #'
 #' @export
 train_control <- function(epochs = 60L, batch_size = 64L, learning_rate = 1e-3,
-                          weight_decay = 1e-4, early_stopping = Inf, val_frac = 0,
+                          weight_decay = 1e-4, optimizer = c("adamw", "adam", "sgd"),
+                          penalty = 0, alpha = 0.5,
+                          schedule = c("cosine", "constant", "plateau"), plateau_factor = 0.1,
+                          plateau_patience = 10L, early_stopping = Inf, val_frac = 0,
                           device = "auto", seed = 1L, swa = FALSE, swa_start = 0.7) {
   given <- names(as.list(match.call()))[-1L]
   # `Inf` is a patience that never runs out, which an integer cannot hold, so it is kept as it is.
@@ -52,10 +77,13 @@ train_control <- function(epochs = 60L, batch_size = 64L, learning_rate = 1e-3,
           is.infinite(early_stopping))) {
     early_stopping <- as.integer(early_stopping)
   }
+  optimizer <- match.arg(optimizer)
+  schedule <- match.arg(schedule)
   settings <- list(
     epochs = as.integer(epochs), batch_size = as.integer(batch_size),
-    learning_rate = learning_rate, weight_decay = weight_decay,
-    early_stopping = early_stopping, val_frac = val_frac,
+    learning_rate = learning_rate, weight_decay = weight_decay, optimizer = optimizer,
+    penalty = penalty, alpha = alpha, schedule = schedule, plateau_factor = plateau_factor,
+    plateau_patience = as.integer(plateau_patience), early_stopping = early_stopping, val_frac = val_frac,
     device = device, seed = as.integer(seed), swa = isTRUE(swa), swa_start = swa_start)
   .check_control(settings)
   structure(settings, given = given, class = "timesift_control")
@@ -81,10 +109,26 @@ train_control <- function(epochs = 60L, batch_size = 64L, learning_rate = 1e-3,
     stop("`early_stopping` is a count of epochs of at least one, or Inf for never, got ",
          paste(format(settings$early_stopping), collapse = ", "), ".", call. = FALSE)
   }
-  if (length(settings$weight_decay) != 1L || is.na(settings$weight_decay) ||
-        settings$weight_decay < 0) {
-    stop("`weight_decay` is a single number that is not negative, got ",
-         paste(format(settings$weight_decay), collapse = ", "), ".", call. = FALSE)
+  for (nm in c("weight_decay", "penalty")) {
+    if (length(settings[[nm]]) != 1L || is.na(settings[[nm]]) || settings[[nm]] < 0) {
+      stop("`", nm, "` is a single number that is not negative, got ",
+           paste(format(settings[[nm]]), collapse = ", "), ".", call. = FALSE)
+    }
+  }
+  if (length(settings$alpha) != 1L || is.na(settings$alpha) || settings$alpha < 0 ||
+        settings$alpha > 1) {
+    stop("`alpha` is a single number in [0, 1], got ",
+         paste(format(settings$alpha), collapse = ", "), ".", call. = FALSE)
+  }
+  if (length(settings$plateau_factor) != 1L || is.na(settings$plateau_factor) ||
+        settings$plateau_factor <= 0 || settings$plateau_factor >= 1) {
+    stop("`plateau_factor` is a single number in (0, 1), got ",
+         paste(format(settings$plateau_factor), collapse = ", "), ".", call. = FALSE)
+  }
+  if (length(settings$plateau_patience) != 1L || is.na(settings$plateau_patience) ||
+        settings$plateau_patience < 0L) {
+    stop("`plateau_patience` is a count of epochs of zero or more, got ",
+         paste(format(settings$plateau_patience), collapse = ", "), ".", call. = FALSE)
   }
   if (!is.character(settings$device) || length(settings$device) != 1L) {
     stop("`device` is \"auto\" or the name of a device, got ", class(settings$device)[1L], ".",
@@ -98,7 +142,7 @@ print.timesift_control <- function(x, ...) {
   cat("<timesift control>\n")
   named <- attr(x, "given")
   for (nm in names(x)) {
-    cat(sprintf("  %-15s %s%s\n", nm, .describe(x[[nm]]),
+    cat(sprintf("  %-16s %s%s\n", nm, .describe(x[[nm]]),
                 if (nm %in% named) "" else "   (default)"))
   }
   invisible(x)

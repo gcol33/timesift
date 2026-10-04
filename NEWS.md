@@ -37,6 +37,24 @@
   `candidate` and `perc` are keyword-only, so the R call `decision_threshold(fit, "ensemble")`
   errors there instead of reading `"ensemble"` as predictions.
 
+## New
+
+* `perceptron()` fits one network of a single hidden layer per response, as nnet fits it and
+  biomod2 fits `ANN`: logistic hidden units, a bias and optional skip-layer connections, the
+  weights fitted by Nash's variable metric (BFGS) method on the head's loss plus a decay on the
+  squared weights. It runs on a new core, `src/ts_perceptron.cpp` over the minimiser in
+  `src/ts_quasi_newton.cpp`, that both languages call, and from the same starting weights it ends
+  at nnet's weights to the bit on the fixture design. `preset = "default"` is biomod2's default
+  option set (two hidden units, nnet's `decay = 0`, `rang = 0.7`, `maxit = 100`) and
+  `preset = "bigboss"` its tuned one; `tune()` searches biomod2's `ANN` grid of `hidden` and
+  `decay`. Under a presence-absence head it fits the cross-entropy, nnet's `entropy = TRUE`, where
+  biomod2 leaves nnet's least squares on the logistic output.
+* `train_control()` takes `optimizer` (`"adamw"`, the default, `"adam"` or `"sgd"`), a `penalty`
+  with its `alpha`, cito's `lambda` and `alpha` with `alpha` read as `elasticnet()` reads it, and a
+  `schedule` (`"cosine"`, the default, `"constant"` or `"plateau"` with `plateau_factor` and
+  `plateau_patience`). biomod2's `DNN` is cito's `dnn()`, and both its option sets are now
+  settings of `mlp()`; the biomod2 article spells them out. The defaults train as before.
+
 ## Bug fixes
 
 * A nested run whose ensemble sets `min_score` no longer fails with "numbers of columns of

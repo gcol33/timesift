@@ -346,16 +346,22 @@ settings it names and takes the rest from it.
 ```python
 ts.train_control(epochs=200, device="cpu")
 #> <timesift control>
-#>   epochs          200
-#>   batch_size      64   (default)
-#>   learning_rate   0.001   (default)
-#>   weight_decay    0.0001   (default)
-#>   early_stopping  inf   (default)
-#>   val_frac        0.0   (default)
-#>   device          cpu
-#>   seed            1   (default)
-#>   swa             False   (default)
-#>   swa_start       0.7   (default)
+#>   epochs           200
+#>   batch_size       64   (default)
+#>   learning_rate    0.001   (default)
+#>   weight_decay     0.0001   (default)
+#>   optimizer        adamw   (default)
+#>   penalty          0.0   (default)
+#>   alpha            0.5   (default)
+#>   schedule         cosine   (default)
+#>   plateau_factor   0.1   (default)
+#>   plateau_patience 10   (default)
+#>   early_stopping   inf   (default)
+#>   val_frac         0.0   (default)
+#>   device           cpu
+#>   seed             1   (default)
+#>   swa              False   (default)
+#>   swa_start        0.7   (default)
 ts.cnn(channels=(16, 32), epochs=300)
 #> <timesift learner> cnn
 #> reads   : sequence ; one model per response: no, joint

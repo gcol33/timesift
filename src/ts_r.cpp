@@ -10,6 +10,7 @@
 #include "ts_fda.h"
 #include "ts_hierarchical.h"
 #include "ts_mars.h"
+#include "ts_perceptron.h"
 #include "ts_maxnet.h"
 #include "ts_penalised.h"
 #include "ts_stepwise.h"
@@ -888,6 +889,55 @@ cpp11::doubles ts_mars_predict_(cpp11::list fit, cpp11::doubles newx, int n, int
   std::vector<double> out(static_cast<std::size_t>(n));
   timesift::mars_predict(m, REAL_RO(newx.data()), static_cast<std::size_t>(n),
                          static_cast<std::size_t>(p), out.data());
+  return give(out);
+}
+
+// The one-hidden-layer network, from the same core the Python side calls. A fit crosses into R as
+// a list of plain values: its size, its family and its weights.
+[[cpp11::register]]
+cpp11::list ts_perceptron_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
+                               std::string family, int hidden, bool skip, double decay,
+                               double range, int max_iter, double abs_tol, double rel_tol,
+                               int seed, cpp11::doubles start) {
+  timesift::PerceptronSpec spec;
+  spec.family = timesift::family_from_name(family);
+  spec.hidden = hidden;
+  spec.skip = skip;
+  spec.decay = decay;
+  spec.range = range;
+  spec.max_iter = max_iter;
+  spec.abs_tol = abs_tol;
+  spec.rel_tol = rel_tol;
+  spec.seed = static_cast<std::uint32_t>(seed);
+  const std::vector<double> init(start.begin(), start.end());
+  const timesift::Perceptron fit =
+      timesift::perceptron_fit(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()),
+                               static_cast<std::size_t>(n), static_cast<std::size_t>(p), spec,
+                               init);
+  using namespace cpp11::literals;
+  return cpp11::writable::list({
+    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
+    "n_column"_nm = cpp11::as_sexp(fit.n_column),
+    "hidden"_nm = cpp11::as_sexp(fit.hidden),
+    "skip"_nm = cpp11::as_sexp(fit.skip),
+    "weights"_nm = give(fit.weights),
+    "value"_nm = cpp11::as_sexp(fit.value),
+    "iterations"_nm = cpp11::as_sexp(fit.iterations),
+    "converged"_nm = cpp11::as_sexp(fit.converged)
+  });
+}
+
+[[cpp11::register]]
+cpp11::doubles ts_perceptron_predict_(cpp11::list fit, cpp11::doubles newx, int n, int p) {
+  timesift::Perceptron m;
+  m.family = timesift::family_from_name(cpp11::as_cpp<std::string>(fit["family"]));
+  m.n_column = cpp11::as_cpp<int>(fit["n_column"]);
+  m.hidden = cpp11::as_cpp<int>(fit["hidden"]);
+  m.skip = cpp11::as_cpp<bool>(fit["skip"]);
+  m.weights = take_field<double>(fit, "weights");
+  std::vector<double> out(static_cast<std::size_t>(n));
+  timesift::perceptron_predict(m, REAL_RO(newx.data()), static_cast<std::size_t>(n),
+                               static_cast<std::size_t>(p), out.data());
   return give(out);
 }
 

@@ -381,16 +381,22 @@ from it.
 
 train_control(epochs = 200L, device = "cpu")
 #> <timesift control>
-#>   epochs          200
-#>   batch_size      64   (default)
-#>   learning_rate   0.001   (default)
-#>   weight_decay    1e-04   (default)
-#>   early_stopping  Inf   (default)
-#>   val_frac        0   (default)
-#>   device          cpu
-#>   seed            1   (default)
-#>   swa             FALSE   (default)
-#>   swa_start       0.7   (default)
+#>   epochs           200
+#>   batch_size       64   (default)
+#>   learning_rate    0.001   (default)
+#>   weight_decay     1e-04   (default)
+#>   optimizer        adamw   (default)
+#>   penalty          0   (default)
+#>   alpha            0.5   (default)
+#>   schedule         cosine   (default)
+#>   plateau_factor   0.1   (default)
+#>   plateau_patience 10   (default)
+#>   early_stopping   Inf   (default)
+#>   val_frac         0   (default)
+#>   device           cpu
+#>   seed             1   (default)
+#>   swa              FALSE   (default)
+#>   swa_start        0.7   (default)
 cnn(channels = c(16L, 32L), epochs = 300L)
 #> <timesift learner> cnn 
 #> reads   : sequence ; one model per response: no, joint 

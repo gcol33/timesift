@@ -23,8 +23,8 @@
 #' `mtry` of a [forest()] from 1 to the smaller of 10 and the number of columns; `trees`, `depth`
 #' and `shrinkage` of a gbm-style [boosting()], `shrinkage` and `colsample` of the second-order one;
 #' `degree` and `nprune` of [mars()]; `degree` of [discriminant()]; `regmult` of [maxent()];
-#' `quantile` of [envelope()]; and the layer width of [mlp()] at 2, 4, 6 and 8. biomod2's weight
-#' decay is a training setting here, which [train_control()] holds and a grid does not reach.
+#' `quantile` of [envelope()]; `hidden` of a [perceptron()] at 2, 4, 6 and 8 with `decay` at 0.01,
+#' 0.05 and 0.1; and the layer width of [mlp()] at 2, 4, 6 and 8.
 #'
 #' @param learner A [learner()], or the name of a registered one.
 #' @param grid A named list of values to try, one element per setting, or `NULL` for the grid
@@ -195,6 +195,7 @@ tunings <- function() .tuning_reg$names()
     discriminant = list(degree = 1:2),
     maxent = list(regmult = c(0.5, 1)),
     envelope = list(quantile = c(0, 0.0125, 0.025, 0.05, 0.1)),
+    perceptron = list(hidden = c(2L, 4L, 6L, 8L), decay = c(0.01, 0.05, 0.1)),
     mlp = list(hidden = list(2L, 4L, 6L, 8L))
   )
 }

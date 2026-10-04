@@ -377,6 +377,20 @@ with the linear function, which the penalty on the spline’s squared
 second derivative leaves free. Each smooth sums to zero over the units,
 beside one intercept.
 </dd>
+<dt><a href="python-learners.html#perceptron"><code>perceptron()</code></a></dt>
+<dd>
+One network per variable over every bin-by-channel column, fitted as the
+nnet package fits it and as biomod2 fits <code>ANN</code>. Each of
+<code>hidden</code> logistic units takes a bias and every column, and
+the output takes a bias, every hidden unit and, with <code>skip</code>,
+every column again. The weights start uniform on
+<code>[-range, range]</code> and are fitted by the variable metric
+(BFGS) method of Nash (1990), the minimiser nnet uses, on the response
+head’s loss plus <code>decay</code> times the sum of the squared
+weights, biases included. The fit stops after <code>max_iter</code>
+iterations, when the objective falls below <code>abs_tol</code>, or when
+an iteration lowers it by no more than <code>rel_tol</code> of itself.
+</dd>
 <dt><a href="python-learners.html#hierarchical"><code>hierarchical()</code></a></dt>
 <dd>
 One Bayesian logistic model per response: a logistic regression on every

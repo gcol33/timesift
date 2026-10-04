@@ -233,6 +233,19 @@ your own goes through.
   leaves free. Each smooth sums to zero over the units, beside one
   intercept.
 
+- [`perceptron()`](https://gillescolling.com/timesift/articles/python-learners.html#perceptron):
+
+  One network per variable over every bin-by-channel column, fitted as
+  the nnet package fits it and as biomod2 fits `ANN`. Each of `hidden`
+  logistic units takes a bias and every column, and the output takes a
+  bias, every hidden unit and, with `skip`, every column again. The
+  weights start uniform on `[-range, range]` and are fitted by the
+  variable metric (BFGS) method of Nash (1990), the minimiser nnet uses,
+  on the response head’s loss plus `decay` times the sum of the squared
+  weights, biases included. The fit stops after `max_iter` iterations,
+  when the objective falls below `abs_tol`, or when an iteration lowers
+  it by no more than `rel_tol` of itself.
+
 - [`hierarchical()`](https://gillescolling.com/timesift/articles/python-learners.html#hierarchical):
   One Bayesian logistic model per response: a logistic regression on
   every bin-by-channel column of the representation, standardised so the

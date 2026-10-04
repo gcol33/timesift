@@ -81,12 +81,12 @@ and `shrinkage` of a gbm-style
 [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md);
 `quantile` of
 [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md);
-and the layer width of
+`hidden` of a
+[`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md)
+at 2, 4, 6 and 8 with `decay` at 0.01, 0.05 and 0.1; and the layer width
+of
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
-at 2, 4, 6 and 8. biomod2's weight decay is a training setting here,
-which
-[`train_control()`](https://gillescolling.com/timesift/reference/train_control.md)
-holds and a grid does not reach.
+at 2, 4, 6 and 8.
 
 ## Examples
 

@@ -97,6 +97,7 @@ reference:
   - mars
   - discriminant
   - additive
+  - perceptron
   - hierarchical
   - torch_learners
   - train_control

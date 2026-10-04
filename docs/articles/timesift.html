@@ -516,16 +516,22 @@ it names and takes the rest from it.</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/train_control.html">train_control</a></span><span class="op">(</span>epochs <span class="op">=</span> <span class="fl">200L</span>, device <span class="op">=</span> <span class="st">"cpu"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;timesift control&gt;</span></span>
-<span><span class="co">#&gt;   epochs          200</span></span>
-<span><span class="co">#&gt;   batch_size      64   (default)</span></span>
-<span><span class="co">#&gt;   learning_rate   0.001   (default)</span></span>
-<span><span class="co">#&gt;   weight_decay    1e-04   (default)</span></span>
-<span><span class="co">#&gt;   early_stopping  Inf   (default)</span></span>
-<span><span class="co">#&gt;   val_frac        0   (default)</span></span>
-<span><span class="co">#&gt;   device          cpu</span></span>
-<span><span class="co">#&gt;   seed            1   (default)</span></span>
-<span><span class="co">#&gt;   swa             FALSE   (default)</span></span>
-<span><span class="co">#&gt;   swa_start       0.7   (default)</span></span>
+<span><span class="co">#&gt;   epochs           200</span></span>
+<span><span class="co">#&gt;   batch_size       64   (default)</span></span>
+<span><span class="co">#&gt;   learning_rate    0.001   (default)</span></span>
+<span><span class="co">#&gt;   weight_decay     1e-04   (default)</span></span>
+<span><span class="co">#&gt;   optimizer        adamw   (default)</span></span>
+<span><span class="co">#&gt;   penalty          0   (default)</span></span>
+<span><span class="co">#&gt;   alpha            0.5   (default)</span></span>
+<span><span class="co">#&gt;   schedule         cosine   (default)</span></span>
+<span><span class="co">#&gt;   plateau_factor   0.1   (default)</span></span>
+<span><span class="co">#&gt;   plateau_patience 10   (default)</span></span>
+<span><span class="co">#&gt;   early_stopping   Inf   (default)</span></span>
+<span><span class="co">#&gt;   val_frac         0   (default)</span></span>
+<span><span class="co">#&gt;   device           cpu</span></span>
+<span><span class="co">#&gt;   seed             1   (default)</span></span>
+<span><span class="co">#&gt;   swa              FALSE   (default)</span></span>
+<span><span class="co">#&gt;   swa_start        0.7   (default)</span></span>
 <span><span class="fu"><a href="../reference/torch_learners.html">cnn</a></span><span class="op">(</span>channels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">16L</span>, <span class="fl">32L</span><span class="op">)</span>, epochs <span class="op">=</span> <span class="fl">300L</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;timesift learner&gt; cnn </span></span>
 <span><span class="co">#&gt; reads   : sequence ; one model per response: no, joint </span></span>

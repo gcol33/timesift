@@ -36,8 +36,9 @@ def tune(learner, grid: dict | None = None, metric=None, n_inner: int = 5, seed:
     ``mtry`` of a forest from 1 to the smaller of 10 and the number of columns; ``trees``,
     ``depth`` and ``shrinkage`` of a gbm-style boosting, ``shrinkage`` and ``colsample`` of the
     second-order one; ``degree`` and ``nprune`` of ``mars``; ``degree`` of ``discriminant``;
-    ``regmult`` of ``maxent``; ``quantile`` of ``envelope``; and the layer width of ``mlp`` at 2, 4,
-    6 and 8. biomod2's weight decay is a training setting here, which the control holds.
+    ``regmult`` of ``maxent``; ``quantile`` of ``envelope``; ``hidden`` of a ``perceptron`` at 2,
+    4, 6 and 8 with ``decay`` at 0.01, 0.05 and 0.1; and the layer width of ``mlp`` at 2, 4,
+    6 and 8.
 
     A learner's settings are the ones it carries as ``params``. ``grid`` names some of them and
     gives the values to try, and the grid is every combination, the first setting varying fastest
@@ -97,6 +98,7 @@ def default_grids() -> dict:
     return {"forest": forest_grid, "boosting": boosting_grid, "mars": mars_grid,
             "discriminant": {"degree": [1, 2]}, "maxent": {"regmult": [0.5, 1.0]},
             "envelope": {"quantile": [0.0, 0.0125, 0.025, 0.05, 0.1]},
+            "perceptron": {"hidden": [2, 4, 6, 8], "decay": [0.01, 0.05, 0.1]},
             "mlp": {"hidden": [[2], [4], [6], [8]]}}
 
 

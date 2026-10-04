@@ -47,8 +47,8 @@ With \code{grid} left unset the learner is searched over the grid registered und
 \code{mtry} of a \code{\link[=forest]{forest()}} from 1 to the smaller of 10 and the number of columns; \code{trees}, \code{depth}
 and \code{shrinkage} of a gbm-style \code{\link[=boosting]{boosting()}}, \code{shrinkage} and \code{colsample} of the second-order one;
 \code{degree} and \code{nprune} of \code{\link[=mars]{mars()}}; \code{degree} of \code{\link[=discriminant]{discriminant()}}; \code{regmult} of \code{\link[=maxent]{maxent()}};
-\code{quantile} of \code{\link[=envelope]{envelope()}}; and the layer width of \code{\link[=mlp]{mlp()}} at 2, 4, 6 and 8. biomod2's weight
-decay is a training setting here, which \code{\link[=train_control]{train_control()}} holds and a grid does not reach.
+\code{quantile} of \code{\link[=envelope]{envelope()}}; \code{hidden} of a \code{\link[=perceptron]{perceptron()}} at 2, 4, 6 and 8 with \code{decay} at 0.01,
+0.05 and 0.1; and the layer width of \code{\link[=mlp]{mlp()}} at 2, 4, 6 and 8.
 }
 \examples{
 tuned <- tune(forest(), list(mtry = c(2, 4), min_node = c(1, 5)), n_inner = 3L)

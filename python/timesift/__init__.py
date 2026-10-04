@@ -23,8 +23,8 @@ from .fit import Timesift, timesift
 from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
 from .learners import (Fit, Learner, additive, boosting, cnn, discriminant, elasticnet, envelope,
-                       fit_learner, flatten, forest, hierarchical, linear, mars, maxent, mlp, rescnn,
-                       tree)
+                       fit_learner, flatten, forest, hierarchical, linear, mars, maxent, mlp, perceptron,
+                       rescnn, tree)
 from .metrics import (ORDINAL_METRICS, TABLE_METRICS, average_precision, boyce_index,
                       cohen_kappa, decision_threshold, kappa_score, model_agreement,
                       ordinal_metric, regression_metric, roc_auc, table_metric, tss)
@@ -93,6 +93,7 @@ register_learner("envelope", envelope)
 register_learner("mars", mars)
 register_learner("discriminant", discriminant)
 register_learner("additive", additive)
+register_learner("perceptron", perceptron)
 register_learner("hierarchical", hierarchical)
 register_learner("mlp", mlp)
 register_learner("cnn", cnn)
@@ -116,7 +117,7 @@ __all__ = [
     "kappa_score",
     "learners", "linear", "lookback", "lookback_matrix", "lookbacks", "mars", "maxent", "metrics", "mlp",
     "model_agreement",
-    "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "plot", "positive_weights", "project", "pseudo_absences",
+    "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "perceptron", "plot", "positive_weights", "project", "pseudo_absences",
     "procedure_table",
     "range_change", "read_cells",
     "read_folds", "read_response", "register_learner", "register_metric", "register_response", "register_tuning",

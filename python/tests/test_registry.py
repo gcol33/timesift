@@ -45,8 +45,8 @@ def readings(n_unit=12, days=40, seed=5):
 
 def test_what_ships_is_registered_and_reachable_by_name():
     assert learners() == ["additive", "boosting", "cnn", "discriminant", "elasticnet", "envelope",
-                          "forest", "hierarchical", "linear", "mars", "maxent", "mlp", "rescnn",
-                          "tree"]
+                          "forest", "hierarchical", "linear", "mars", "maxent", "mlp", "perceptron",
+                          "rescnn", "tree"]
     assert {"average_precision", "kappa", "kappa_youden", "roc_auc", "tss", "accuracy", "ets",
             "boyce"} <= set(metrics())
     assert {"presence_absence", "continuous", "abundance", "ordinal"} <= set(responses())

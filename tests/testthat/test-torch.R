@@ -374,3 +374,60 @@ test_that("the encoders fit under the head's weight", {
   expect_false(isTRUE(all.equal(weighted, plain)))
   expect_gt(mean(weighted[1:3, 1L]), mean(plain[1:3, 1L]))
 })
+
+test_that("the optimiser, the penalty and the schedule are settings the control checks", {
+  expect_identical(train_control()$optimizer, "adamw")
+  expect_identical(train_control()$schedule, "cosine")
+  expect_identical(train_control(optimizer = "sgd")$optimizer, "sgd")
+  expect_error(train_control(optimizer = "lbfgs"), "should be one of")
+  expect_error(train_control(schedule = "step"), "should be one of")
+  expect_error(train_control(penalty = -1), "not negative")
+  expect_error(train_control(alpha = 1.5), "[0, 1]", fixed = TRUE)
+  expect_error(train_control(plateau_factor = 1), "(0, 1)", fixed = TRUE)
+  expect_error(train_control(plateau_patience = -1L), "zero or more")
+  merged <- .resolve_control(train_control(optimizer = "adam"), train_control(penalty = 0.01))
+  expect_identical(merged$optimizer, "adam")
+  expect_identical(merged$penalty, 0.01)
+})
+
+test_that("the penalty is the absolute weights' sum and their norm over the weight matrices", {
+  skip_if_no_torch()
+  torch <- .torch()
+  torch$torch_manual_seed(1L)
+  net <- torch$nn_sequential(torch$nn_linear(3L, 4L), torch$nn_relu(), torch$nn_linear(4L, 1L))
+  weights <- lapply(net$parameters, function(p) as.array(p$detach()))
+  matrices <- Filter(function(w) length(dim(w)) >= 2L, weights)
+  expected <- 0.01 * sum(vapply(matrices, function(w) 0.3 * sum(abs(w)) + 0.7 * sqrt(sum(w^2)),
+                                numeric(1L)))
+  got <- as.numeric(.torch_penalty(torch, net, 0.01, 0.3))
+  expect_equal(got, expected, tolerance = 1e-6)
+})
+
+test_that("a plateau cuts the learning rate once the loss stops improving", {
+  skip_if_no_torch()
+  torch <- .torch()
+  net <- torch$nn_linear(2L, 1L)
+  cfg <- train_control(optimizer = "sgd", learning_rate = 0.1, schedule = "plateau",
+                       plateau_factor = 0.5, plateau_patience = 2L)
+  opt <- .torch_optimizer(torch, net, cfg)
+  sched <- .torch_schedule(torch, opt, cfg)
+  rates <- vapply(c(1, 0.5, 0.5, 0.5, 0.5), function(loss) {
+    .step_schedule(sched, cfg$schedule, loss)
+    opt$param_groups[[1L]]$lr
+  }, numeric(1L))
+  expect_equal(rates, c(0.1, 0.1, 0.1, 0.1, 0.05))
+  expect_null(.torch_schedule(torch, opt, train_control(schedule = "constant")))
+})
+
+test_that("every optimiser and schedule fits, and the penalty moves the fit", {
+  skip_if_no_torch()
+  f <- torch_fixture(n_unit = 24L, days = 60L)
+  base <- stats::predict(fit_learner(mlp(epochs = 4L), f$x, f$y), f$x)
+  for (args in list(list(optimizer = "adam"), list(optimizer = "sgd", learning_rate = 0.01),
+                    list(schedule = "constant"), list(schedule = "plateau"),
+                    list(schedule = "plateau", val_frac = 0.2), list(penalty = 0.05))) {
+    p <- stats::predict(fit_learner(do.call(mlp, c(list(epochs = 4L), args)), f$x, f$y), f$x)
+    expect_true(all(p > 0 & p < 1), info = names(args)[1L])
+    expect_false(isTRUE(all.equal(p, base)), info = paste(names(args), args, collapse = " "))
+  }
+})

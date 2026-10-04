@@ -91,6 +91,12 @@ step with this one.</p>
 <span>  batch_size <span class="op">=</span> <span class="fl">64L</span>,</span>
 <span>  learning_rate <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  weight_decay <span class="op">=</span> <span class="fl">1e-04</span>,</span>
+<span>  optimizer <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"adamw"</span>, <span class="st">"adam"</span>, <span class="st">"sgd"</span><span class="op">)</span>,</span>
+<span>  penalty <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  alpha <span class="op">=</span> <span class="fl">0.5</span>,</span>
+<span>  schedule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cosine"</span>, <span class="st">"constant"</span>, <span class="st">"plateau"</span><span class="op">)</span>,</span>
+<span>  plateau_factor <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  plateau_patience <span class="op">=</span> <span class="fl">10L</span>,</span>
 <span>  early_stopping <span class="op">=</span> <span class="cn">Inf</span>,</span>
 <span>  val_frac <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  device <span class="op">=</span> <span class="st">"auto"</span>,</span>
@@ -115,11 +121,44 @@ batch is a remainder of one.</p></dd>
 
 
 <dt id="arg-learning-rate">learning_rate<a class="anchor" aria-label="anchor" href="#arg-learning-rate"></a></dt>
-<dd><p>Learning rate.</p></dd>
+<dd><p>Learning rate, the one the schedule starts from.</p></dd>
 
 
 <dt id="arg-weight-decay">weight_decay<a class="anchor" aria-label="anchor" href="#arg-weight-decay"></a></dt>
-<dd><p>AdamW weight decay.</p></dd>
+<dd><p>The optimiser's weight decay: decoupled from the gradient under <code>"adamw"</code>,
+and added to it as <code>weight_decay</code> times each parameter under <code>"adam"</code> and <code>"sgd"</code>, as torch's
+optimisers take it.</p></dd>
+
+
+<dt id="arg-optimizer">optimizer<a class="anchor" aria-label="anchor" href="#arg-optimizer"></a></dt>
+<dd><p><code>"adamw"</code>, <code>"adam"</code> or <code>"sgd"</code>, torch's optimisers at their own defaults besides
+the learning rate and the weight decay; <code>"sgd"</code> takes no momentum.</p></dd>
+
+
+<dt id="arg-penalty">penalty<a class="anchor" aria-label="anchor" href="#arg-penalty"></a></dt>
+<dd><p>The weight of a penalty added to the loss of every batch:
+<code>penalty * (alpha * sum(abs(W)) + (1 - alpha) * sqrt(sum(W^2)))</code> summed over every weight matrix
+and kernel of the network, its biases and normalisation scales left out. This is cito's
+<code>lambda</code>, the penalty biomod2's <code>DNN</code> fits under. 0 adds nothing.</p></dd>
+
+
+<dt id="arg-alpha">alpha<a class="anchor" aria-label="anchor" href="#arg-alpha"></a></dt>
+<dd><p>The share of the penalty on the absolute weights, as <code><a href="elasticnet.html">elasticnet()</a></code> reads its
+<code>alpha</code>: 1 penalises the absolute weights alone and 0 the norm alone. cito's <code>alpha</code> is
+<code>1 - alpha</code>.</p></dd>
+
+
+<dt id="arg-schedule">schedule<a class="anchor" aria-label="anchor" href="#arg-schedule"></a></dt>
+<dd><p>How the learning rate moves over the epochs: <code>"cosine"</code> anneals it to zero over
+the budget, <code>"constant"</code> holds it, and <code>"plateau"</code> multiplies it by <code>plateau_factor</code> once the
+loss has not improved for <code>plateau_patience</code> epochs, reading the validation loss where
+<code>val_frac</code> holds a set back and the epoch's mean training loss where it does not, as cito's
+<code>reduce_on_plateau</code> reads them. torch's own relative threshold of <code>1e-4</code> decides an improvement.</p></dd>
+
+
+<dt id="arg-plateau-factor-plateau-patience">plateau_factor, plateau_patience<a class="anchor" aria-label="anchor" href="#arg-plateau-factor-plateau-patience"></a></dt>
+<dd><p>The factor a plateau multiplies the learning rate by, and
+the epochs without improvement that make one.</p></dd>
 
 
 <dt id="arg-early-stopping">early_stopping<a class="anchor" aria-label="anchor" href="#arg-early-stopping"></a></dt>
@@ -175,6 +214,10 @@ moves only the settings that were asked for: a learner given <code>train_control
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">train_control</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">train_control</span><span class="op">(</span>epochs <span class="op">=</span> <span class="fl">200L</span>, device <span class="op">=</span> <span class="st">"cpu"</span><span class="op">)</span></span>
+<span><span class="co"># biomod2's tuned DNN, cito's adam with a penalty and a plateau schedule</span></span>
+<span><span class="fu">train_control</span><span class="op">(</span>optimizer <span class="op">=</span> <span class="st">"adam"</span>, learning_rate <span class="op">=</span> <span class="fl">0.05</span>, weight_decay <span class="op">=</span> <span class="fl">0</span>, penalty <span class="op">=</span> <span class="fl">0.001</span>,</span>
+<span>              alpha <span class="op">=</span> <span class="fl">0</span>, schedule <span class="op">=</span> <span class="st">"plateau"</span>, plateau_patience <span class="op">=</span> <span class="fl">7L</span>, epochs <span class="op">=</span> <span class="fl">150L</span>,</span>
+<span>              batch_size <span class="op">=</span> <span class="fl">100L</span>, val_frac <span class="op">=</span> <span class="fl">0.2</span>, early_stopping <span class="op">=</span> <span class="fl">14L</span><span class="op">)</span></span>
 <span></span></code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

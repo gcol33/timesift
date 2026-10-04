@@ -72,6 +72,8 @@ your own goes through.
   : Flexible discriminant analysis on the flattened representation
 - [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
   : Generalised additive model on the flattened representation
+- [`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md)
+  : Single-hidden-layer network on the flattened representation
 - [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
   : Bayesian logistic model with a spatial field
 - [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)

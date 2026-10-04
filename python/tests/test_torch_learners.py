@@ -351,3 +351,62 @@ def test_the_encoders_train_under_the_poisson_deviance_and_predict_a_positive_me
     assert (p > 0).all()
     assert np.corrcoef(p, rate)[0, 1] > 0.5
     assert poisson_deviance_of(count, p) < poisson_deviance_of(count, np.full(len(p), count.mean()))
+
+
+def test_the_optimiser_the_penalty_and_the_schedule_are_settings_the_control_checks():
+    assert train_control().optimizer == "adamw"
+    assert train_control().schedule == "cosine"
+    assert train_control(optimizer="sgd").optimizer == "sgd"
+    with pytest.raises(ValueError, match="optimizer"):
+        train_control(optimizer="lbfgs")
+    with pytest.raises(ValueError, match="schedule"):
+        train_control(schedule="step")
+    with pytest.raises(ValueError, match="penalty"):
+        train_control(penalty=-1)
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        train_control(alpha=1.5)
+    with pytest.raises(ValueError, match=r"\(0, 1\)"):
+        train_control(plateau_factor=1)
+    with pytest.raises(ValueError, match="plateau_patience"):
+        train_control(plateau_patience=-1)
+    merged = train_control(optimizer="adam").override({"penalty": 0.01})
+    assert (merged.optimizer, merged.penalty) == ("adam", 0.01)
+
+
+def test_the_penalty_is_the_absolute_weights_sum_and_their_norm_over_the_weight_matrices():
+    import torch
+    from timesift.learners import _torch_penalty
+    torch.manual_seed(1)
+    net = torch.nn.Sequential(torch.nn.Linear(3, 4), torch.nn.ReLU(), torch.nn.Linear(4, 1))
+    matrices = [p.detach().numpy() for p in net.parameters() if p.dim() >= 2]
+    expected = 0.01 * sum(0.3 * np.abs(w).sum() + 0.7 * np.sqrt((w ** 2).sum()) for w in matrices)
+    assert _torch_penalty(torch, net, 0.01, 0.3).item() == pytest.approx(expected, rel=1e-6)
+
+
+def test_a_plateau_cuts_the_learning_rate_once_the_loss_stops_improving():
+    import torch
+    from timesift.learners import _step_schedule, _torch_optimizer, _torch_schedule
+    net = torch.nn.Linear(2, 1)
+    cfg = train_control(optimizer="sgd", learning_rate=0.1, schedule="plateau",
+                        plateau_factor=0.5, plateau_patience=2)
+    opt = _torch_optimizer(torch, net, cfg)
+    sched = _torch_schedule(torch, opt, cfg)
+    rates = []
+    for loss in (1, 0.5, 0.5, 0.5, 0.5):
+        _step_schedule(sched, cfg.schedule, loss)
+        rates.append(opt.param_groups[0]["lr"])
+    assert rates == pytest.approx([0.1, 0.1, 0.1, 0.1, 0.05])
+    assert _torch_schedule(torch, opt, train_control(schedule="constant")) is None
+
+
+@pytest.mark.parametrize("settings", [
+    dict(optimizer="adam"), dict(optimizer="sgd", learning_rate=0.01),
+    dict(schedule="constant"), dict(schedule="plateau"),
+    dict(schedule="plateau", val_frac=0.2), dict(penalty=0.05)],
+    ids=["adam", "sgd", "constant", "plateau", "plateau-validated", "penalty"])
+def test_every_optimiser_and_schedule_fits_and_moves_the_fit(settings):
+    x, y, _ = fixture(n_unit=24, days=60)
+    base = fit_learner(mlp(epochs=4), x, y).predict(x)
+    p = fit_learner(mlp(epochs=4, **settings), x, y).predict(x)
+    assert ((p > 0) & (p < 1)).all()
+    assert not np.allclose(p, base)
