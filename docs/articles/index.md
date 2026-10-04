@@ -12,8 +12,6 @@ comparison and the prediction that follows from it.
 
 ### Articles
 
-- [Reproducing the Schrankogel
-  grid](https://gillescolling.com/timesift/articles/reproducing-schrankogel.md):
 - [Coming from
   biomod2](https://gillescolling.com/timesift/articles/biomod2.md):
 

@@ -5,6 +5,9 @@
 * The site's Python side has a Get started article, the R walkthrough section by section and run
   against the package, and a reference laid out under the sections of the R reference with an
   index page, so the two language menus carry the same pages.
+* The `reproducing-schrankogel` vignette is gone. `inst/reproduce/README.md` is where the
+  reproduction is documented: how to run each stage, what it costs, and the comparison with the
+  paper, which the vignette carried an older copy of.
 
 # timesift 0.5.0
 

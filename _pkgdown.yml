@@ -35,7 +35,6 @@ navbar:
     - r
     - python
     - articles
-    - contract
     - news
     right:
     - search
@@ -59,13 +58,10 @@ navbar:
     articles:
       text: Articles
       menu:
-      - text: Reproducing the study
-        href: articles/reproducing-schrankogel.html
       - text: Coming from biomod2
         href: articles/biomod2.html
-    contract:
-      text: Contract
-      href: articles/contract.html
+      - text: The contract between R and Python
+        href: articles/contract.html
 reference:
 - title: The one call
   desc: |
@@ -195,7 +191,6 @@ articles:
   - articles/python
 - title: Articles
   contents:
-  - reproducing-schrankogel
   - articles/biomod2
 - title: The contract
   desc: |

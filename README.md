@@ -245,8 +245,8 @@ carries.
 
 `inst/reproduce/schrankogel.R` runs the published grid from the Zenodo deposit it was built on, and
 asserts the plot count, the species count, the cell count and the bin count of every grain before
-fitting anything. `vignette("reproducing-schrankogel")` says which setting corresponds to which
-part of that grid.
+fitting anything. [Its README](https://github.com/gcol33/timesift/blob/master/inst/reproduce/README.md)
+says how to run each stage, what it costs, and how every number compares with the paper.
 
 ## License
 
