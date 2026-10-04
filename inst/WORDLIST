@@ -13,6 +13,7 @@ Friedman
 Friedman's
 Fuglstad
 Gini
+Guestrin
 Hastie
 Hirzel
 Hochberg
@@ -22,10 +23,11 @@ Kadmon
 LF
 Lanczos
 MARS
+MASS's
 Martino
 Massias
 MaxEnt
-MASS's
+Maxent
 NVIDIA's
 NumPy
 ORCID
@@ -41,6 +43,7 @@ TSS
 Tibshirani
 TimesiftSpec
 Tsoar
+XGBoost's
 Zenodo
 artifact
 artifacts
@@ -49,6 +52,7 @@ biomod
 climgrain
 cloglog
 contrast's
+dataclass
 dict
 docstring
 doi
@@ -63,6 +67,7 @@ gbm's
 glmnet
 glmnet's
 halfday
+hsgp
 int
 jss
 leaps
@@ -81,6 +86,7 @@ mgcv
 mgcv's
 nanobind
 ndarray
+nngp
 np
 numpy
 numpy's
@@ -106,13 +112,12 @@ str
 subtree's
 tidyselect
 tidyselect's
+tulpa
+tulpa's
 unscorable
 vendored
+walkthrough
 xgboost
 xgboost's
 xoshiro
 zenodo
-hsgp
-nngp
-tulpa
-tulpa's
