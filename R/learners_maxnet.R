@@ -1,6 +1,7 @@
-#' maxnet's MaxEnt on the flattened representation
+#' Maxent on the flattened representation
 #'
-#' One maxnet model per response, over every bin-by-channel column of the representation: maxnet's
+#' One maximum-entropy model per response, over every bin-by-channel column of the representation,
+#' in the formulation of the maxnet package (Phillips et al. 2017) and biomod2's `MAXNET`: maxnet's
 #' feature classes, its regularisation of each feature, and a lasso over them, fitted by the
 #' penalised core [elasticnet()] runs on, which the Python package calls too. With the maxnet
 #' package's own settings the features and the penalty factors are maxnet's to rounding, and the
@@ -63,12 +64,12 @@
 #' @return A [learner()].
 #'
 #' @examples
-#' maxnet()
-#' maxnet(classes = "lqh", regmult = 2)
-#' maxnet(formulation = "absence")
+#' maxent()
+#' maxent(classes = "lqh", regmult = 2)
+#' maxent(formulation = "absence")
 #'
 #' @export
-maxnet <- function(data = NULL, classes = NULL, regmult = 1,
+maxent <- function(data = NULL, classes = NULL, regmult = 1,
                    formulation = c("background", "absence"), type = NULL, knots = 50L,
                    add_samples = TRUE, clamp = TRUE, n_inner = 5L,
                    s = c("lambda.min", "lambda.1se"), thresh = 1e-8, max_design = 2,
@@ -82,7 +83,7 @@ maxnet <- function(data = NULL, classes = NULL, regmult = 1,
          .describe(classes), ".", call. = FALSE)
   }
   learner(
-    name = "maxnet",
+    name = "maxent",
     data = data, reads = "tabular", multi = "separate",
     params = list(classes = classes, regmult = regmult, formulation = formulation, type = type,
                   knots = as.integer(knots), add_samples = isTRUE(add_samples),

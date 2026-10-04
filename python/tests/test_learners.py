@@ -8,7 +8,7 @@ import pytest
 from dataclasses import replace
 
 from timesift.control import train_control
-from timesift.learners import (Learner, elasticnet, fit_learner, flatten, forest, stepwise, tree,
+from timesift.learners import (Learner, elasticnet, fit_learner, flatten, forest, linear, tree,
                                _design)
 from timesift.metrics import roc_auc
 from timesift.representation import grain_matrix
@@ -32,7 +32,7 @@ def planted(n_unit=40, days=56, noise=1.0, seed=17):
 
 def test_the_selector_fits_predicts_and_finds_the_planted_signal():
     x, y = planted()
-    fit = fit_learner(stepwise(max_terms=2), x, y)
+    fit = fit_learner(linear(select="forward", terms="column", max_terms=2), x, y)
     p = fit.predict(x)
     assert p.shape == (len(y.units), 2)
     assert np.all((p >= 0) & (p <= 1))
@@ -42,7 +42,7 @@ def test_the_selector_fits_predicts_and_finds_the_planted_signal():
 def test_the_selector_admits_no_more_columns_than_its_budget():
     x, y = planted()
     for budget in (1, 3):
-        model = fit_learner(stepwise(max_terms=budget), x, y).model
+        model = fit_learner(linear(select="forward", terms="column", max_terms=budget), x, y).model
         for f in model["models"]:
             assert isinstance(f, float) or len(f["term_column"]) <= budget
 
@@ -51,21 +51,21 @@ def test_a_variable_with_one_outcome_is_predicted_as_its_share():
     x, y = planted()
     flat = Response(np.column_stack([y.values[:, 0], np.zeros(len(y.units))]),
                     y.units, ("sp1", "absent"))
-    fit = fit_learner(stepwise(), x, flat)
+    fit = fit_learner(linear(), x, flat)
     p = fit.predict(x)
     assert np.allclose(p[:, 1], 0.0)
 
 
 def test_predicting_a_single_unit_returns_one_row_and_not_one_column():
     x, y = planted()
-    fit = fit_learner(stepwise(max_terms=2), x, y)
+    fit = fit_learner(linear(select="forward", terms="column", max_terms=2), x, y)
     one = x.take_units([0])
     assert fit.predict(one).shape == (1, 2)
 
 
 def test_the_selector_refuses_a_representation_it_was_not_fitted_on():
     x, y = planted()
-    fit = fit_learner(stepwise(max_terms=1), x, y)
+    fit = fit_learner(linear(select="forward", terms="column", max_terms=1), x, y)
     with pytest.raises(ValueError, match="different channels or bins"):
         fit.predict(grain_matrix(
             {"id": [u for u in y.units for _ in range(24)],
@@ -95,7 +95,8 @@ def test_a_column_holding_one_value_is_not_offered_to_the_forward_search(tempora
     arms = [(y, "presence_absence"),
             (Response(level.reshape(-1, 1), y.units, ("height",)), "constant_continuous_test")]
     for response, name in arms:
-        fit = fit_learner(stepwise(max_terms=2), flat, response, response=name)
+        fit = fit_learner(linear(select="forward", terms="column", max_terms=2), flat, response,
+                          response=name)
         chosen = list(fit.model["models"][0]["term_column"])
         assert chosen, name
         # flatten() lays the channels out one block of bins after another, so the constant one is
@@ -162,9 +163,9 @@ def test_the_settings_a_learner_carries_are_the_ones_it_reports():
 
 
 def test_every_learner_declares_what_it_reads_and_how_it_covers_the_responses():
-    declared = {"elasticnet": ("tabular", "separate"), "stepwise": ("tabular", "separate"),
+    declared = {"elasticnet": ("tabular", "separate"), "linear": ("tabular", "separate"),
                 "forest": ("tabular", "separate"), "tree": ("tabular", "separate")}
-    for build in (elasticnet, stepwise, forest, tree):
+    for build in (elasticnet, linear, forest, tree):
         learner = build()
         assert (learner.reads, learner.multi) == declared[learner.name]
         assert learner.data is None
@@ -259,7 +260,8 @@ def test_the_per_response_learners_fit_the_family_the_response_heads_loss_names(
     level = x.values[:, :, 0].mean(axis=1)
     level = 10 + 3 * (level - level.mean()) / level.std()
     yc = Response(level.reshape(-1, 1), y.units, ("height",))
-    for learner in (elasticnet(squares=False), forest(trees=100), stepwise(max_terms=1)):
+    for learner in (elasticnet(squares=False), forest(trees=100),
+                    linear(select="forward", terms="column", max_terms=1)):
         fit = fit_learner(learner, x, yc, response="continuous_test")
         p = fit.predict(x)
         assert (p > 1).all(), learner.name
@@ -270,7 +272,7 @@ def test_the_per_response_learners_fit_the_family_the_response_heads_loss_names(
         prepare=as_response, activation="exp", loss="poisson", metric="roc_auc",
         cells=lambda y, folds: scorable_cells(y, folds)))
     with pytest.raises(ValueError, match="no family for the 'poisson'"):
-        fit_learner(stepwise(), x, yc, response="poisson_test")
+        fit_learner(linear(), x, yc, response="poisson_test")
 
 
 def test_a_learners_fit_is_handed_the_head_only_where_it_declares_one():
@@ -423,7 +425,7 @@ def test_every_shipped_learner_fits_a_rare_response_under_the_heads_weight(tempo
     assert 15 <= present.sum() <= 30
     rare = Response(np.column_stack([present.astype(float)]), y.units, ("rare",))
     for make in (lambda: elasticnet(n_inner=3), lambda: forest(trees=30),
-                 lambda: stepwise(max_terms=1)):
+                 lambda: linear(select="forward", terms="column", max_terms=1)):
         weighted = fit_learner(make(), x, rare).predict(x)
         plain = fit_learner(make(), x, rare, response="unweighted_test").predict(x)
         assert not np.allclose(weighted, plain), make().name

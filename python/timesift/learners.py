@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+import math
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -25,7 +26,7 @@ from .response import fitting_rows
 
 __all__ = ["Fit", "Learner", "READS", "MULTI", "additive", "boosting", "cnn", "discriminant", "elasticnet",
            "fit_learner", "envelope", "flatten", "hierarchical", "mars", "mlp", "rescnn", "forest",
-           "stepwise", "tree"]
+           "linear", "tree"]
 
 READS = ("tabular", "sequence")
 MULTI = ("joint", "separate")
@@ -988,10 +989,11 @@ def _boost_predict(model, x):
     return _predict_columns(model["models"], flatten(x), boost_predict)
 
 
-def maxnet(data=None, classes=None, regmult=1.0, formulation="background", type=None, knots=50,
+def maxent(data=None, classes=None, regmult=1.0, formulation="background", type=None, knots=50,
            add_samples=True, clamp=True, n_inner=5, s="lambda.min", thresh=1e-8, max_design=2.0,
            threads=1, seed=1) -> Learner:
-    """One maxnet model per variable, over every bin-by-channel column: maxnet's feature classes,
+    """One maximum-entropy model per variable, over every bin-by-channel column, in the formulation
+    of the maxnet package (Phillips et al. 2017) and biomod2's `MAXNET`: maxnet's feature classes,
     its regularisation of each feature, and a lasso over them, fitted by the penalised core
     :func:`elasticnet` runs on, which the R package calls too. With the maxnet package's own
     settings the features and the penalty factors are maxnet's to rounding, and the fit settles at
@@ -1039,7 +1041,7 @@ def maxnet(data=None, classes=None, regmult=1.0, formulation="background", type=
                                 or any(c not in "lqpht" for c in classes)):
         raise ValueError("`classes` is a string of the letters l, q, p, h and t, or None, "
                          f"got {classes!r}.")
-    return Learner(name="maxnet", fit=_maxnet_fit, predict=_maxnet_predict, data=data,
+    return Learner(name="maxent", fit=_maxnet_fit, predict=_maxnet_predict, data=data,
                    reads="tabular", multi="separate",
                    params=dict(classes=classes, regmult=float(regmult), formulation=formulation,
                                type=_maxnet_type(formulation, type), knots=int(knots),
@@ -1191,26 +1193,29 @@ def _tree_predict(model, x):
     return _predict_columns(model["models"], flatten(x), tree_predict)
 
 
-def stepwise(data=None, max_terms=3, degree=2, direction="forward", terms="column",
-             threads=1) -> Learner:
-    """One generalised linear model per variable, its terms chosen by Akaike's criterion over every
-    bin-by-channel column. The family is the response head's: logistic under a binary
+def linear(data=None, select="both", terms="power", max_terms=math.inf, degree=2,
+           threads=1) -> Learner:
+    """One generalised linear model per variable over every bin-by-channel column, its terms chosen
+    by Akaike's criterion. The family is the response head's: logistic under a binary
     cross-entropy loss, Gaussian under a squared-error one and Poisson under a Poisson-deviance
     one, and so are the case weights.
 
-    ``terms`` says what one term is. Under ``"column"`` it is a column's orthogonal polynomial of
-    degree ``degree``, so a column enters with its curvature at once and can be non-monotone in the
-    reading the way a niche optimum is. Under ``"power"`` each power of a column is a term of its
-    own, which is how biomod2 writes a quadratic formula and how ``MASS::stepAIC()`` walks it. A
+    The defaults are biomod2's ``GLM``: every column enters as ``x + I(x^2)``, and the terms are
+    searched in both directions by AIC as ``MASS::stepAIC()`` searches them, with no bound on how
+    many are kept.
+
+    ``terms`` says what one term is. Under ``"power"`` each power of a column is a term of its own,
+    which is how biomod2 writes a quadratic formula and how ``stepAIC()`` walks it. Under
+    ``"column"`` a term is a column's orthogonal polynomial of degree ``degree``, so a column enters
+    with its curvature at once and can be non-monotone in the reading the way a niche optimum is. A
     column holding one value over the fitting units is not a term.
 
-    ``direction`` is the search. ``"forward"`` starts from the intercept and admits the term that
-    lowers the criterion most, while one does and the model holds fewer than ``max_terms``.
-    ``"both"`` also weighs dropping each term it holds at every step, and ``"backward"`` starts
-    from every term and drops alone. ``"none"`` fits every term and selects nothing: with
-    ``terms="power"`` and ``degree=2`` that is the model biomod2's GLM fits. The two-way and
-    backward searches are MASS's ``stepAIC()``, step for step. ``max_terms`` bounds what a forward
-    or two-way search adds; ``float("inf")`` for no bound.
+    ``select`` is the search. ``"both"`` starts from the intercept and at every step takes the move
+    that lowers the criterion most, adding a term or dropping one it holds, while one does and the
+    model holds fewer than ``max_terms``. ``"forward"`` only adds, and ``"backward"`` starts from
+    every term and only drops. ``"none"`` fits every term and selects nothing. The two-way and
+    backward searches are ``stepAIC()``, step for step. ``max_terms`` bounds what a forward or
+    two-way search adds; ``math.inf`` for no bound.
 
     Each fit is R's ``glm.fit``: iteratively reweighted least squares, the rank read off the same
     pivoted decomposition, and the same stopping rule. A move whose fit does not settle within its
@@ -1220,29 +1225,29 @@ def stepwise(data=None, max_terms=3, degree=2, direction="forward", terms="colum
     select the same terms and return the same coefficients; ``threads`` runs one step's candidate
     fits at once and does not change what comes back.
     """
-    if direction not in ("forward", "both", "backward", "none"):
-        raise ValueError('`direction` is "forward", "both", "backward" or "none", '
-                         f"got {direction!r}.")
-    if terms not in ("column", "power"):
-        raise ValueError(f'`terms` is "column" or "power", got {terms!r}.')
-    if isinstance(max_terms, bool) or not isinstance(max_terms, (int, float))             or np.isnan(max_terms) or max_terms < 0:
+    if select not in ("both", "forward", "backward", "none"):
+        raise ValueError('`select` is "both", "forward", "backward" or "none", '
+                         f"got {select!r}.")
+    if terms not in ("power", "column"):
+        raise ValueError(f'`terms` is "power" or "column", got {terms!r}.')
+    if isinstance(max_terms, bool) or not isinstance(max_terms, (int, float)) \
+            or np.isnan(max_terms) or max_terms < 0:
         raise ValueError(f"`max_terms` is one number of zero or more, or inf, got {max_terms!r}.")
     if isinstance(degree, bool) or not float(degree).is_integer() or degree < 1:
         raise ValueError(f"`degree` is one whole number of one or more, got {degree!r}.")
-    return Learner(name="stepwise", fit=_stepwise_fit, predict=_stepwise_predict,
+    return Learner(name="linear", fit=_linear_fit, predict=_linear_predict,
                    data=data, reads="tabular", multi="separate",
-                   params=dict(max_terms=max_terms, degree=int(degree), direction=direction,
-                               terms=terms, threads=int(threads)))
+                   params=dict(select=select, terms=terms, max_terms=max_terms,
+                               degree=int(degree), threads=int(threads)))
 
-
-def _stepwise_fit(x, y, max_terms, degree, direction, terms, threads, head, variables, **_):
+def _linear_fit(x, y, select, terms, max_terms, degree, threads, head, variables, **_):
     from ._stepwise import stepwise_fit
     family = _family(head)
     m = flatten(x)
 
     def make(design, yj, seed_j, w):
         return stepwise_fit(design, yj, w, family, max_terms=max_terms, degree=degree,
-                            direction=direction, terms=terms, threads=threads)
+                            direction=select, terms=terms, threads=threads)
 
     models = _fit_columns(m, y, make, [0] * y.shape[1], _head_weights(head, y))
     return dict(models=models, n_col=m.shape[1], family=family,
@@ -1250,7 +1255,7 @@ def _stepwise_fit(x, y, max_terms, degree, direction, terms, threads, head, vari
                          if isinstance(f, dict) and not f["converged"]])
 
 
-def _stepwise_predict(model, x):
+def _linear_predict(model, x):
     from ._stepwise import stepwise_predict
     return _predict_columns(model["models"], flatten(x), stepwise_predict)
 

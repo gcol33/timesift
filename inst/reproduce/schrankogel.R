@@ -603,7 +603,8 @@ if ("baseline" %in% stages) {
       elastic_net = list(learner = elasticnet(alpha = 0.5, n_inner = INNER_FOLDS, squares = TRUE,
                                               threads = threads, seed = CV_SEED),
                          response = "presence_absence"),
-      stepwise = list(learner = stepwise(max_terms = 3L, degree = 2L),
+      stepwise = list(learner = linear(select = "forward", terms = "column", max_terms = 3L,
+                                       degree = 2L),
                       response = UNWEIGHTED))[aggregated]
     ladders <- lapply(names(arms), function(a) {
       grain_ladder(features, y, stats::setNames(list(arms[[a]]$learner), a), folds = folds,

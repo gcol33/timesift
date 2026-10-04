@@ -78,7 +78,7 @@ and `shrinkage` of a gbm-style
 `degree` of
 [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md);
 `regmult` of
-[`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md);
+[`maxent()`](https://gillescolling.com/timesift/reference/maxent.md);
 `quantile` of
 [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md);
 and the layer width of

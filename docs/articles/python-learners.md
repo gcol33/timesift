@@ -66,42 +66,39 @@ anything, and `n_inner + 1` threads is as many as a response can use.
 The default is serial, because a package does not take a machine’s cores
 without being asked. What comes back does not depend on it.
 
-## `stepwise()`
+## `linear()`
 
 ``` python
-stepwise(
-    data=None,
-    max_terms=3,
-    degree=2,
-    direction='forward',
-    terms='column',
-    threads=1,
-)
+linear(data=None, select='both', terms='power', max_terms=math.inf, degree=2, threads=1)
 ```
 
-One generalised linear model per variable, its terms chosen by Akaike’s
-criterion over every bin-by-channel column. The family is the response
-head’s: logistic under a binary cross-entropy loss, Gaussian under a
-squared-error one and Poisson under a Poisson-deviance one, and so are
-the case weights.
+One generalised linear model per variable over every bin-by-channel
+column, its terms chosen by Akaike’s criterion. The family is the
+response head’s: logistic under a binary cross-entropy loss, Gaussian
+under a squared-error one and Poisson under a Poisson-deviance one, and
+so are the case weights.
 
-`terms` says what one term is. Under `"column"` it is a column’s
+The defaults are biomod2’s `GLM`: every column enters as `x + I(x^2)`,
+and the terms are searched in both directions by AIC as
+[`MASS::stepAIC()`](https://rdrr.io/pkg/MASS/man/stepAIC.html) searches
+them, with no bound on how many are kept.
+
+`terms` says what one term is. Under `"power"` each power of a column is
+a term of its own, which is how biomod2 writes a quadratic formula and
+how `stepAIC()` walks it. Under `"column"` a term is a column’s
 orthogonal polynomial of degree `degree`, so a column enters with its
 curvature at once and can be non-monotone in the reading the way a niche
-optimum is. Under `"power"` each power of a column is a term of its own,
-which is how biomod2 writes a quadratic formula and how
-[`MASS::stepAIC()`](https://rdrr.io/pkg/MASS/man/stepAIC.html) walks it.
-A column holding one value over the fitting units is not a term.
+optimum is. A column holding one value over the fitting units is not a
+term.
 
-`direction` is the search. `"forward"` starts from the intercept and
-admits the term that lowers the criterion most, while one does and the
-model holds fewer than `max_terms`. `"both"` also weighs dropping each
-term it holds at every step, and `"backward"` starts from every term and
-drops alone. `"none"` fits every term and selects nothing: with
-`terms="power"` and `degree=2` that is the model biomod2’s GLM fits. The
-two-way and backward searches are MASS’s `stepAIC()`, step for step.
-`max_terms` bounds what a forward or two-way search adds; `float("inf")`
-for no bound.
+`select` is the search. `"both"` starts from the intercept and at every
+step takes the move that lowers the criterion most, adding a term or
+dropping one it holds, while one does and the model holds fewer than
+`max_terms`. `"forward"` only adds, and `"backward"` starts from every
+term and only drops. `"none"` fits every term and selects nothing. The
+two-way and backward searches are `stepAIC()`, step for step.
+`max_terms` bounds what a forward or two-way search adds; `math.inf` for
+no bound.
 
 Each fit is R’s `glm.fit`: iteratively reweighted least squares, the
 rank read off the same pivoted decomposition, and the same stopping
@@ -286,10 +283,10 @@ weights are the response head’s, `timesift.response.positive_weights`
 under presence-absence, and weigh the gradient and every sum a tree is
 grown on; `min_leaf` counts units under gbm, as `n.minobsinnode` does.
 
-## `maxnet()`
+## `maxent()`
 
 ``` python
-maxnet(
+maxent(
     data=None,
     classes=None,
     regmult=1.0,
@@ -307,12 +304,14 @@ maxnet(
 )
 ```
 
-One maxnet model per variable, over every bin-by-channel column:
-maxnet’s feature classes, its regularisation of each feature, and a
-lasso over them, fitted by the penalised core `elasticnet` runs on,
-which the R package calls too. With the maxnet package’s own settings
-the features and the penalty factors are maxnet’s to rounding, and the
-fit settles at the objective glmnet reaches for maxnet.
+One maximum-entropy model per variable, over every bin-by-channel
+column, in the formulation of the maxnet package (Phillips et al. 2017)
+and biomod2’s `MAXNET`: maxnet’s feature classes, its regularisation of
+each feature, and a lasso over them, fitted by the penalised core
+`elasticnet` runs on, which the R package calls too. With the maxnet
+package’s own settings the features and the penalty factors are maxnet’s
+to rounding, and the fit settles at the objective glmnet reaches for
+maxnet.
 
 The feature classes are the letters of `classes`: `l` the column itself,
 `q` its square, `p` the product of each pair of columns, `h` forward and
@@ -798,7 +797,7 @@ the one `BIOMOD_Tuning()` searches: `mtry` of a forest from 1 to the
 smaller of 10 and the number of columns; `trees`, `depth` and
 `shrinkage` of a gbm-style boosting, `shrinkage` and `colsample` of the
 second-order one; `degree` and `nprune` of `mars`; `degree` of
-`discriminant`; `regmult` of `maxnet`; `quantile` of `envelope`; and the
+`discriminant`; `regmult` of `maxent`; `quantile` of `envelope`; and the
 layer width of `mlp` at 2, 4, 6 and 8. biomod2’s weight decay is a
 training setting here, which the control holds.
 

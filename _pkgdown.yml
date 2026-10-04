@@ -88,11 +88,11 @@ reference:
     The arms that ship, how they are trained, and the interface a learner of your own goes through.
   contents:
   - elasticnet
-  - stepwise
+  - linear
   - forest
   - tree
   - boosting
-  - maxnet
+  - maxent
   - envelope
   - mars
   - discriminant

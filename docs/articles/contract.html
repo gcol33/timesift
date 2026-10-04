@@ -1567,12 +1567,12 @@ a failure both implementations would have to reproduce to match.</p>
 <div class="section level2">
 <h2 id="maxnet">maxnet<a class="anchor" aria-label="anchor" href="#maxnet"></a>
 </h2>
-<p><code><a href="../reference/maxnet.html">maxnet()</a></code> is one maxnet model per response, over
-<code>src/ts_maxnet.cpp</code>, which both languages compile, and which
-hands its design to the penalised fit above. Its features, their
-regularisation and its path are the maxnet package’s (0.1.4), because a
-biomod2 user’s <code>MAXNET</code> is maxnet’s and the model here has to
-be the one they already fit.</p>
+<p><code><a href="../reference/maxent.html">maxent()</a></code> is one Maxent model per response in maxnet’s
+formulation, over <code>src/ts_maxnet.cpp</code>, which both languages
+compile, and which hands its design to the penalised fit above. Its
+features, their regularisation and its path are the maxnet package’s
+(0.1.4), because a biomod2 user’s <code>MAXNET</code> is maxnet’s and
+the model here has to be the one they already fit.</p>
 <ul>
 <li>The features are built over the rows fitted. A column holding one
 value there takes none. The classes are letters: <code>l</code> the
@@ -2180,7 +2180,7 @@ the last bit.</li>
 <div class="section level2">
 <h2 id="the-stepwise-model">The stepwise model<a class="anchor" aria-label="anchor" href="#the-stepwise-model"></a>
 </h2>
-<p><code><a href="../reference/stepwise.html">stepwise()</a></code> is one generalised linear model per response,
+<p><code><a href="../reference/linear.html">linear()</a></code> is one generalised linear model per response,
 its terms chosen by Akaike’s criterion, over
 <code>src/ts_stepwise.cpp</code>, which both languages compile. Each fit
 is R’s <code>glm.fit</code> and the search is MASS’s
@@ -3334,10 +3334,10 @@ them</td>
 <td><code><a href="../reference/elasticnet.html">elasticnet()</a></code></td>
 </tr>
 <tr class="odd">
-<td>the stepwise selector</td>
+<td>the generalised linear model</td>
 <td>
-<code><a href="../reference/stepwise.html">stepwise()</a></code>, forward, two-way, backward or
-unselected</td>
+<code><a href="../reference/linear.html">linear()</a></code>, its terms searched two-way, forward, backward
+or not at all</td>
 </tr>
 <tr class="even">
 <td>the forest</td>
@@ -3353,7 +3353,7 @@ unselected</td>
 </tr>
 <tr class="odd">
 <td>maxnet’s MaxEnt</td>
-<td><code><a href="../reference/maxnet.html">maxnet()</a></code></td>
+<td><code><a href="../reference/maxent.html">maxent()</a></code></td>
 </tr>
 <tr class="even">
 <td>the surface range envelope</td>

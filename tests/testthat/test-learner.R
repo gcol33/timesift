@@ -15,7 +15,7 @@ test_that("a learner of one's own needs nothing but a fit and a predict", {
 })
 
 test_that("a registered learner can be asked for by name", {
-  expect_true(all(c("elasticnet", "stepwise", "forest", "tree", "boosting", "maxnet", "envelope",
+  expect_true(all(c("elasticnet", "linear", "forest", "tree", "boosting", "maxent", "envelope",
                     "mars", "discriminant", "additive",
                     "mlp", "cnn", "rescnn") %in% learners()))
   expect_s3_class(.as_learner("elasticnet"), "timesift_learner")
@@ -124,7 +124,7 @@ test_that("forward selection stops at its budget and is non-monotone in a predic
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 33L)
   y <- sim_response(sim, n_var = 1L, seed = 34L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "month")
-  fit <- fit_learner(stepwise(max_terms = 2L), x, y)
+  fit <- fit_learner(linear(select = "forward", terms = "column", max_terms = 2L), x, y)
   chosen <- fit$model$models[[1L]]$term_column + 1L
   expect_lte(length(chosen), 2L)
   p <- stats::predict(fit, x)
@@ -150,7 +150,8 @@ test_that("a column holding one value is not offered to the forward search", {
                   dimnames = list(dimnames(x)[[1L]], "height"))
   for (arm in list(list(y = binary, response = "presence_absence"),
                    list(y = level, response = "constant_continuous_test"))) {
-    fit <- fit_learner(stepwise(max_terms = 2L), flat, arm$y, response = arm$response)
+    fit <- fit_learner(linear(select = "forward", terms = "column", max_terms = 2L), flat, arm$y,
+                       response = arm$response)
     chosen <- fit$model$models[[1L]]$term_column + 1L
     expect_gt(length(chosen), 0L)
     expect_false(any(grepl("min", fit$model$columns[chosen], fixed = TRUE)), info = arm$response)
@@ -179,9 +180,9 @@ test_that("a forest is the same forest twice and reads the same columns as the l
 })
 
 test_that("a learner declares what it reads, how it covers responses and what it is pinned to", {
-  expect_equal(vapply(list(elasticnet(), stepwise(), forest()), function(l) l$reads, character(1L)),
+  expect_equal(vapply(list(elasticnet(), linear(), forest()), function(l) l$reads, character(1L)),
                rep("tabular", 3L))
-  expect_equal(vapply(list(elasticnet(), stepwise(), forest()), function(l) l$multi, character(1L)),
+  expect_equal(vapply(list(elasticnet(), linear(), forest()), function(l) l$multi, character(1L)),
                rep("separate", 3L))
   expect_equal(vapply(list(mlp(), cnn(), rescnn()), function(l) l$multi, character(1L)),
                rep("joint", 3L))
@@ -205,7 +206,7 @@ test_that("the old learner names are gone", {
                "rescnn_learner", "ensemble_learner")) {
     expect_false(nm %in% getNamespaceExports("timesift"), info = nm)
   }
-  expect_true(all(c("elasticnet", "stepwise", "forest", "tree", "boosting", "maxnet", "envelope",
+  expect_true(all(c("elasticnet", "linear", "forest", "tree", "boosting", "maxent", "envelope",
                     "mars", "discriminant", "additive",
                     "mlp", "cnn", "rescnn") %in% learners()))
   expect_false("ensemble" %in% learners())
@@ -267,7 +268,7 @@ test_that("predicting a single unit returns one row and not one column", {
                                                        "bin_start", "bin_end", "bin_partial")],
                                        list(dim = dim(one), dimnames = dimnames(one),
                                             class = c("timesift_matrix", "array")))
-  for (l in list(elasticnet(), stepwise())) {
+  for (l in list(elasticnet(), linear())) {
     fit <- suppressWarnings(fit_learner(l, x, y))
     p <- stats::predict(fit, one)
     expect_equal(dim(p), c(1L, 3L))
@@ -284,7 +285,8 @@ test_that("the per-response learners fit the family the response head's loss nam
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
   level <- 10 + 3 * scale(rowMeans(x[, , 1L]))[, 1L]
   y <- matrix(level, ncol = 1L, dimnames = list(dimnames(x)[[1L]], "height"))
-  for (l in list(elasticnet(squares = FALSE), forest(trees = 100L), stepwise(max_terms = 1L))) {
+  for (l in list(elasticnet(squares = FALSE), forest(trees = 100L),
+                 linear(select = "forward", terms = "column", max_terms = 1L))) {
     fit <- fit_learner(l, x, y, response = "continuous_test")
     p <- stats::predict(fit, x)
     expect_true(all(p > 1), info = l$name)
@@ -292,13 +294,14 @@ test_that("the per-response learners fit the family the response head's loss nam
   }
   expect_equal(fit_learner(forest(trees = 20L), x, y, response = "continuous_test")$model$family,
                "gaussian")
-  expect_equal(fit_learner(stepwise(max_terms = 1L), x, y, response = "continuous_test")$model$family,
+  forward <- linear(select = "forward", terms = "column", max_terms = 1L)
+  expect_equal(fit_learner(forward, x, y, response = "continuous_test")$model$family,
                "gaussian")
 
   local_response("poisson_test", list(
     prepare = function(y) .as_response(y), activation = "exp", loss = "poisson",
     metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)))
-  expect_error(fit_learner(stepwise(), x, y, response = "poisson_test"), "no family for the poisson")
+  expect_error(fit_learner(linear(), x, y, response = "poisson_test"), "no family for the poisson")
 })
 
 test_that("a learner's fit is handed the head only where it declares one", {
@@ -491,7 +494,7 @@ test_that("every shipped learner fits a rare response under the head's weight", 
   stopifnot(sum(present) >= 15L, sum(present) <= 30L)
   rare <- matrix(as.numeric(present), ncol = 1L, dimnames = list(sim$units, "rare"))
   for (make in list(function() elasticnet(n_inner = 3L), function() forest(trees = 30L),
-                    function() stepwise(max_terms = 1L))) {
+                    function() linear(select = "forward", terms = "column", max_terms = 1L))) {
     weighted <- stats::predict(fit_learner(make(), x, rare), x)
     plain <- stats::predict(fit_learner(make(), x, rare, response = "unweighted_test"), x)
     expect_false(isTRUE(all.equal(weighted, plain)), info = make()$name)

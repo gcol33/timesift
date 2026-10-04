@@ -13,7 +13,7 @@
 
 \item{col}{One colour per response, recycled.}
 
-\item{...}{Passed to \code{\link[graphics:plot.default]{graphics::plot()}} or \code{\link[graphics:image]{graphics::image()}}.}
+\item{...}{Passed to \code{\link[graphics:plot]{graphics::plot()}} or \code{\link[graphics:image]{graphics::image()}}.}
 }
 \value{
 The data frame drawn, invisibly.

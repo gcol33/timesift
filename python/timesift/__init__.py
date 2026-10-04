@@ -23,8 +23,8 @@ from .fit import Timesift, timesift
 from .ladder import (Ladder, grain_ladder, implied_skill, paired_contrast,
                      score_predictions, tss_inflation)
 from .learners import (Fit, Learner, additive, boosting, cnn, discriminant, elasticnet, envelope,
-                       fit_learner, flatten, forest, hierarchical, mars, maxnet, mlp, rescnn,
-                       stepwise, tree)
+                       fit_learner, flatten, forest, hierarchical, linear, mars, maxent, mlp, rescnn,
+                       tree)
 from .metrics import (ORDINAL_METRICS, TABLE_METRICS, average_precision, boyce_index,
                       cohen_kappa, decision_threshold, kappa_score, model_agreement,
                       ordinal_metric, regression_metric, roc_auc, table_metric, tss)
@@ -84,11 +84,11 @@ for _name, _grid in default_grids().items():
     register_tuning(_name, _grid)
 
 register_learner("elasticnet", elasticnet)
-register_learner("stepwise", stepwise)
+register_learner("linear", linear)
 register_learner("forest", forest)
 register_learner("tree", tree)
 register_learner("boosting", boosting)
-register_learner("maxnet", maxnet)
+register_learner("maxent", maxent)
 register_learner("envelope", envelope)
 register_learner("mars", mars)
 register_learner("discriminant", discriminant)
@@ -114,7 +114,7 @@ __all__ = [
     "get_learner", "grain", "grain_contrasts",
     "grain_ladder", "grain_matrix", "grains", "grouped_cv", "hierarchical", "implied_skill",
     "kappa_score",
-    "learners", "lookback", "lookback_matrix", "lookbacks", "mars", "maxnet", "metrics", "mlp",
+    "learners", "linear", "lookback", "lookback_matrix", "lookbacks", "mars", "maxent", "metrics", "mlp",
     "model_agreement",
     "multigrain", "n_targets", "native", "occlusion", "paired_contrast", "plot", "positive_weights", "project", "pseudo_absences",
     "procedure_table",
@@ -122,6 +122,6 @@ __all__ = [
     "read_folds", "read_response", "register_learner", "register_metric", "register_response", "register_tuning",
     "rescnn", "resolve_folds", "response_curve", "resolve_metric", "responses", "roc_auc", "scorable_cells",
     "score_predictions", "select_columns", "table_metric",
-    "select_grain", "simulate_records", "stepwise", "summary", "target_labels", "timesift", "timesift_set",
+    "select_grain", "simulate_records", "summary", "target_labels", "timesift", "timesift_set",
     "train_control", "tree", "tss", "tune", "tss_inflation", "tunings", "write_cells", "write_folds", "write_response",
 ]

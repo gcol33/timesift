@@ -92,9 +92,9 @@ def _occlude_a_continuous_head():
     y = Response(np.column_stack([level, -level]), binary.units, ("height", "depth"))
 
     folds = fold_map(binary, v=3, seed=6)
-    lad = grain_ladder(x, y, "stepwise", folds=folds, response="continuous_occlusion_test",
+    lad = grain_ladder(x, y, "linear", folds=folds, response="continuous_occlusion_test",
                        keep_fits=True, verbose=False)
-    out = ladder_occlusion(lad, x, y, "month|stepwise", permutations=2, seed=4)
+    out = ladder_occlusion(lad, x, y, "month|linear", permutations=2, seed=4)
     assert out["variable"] == ["height", "depth"]
     assert np.isfinite(out["weight"]).any()
 

@@ -172,14 +172,14 @@ holds</td>
 <td>
 <code>MAXNET</code>, <code>MAXENT</code>
 </td>
-<td><code><a href="../reference/maxnet.html">maxnet()</a></code></td>
+<td><code><a href="../reference/maxent.html">maxent()</a></code></td>
 <td>
 <code>classes</code>, <code>regmult</code> and <code>knots</code>
 are maxnet’s; the model is the background formulation by default</td>
 </tr>
 <tr class="odd">
 <td><code>GLM</code></td>
-<td><code>stepwise(direction = "both", terms = "power", max_terms = Inf)</code></td>
+<td><code><a href="../reference/linear.html">linear()</a></code></td>
 <td>
 <code>y ~ x + I(x^2)</code> over every column, searched by AIC as
 <code><a href="https://rdrr.io/pkg/MASS/man/stepAIC.html" class="external-link">MASS::stepAIC()</a></code> does</td>
@@ -271,8 +271,8 @@ representation alone.</p>
 <span>  RFd <span class="op">=</span> <span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span>balance <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
 <span>  GBM <span class="op">=</span> <span class="fu"><a href="../reference/boosting.html">boosting</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  XGBOOST <span class="op">=</span> <span class="fu"><a href="../reference/boosting.html">boosting</a></span><span class="op">(</span>newton <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  MAXNET <span class="op">=</span> <span class="fu"><a href="../reference/maxnet.html">maxnet</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  GLM <span class="op">=</span> <span class="fu"><a href="../reference/stepwise.html">stepwise</a></span><span class="op">(</span>direction <span class="op">=</span> <span class="st">"both"</span>, terms <span class="op">=</span> <span class="st">"power"</span>, max_terms <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>,</span>
+<span>  MAXNET <span class="op">=</span> <span class="fu"><a href="../reference/maxent.html">maxent</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  GLM <span class="op">=</span> <span class="fu"><a href="../reference/linear.html">linear</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  GAM <span class="op">=</span> <span class="fu"><a href="../reference/additive.html">additive</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="../reference/native.html">grain</a></span><span class="op">(</span><span class="st">"season"</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">5L</span><span class="op">)</span>,</span>
 <span>  MARS <span class="op">=</span> <span class="fu"><a href="../reference/mars.html">mars</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  FDA <span class="op">=</span> <span class="fu"><a href="../reference/discriminant.html">discriminant</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -615,9 +615,8 @@ is not evaluated.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot_id</span>, time <span class="op">=</span> <span class="va">datetime</span>,</span>
 <span>                models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>CTA <span class="op">=</span> <span class="fu"><a href="../reference/tree.html">tree</a></span><span class="op">(</span><span class="op">)</span>, RF <span class="op">=</span> <span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>, GBM <span class="op">=</span> <span class="fu"><a href="../reference/boosting.html">boosting</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>                              XGBOOST <span class="op">=</span> <span class="fu"><a href="../reference/boosting.html">boosting</a></span><span class="op">(</span>newton <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, MAXNET <span class="op">=</span> <span class="fu"><a href="../reference/maxnet.html">maxnet</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>                              GLM <span class="op">=</span> <span class="fu"><a href="../reference/stepwise.html">stepwise</a></span><span class="op">(</span>direction <span class="op">=</span> <span class="st">"both"</span>, terms <span class="op">=</span> <span class="st">"power"</span>,</span>
-<span>                                             max_terms <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>,</span>
+<span>                              XGBOOST <span class="op">=</span> <span class="fu"><a href="../reference/boosting.html">boosting</a></span><span class="op">(</span>newton <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, MAXNET <span class="op">=</span> <span class="fu"><a href="../reference/maxent.html">maxent</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>                              GLM <span class="op">=</span> <span class="fu"><a href="../reference/linear.html">linear</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                              MARS <span class="op">=</span> <span class="fu"><a href="../reference/mars.html">mars</a></span><span class="op">(</span><span class="op">)</span>, FDA <span class="op">=</span> <span class="fu"><a href="../reference/discriminant.html">discriminant</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>                sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"week"</span>, <span class="st">"month"</span>, <span class="st">"season"</span><span class="op">)</span>,</span>
 <span>                ensemble <span class="op">=</span> <span class="fu"><a href="../reference/ensemble.html">ensemble</a></span><span class="op">(</span><span class="st">"weighted"</span>, min_score <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>,</span>
@@ -627,7 +626,7 @@ arguments:</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a></span>
 <span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp_*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot_id"</span>, time<span class="op">=</span><span class="st">"datetime"</span>,</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>                  models<span class="op">=</span>[ts.tree(), ts.forest(), ts.boosting(newton<span class="op">=</span><span class="va">True</span>), ts.maxnet(),</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>                  models<span class="op">=</span>[ts.tree(), ts.forest(), ts.boosting(newton<span class="op">=</span><span class="va">True</span>), ts.maxent(),</span>
 <span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>                          ts.mars(), ts.discriminant()],</span>
 <span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>                  sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>, <span class="st">"season"</span>),</span>
 <span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>                  ensemble<span class="op">=</span>ts.ensemble(<span class="st">"weighted"</span>, min_score<span class="op">=</span><span class="fl">0.5</span>),</span>
@@ -837,14 +836,15 @@ class.</p>
 <p>A count is fitted under the Poisson deviance through a log link and
 an exponential output, and a comparison reads
 <code>neg_poisson_deviance</code>, the mean deviance with its sign
-reversed. The elastic net, the stepwise search, MARS, the additive
-model, the tree and the boosted trees each fit the Poisson family on
-their own core, pinned against glmnet, MASS and <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code>,
-earth, mgcv, rpart and gbm or xgboost’s <code>count:poisson</code>. The
-forest cuts a count on its variance, the networks train under the
-deviance and the combiner minimises it. A tree shrinks a leaf’s rate
-towards the rate of the units it is grown on, as rpart does, and
-<code>tree(shrink = 0)</code> takes the shrinkage away.</p>
+reversed. The elastic net, the generalised linear model, MARS, the
+additive model, the tree and the boosted trees each fit the Poisson
+family on their own core, pinned against glmnet, MASS and
+<code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code>, earth, mgcv, rpart and gbm or xgboost’s
+<code>count:poisson</code>. The forest cuts a count on its variance, the
+networks train under the deviance and the combiner minimises it. A tree
+shrinks a leaf’s rate towards the rate of the units it is grown on, as
+rpart does, and <code>tree(shrink = 0)</code> takes the shrinkage
+away.</p>
 </div>
 <div class="section level2">
 <h2 id="maps">Maps<a class="anchor" aria-label="anchor" href="#maps"></a>
@@ -915,7 +915,7 @@ background units by biomod2’s <code>random</code>, <code>sre</code> and
 <code>disk</code> strategies, with repeated draws, before the fit. A
 drawn unit is a row of the targets like any other: it is not flagged in
 the score, and a set of one’s own is the rows of the pool it names.
-<code><a href="../reference/maxnet.html">maxnet()</a></code> offers both formulations: the default treats every
+<code><a href="../reference/maxent.html">maxent()</a></code> offers both formulations: the default treats every
 unit as background, as biomod2’s <code>MAXNET</code> does, and
 <code>formulation = "absence"</code> reads the absences as absences
 under the response head’s case weights.</li>
@@ -942,11 +942,11 @@ cells.</li>
 <li>
 <strong>Case weights.</strong> The response head sets them, and
 <code><a href="../reference/positive_weights.html">positive_weights()</a></code> gives the presence-absence head’s. A
-learner that cannot use them (the background <code><a href="../reference/maxnet.html">maxnet()</a></code>,
+learner that cannot use them (the background <code><a href="../reference/maxent.html">maxent()</a></code>,
 <code><a href="../reference/envelope.html">envelope()</a></code>) says so in its documentation.</li>
 <li>
 <strong>Presence-absence only for three algorithms.</strong>
-<code><a href="../reference/maxnet.html">maxnet()</a></code>, <code><a href="../reference/envelope.html">envelope()</a></code> and
+<code><a href="../reference/maxent.html">maxent()</a></code>, <code><a href="../reference/envelope.html">envelope()</a></code> and
 <code><a href="../reference/discriminant.html">discriminant()</a></code> need a binary response and refuse a head
 fitted under squared error. The other learners follow the head’s loss,
 and <code><a href="../reference/mars.html">mars()</a></code> is among them.</li>

@@ -28,8 +28,8 @@ algorithm is an argument of its constructor.
 | `RFd` | `forest(balance = TRUE)` | each tree draws as many units from each class as the smaller class holds |
 | `GBM` | [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md) | gbm’s trees and Newton step |
 | `XGBOOST` | `boosting(newton = TRUE)` | xgboost’s exact greedy trees; `lambda` and `gamma` are its penalties |
-| `MAXNET`, `MAXENT` | [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md) | `classes`, `regmult` and `knots` are maxnet’s; the model is the background formulation by default |
-| `GLM` | `stepwise(direction = "both", terms = "power", max_terms = Inf)` | `y ~ x + I(x^2)` over every column, searched by AIC as [`MASS::stepAIC()`](https://rdrr.io/pkg/MASS/man/stepAIC.html) does |
+| `MAXNET`, `MAXENT` | [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md) | `classes`, `regmult` and `knots` are maxnet’s; the model is the background formulation by default |
+| `GLM` | [`linear()`](https://gillescolling.com/timesift/reference/linear.md) | `y ~ x + I(x^2)` over every column, searched by AIC as [`MASS::stepAIC()`](https://rdrr.io/pkg/MASS/man/stepAIC.html) does |
 | `GAM` | [`additive()`](https://gillescolling.com/timesift/reference/additive.md) | mgcv’s `gam(method = "GCV.Cp")`, `k = 10` |
 | `MARS` | [`mars()`](https://gillescolling.com/timesift/reference/mars.md) | earth’s forward and pruning passes, refitted as a logistic model |
 | `FDA` | [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md) | mda’s `fda(method = mars)` with the probit recalibration biomod2 applies |
@@ -97,8 +97,8 @@ models <- list(
   RFd = forest(balance = TRUE),
   GBM = boosting(),
   XGBOOST = boosting(newton = TRUE),
-  MAXNET = maxnet(),
-  GLM = stepwise(direction = "both", terms = "power", max_terms = Inf),
+  MAXNET = maxent(),
+  GLM = linear(),
   GAM = additive(data = grain("season"), k = 5L),
   MARS = mars(),
   FDA = discriminant(),
@@ -231,9 +231,8 @@ ens <- BIOMOD_EnsembleModeling(mod, models.chosen = "all",
 
 fit <- timesift(targets, series, y = starts_with("sp"), id = plot_id, time = datetime,
                 models = list(CTA = tree(), RF = forest(), GBM = boosting(),
-                              XGBOOST = boosting(newton = TRUE), MAXNET = maxnet(),
-                              GLM = stepwise(direction = "both", terms = "power",
-                                             max_terms = Inf),
+                              XGBOOST = boosting(newton = TRUE), MAXNET = maxent(),
+                              GLM = linear(),
                               MARS = mars(), FDA = discriminant()),
                 sift = grains("week", "month", "season"),
                 ensemble = ensemble("weighted", min_score = 0.5),
@@ -246,7 +245,7 @@ The Python call takes the same constructors and the same arguments:
 import timesift as ts
 
 fit = ts.timesift(targets, series, y="sp_*", id="plot_id", time="datetime",
-                  models=[ts.tree(), ts.forest(), ts.boosting(newton=True), ts.maxnet(),
+                  models=[ts.tree(), ts.forest(), ts.boosting(newton=True), ts.maxent(),
                           ts.mars(), ts.discriminant()],
                   sift=ts.grains("week", "month", "season"),
                   ensemble=ts.ensemble("weighted", min_score=0.5),
@@ -397,11 +396,11 @@ one presence-absence column per class.
 
 A count is fitted under the Poisson deviance through a log link and an
 exponential output, and a comparison reads `neg_poisson_deviance`, the
-mean deviance with its sign reversed. The elastic net, the stepwise
-search, MARS, the additive model, the tree and the boosted trees each
-fit the Poisson family on their own core, pinned against glmnet, MASS
-and [`glm()`](https://rdrr.io/r/stats/glm.html), earth, mgcv, rpart and
-gbm or xgboost’s `count:poisson`. The forest cuts a count on its
+mean deviance with its sign reversed. The elastic net, the generalised
+linear model, MARS, the additive model, the tree and the boosted trees
+each fit the Poisson family on their own core, pinned against glmnet,
+MASS and [`glm()`](https://rdrr.io/r/stats/glm.html), earth, mgcv, rpart
+and gbm or xgboost’s `count:poisson`. The forest cuts a count on its
 variance, the networks train under the deviance and the combiner
 minimises it. A tree shrinks a leaf’s rate towards the rate of the units
 it is grown on, as rpart does, and `tree(shrink = 0)` takes the
@@ -479,7 +478,7 @@ plot(rc)
   `sre` and `disk` strategies, with repeated draws, before the fit. A
   drawn unit is a row of the targets like any other: it is not flagged
   in the score, and a set of one’s own is the rows of the pool it names.
-  [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md)
+  [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md)
   offers both formulations: the default treats every unit as background,
   as biomod2’s `MAXNET` does, and `formulation = "absence"` reads the
   absences as absences under the response head’s case weights.
@@ -511,11 +510,11 @@ plot(rc)
   [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
   gives the presence-absence head’s. A learner that cannot use them (the
   background
-  [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md),
+  [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md),
   [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md))
   says so in its documentation.
 - **Presence-absence only for three algorithms.**
-  [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md),
+  [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md),
   [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
   and
   [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)

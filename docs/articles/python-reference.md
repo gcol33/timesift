@@ -135,9 +135,9 @@ your own goes through.
   column and, by default, their squares, with the penalty chosen by an
   inner cross-validation on the fitting units.
 
-- [`stepwise()`](https://gillescolling.com/timesift/articles/python-learners.html#stepwise):
-  One generalised linear model per variable, its terms chosen by
-  Akaike’s criterion over every bin-by-channel column. The family is the
+- [`linear()`](https://gillescolling.com/timesift/articles/python-learners.html#linear):
+  One generalised linear model per variable over every bin-by-channel
+  column, its terms chosen by Akaike’s criterion. The family is the
   response head’s: logistic under a binary cross-entropy loss, Gaussian
   under a squared-error one and Poisson under a Poisson-deviance one,
   and so are the case weights.
@@ -175,14 +175,16 @@ your own goes through.
   scaled by `shrinkage`. Each tree is grown on a subsample of the units
   drawn without replacement, and reads a subsample of the columns.
 
-- [`maxnet()`](https://gillescolling.com/timesift/articles/python-learners.html#maxnet):
+- [`maxent()`](https://gillescolling.com/timesift/articles/python-learners.html#maxent):
 
-  One maxnet model per variable, over every bin-by-channel column:
-  maxnet’s feature classes, its regularisation of each feature, and a
-  lasso over them, fitted by the penalised core `elasticnet` runs on,
-  which the R package calls too. With the maxnet package’s own settings
-  the features and the penalty factors are maxnet’s to rounding, and the
-  fit settles at the objective glmnet reaches for maxnet.
+  One maximum-entropy model per variable, over every bin-by-channel
+  column, in the formulation of the maxnet package (Phillips et
+  al. 2017) and biomod2’s `MAXNET`: maxnet’s feature classes, its
+  regularisation of each feature, and a lasso over them, fitted by the
+  penalised core `elasticnet` runs on, which the R package calls too.
+  With the maxnet package’s own settings the features and the penalty
+  factors are maxnet’s to rounding, and the fit settles at the objective
+  glmnet reaches for maxnet.
 
 - [`envelope()`](https://gillescolling.com/timesift/articles/python-learners.html#envelope):
 

@@ -169,40 +169,35 @@ a package does not take a machine’s cores without being asked. What
 comes back does not depend on it.</p>
 </div>
 <div class="section level2">
-<h2 id="stepwise">
-<code>stepwise()</code><a class="anchor" aria-label="anchor" href="#stepwise"></a>
+<h2 id="linear">
+<code>linear()</code><a class="anchor" aria-label="anchor" href="#linear"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>stepwise(</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>    max_terms<span class="op">=</span><span class="dv">3</span>,</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>    degree<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">'forward'</span>,</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>    terms<span class="op">=</span><span class="st">'column'</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>)</span></code></pre></div>
-<p>One generalised linear model per variable, its terms chosen by
-Akaike’s criterion over every bin-by-channel column. The family is the
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>linear(data<span class="op">=</span><span class="va">None</span>, select<span class="op">=</span><span class="st">'both'</span>, terms<span class="op">=</span><span class="st">'power'</span>, max_terms<span class="op">=</span>math.inf, degree<span class="op">=</span><span class="dv">2</span>, threads<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div>
+<p>One generalised linear model per variable over every bin-by-channel
+column, its terms chosen by Akaike’s criterion. The family is the
 response head’s: logistic under a binary cross-entropy loss, Gaussian
 under a squared-error one and Poisson under a Poisson-deviance one, and
 so are the case weights.</p>
-<p><code>terms</code> says what one term is. Under <code>"column"</code>
-it is a column’s orthogonal polynomial of degree <code>degree</code>, so
-a column enters with its curvature at once and can be non-monotone in
-the reading the way a niche optimum is. Under <code>"power"</code> each
-power of a column is a term of its own, which is how biomod2 writes a
-quadratic formula and how <code><a href="https://rdrr.io/pkg/MASS/man/stepAIC.html" class="external-link">MASS::stepAIC()</a></code> walks it. A
-column holding one value over the fitting units is not a term.</p>
-<p><code>direction</code> is the search. <code>"forward"</code> starts
-from the intercept and admits the term that lowers the criterion most,
-while one does and the model holds fewer than <code>max_terms</code>.
-<code>"both"</code> also weighs dropping each term it holds at every
-step, and <code>"backward"</code> starts from every term and drops
-alone. <code>"none"</code> fits every term and selects nothing: with
-<code>terms="power"</code> and <code>degree=2</code> that is the model
-biomod2’s GLM fits. The two-way and backward searches are MASS’s
-<code>stepAIC()</code>, step for step. <code>max_terms</code> bounds
-what a forward or two-way search adds; <code>float("inf")</code> for no
-bound.</p>
+<p>The defaults are biomod2’s <code>GLM</code>: every column enters as
+<code>x + I(x^2)</code>, and the terms are searched in both directions
+by AIC as <code><a href="https://rdrr.io/pkg/MASS/man/stepAIC.html" class="external-link">MASS::stepAIC()</a></code> searches them, with no bound on
+how many are kept.</p>
+<p><code>terms</code> says what one term is. Under <code>"power"</code>
+each power of a column is a term of its own, which is how biomod2 writes
+a quadratic formula and how <code>stepAIC()</code> walks it. Under
+<code>"column"</code> a term is a column’s orthogonal polynomial of
+degree <code>degree</code>, so a column enters with its curvature at
+once and can be non-monotone in the reading the way a niche optimum is.
+A column holding one value over the fitting units is not a term.</p>
+<p><code>select</code> is the search. <code>"both"</code> starts from
+the intercept and at every step takes the move that lowers the criterion
+most, adding a term or dropping one it holds, while one does and the
+model holds fewer than <code>max_terms</code>. <code>"forward"</code>
+only adds, and <code>"backward"</code> starts from every term and only
+drops. <code>"none"</code> fits every term and selects nothing. The
+two-way and backward searches are <code>stepAIC()</code>, step for step.
+<code>max_terms</code> bounds what a forward or two-way search adds;
+<code>math.inf</code> for no bound.</p>
 <p>Each fit is R’s <code>glm.fit</code>: iteratively reweighted least
 squares, the rank read off the same pivoted decomposition, and the same
 stopping rule. A move whose fit does not settle within its 25 iterations
@@ -392,10 +387,10 @@ and weigh the gradient and every sum a tree is grown on;
 <code>n.minobsinnode</code> does.</p>
 </div>
 <div class="section level2">
-<h2 id="maxnet">
-<code>maxnet()</code><a class="anchor" aria-label="anchor" href="#maxnet"></a>
+<h2 id="maxent">
+<code>maxent()</code><a class="anchor" aria-label="anchor" href="#maxent"></a>
 </h2>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>maxnet(</span>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>maxent(</span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    classes<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    regmult<span class="op">=</span><span class="fl">1.0</span>,</span>
@@ -411,12 +406,14 @@ and weigh the gradient and every sum a tree is grown on;
 <span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a>)</span></code></pre></div>
-<p>One maxnet model per variable, over every bin-by-channel column:
-maxnet’s feature classes, its regularisation of each feature, and a
-lasso over them, fitted by the penalised core <code>elasticnet</code>
-runs on, which the R package calls too. With the maxnet package’s own
-settings the features and the penalty factors are maxnet’s to rounding,
-and the fit settles at the objective glmnet reaches for maxnet.</p>
+<p>One maximum-entropy model per variable, over every bin-by-channel
+column, in the formulation of the maxnet package (Phillips et al. 2017)
+and biomod2’s <code>MAXNET</code>: maxnet’s feature classes, its
+regularisation of each feature, and a lasso over them, fitted by the
+penalised core <code>elasticnet</code> runs on, which the R package
+calls too. With the maxnet package’s own settings the features and the
+penalty factors are maxnet’s to rounding, and the fit settles at the
+objective glmnet reaches for maxnet.</p>
 <p>The feature classes are the letters of <code>classes</code>:
 <code>l</code> the column itself, <code>q</code> its square,
 <code>p</code> the product of each pair of columns, <code>h</code>
@@ -902,7 +899,7 @@ the number of columns; <code>trees</code>, <code>depth</code> and
 <code>shrinkage</code> of a gbm-style boosting, <code>shrinkage</code>
 and <code>colsample</code> of the second-order one; <code>degree</code>
 and <code>nprune</code> of <code>mars</code>; <code>degree</code> of
-<code>discriminant</code>; <code>regmult</code> of <code>maxnet</code>;
+<code>discriminant</code>; <code>regmult</code> of <code>maxent</code>;
 <code>quantile</code> of <code>envelope</code>; and the layer width of
 <code>mlp</code> at 2, 4, 6 and 8. biomod2’s weight decay is a training
 setting here, which the control holds.</p>

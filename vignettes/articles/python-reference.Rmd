@@ -102,8 +102,8 @@ The arms that ship, how they are trained, and the interface a learner of your ow
 [`elasticnet()`](python-learners.html#elasticnet)
 : One penalised regression per variable, over every bin-by-channel column and, by default, their squares, with the penalty chosen by an inner cross-validation on the fitting units.
 
-[`stepwise()`](python-learners.html#stepwise)
-: One generalised linear model per variable, its terms chosen by Akaike's criterion over every bin-by-channel column. The family is the response head's: logistic under a binary cross-entropy loss, Gaussian under a squared-error one and Poisson under a Poisson-deviance one, and so are the case weights.
+[`linear()`](python-learners.html#linear)
+: One generalised linear model per variable over every bin-by-channel column, its terms chosen by Akaike's criterion. The family is the response head's: logistic under a binary cross-entropy loss, Gaussian under a squared-error one and Poisson under a Poisson-deviance one, and so are the case weights.
 
 [`forest()`](python-learners.html#forest)
 : One random forest per variable, over every bin-by-channel column: a probability forest under a presence-absence head and a regression forest under a head with a squared-error loss or a count head, a count being cut on its variance and a leaf reporting its mean. Trees split on one column at a time and pay nothing for columns that carry nothing, so a forest reads a wide tabular representation without a penalty path and without a selection step.
@@ -114,8 +114,8 @@ The arms that ship, how they are trained, and the interface a learner of your ow
 [`boosting()`](python-learners.html#boosting)
 : One boosted model per variable, over every bin-by-channel column: a logistic model under a presence-absence head, a squared-error one under a head with a squared-error loss and a Poisson one with a log link under a count head. The score starts at the log-odds of the weighted share of presences, or the weighted mean, and each tree is fitted to the loss's gradient at the current score and added to it scaled by `shrinkage`. Each tree is grown on a subsample of the units drawn without replacement, and reads a subsample of the columns.
 
-[`maxnet()`](python-learners.html#maxnet)
-: One maxnet model per variable, over every bin-by-channel column: maxnet's feature classes, its regularisation of each feature, and a lasso over them, fitted by the penalised core `elasticnet` runs on, which the R package calls too. With the maxnet package's own settings the features and the penalty factors are maxnet's to rounding, and the fit settles at the objective glmnet reaches for maxnet.
+[`maxent()`](python-learners.html#maxent)
+: One maximum-entropy model per variable, over every bin-by-channel column, in the formulation of the maxnet package (Phillips et al. 2017) and biomod2's `MAXNET`: maxnet's feature classes, its regularisation of each feature, and a lasso over them, fitted by the penalised core `elasticnet` runs on, which the R package calls too. With the maxnet package's own settings the features and the penalty factors are maxnet's to rounding, and the fit settles at the objective glmnet reaches for maxnet.
 
 [`envelope()`](python-learners.html#envelope)
 : biomod2's surface range envelope, one per variable, over every bin-by-channel column: for each column the `quantile` and `1 - quantile` quantiles of its readings over the units present, and a unit predicted present where every column lies between its two, the ends included. With the same quantile it draws the envelope `bm_SRE()` draws; the quantile is R's default, type 7.

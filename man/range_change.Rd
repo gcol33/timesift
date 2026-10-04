@@ -7,8 +7,8 @@
 range_change(now, later, threshold = NULL)
 }
 \arguments{
-\item{now, later}{The two maps: a \link[terra:SpatRaster-class]{terra::SpatRaster} with a layer per response, such as
-\code{\link[terra:project]{terra::project()}} with \code{type = "binary"} returns, or a matrix of cells by responses. Layers are
+\item{now, later}{The two maps: a \link[terra:SpatRaster]{terra::SpatRaster} with a layer per response, such as
+\code{\link[=project]{project()}} with \code{type = "binary"} returns, or a matrix of cells by responses. Layers are
 matched by position and must be as many.}
 
 \item{threshold}{\code{NULL} where the maps are already 0 and 1. Otherwise one cut per response, or

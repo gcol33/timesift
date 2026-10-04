@@ -49,11 +49,11 @@ utils::globalVariables("self")
   }
 
   register_learner("elasticnet", elasticnet)
-  register_learner("stepwise", stepwise)
+  register_learner("linear", linear)
   register_learner("forest", forest)
   register_learner("tree", tree)
   register_learner("boosting", boosting)
-  register_learner("maxnet", maxnet)
+  register_learner("maxent", maxent)
   register_learner("envelope", envelope)
   register_learner("mars", mars)
   register_learner("discriminant", discriminant)

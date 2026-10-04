@@ -17,7 +17,7 @@ project(
 \arguments{
 \item{fit}{A \code{\link[=timesift]{timesift()}} result.}
 
-\item{series}{A \link[terra:SpatRaster-class]{terra::SpatRaster} whose layers are instants, for a fit made on a record; for a
+\item{series}{A \link[terra:SpatRaster]{terra::SpatRaster} whose layers are instants, for a fit made on a record; for a
 record of several variables, a list of them named as the fit's \code{x} columns. Every raster
 shares one geometry and one set of instants.}
 

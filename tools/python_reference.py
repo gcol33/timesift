@@ -41,7 +41,7 @@ SECTIONS = (
      ("native", "grain", "multigrain", "lookback", "grains", "lookbacks", "Representation",
       "Sift", "as_sift", "expand_sift", "auto_grains", "build_representation")),
     ("Learners", "python-learners",
-     ("elasticnet", "stepwise", "forest", "tree", "boosting", "maxnet", "envelope", "mars",
+     ("elasticnet", "linear", "forest", "tree", "boosting", "maxent", "envelope", "mars",
       "discriminant", "additive", "hierarchical", "mlp", "cnn", "rescnn", "train_control",
       "TrainControl", "Learner", "flatten", "register_learner", "get_learner", "learners", "tune",
       "Tuned", "register_tuning", "tunings")),

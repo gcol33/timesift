@@ -174,8 +174,8 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   and predict through the activation, the per-response learners take the family the loss names,
   and the combiner minimises the loss. A fit that declares a `head` argument is handed the head,
   as one that declares `control` is handed the control; no learner holds a response of its own.
-  Same for learners: `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `stepwise()`, `forest()`,
-  `tree()`, `boosting()`, `maxnet()`, `envelope()`, `mars()`, `discriminant()`, `additive()` and
+  Same for learners: `mlp()`, `cnn()`, `rescnn()`, `elasticnet()`, `linear()`, `forest()`,
+  `tree()`, `boosting()`, `maxent()`, `envelope()`, `mars()`, `discriminant()`, `additive()` and
   any user-supplied fit/predict pair go through one interface.
 - **A fitted encoder is a plain object.** Its weights are arrays and its device is the setting,
   not the resolved device; the network is rebuilt at prediction. `saveRDS()` and `pickle` round
@@ -200,8 +200,9 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   fixtures, and differs from rpart only where rpart's class priors, computed with R's
   extended-precision sums, break an exact tie at `cp` under fractional weights.
 - **So is the stepwise search.** `src/ts_stepwise.cpp` is IRLS over a pivoted Householder QR under R's
-  rank rule, searched by MASS's `stepAIC()` rules, so `stepwise()` over column terms is the published
-  forward arm and over power terms a biomod2 user's `GLM`. It is pinned against MASS, `glm()` and
+  rank rule, searched by MASS's `stepAIC()` rules, so `linear()` is a biomod2 user's `GLM`, and
+  searched forward over column terms capped at three it is the published forward arm. It is pinned
+  against MASS, `glm()` and
   the old R search (`tests/testthat/helper-oracle-stepwise.R`) in the fixtures. Its least squares
   and `glm.fit` live in `src/ts_glm.cpp`, which MARS refits through too.
 - **So is MARS.** `src/ts_mars.cpp` is Friedman's MARS with Fast MARS and AS 274 backward

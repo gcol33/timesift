@@ -157,9 +157,9 @@ test_that("maxnet refuses what it has no model for", {
                      fold = c(0L, 1L, 0L, 1L), n_fold = 2L)
   expect_error(.maxnet_predict(fit, x, type = "cloglog"), "background formulation")
   expect_error(.maxnet_predict(fit, cbind(x, x)), "columns it was fitted on")
-  expect_error(maxnet(classes = "lqx"), "letters")
-  expect_error(maxnet(formulation = "absence", type = "cloglog"), "\"logistic\"")
-  expect_error(maxnet(type = "exponential"), "\"cloglog\" or \"logistic\"")
+  expect_error(maxent(classes = "lqx"), "letters")
+  expect_error(maxent(formulation = "absence", type = "cloglog"), "\"logistic\"")
+  expect_error(maxent(type = "exponential"), "\"cloglog\" or \"logistic\"")
 })
 
 test_that("a design above the limit is refused with the size it would have taken", {
@@ -176,7 +176,7 @@ test_that("maxnet fits, predicts, survives a round trip and refuses a different 
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 35L)
   y <- sim_response(sim, n_var = 2L, seed = 36L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
-  for (l in list(maxnet(), maxnet(formulation = "absence"))) {
+  for (l in list(maxent(), maxent(formulation = "absence"))) {
     fit <- fit_learner(l, x, y)
     p <- stats::predict(fit, x)
     expect_equal(dim(p), c(60L, 2L))
@@ -224,10 +224,10 @@ test_that("maxnet needs a presence-absence head, and a thin response is its shar
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 91L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
   level <- matrix(rowMeans(x[, , 1L]), ncol = 1L, dimnames = list(dimnames(x)[[1L]], "height"))
-  expect_error(fit_learner(maxnet(), x, level, response = "continuous_test"),
+  expect_error(fit_learner(maxent(), x, level, response = "continuous_test"),
                "presence-absence")
   one <- matrix(c(1, rep(0, 59)), ncol = 1L, dimnames = list(dimnames(x)[[1L]], "rare"))
-  fit <- fit_learner(maxnet(), x, one)
+  fit <- fit_learner(maxent(), x, one)
   expect_identical(fit$model$unfitted, "rare")
   expect_equal(unique(stats::predict(fit, x)[, 1L]), 1 / 60)
 })

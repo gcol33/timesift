@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 from counts import fixture_counts
-from timesift import Response, feature_matrix, fit_learner, grain_matrix, stepwise
+from timesift import Response, feature_matrix, fit_learner, grain_matrix, linear
 from timesift._stepwise import stepwise_fit, stepwise_predict
 
 FIXTURES = Path(__file__).resolve().parents[2] / "inst" / "spec" / "fixtures"
@@ -93,20 +93,20 @@ def test_a_move_whose_fit_does_not_settle_is_refused_and_a_final_one_is_named():
     assert not full["converged"]
     units = tuple(f"u{i:02d}" for i in range(20))
     features = feature_matrix(x, units=units, features=("a", "b"))
-    learned = fit_learner(stepwise(direction="none", terms="power", degree=1), features,
+    learned = fit_learner(linear(select="none", degree=1), features,
                           Response(y.reshape(-1, 1), units, ("sp",)))
     assert learned.model["stopped"] == ["sp"]
 
 
 def test_stepwise_refuses_settings_it_has_no_search_for():
-    with pytest.raises(ValueError, match="direction"):
-        stepwise(direction="sideways")
+    with pytest.raises(ValueError, match="select"):
+        linear(select="sideways")
     with pytest.raises(ValueError, match="terms"):
-        stepwise(terms="pair")
+        linear(terms="pair")
     with pytest.raises(ValueError, match="zero or more"):
-        stepwise(max_terms=-1)
+        linear(max_terms=-1)
     with pytest.raises(ValueError, match="whole number"):
-        stepwise(degree=1.5)
+        linear(degree=1.5)
     x = np.arange(1.0, 7.0).reshape(-1, 1)
     with pytest.raises(Exception, match="zero and one"):
         stepwise_fit(x, np.array([0.0, 1, 2, 0, 1, 0]), np.ones(6), "binomial")
@@ -132,8 +132,8 @@ def planted(n_unit=60, days=120, seed=41):
 
 
 @pytest.mark.parametrize("learner", [
-    stepwise(), stepwise(direction="both", terms="power", max_terms=math.inf),
-    stepwise(direction="backward", terms="power"), stepwise(direction="none")],
+    linear(select="forward", terms="column", max_terms=3), linear(),
+    linear(select="backward"), linear(select="none", terms="column")],
     ids=["forward", "both", "backward", "none"])
 def test_stepwise_fits_every_direction_and_round_trips(learner):
     x, y = planted()

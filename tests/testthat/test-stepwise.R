@@ -95,16 +95,16 @@ test_that("a move whose fit does not settle is refused, and a final fit that doe
   units <- sprintf("u%02d", 1:20)
   features <- feature_matrix(matrix(x, ncol = 2L, dimnames = list(units, c("a", "b"))))
   resp <- matrix(y, ncol = 1L, dimnames = list(units, "sp"))
-  learned <- fit_learner(stepwise(direction = "none", terms = "power", degree = 1L), features,
+  learned <- fit_learner(linear(select = "none", degree = 1L), features,
                          resp)
   expect_identical(learned$model$stopped, "sp")
 })
 
 test_that("stepwise refuses settings it has no search for", {
-  expect_error(stepwise(direction = "sideways"), "should be one of")
-  expect_error(stepwise(terms = "pair"), "should be one of")
-  expect_error(stepwise(max_terms = -1), "zero or more")
-  expect_error(stepwise(degree = 1.5), "whole number")
+  expect_error(linear(select = "sideways"), "should be one of")
+  expect_error(linear(terms = "pair"), "should be one of")
+  expect_error(linear(max_terms = -1), "zero or more")
+  expect_error(linear(degree = 1.5), "whole number")
   x <- matrix(1:6, ncol = 1L)
   expect_error(.stepwise_fit(x, c(0, 1, 2, 0, 1, 0), rep(1, 6L), "binomial"), "zero and one")
   expect_error(.stepwise_fit(x, c(0, 1, -2, 0, 1, 0), rep(1, 6L), "poisson"),
@@ -119,9 +119,9 @@ test_that("stepwise fits under both heads, round trips, and a model of no term i
   sim <- sim_series(n_unit = 60L, days = 120L, seed = 41L)
   y <- sim_response(sim, n_var = 2L, seed = 42L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "month")
-  for (l in list(stepwise(), stepwise(direction = "both", terms = "power", max_terms = Inf),
-                 stepwise(direction = "backward", terms = "power"),
-                 stepwise(direction = "none"))) {
+  for (l in list(linear(select = "forward", terms = "column", max_terms = 3), linear(),
+                 linear(select = "backward"),
+                 linear(select = "none", terms = "column"))) {
     fit <- fit_learner(l, x, y)
     p <- stats::predict(fit, x)
     expect_equal(dim(p), c(60L, 2L))

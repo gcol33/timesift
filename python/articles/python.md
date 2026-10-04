@@ -196,7 +196,7 @@ one denominator and every paired difference runs on matched cells.
 
 ## Learners, and how they are trained
 
-`ts.elasticnet()` and `ts.stepwise()` read a block of features, `ts.forest()` grows a probability
+`ts.elasticnet()` and `ts.linear()` read a block of features, `ts.forest()` grows a probability
 forest over one, and the `torch` encoders `ts.mlp()`, `ts.cnn()` and `ts.rescnn()` read a sequence
 with a joint multi-label head, so every response is predicted together from a shared embedding.
 Pooling strength across responses is what makes the rarer ones learnable at these sample sizes.

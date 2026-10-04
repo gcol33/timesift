@@ -147,9 +147,9 @@ apart on one sensor read two different stretches of the same series, anchored by
 
 ## Learners
 
-`elasticnet()` and `stepwise()` read a block of features, `tree()` grows rpart's tree over one,
+`elasticnet()` and `linear()` read a block of features, `tree()` grows rpart's tree over one,
 `forest()` grows a probability forest over one, `boosting()` fits gbm's or xgboost's boosted trees
-over one, `maxnet()` fits maxnet's MaxEnt over one, `envelope()` draws biomod2's surface range
+over one, `maxent()` fits Maxent as maxnet does over one, `envelope()` draws biomod2's surface range
 envelope around the presences in one, `mars()` fits earth's multivariate adaptive regression
 splines over one, `discriminant()` fits mda's flexible discriminant analysis over one,
 `additive()` fits mgcv's generalised additive model over one, `hierarchical()` fits a Bayesian

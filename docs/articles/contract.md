@@ -1145,12 +1145,13 @@ a failure both implementations would have to reproduce to match.
 
 ## maxnet
 
-[`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md) is
-one maxnet model per response, over `src/ts_maxnet.cpp`, which both
-languages compile, and which hands its design to the penalised fit
-above. Its features, their regularisation and its path are the maxnet
-package’s (0.1.4), because a biomod2 user’s `MAXNET` is maxnet’s and the
-model here has to be the one they already fit.
+[`maxent()`](https://gillescolling.com/timesift/reference/maxent.md) is
+one Maxent model per response in maxnet’s formulation, over
+`src/ts_maxnet.cpp`, which both languages compile, and which hands its
+design to the penalised fit above. Its features, their regularisation
+and its path are the maxnet package’s (0.1.4), because a biomod2 user’s
+`MAXNET` is maxnet’s and the model here has to be the one they already
+fit.
 
 - The features are built over the rows fitted. A column holding one
   value there takes none. The classes are letters: `l` the column, `q`
@@ -1648,12 +1649,12 @@ each bound, which is where an exclusive comparison would differ.
 
 ## The stepwise model
 
-[`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
-is one generalised linear model per response, its terms chosen by
-Akaike’s criterion, over `src/ts_stepwise.cpp`, which both languages
-compile. Each fit is R’s `glm.fit` and the search is MASS’s `stepAIC()`,
-because the forward search over column terms is the arm the published
-comparison ran and the rest is what a biomod2 user’s `GLM` is.
+[`linear()`](https://gillescolling.com/timesift/reference/linear.md) is
+one generalised linear model per response, its terms chosen by Akaike’s
+criterion, over `src/ts_stepwise.cpp`, which both languages compile.
+Each fit is R’s `glm.fit` and the search is MASS’s `stepAIC()`, because
+the forward search over column terms is the arm the published comparison
+ran and the rest is what a biomod2 user’s `GLM` is.
 
 - **The terms.** A column holding one value over the rows fitted is not
   a term. Under `"column"` a term is the column’s orthogonal polynomial
@@ -2512,11 +2513,11 @@ the difference is recorded here rather than found at a call site.
 | building one representation | [`build_representation()`](https://gillescolling.com/timesift/reference/build_representation.md) |
 | a channel added to an array | [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md), and [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md) for the sine and cosine of each bin’s position in the year and, finer than a day, in the day, both as **The channels** defines them |
 | the penalised learner | [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md) |
-| the stepwise selector | [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md), forward, two-way, backward or unselected |
+| the generalised linear model | [`linear()`](https://gillescolling.com/timesift/reference/linear.md), its terms searched two-way, forward, backward or not at all |
 | the forest | [`forest()`](https://gillescolling.com/timesift/reference/forest.md) |
 | the classification and regression tree | [`tree()`](https://gillescolling.com/timesift/reference/tree.md) |
 | gradient boosted trees | [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md) |
-| maxnet’s MaxEnt | [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md) |
+| maxnet’s MaxEnt | [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md) |
 | the surface range envelope | [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md) |
 | multivariate adaptive regression splines | [`mars()`](https://gillescolling.com/timesift/reference/mars.md) |
 | flexible discriminant analysis | [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md) |

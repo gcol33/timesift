@@ -909,8 +909,8 @@ have to reproduce to match.
 
 ## maxnet
 
-`maxnet()` is one maxnet model per response, over `src/ts_maxnet.cpp`, which both languages
-compile, and which hands its design to the penalised fit above. Its features, their regularisation
+`maxent()` is one Maxent model per response in maxnet's formulation, over `src/ts_maxnet.cpp`,
+which both languages compile, and which hands its design to the penalised fit above. Its features, their regularisation
 and its path are the maxnet package's (0.1.4), because a biomod2 user's `MAXNET` is maxnet's and
 the model here has to be the one they already fit.
 
@@ -1296,7 +1296,7 @@ comparison would differ.
 
 ## The stepwise model
 
-`stepwise()` is one generalised linear model per response, its terms chosen by Akaike's criterion,
+`linear()` is one generalised linear model per response, its terms chosen by Akaike's criterion,
 over `src/ts_stepwise.cpp`, which both languages compile. Each fit is R's `glm.fit` and the search
 is MASS's `stepAIC()`, because the forward search over column terms is the arm the published
 comparison ran and the rest is what a biomod2 user's `GLM` is.
@@ -1939,11 +1939,11 @@ call site.
 | building one representation | `build_representation()` |
 | a channel added to an array | `bind_channels()`, and `calendar_channels()` for the sine and cosine of each bin's position in the year and, finer than a day, in the day, both as **The channels** defines them |
 | the penalised learner | `elasticnet()` |
-| the stepwise selector | `stepwise()`, forward, two-way, backward or unselected |
+| the generalised linear model | `linear()`, its terms searched two-way, forward, backward or not at all |
 | the forest | `forest()` |
 | the classification and regression tree | `tree()` |
 | gradient boosted trees | `boosting()` |
-| maxnet's MaxEnt | `maxnet()` |
+| maxnet's MaxEnt | `maxent()` |
 | the surface range envelope | `envelope()` |
 | multivariate adaptive regression splines | `mars()` |
 | flexible discriminant analysis | `discriminant()` |

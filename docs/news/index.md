@@ -2,6 +2,28 @@
 
 ## timesift (development version)
 
+### Breaking changes
+
+- `stepwise()` is
+  [`linear()`](https://gillescolling.com/timesift/reference/linear.md),
+  named after the model it fits as
+  [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
+  is, and its defaults are biomod2’s `GLM`: every column as
+  `x + I(x^2)`, searched both ways by AIC as
+  [`MASS::stepAIC()`](https://rdrr.io/pkg/MASS/man/stepAIC.html)
+  searches, with no bound on the terms kept. The search is the `select`
+  argument (`"both"`, `"forward"`, `"backward"` or `"none"`), formerly
+  `direction`. The old defaults were the study’s forward arm, which is
+  now `linear(select = "forward", terms = "column", max_terms = 3)`. The
+  learner registers and reports as `linear`.
+- `maxnet()` is
+  [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md),
+  named after the model rather than the package whose formulation it
+  follows. Its arguments, defaults and numbers are unchanged; it
+  registers and reports as `maxent`.
+
+### Other changes
+
 - In Python a representation, a learner and a training control print as
   they do in R, where they printed as their dataclass fields and a
   learner’s functions.
@@ -33,7 +55,7 @@
   distribution, and xgboost’s `count:poisson` under `newton = TRUE`). A
   forest cuts a count on its variance and a leaf holds the mean count,
   the encoders train under the deviance, and the combiner minimises it.
-  [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md),
+  `maxnet()`,
   [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
   and
   [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
@@ -65,8 +87,7 @@
 - Three response heads for a numeric response: `"continuous"`,
   `"abundance"` (not negative) and `"ordinal"` (whole-number classes),
   fitted under squared error through an identity output by every learner
-  but
-  [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md),
+  but `maxnet()`,
   [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
   and
   [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md).
@@ -100,7 +121,7 @@
   [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md),
   [`mars()`](https://gillescolling.com/timesift/reference/mars.md),
   [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md),
-  [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md),
+  `maxnet()`,
   [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
   and
   [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
@@ -269,12 +290,11 @@
   against gbm’s 68 s, and xgboost’s defaults 1.2 s against xgboost’s
   exact method’s 2.6 s. Both languages.
 
-- [`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md)
-  fits one maxnet model per response, which is what biomod2 fits as
-  `MAXNET`: maxnet’s linear, quadratic, product, hinge and threshold
-  features, chosen by the presence count as `maxnet.formula()` chooses
-  them or named in `classes`, its regularisation of each feature times
-  `regmult`, and a lasso over them on the penalised core
+- `maxnet()` fits one maxnet model per response, which is what biomod2
+  fits as `MAXNET`: maxnet’s linear, quadratic, product, hinge and
+  threshold features, chosen by the presence count as `maxnet.formula()`
+  chooses them or named in `classes`, its regularisation of each feature
+  times `regmult`, and a lasso over them on the penalised core
   [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
   runs on, so the two languages fit the same model.
   `formulation = "background"` is maxnet’s presence-background model and
@@ -322,8 +342,8 @@
   cases its bounds and projections are `bm_SRE()`’s to the last bit. The
   core is `src/ts_envelope.cpp`. Both languages.
 
-- [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
-  takes `direction = c("forward", "both", "backward", "none")` and
+- `stepwise()` takes
+  `direction = c("forward", "both", "backward", "none")` and
   `terms = c("column", "power")`. `"both"` and `"backward"` are MASS’s
   `stepAIC()` step for step, and `terms = "power"` makes each power of a
   column a term of its own, as biomod2’s quadratic formula writes them;
@@ -338,10 +358,9 @@
 
 ### Changed
 
-- [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
-  runs on a new core, `src/ts_stepwise.cpp`, compiled into both
-  languages: R’s `glm.fit` iteration over LINPACK’s `dqrdc2`, which sets
-  the rank R reports, and MASS’s step rules. It replaces
+- `stepwise()` runs on a new core, `src/ts_stepwise.cpp`, compiled into
+  both languages: R’s `glm.fit` iteration over LINPACK’s `dqrdc2`, which
+  sets the rank R reports, and MASS’s step rules. It replaces
   [`stats::glm()`](https://rdrr.io/r/stats/glm.html) in R and a separate
   NumPy fitter in Python, which differed on what they refused: R took
   any fit that settled within 25 iterations, while Python also refused
@@ -352,10 +371,8 @@
   predictions equal to about `1e-15`. A fit saved from an earlier
   version does not predict under this one; refit it.
 
-- A
-  [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
-  fit names every response whose final model did not settle in
-  `stopped`.
+- A `stepwise()` fit names every response whose final model did not
+  settle in `stopped`.
 
 - A `"weighted"` ensemble in Python gives every member the same weight
   where none scores above zero, as R’s always did, where it used to
@@ -916,8 +933,7 @@ CRAN release: 2026-10-02
   fit’s own signature, at the one point every fold loop fits through, so
   a learner whose fit takes `(x, y)` is called with `(x, y)`.
 - [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md),
-  [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
-  and
+  `stepwise()` and
   [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
   fit the Gaussian family where the head’s loss is squared error.
 - [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md)
@@ -1006,10 +1022,8 @@ CRAN release: 2026-10-02
   both did. Fitting a response alone, or beside others, or in a
   different order now gives the same model, which
   `tests/testthat/test-variable-seeds.R` holds to. This changes the
-  numbers those two produce;
-  [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
-  spends no randomness and the encoders cover the responses jointly, so
-  neither moves.
+  numbers those two produce; `stepwise()` spends no randomness and the
+  encoders cover the responses jointly, so neither moves.
 - `metric` takes a registered name or a function of `(y, p)` everywhere
   the contract says it does. What scores and what a report prints travel
   with the fit, so a function reads as `<function>` in a report rather
@@ -1463,7 +1477,7 @@ reproduces from `inst/reproduce/schrankogel.R`.
 ### Learners and training
 
 - [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md),
-  [`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md),
+  `stepwise()`,
   [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md),
   [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
   and

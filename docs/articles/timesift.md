@@ -347,8 +347,7 @@ runs on matched cells.
 ## Learners, and how they are trained
 
 [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
-and
-[`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
+and [`linear()`](https://gillescolling.com/timesift/reference/linear.md)
 read a block of features,
 [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
 grows a probability forest over one, and the `torch` encoders

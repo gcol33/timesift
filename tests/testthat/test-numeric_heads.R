@@ -107,11 +107,11 @@ test_that("a run under a numeric head is scored by that head's metric and stacke
 
 test_that("the learners that need presences and absences refuse a numeric head", {
   d <- numeric_data()
-  for (l in list(discriminant(), envelope(), maxnet())) {
+  for (l in list(discriminant(), envelope(), maxent())) {
     expect_error(fit_learner(l, d$x, d$y, response = "continuous"), "squared_error",
                  info = l$name)
   }
-  for (l in list(elasticnet(), forest(trees = 20L), boosting(trees = 20L), tree(), stepwise(),
+  for (l in list(elasticnet(), forest(trees = 20L), boosting(trees = 20L), tree(), linear(),
                  mars())) {
     fit <- fit_learner(l, d$x, d$y, response = "continuous")
     expect_gt(stats::cor(stats::predict(fit, d$x)[, 1L], d$height), 0.8, label = l$name)

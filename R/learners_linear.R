@@ -110,28 +110,31 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
   )
 }
 
-#' Stepwise selection by AIC on the flattened representation
+#' A generalised linear model on the flattened representation
 #'
-#' One generalised linear model per variable, its terms chosen by Akaike's criterion over every
-#' bin-by-channel column. The family is the response head's: logistic under a binary cross-entropy
+#' One generalised linear model per variable over every bin-by-channel column, its terms chosen by
+#' Akaike's criterion. The family is the response head's: logistic under a binary cross-entropy
 #' loss, Gaussian under a squared-error one and Poisson under a Poisson-deviance one. So are the
 #' case weights, so a rare response weighs here what it weighs in every other learner.
 #'
-#' `terms` says what one term is. Under `"column"` it is a column's orthogonal polynomial of degree
-#' `degree`, so a column enters with its curvature at once and can be non-monotone in the reading
-#' the way a niche optimum is. Under `"power"` each power of a column, `x`, `x^2` and so on, is a
-#' term of its own, which is how biomod2 writes a quadratic formula and how `MASS::stepAIC()` walks
-#' it. A column holding one value over the fitting units is not a term.
+#' The defaults are biomod2's `GLM`: every column enters as `x + I(x^2)`, and the terms are
+#' searched in both directions by AIC as `MASS::stepAIC()` searches them, with no bound on how many
+#' are kept.
 #'
-#' `direction` is the search. `"forward"` starts from the intercept and admits the term that lowers
-#' the criterion most, while one does and the model holds fewer than `max_terms`. `"both"` does the
-#' same but also weighs dropping each term it holds at every step, and `"backward"` starts from
-#' every term and drops alone. `"none"` fits every term and selects nothing: with
-#' `terms = "power"` and `degree = 2` that is the model biomod2's GLM fits, `y ~ x + I(x^2)` over
-#' every column. The two-way and backward searches are MASS's `stepAIC()`, step for step: the model as it
-#' stands wins a tie, a term whose removal leaves the rank unchanged is dropped first, and an
-#' addition that does not raise the rank is not offered. `max_terms` bounds what a forward or
-#' two-way search adds, and the backward and unselected fits start from every term whatever it is.
+#' `terms` says what one term is. Under `"power"` each power of a column, `x`, `x^2` and so on, is
+#' a term of its own, which is how biomod2 writes a quadratic formula and how `stepAIC()` walks it.
+#' Under `"column"` a term is a column's orthogonal polynomial of degree `degree`, so a column enters
+#' with its curvature at once and can be non-monotone in the reading the way a niche optimum is. A
+#' column holding one value over the fitting units is not a term.
+#'
+#' `select` is the search. `"both"` starts from the intercept and at every step takes the move that
+#' lowers the criterion most, adding a term or dropping one it holds, while one does and the model
+#' holds fewer than `max_terms`. `"forward"` only adds, and `"backward"` starts from every term and
+#' only drops. `"none"` fits every term and selects nothing. The two-way and backward searches are
+#' `stepAIC()`, step for step: the model as it stands wins a tie, a term whose removal leaves the
+#' rank unchanged is dropped first, and an addition that does not raise the rank is not offered.
+#' `max_terms` bounds what a forward or two-way search adds, and the backward and unselected fits
+#' start from every term whatever it is.
 #'
 #' Each fit is R's `glm.fit`: iteratively reweighted least squares, the rank read off the same
 #' pivoted decomposition, and the same stopping rule. A move whose fit does not settle within its
@@ -151,23 +154,23 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
 #' @inheritParams elasticnet
 #' @param max_terms Terms a forward or two-way search holds at most; `Inf` for no bound.
 #' @param degree Polynomial degree each column enters at.
-#' @param direction `"forward"`, `"both"`, `"backward"` or `"none"`.
-#' @param terms `"column"` for a column's polynomial as one term, `"power"` for each power its own.
+#' @param select `"both"`, `"forward"`, `"backward"` or `"none"`.
+#' @param terms `"power"` for each power of a column its own term, `"column"` for a column's
+#'   polynomial as one term.
 #' @param threads How many of one step's candidate fits run at once. What comes back does not
 #'   depend on it.
 #'
 #' @return A [learner()].
 #'
 #' @examples
-#' stepwise(max_terms = 3)
-#' stepwise(direction = "both", terms = "power", max_terms = Inf)
-#' stepwise(data = grain("season"), direction = "none", terms = "power")
+#' linear()
+#' linear(select = "forward", terms = "column", max_terms = 3)
+#' linear(data = grain("season"), select = "none")
 #'
 #' @export
-stepwise <- function(data = NULL, max_terms = 3L, degree = 2L,
-                     direction = c("forward", "both", "backward", "none"),
-                     terms = c("column", "power"), threads = 1L) {
-  direction <- match.arg(direction)
+linear <- function(data = NULL, select = c("both", "forward", "backward", "none"),
+                   terms = c("power", "column"), max_terms = Inf, degree = 2L, threads = 1L) {
+  select <- match.arg(select)
   terms <- match.arg(terms)
   if (!is.numeric(max_terms) || length(max_terms) != 1L || is.na(max_terms) || max_terms < 0) {
     stop("`max_terms` is one number of zero or more, or Inf, got ", .describe(max_terms), ".",
@@ -179,11 +182,11 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L,
          call. = FALSE)
   }
   learner(
-    name = "stepwise",
+    name = "linear",
     data = data, reads = "tabular", multi = "separate",
-    params = list(max_terms = max_terms, degree = as.integer(degree), direction = direction,
-                  terms = terms, threads = as.integer(threads)),
-    fit = function(x, y, max_terms, degree, direction, terms, threads, head, ...) {
+    params = list(select = select, terms = terms, max_terms = max_terms,
+                  degree = as.integer(degree), threads = as.integer(threads)),
+    fit = function(x, y, select, terms, max_terms, degree, threads, head, ...) {
       family <- .head_family(head)
       m <- .flatten(x)
       weights <- .head_weights(head, y)
@@ -193,7 +196,7 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L,
           return(mean(yj))
         }
         .stepwise_fit(m, yj, weights[, j], family, max_terms = max_terms, degree = degree,
-                      direction = direction, terms = terms, threads = threads)
+                      direction = select, terms = terms, threads = threads)
       })
       stopped <- colnames(y)[vapply(models, function(f) is.list(f) && !f$converged, logical(1L))]
       list(models = models, columns = colnames(m), family = family, stopped = stopped)
@@ -206,7 +209,6 @@ stepwise <- function(data = NULL, max_terms = 3L, degree = 2L,
     }
   )
 }
-
 # The stepwise model, over the core `src/ts_stepwise.cpp` compiles into both languages. The design,
 # the response and the case weights are settled above; a fit is a plain list of numbers, its terms
 # as the column each reads and the recurrence of its polynomial, so it round trips through

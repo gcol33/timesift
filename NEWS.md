@@ -1,5 +1,18 @@
 # timesift (development version)
 
+## Breaking changes
+
+* `stepwise()` is `linear()`, named after the model it fits as `additive()` is, and its defaults
+  are biomod2's `GLM`: every column as `x + I(x^2)`, searched both ways by AIC as
+  `MASS::stepAIC()` searches, with no bound on the terms kept. The search is the `select` argument
+  (`"both"`, `"forward"`, `"backward"` or `"none"`), formerly `direction`. The old defaults were
+  the study's forward arm, which is now `linear(select = "forward", terms = "column",
+  max_terms = 3)`. The learner registers and reports as `linear`.
+* `maxnet()` is `maxent()`, named after the model rather than the package whose formulation it
+  follows. Its arguments, defaults and numbers are unchanged; it registers and reports as `maxent`.
+
+## Other changes
+
 * In Python a representation, a learner and a training control print as they do in R, where they
   printed as their dataclass fields and a learner's functions.
 * The site's Python side has a Get started article, the R walkthrough section by section and run

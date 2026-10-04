@@ -5,7 +5,7 @@ import pytest
 
 import timesift as ts
 from timesift import (boosting, discriminant, elasticnet, ensemble, envelope, fit_learner, forest,
-                      grains, mars, maxnet, ordinal_metric, regression_metric, stepwise, timesift,
+                      grains, linear, mars, maxent, ordinal_metric, regression_metric, timesift,
                       tree)
 from timesift.registry import RESPONSES
 from timesift.representation import grain_matrix
@@ -117,7 +117,7 @@ def test_a_run_under_a_numeric_head_is_scored_by_that_heads_metric_and_stacked()
 
 def test_the_learners_that_need_presences_and_absences_refuse_a_numeric_head():
     x, _, _, height, y = numeric_data()
-    for learner in (discriminant(), envelope(), maxnet()):
+    for learner in (discriminant(), envelope(), maxent()):
         with pytest.raises(ValueError, match="squared_error"):
             fit_learner(learner, x, y, response="continuous")
     for learner in (elasticnet(), forest(trees=20), boosting(trees=20), tree(), mars()):
@@ -185,7 +185,7 @@ def test_the_count_head_refuses_a_response_it_cannot_hold():
 def test_each_learner_that_fits_a_family_fits_a_count_under_the_poisson_one():
     x, _, _, rate, count, y = count_data()
     for learner in (elasticnet(), forest(trees=30), boosting(trees=30),
-                    boosting(trees=30, newton=True, depth=2), tree(), stepwise(), mars(),
+                    boosting(trees=30, newton=True, depth=2), tree(), linear(), mars(),
                     ts.additive(k=5)):
         fit = fit_learner(learner, x, y, response="count")
         p = fit.predict(x)[:, 0]
@@ -197,7 +197,7 @@ def test_each_learner_that_fits_a_family_fits_a_count_under_the_poisson_one():
 
 def test_the_learners_that_need_presences_and_absences_refuse_a_count_head():
     x, _, _, _, _, y = count_data(n=40)
-    for learner in (discriminant(), envelope(), maxnet()):
+    for learner in (discriminant(), envelope(), maxent()):
         with pytest.raises(ValueError, match="poisson_deviance"):
             fit_learner(learner, x, y, response="count")
 

@@ -12,10 +12,10 @@ test_that("c() on learners is a set of them, named by each learner", {
 
 test_that("a set handed back to c() splices rather than nests", {
   base <- c(elasticnet(), forest())
-  expect_named(c(base, stepwise()), c("elasticnet", "forest", "stepwise"))
-  expect_named(c(stepwise(), base), c("stepwise", "elasticnet", "forest"))
-  expect_named(c(base, c(stepwise(), mlp())),
-               c("elasticnet", "forest", "stepwise", "mlp"))
+  expect_named(c(base, linear()), c("elasticnet", "forest", "linear"))
+  expect_named(c(linear(), base), c("linear", "elasticnet", "forest"))
+  expect_named(c(base, c(linear(), mlp())),
+               c("elasticnet", "forest", "linear", "mlp"))
   expect_length(c(base, base[0L]), 2L)
 })
 

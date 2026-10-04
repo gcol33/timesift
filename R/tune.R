@@ -22,7 +22,7 @@
 #' [register_tuning()], which for the learners that ship is the one `BIOMOD_Tuning()` searches:
 #' `mtry` of a [forest()] from 1 to the smaller of 10 and the number of columns; `trees`, `depth`
 #' and `shrinkage` of a gbm-style [boosting()], `shrinkage` and `colsample` of the second-order one;
-#' `degree` and `nprune` of [mars()]; `degree` of [discriminant()]; `regmult` of [maxnet()];
+#' `degree` and `nprune` of [mars()]; `degree` of [discriminant()]; `regmult` of [maxent()];
 #' `quantile` of [envelope()]; and the layer width of [mlp()] at 2, 4, 6 and 8. biomod2's weight
 #' decay is a training setting here, which [train_control()] holds and a grid does not reach.
 #'
@@ -193,7 +193,7 @@ tunings <- function() .tuning_reg$names()
     },
     mars = function(learner, x) list(degree = 1:2, nprune = 2:max(21L, 2L * ncol(.flatten(x)) + 1L)),
     discriminant = list(degree = 1:2),
-    maxnet = list(regmult = c(0.5, 1)),
+    maxent = list(regmult = c(0.5, 1)),
     envelope = list(quantile = c(0, 0.0125, 0.025, 0.05, 0.1)),
     mlp = list(hidden = list(2L, 4L, 6L, 8L))
   )

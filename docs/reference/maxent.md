@@ -1,8 +1,10 @@
-# maxnet's MaxEnt on the flattened representation
+# Maxent on the flattened representation
 
-One maxnet model per response, over every bin-by-channel column of the
-representation: maxnet's feature classes, its regularisation of each
-feature, and a lasso over them, fitted by the penalised core
+One maximum-entropy model per response, over every bin-by-channel column
+of the representation, in the formulation of the maxnet package
+(Phillips et al. 2017) and biomod2's `MAXNET`: maxnet's feature classes,
+its regularisation of each feature, and a lasso over them, fitted by the
+penalised core
 [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
 runs on, which the Python package calls too. With the maxnet package's
 own settings the features and the penalty factors are maxnet's to
@@ -12,7 +14,7 @@ maxnet.
 ## Usage
 
 ``` r
-maxnet(
+maxent(
   data = NULL,
   classes = NULL,
   regmult = 1,
@@ -156,7 +158,7 @@ refused.
 ## Examples
 
 ``` r
-maxnet()
-maxnet(classes = "lqh", regmult = 2)
-maxnet(formulation = "absence")
+maxent()
+maxent(classes = "lqh", regmult = 2)
+maxent(formulation = "absence")
 ```

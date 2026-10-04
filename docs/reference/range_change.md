@@ -18,7 +18,7 @@ range_change(now, later, threshold = NULL)
   The two maps: a
   [terra::SpatRaster](https://rspatial.github.io/terra/reference/SpatRaster-class.html)
   with a layer per response, such as
-  [`terra::project()`](https://rspatial.github.io/terra/reference/project.html)
+  [`project()`](https://gillescolling.com/timesift/reference/project.md)
   with `type = "binary"` returns, or a matrix of cells by responses.
   Layers are matched by position and must be as many.
 

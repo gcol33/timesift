@@ -33,7 +33,7 @@ cannot do: \code{c(base, cnn())} where \code{base} is already a set.
 \examples{
 base <- c(elasticnet(), forest())
 base
-c(base, stepwise())
+c(base, linear())
 
 c(grains("day", "week"), lookback("30 days"))
 

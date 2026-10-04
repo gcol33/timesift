@@ -44,7 +44,7 @@ a registered learner.
 ``` r
 base <- c(elasticnet(), forest())
 base
-c(base, stepwise())
+c(base, linear())
 
 c(grains("day", "week"), lookback("30 days"))
 ```

@@ -55,7 +55,7 @@ test_that("the count head refuses a response it cannot hold", {
 test_that("each learner that fits a family fits a count under the Poisson one", {
   d <- count_data()
   for (l in list(elasticnet(), forest(trees = 30L), boosting(trees = 30L),
-                 boosting(trees = 30L, newton = TRUE, depth = 2L), tree(), stepwise(), mars(),
+                 boosting(trees = 30L, newton = TRUE, depth = 2L), tree(), linear(), mars(),
                  additive(k = 5L))) {
     fit <- fit_learner(l, d$x, d$y, response = "count")
     p <- stats::predict(fit, d$x)[, 1L]
@@ -72,7 +72,7 @@ test_that("each learner that fits a family fits a count under the Poisson one", 
 
 test_that("the learners that need presences and absences refuse a count head", {
   d <- count_data(n = 40L)
-  for (l in list(discriminant(), envelope(), maxnet())) {
+  for (l in list(discriminant(), envelope(), maxent())) {
     expect_error(fit_learner(l, d$x, d$y, response = "count"), "poisson_deviance", info = l$name)
   }
 })

@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from timesift import Response, fit_learner, grain_matrix, maxnet
+from timesift import Response, fit_learner, grain_matrix, maxent
 from timesift.learners import flatten
 from timesift.metrics import tss
 from timesift._maxnet import maxnet_design, maxnet_fit, maxnet_predict
@@ -191,11 +191,11 @@ def test_maxnet_refuses_what_it_has_no_model_for():
     with pytest.raises(Exception, match="columns it was fitted on"):
         maxnet_predict(fit, np.column_stack([x, x]))
     with pytest.raises(ValueError, match="letters"):
-        maxnet(classes="lqx")
+        maxent(classes="lqx")
     with pytest.raises(ValueError, match="'logistic'"):
-        maxnet(formulation="absence", type="cloglog")
+        maxent(formulation="absence", type="cloglog")
     with pytest.raises(ValueError, match="'cloglog' or 'logistic'"):
-        maxnet(type="exponential")
+        maxent(type="exponential")
 
 
 def test_a_design_above_the_limit_is_refused_with_the_size_it_would_have_taken():
@@ -225,7 +225,7 @@ def planted(n_unit=60, days=56, seed=17):
 @pytest.mark.parametrize("formulation", ["background", "absence"])
 def test_maxnet_fits_predicts_and_survives_a_round_trip(formulation):
     x, y = planted()
-    fit = fit_learner(maxnet(formulation=formulation), x, y)
+    fit = fit_learner(maxent(formulation=formulation), x, y)
     p = fit.predict(x)
     assert p.shape == (len(y.units), 2)
     assert np.all((p >= 0) & (p <= 1))
@@ -265,10 +265,10 @@ def test_maxnet_needs_a_presence_absence_head_and_a_thin_response_is_its_share(
     x, y = planted(seed=91)
     level = x.values[:, :, 0].mean(axis=1).reshape(-1, 1)
     with pytest.raises(ValueError, match="presence-absence"):
-        fit_learner(maxnet(), x, Response(level, y.units, ("height",)),
+        fit_learner(maxent(), x, Response(level, y.units, ("height",)),
                     response="continuous_test")
     one = np.zeros((len(y.units), 1))
     one[0, 0] = 1.0
-    fit = fit_learner(maxnet(), x, Response(one, y.units, ("rare",)))
+    fit = fit_learner(maxent(), x, Response(one, y.units, ("rare",)))
     assert fit.model["unfitted"] == ["rare"]
     np.testing.assert_allclose(np.unique(fit.predict(x)), [1 / len(y.units)])

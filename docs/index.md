@@ -110,8 +110,7 @@ series, anchored by `target_time`.
 ## Learners
 
 [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
-and
-[`stepwise()`](https://gillescolling.com/timesift/reference/stepwise.md)
+and [`linear()`](https://gillescolling.com/timesift/reference/linear.md)
 read a block of features,
 [`tree()`](https://gillescolling.com/timesift/reference/tree.md) grows
 rpart’s tree over one,
@@ -119,8 +118,8 @@ rpart’s tree over one,
 grows a probability forest over one,
 [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md)
 fits gbm’s or xgboost’s boosted trees over one,
-[`maxnet()`](https://gillescolling.com/timesift/reference/maxnet.md)
-fits maxnet’s MaxEnt over one,
+[`maxent()`](https://gillescolling.com/timesift/reference/maxent.md)
+fits Maxent as maxnet does over one,
 [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
 draws biomod2’s surface range envelope around the presences in one,
 [`mars()`](https://gillescolling.com/timesift/reference/mars.md) fits
