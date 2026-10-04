@@ -466,7 +466,10 @@ three-channel representation, 471 columns, is 47,100 features under
 <code>"lqh"</code>, and its products under <code>"lqph"</code> 110,685
 more. The design is held in memory with a centred copy beside it, and a
 fit whose design would take more than <code>max_design</code> gigabytes
-is refused with the size it would have taken.</p>
+is refused with the size it would have taken. <code>threads</code> fit
+that many variables at once, each the fit it gets alone, or one
+variable’s inner cross-validation under the absences, and the designs
+held at once share <code>max_design</code>.</p>
 <p>A response with fewer than two presences, or one whose inner training
 sets cannot each hold two of each outcome under the absence formulation,
 is predicted its share among the fitting units, and the fit names it in

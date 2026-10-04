@@ -1,5 +1,7 @@
 #include "ts_maxnet.h"
 
+#include "ts_internal.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -513,21 +515,29 @@ MaxnetDesign maxnet_design(const double* x, const double* y, std::size_t n, std:
   }
   const double gigabytes = static_cast<double>(m) * static_cast<double>(d.features.size()) *
                            sizeof(double) / 1e9;
-  if (gigabytes > spec.max_design) {
+  if (gigabytes > spec.max_design / spec.sharing) {
     throw Error("maxnet's '" + d.classes + "' classes over " + std::to_string(p) +
                 " columns are " + std::to_string(d.features.size()) + " features over " +
                 std::to_string(m) + " rows, a design of " + two_digits(gigabytes) +
                 " GB, and the fit holds a centred copy beside it. The limit is " +
-                two_digits(spec.max_design) +
-                " GB. Fit a coarser representation, fewer classes, or raise the limit.");
+                two_digits(spec.max_design / spec.sharing) + " GB" +
+                (spec.sharing > 1 ? ", `max_design = " + two_digits(spec.max_design) +
+                                        "` shared by the " + std::to_string(spec.sharing) +
+                                        " fits held at once"
+                                  : std::string()) +
+                ". Fit a coarser representation, fewer classes, fewer threads, or raise the "
+                "limit.");
   }
   d.design = expand(d.features, d.x.data(), m);
   d.reg = tolerances(d.features, d.design.data(), m, d.y.data(), spec.regmult);
   return d;
 }
 
-Maxnet maxnet_fit(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
-                  const MaxnetSpec& spec, const std::int32_t* fold, std::int32_t n_fold) {
+namespace {
+
+Maxnet fit_response(const double* x, const double* y, const double* w, std::size_t n,
+                    std::size_t p, const MaxnetSpec& spec, const std::int32_t* fold,
+                    std::int32_t n_fold) {
   const MaxnetDesign d = maxnet_design(x, y, n, p, spec);
   const std::size_t m = d.m;
 
@@ -569,6 +579,24 @@ Maxnet maxnet_fit(const double* x, const double* y, const double* w, std::size_t
 
   if (spec.formulation == MaxnetFormulation::background) normalise_over_background(d, fit);
   return fit;
+}
+
+}  // namespace
+
+std::vector<Maxnet> maxnet_fit(const double* x, std::size_t n, std::size_t p, const double* y,
+                               const double* w, std::size_t r, const MaxnetSpec& spec,
+                               const std::int32_t* fold, const std::int32_t* n_fold) {
+  MaxnetSpec each = spec;
+  each.sharing = static_cast<int>(std::max<std::size_t>(
+      std::min<std::size_t>(static_cast<std::size_t>(std::max(spec.threads, 1)), r), 1));
+  each.threads = r == 1 ? spec.threads : 1;
+  std::vector<Maxnet> fits(r);
+  detail::run_tasks(r, spec.threads, [&](std::size_t s) {
+    fits[s] = fit_response(x, y + s * n, w == nullptr ? nullptr : w + s * n, n, p, each,
+                           fold == nullptr ? nullptr : fold + s * n,
+                           n_fold == nullptr ? 0 : n_fold[s]);
+  });
+  return fits;
 }
 
 void maxnet_predict(const Maxnet& fit, const double* x, std::size_t n, std::size_t p, bool clamp,

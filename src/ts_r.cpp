@@ -698,39 +698,49 @@ cpp11::list ts_maxnet_design_(cpp11::doubles x, cpp11::doubles y, int n, int p,
 
 [[cpp11::register]]
 cpp11::list ts_maxnet_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
-                           std::string classes, int knots, double regmult,
+                           int r, std::string classes, int knots, double regmult,
                            std::string formulation, bool add_samples, double thresh,
                            double max_pass, int n_lambda, bool one_se, cpp11::sexp fold,
-                           int n_fold, int threads, double max_design) {
+                           cpp11::integers n_fold, int threads, double max_design) {
   const timesift::MaxnetSpec spec = maxnet_spec(classes, knots, regmult, formulation, add_samples,
                                                 thresh, max_pass, n_lambda, one_se, threads,
                                                 max_design);
   const std::vector<std::int32_t> which = take_folds(fold);
-  const timesift::Maxnet fit = timesift::maxnet_fit(
-      REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
-      static_cast<std::size_t>(p), spec, which.empty() ? nullptr : which.data(),
-      which.empty() ? 0 : n_fold);
+  const std::vector<std::int32_t> folds(n_fold.begin(), n_fold.end());
+  if (!which.empty() && (which.size() != static_cast<std::size_t>(n) * static_cast<std::size_t>(r) ||
+                         folds.size() != static_cast<std::size_t>(r))) {
+    throw std::invalid_argument("maxnet's folds are one per unit and response, and one count per "
+                                "response");
+  }
+  const std::vector<timesift::Maxnet> fits = timesift::maxnet_fit(
+      REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
+      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec,
+      which.empty() ? nullptr : which.data(), which.empty() ? nullptr : folds.data());
   using namespace cpp11::literals;
-  cpp11::writable::list out({
-    "formulation"_nm = cpp11::as_sexp(std::string(timesift::maxnet_formulation_name(fit.formulation))),
-    "classes"_nm = cpp11::as_sexp(fit.classes),
-    "n_column"_nm = cpp11::as_sexp(fit.n_column),
-    "n_presence"_nm = cpp11::as_sexp(fit.n_presence),
-    "n_feature"_nm = cpp11::as_sexp(fit.n_feature),
-    "var_min"_nm = give(fit.var_min),
-    "var_max"_nm = give(fit.var_max),
-    "feature_min"_nm = give(fit.feature_min),
-    "feature_max"_nm = give(fit.feature_max),
-    "beta"_nm = give(fit.beta),
-    "intercept"_nm = cpp11::as_sexp(fit.intercept),
-    "lasso_intercept"_nm = cpp11::as_sexp(fit.lasso_intercept),
-    "entropy"_nm = cpp11::as_sexp(fit.entropy),
-    "lambda"_nm = cpp11::as_sexp(fit.lambda),
-    "stalled"_nm = cpp11::as_sexp(fit.stalled),
-    "fold_stalled"_nm = cpp11::as_sexp(fit.fold_stalled)
-  });
-  give_features(out, fit.features);
-  return out;
+  cpp11::writable::list all;
+  for (const timesift::Maxnet& fit : fits) {
+    cpp11::writable::list out({
+      "formulation"_nm = cpp11::as_sexp(std::string(timesift::maxnet_formulation_name(fit.formulation))),
+      "classes"_nm = cpp11::as_sexp(fit.classes),
+      "n_column"_nm = cpp11::as_sexp(fit.n_column),
+      "n_presence"_nm = cpp11::as_sexp(fit.n_presence),
+      "n_feature"_nm = cpp11::as_sexp(fit.n_feature),
+      "var_min"_nm = give(fit.var_min),
+      "var_max"_nm = give(fit.var_max),
+      "feature_min"_nm = give(fit.feature_min),
+      "feature_max"_nm = give(fit.feature_max),
+      "beta"_nm = give(fit.beta),
+      "intercept"_nm = cpp11::as_sexp(fit.intercept),
+      "lasso_intercept"_nm = cpp11::as_sexp(fit.lasso_intercept),
+      "entropy"_nm = cpp11::as_sexp(fit.entropy),
+      "lambda"_nm = cpp11::as_sexp(fit.lambda),
+      "stalled"_nm = cpp11::as_sexp(fit.stalled),
+      "fold_stalled"_nm = cpp11::as_sexp(fit.fold_stalled)
+    });
+    give_features(out, fit.features);
+    all.push_back(out);
+  }
+  return all;
 }
 
 [[cpp11::register]]

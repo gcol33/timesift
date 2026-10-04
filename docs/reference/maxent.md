@@ -87,12 +87,13 @@ maxent(
 
 - max_design:
 
-  Gigabytes the expanded design may take.
+  Gigabytes the expanded designs fitted at once may take together.
 
 - threads:
 
-  How many fits of the absence formulation's inner cross-validation run
-  at once. What comes back does not depend on it.
+  Responses fitted at once, or, with one response to fit, the fits of
+  the absence formulation's inner cross-validation run at once. What
+  comes back does not depend on it.
 
 - seed:
 
@@ -141,8 +142,10 @@ three-channel representation, 471 columns, is 47,100 features under
 `"lqh"`, and its products under `"lqph"` 110,685 more. The design is
 held in memory with a centred copy beside it, and a fit whose design
 would take more than `max_design` gigabytes is refused with the size it
-would have taken. A coarser representation (`data = grain("month")`) or
-fewer classes is then the way to fit it.
+would have taken. `threads` fit that many responses at once, each the
+fit it gets alone, and the designs held at once share `max_design`. A
+coarser representation (`data = grain("month")`), fewer classes or fewer
+threads is then the way to fit it.
 
 A response with fewer than two presences, or one whose inner training
 sets cannot each hold two of each outcome under the absence formulation,

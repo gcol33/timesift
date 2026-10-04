@@ -48,10 +48,10 @@ formulation predicts a probability, which is its \code{"logistic"}.}
 
 \item{tol}{Where the coordinate descent stops, as the elastic net's \code{tol}.}
 
-\item{max_design}{Gigabytes the expanded design may take.}
+\item{max_design}{Gigabytes the expanded designs fitted at once may take together.}
 
-\item{threads}{How many fits of the absence formulation's inner cross-validation run at once.
-What comes back does not depend on it.}
+\item{threads}{Responses fitted at once, or, with one response to fit, the fits of the absence
+formulation's inner cross-validation run at once. What comes back does not depend on it.}
 
 \item{seed}{Seed for the inner cross-validation's fold draw, which is random and would otherwise
 make the fit irreproducible.}
@@ -92,8 +92,10 @@ as maxnet's \code{predict(clamp = TRUE)} does; \code{clamp = FALSE} reads them a
 A hinge per column per knot makes the design large: a weekly three-channel representation,
 471 columns, is 47,100 features under \code{"lqh"}, and its products under \code{"lqph"} 110,685 more.
 The design is held in memory with a centred copy beside it, and a fit whose design would take
-more than \code{max_design} gigabytes is refused with the size it would have taken. A coarser
-representation (\code{data = grain("month")}) or fewer classes is then the way to fit it.
+more than \code{max_design} gigabytes is refused with the size it would have taken. \code{threads} fit
+that many responses at once, each the fit it gets alone, and the designs held at once share
+\code{max_design}. A coarser representation (\code{data = grain("month")}), fewer classes or fewer
+threads is then the way to fit it.
 
 A response with fewer than two presences, or one whose inner training sets cannot each hold two
 of each outcome under the absence formulation, is predicted its share among the fitting units,

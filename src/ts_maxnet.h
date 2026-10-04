@@ -68,9 +68,11 @@ struct MaxnetSpec {
   int n_lambda = 100;        // absence: points of the derived path
   bool one_se = false;       // absence: read the path at the largest penalty within one standard
                              // error of the least held-out deviance rather than at the least
-  int threads = 1;           // absence: fits of the cross-validation at once
-  double max_design = 2.0;   // gigabytes the expanded design may take; the penalised core holds a
-                             // centred copy beside it, so a fit needs about twice this
+  int threads = 1;           // responses fitted at once, and a lone response's absence folds
+  double max_design = 2.0;   // gigabytes the expanded designs held at once may take together; the
+                             // penalised core holds a centred copy beside each, so a fit needs
+                             // about twice this
+  int sharing = 1;           // designs held at once, which share `max_design`
 };
 
 // What a fit is handed to the penalised core: the rows it fits, background rows added, with their
@@ -106,10 +108,15 @@ struct Maxnet {
   std::int32_t fold_stalled = 0;    // absence: folds whose path stalled
 };
 
-// `y` holds zero and one. `w` is read by the absence formulation alone, and `fold` (0-based, one
-// per unit) is its cross-validation's; the background formulation takes neither.
-Maxnet maxnet_fit(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
-                  const MaxnetSpec& spec, const std::int32_t* fold, std::int32_t n_fold);
+// One fit per response over the shared columns `x` [n, p]: response `s` is column `s` of `y`
+// [n, r], holding zero and one. `w` [n, r] is read by the absence formulation alone, and so is
+// `fold` [n, r], 0-based, column `s` the cross-validation of response `s` over `n_fold[s]` folds;
+// the background formulation takes neither, and both may be null. `spec.threads` fit that many
+// responses at once, or a lone response's folds at once, and each fit is the one its response
+// gives alone.
+std::vector<Maxnet> maxnet_fit(const double* x, std::size_t n, std::size_t p, const double* y,
+                               const double* w, std::size_t r, const MaxnetSpec& spec,
+                               const std::int32_t* fold, const std::int32_t* n_fold);
 
 enum class MaxnetOutput { link, exponential, cloglog, logistic };
 

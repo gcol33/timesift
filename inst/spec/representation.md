@@ -956,7 +956,9 @@ the model here has to be the one they already fit.
 - A path that does not settle at a penalty is read at the last point it settled at, and `stalled`
   says where it stopped; maxnet stops with an error there instead.
 - A design of more than `max_design` gigabytes, rows fitted times features times eight bytes, is
-  refused before it is allocated, with its size in the message.
+  refused before it is allocated, with its size in the message. Each response's fit is its own,
+  and `threads` fit that many responses at once, the designs held at once sharing `max_design`
+  equally, or a lone response's folds at once.
 
 ### The fixtures
 

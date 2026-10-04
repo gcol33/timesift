@@ -272,3 +272,16 @@ def test_maxnet_needs_a_presence_absence_head_and_a_thin_response_is_its_share(
     fit = fit_learner(maxent(), x, Response(one, y.units, ("rare",)))
     assert fit.model["unfitted"] == ["rare"]
     np.testing.assert_allclose(np.unique(fit.predict(x)), [1 / len(y.units)])
+
+
+@pytest.mark.parametrize("formulation", ["background", "absence"])
+def test_responses_fitted_on_several_threads_are_the_fits_each_gets_on_one(formulation):
+    x, y = planted(seed=71)
+    y = Response(np.column_stack([y.values, y.values[::-1, 0]]), y.units, ("sp1", "sp2", "sp3"))
+    one = fit_learner(maxent(formulation=formulation), x, y).model["models"]
+    many = fit_learner(maxent(formulation=formulation, threads=3), x, y).model["models"]
+    for a, b in zip(one, many):
+        assert type(a) is type(b)
+        if isinstance(a, dict):
+            np.testing.assert_array_equal(a["beta"], b["beta"])
+            assert a["intercept"] == b["intercept"] and a["lambda"] == b["lambda"]

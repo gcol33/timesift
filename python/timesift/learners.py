@@ -1078,6 +1078,8 @@ def maxent(data=None, classes=None, regmult=1.0, formulation="background", type=
     471 columns, is 47,100 features under ``"lqh"``, and its products under ``"lqph"`` 110,685
     more. The design is held in memory with a centred copy beside it, and a fit whose design would
     take more than ``max_design`` gigabytes is refused with the size it would have taken.
+    ``threads`` fit that many variables at once, each the fit it gets alone, or one variable's
+    inner cross-validation under the absences, and the designs held at once share ``max_design``.
 
     A response with fewer than two presences, or one whose inner training sets cannot each hold two
     of each outcome under the absence formulation, is predicted its share among the fitting units,
@@ -1117,27 +1119,34 @@ def _maxnet_type(formulation, type) -> str:
 
 def _maxnet_fit(x, y, classes, regmult, formulation, type, knots, add_samples, clamp, n_inner, s,
                 tol, max_design, threads, seed, head, variables, group=None, **_):
-    from ._maxnet import maxnet_fit
+    from ._maxnet import maxnet_fits
     if _family(head) != "binomial":
         raise ValueError("maxnet fits a presence-absence response, under a head whose loss is the "
                          f"binary cross-entropy; this head's loss is {head['loss']!r}.")
     m = flatten(x)
-
-    def make(design, yj, seed_j, w):
-        if (yj == 1).sum() < 2:
-            return float(yj.mean())
-        fold, n_fold = None, 0
-        if formulation == "absence":
-            fold = _inner_folds(yj, n_inner, seed_j, group)
-            if not _inner_fittable(yj, fold):
-                return float(yj.mean())
-            n_fold = int(fold.max()) + 1
-        return maxnet_fit(design, yj, w, classes=classes, knots=knots, regmult=regmult,
-                          formulation=formulation, add_samples=add_samples, thresh=tol,
-                          one_se=s == "lambda.1se", fold=fold, n_fold=n_fold, threads=threads,
-                          max_design=max_design)
-
-    models = _fit_columns(m, y, make, _variable_seeds(seed, variables), _head_weights(head, y))
+    seeds = _variable_seeds(seed, variables)
+    models = [float(v) for v in y.mean(axis=0)]
+    fittable = np.array([len(np.unique(c)) > 1 and (c == 1).sum() >= 2 for c in y.T], dtype=bool)
+    fold, n_fold = None, []
+    if formulation == "absence":
+        fold = np.zeros(y.shape, dtype=np.int32)
+        n_fold = np.zeros(y.shape[1], dtype=np.int64)
+        for j in np.flatnonzero(fittable):
+            inner = _inner_folds(y[:, j], n_inner, seeds[j], group)
+            if not _inner_fittable(y[:, j], inner):
+                fittable[j] = False
+                continue
+            fold[:, j] = inner
+            n_fold[j] = int(inner.max()) + 1
+        fold, n_fold = fold[:, fittable], [int(k) for k in n_fold[fittable]]
+    if fittable.any():
+        fits = maxnet_fits(m, y[:, fittable], _head_weights(head, y)[:, fittable],
+                           classes=classes, knots=knots, regmult=regmult,
+                           formulation=formulation, add_samples=add_samples, thresh=tol,
+                           one_se=s == "lambda.1se", fold=fold, n_fold=n_fold, threads=threads,
+                           max_design=max_design)
+        for j, f in zip(np.flatnonzero(fittable), fits):
+            models[j] = f
     return dict(models=models, n_col=m.shape[1], type=type, clamp=clamp,
                 unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)],
                 stopped=[str(v) for v, f in zip(variables, models)

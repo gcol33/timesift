@@ -231,3 +231,14 @@ test_that("maxnet needs a presence-absence head, and a thin response is its shar
   expect_identical(fit$model$unfitted, "rare")
   expect_equal(unique(stats::predict(fit, x)[, 1L]), 1 / 60)
 })
+
+test_that("responses fitted on several threads are the fits each gets on one", {
+  sim <- sim_series(n_unit = 60L, days = 60L, seed = 71L)
+  y <- sim_response(sim, n_var = 3L, seed = 72L)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
+  for (formulation in c("background", "absence")) {
+    one <- fit_learner(maxent(formulation = formulation), x, y)
+    many <- fit_learner(maxent(formulation = formulation, threads = 3L), x, y)
+    expect_identical(many$model$models, one$model$models, info = formulation)
+  }
+})

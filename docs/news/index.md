@@ -96,6 +96,10 @@
   logistic output. `threads` fits that many responses at once, each
   network the one it gets alone, and `standardise = TRUE` centres and
   scales the columns first, which nnet and the default do not.
+- `maxent(threads)` fits that many responses at once under either
+  formulation, each the fit it gets alone; it reached only the absence
+  formulation’s inner folds, so a background fit ran on one thread. The
+  designs held at once share `max_design`.
 - [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md)
   takes `optimizer` (`"adamw"`, the default, `"adam"` or `"sgd"`), a
   `penalty` with its `alpha`, cito’s `lambda` and `alpha` with `alpha`

@@ -31,8 +31,10 @@
 #' A hinge per column per knot makes the design large: a weekly three-channel representation,
 #' 471 columns, is 47,100 features under `"lqh"`, and its products under `"lqph"` 110,685 more.
 #' The design is held in memory with a centred copy beside it, and a fit whose design would take
-#' more than `max_design` gigabytes is refused with the size it would have taken. A coarser
-#' representation (`data = grain("month")`) or fewer classes is then the way to fit it.
+#' more than `max_design` gigabytes is refused with the size it would have taken. `threads` fit
+#' that many responses at once, each the fit it gets alone, and the designs held at once share
+#' `max_design`. A coarser representation (`data = grain("month")`), fewer classes or fewer
+#' threads is then the way to fit it.
 #'
 #' A response with fewer than two presences, or one whose inner training sets cannot each hold two
 #' of each outcome under the absence formulation, is predicted its share among the fitting units,
@@ -57,9 +59,9 @@
 #' @param n_inner Folds of the absence formulation's inner cross-validation.
 #' @param s Where the absence formulation reads its path: `"lambda.min"` or `"lambda.1se"`.
 #' @param tol Where the coordinate descent stops, as the elastic net's `tol`.
-#' @param max_design Gigabytes the expanded design may take.
-#' @param threads How many fits of the absence formulation's inner cross-validation run at once.
-#'   What comes back does not depend on it.
+#' @param max_design Gigabytes the expanded designs fitted at once may take together.
+#' @param threads Responses fitted at once, or, with one response to fit, the fits of the absence
+#'   formulation's inner cross-validation run at once. What comes back does not depend on it.
 #'
 #' @return A [learner()].
 #'
@@ -97,27 +99,35 @@ maxent <- function(data = NULL, classes = NULL, regmult = 1,
       }
       m <- .flatten(x)
       seeds <- .variable_seeds(seed, y)
-      models <- lapply(seq_len(ncol(y)), function(j) {
-        yj <- y[, j]
-        if (length(unique(yj)) < 2L || sum(yj == 1) < 2L) {
-          return(mean(yj))
-        }
-        fold <- NULL
-        n_fold <- 0L
-        if (identical(formulation, "absence")) {
-          inner <- .inner_folds(yj, n_inner, seeds[j], group)
-          if (!.inner_fittable(yj, inner)) {
-            return(mean(yj))
+      models <- as.list(unname(colMeans(y)))
+      fittable <- vapply(seq_len(ncol(y)), function(j) {
+        length(unique(y[, j])) > 1L && sum(y[, j] == 1) >= 2L
+      }, logical(1L))
+      folds <- NULL
+      n_fold <- integer(0)
+      if (identical(formulation, "absence")) {
+        folds <- matrix(0L, nrow(y), ncol(y))
+        n_fold <- integer(ncol(y))
+        for (j in which(fittable)) {
+          inner <- .inner_folds(y[, j], n_inner, seeds[j], group)
+          if (!.inner_fittable(y[, j], inner)) {
+            fittable[j] <- FALSE
+            next
           }
           labels <- sort(unique(inner))
-          fold <- match(inner, labels) - 1L
-          n_fold <- length(labels)
+          folds[, j] <- match(inner, labels) - 1L
+          n_fold[j] <- length(labels)
         }
-        .maxnet_fit(m, yj, weights[, j], classes = classes, knots = knots, regmult = regmult,
-                    formulation = formulation, add_samples = add_samples, thresh = tol,
-                    one_se = identical(s, "lambda.1se"), fold = fold, n_fold = n_fold,
-                    threads = threads, max_design = max_design)
-      })
+        folds <- folds[, fittable, drop = FALSE]
+        n_fold <- n_fold[fittable]
+      }
+      if (any(fittable)) {
+        models[fittable] <- .maxnet_fits(
+          m, y[, fittable, drop = FALSE], weights[, fittable, drop = FALSE], classes = classes,
+          knots = knots, regmult = regmult, formulation = formulation,
+          add_samples = add_samples, thresh = tol, one_se = identical(s, "lambda.1se"),
+          fold = folds, n_fold = n_fold, threads = threads, max_design = max_design)
+      }
       unfitted <- colnames(y)[vapply(models, is.numeric, logical(1L))]
       stopped <- colnames(y)[vapply(models, function(f) {
         is.list(f) && (f$stalled > 0L || f$fold_stalled > 0L)
@@ -150,19 +160,27 @@ maxent <- function(data = NULL, classes = NULL, regmult = 1,
 }
 
 # maxnet, over the core `src/ts_maxnet.cpp` compiles into both languages. Nothing here decides
-# anything: the design, the response, the case weights and the inner folds are settled above, and
-# what is left is to hand them over column-major. A fit is a plain list of numbers, so it round
-# trips through `saveRDS()` and predicts on another machine.
-.maxnet_fit <- function(x, y, w, classes = NULL, knots = 50L, regmult = 1,
-                        formulation = "background", add_samples = TRUE, thresh = 1e-8,
-                        max_pass = 1e8, n_lambda = 100L, one_se = FALSE, fold = NULL,
-                        n_fold = 0L, threads = 1L, max_design = 2) {
-  ts_maxnet_fit_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x),
+# anything: the design, the responses, the case weights and the inner folds are settled above, and
+# what is left is to hand them over column-major, one fit per column of `y`, `fold` [n, r] and
+# `n_fold` one count per column. A fit is a plain list of numbers, so it round trips through
+# `saveRDS()` and predicts on another machine.
+.maxnet_fits <- function(x, y, w, classes = NULL, knots = 50L, regmult = 1,
+                         formulation = "background", add_samples = TRUE, thresh = 1e-8,
+                         max_pass = 1e8, n_lambda = 100L, one_se = FALSE, fold = NULL,
+                         n_fold = integer(0), threads = 1L, max_design = 2) {
+  y <- as.matrix(y)
+  w <- as.matrix(w)
+  ts_maxnet_fit_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x), ncol(y),
                  classes %||% "", as.integer(knots), as.numeric(regmult), formulation,
                  isTRUE(add_samples), as.numeric(thresh), as.numeric(max_pass),
                  as.integer(n_lambda), isTRUE(one_se),
                  if (is.null(fold)) NULL else as.integer(fold), as.integer(n_fold),
                  as.integer(threads), as.numeric(max_design))
+}
+
+# maxnet on one response, `fold` one index per unit.
+.maxnet_fit <- function(x, y, w, ..., fold = NULL, n_fold = 0L) {
+  .maxnet_fits(x, y, w, ..., fold = fold, n_fold = if (is.null(fold)) integer(0) else n_fold)[[1L]]
 }
 
 .maxnet_design <- function(x, y, classes = NULL, knots = 50L, regmult = 1,

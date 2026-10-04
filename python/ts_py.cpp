@@ -30,6 +30,7 @@ using ConstI32 = nb::ndarray<const std::int32_t, nb::ndim<1>, nb::c_contig, nb::
 using ConstI64 = nb::ndarray<const std::int64_t, nb::ndim<1>, nb::c_contig, nb::device::cpu>;
 using ConstF64 = nb::ndarray<const double, nb::ndim<1>, nb::c_contig, nb::device::cpu>;
 using ConstMat = nb::ndarray<const double, nb::ndim<2>, nb::f_contig, nb::device::cpu>;
+using ConstMatI32 = nb::ndarray<const std::int32_t, nb::ndim<2>, nb::f_contig, nb::device::cpu>;
 
 // Hands a vector to NumPy and lets the capsule free it when the array goes.
 template <typename T>
@@ -561,45 +562,56 @@ NB_MODULE(_core, m) {
         nb::arg("formulation"), nb::arg("add_samples"), nb::arg("max_design"));
 
   m.def("maxnet_fit",
-        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& classes, int knots,
+        [](ConstMat x, ConstMat y, ConstMat w, const std::string& classes, int knots,
            double regmult, const std::string& formulation, bool add_samples, double thresh,
-           double max_pass, int n_lambda, bool one_se, std::optional<ConstI32> fold, int n_fold,
-           int threads, double max_design) {
+           double max_pass, int n_lambda, bool one_se, std::optional<ConstMatI32> fold,
+           const std::vector<std::int32_t>& n_fold, int threads, double max_design) {
+          if (y.shape(0) != x.shape(0) || w.shape(0) != x.shape(0) || w.shape(1) != y.shape(1) ||
+              (fold.has_value() && (fold->shape(0) != x.shape(0) || fold->shape(1) != y.shape(1) ||
+                                    n_fold.size() != y.shape(1)))) {
+            throw std::invalid_argument("maxnet is fitted on one response, one weight and, under "
+                                        "the absences, one fold per unit and response");
+          }
           const timesift::MaxnetSpec spec =
               maxnet_spec(classes, knots, regmult, formulation, add_samples, thresh, max_pass,
                           n_lambda, one_se, threads, max_design);
-          timesift::Maxnet fit;
+          std::vector<timesift::Maxnet> fits;
           {
             nb::gil_scoped_release release;
-            fit = timesift::maxnet_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
-                                       spec, fold.has_value() ? fold->data() : nullptr,
-                                       fold.has_value() ? n_fold : 0);
+            fits = timesift::maxnet_fit(x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+                                        y.shape(1), spec,
+                                        fold.has_value() ? fold->data() : nullptr,
+                                        fold.has_value() ? n_fold.data() : nullptr);
           }
-          nb::dict out;
-          out["formulation"] = std::string(timesift::maxnet_formulation_name(fit.formulation));
-          out["classes"] = fit.classes;
-          out["n_column"] = fit.n_column;
-          out["n_presence"] = fit.n_presence;
-          out["n_feature"] = fit.n_feature;
-          out["var_min"] = give(std::move(fit.var_min));
-          out["var_max"] = give(std::move(fit.var_max));
-          out["feature_min"] = give(std::move(fit.feature_min));
-          out["feature_max"] = give(std::move(fit.feature_max));
-          out["beta"] = give(std::move(fit.beta));
-          out["intercept"] = fit.intercept;
-          out["lasso_intercept"] = fit.lasso_intercept;
-          out["entropy"] = fit.entropy;
-          out["lambda"] = fit.lambda;
-          out["stalled"] = fit.stalled;
-          out["fold_stalled"] = fit.fold_stalled;
-          give_features(out, fit.features);
-          return out;
+          nb::list all;
+          for (timesift::Maxnet& fit : fits) {
+            nb::dict out;
+            out["formulation"] = std::string(timesift::maxnet_formulation_name(fit.formulation));
+            out["classes"] = fit.classes;
+            out["n_column"] = fit.n_column;
+            out["n_presence"] = fit.n_presence;
+            out["n_feature"] = fit.n_feature;
+            out["var_min"] = give(std::move(fit.var_min));
+            out["var_max"] = give(std::move(fit.var_max));
+            out["feature_min"] = give(std::move(fit.feature_min));
+            out["feature_max"] = give(std::move(fit.feature_max));
+            out["beta"] = give(std::move(fit.beta));
+            out["intercept"] = fit.intercept;
+            out["lasso_intercept"] = fit.lasso_intercept;
+            out["entropy"] = fit.entropy;
+            out["lambda"] = fit.lambda;
+            out["stalled"] = fit.stalled;
+            out["fold_stalled"] = fit.fold_stalled;
+            give_features(out, fit.features);
+            all.append(out);
+          }
+          return all;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("classes"), nb::arg("knots"),
         nb::arg("regmult"), nb::arg("formulation"), nb::arg("add_samples"), nb::arg("thresh"),
         nb::arg("max_pass"), nb::arg("n_lambda"), nb::arg("one_se"),
-        nb::arg("fold") = nb::none(), nb::arg("n_fold") = 0, nb::arg("threads") = 1,
-        nb::arg("max_design") = 2.0);
+        nb::arg("fold") = nb::none(), nb::arg("n_fold") = std::vector<std::int32_t>(),
+        nb::arg("threads") = 1, nb::arg("max_design") = 2.0);
 
   m.def("maxnet_predict",
         [](const nb::dict& fit, ConstMat newx, bool clamp, const std::string& type) {

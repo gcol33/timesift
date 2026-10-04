@@ -146,10 +146,10 @@ extern "C" SEXP _timesift_ts_maxnet_design_(SEXP x, SEXP y, SEXP n, SEXP p, SEXP
   END_CPP11
 }
 // ts_r.cpp
-cpp11::list ts_maxnet_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string classes, int knots, double regmult, std::string formulation, bool add_samples, double thresh, double max_pass, int n_lambda, bool one_se, cpp11::sexp fold, int n_fold, int threads, double max_design);
-extern "C" SEXP _timesift_ts_maxnet_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP classes, SEXP knots, SEXP regmult, SEXP formulation, SEXP add_samples, SEXP thresh, SEXP max_pass, SEXP n_lambda, SEXP one_se, SEXP fold, SEXP n_fold, SEXP threads, SEXP max_design) {
+cpp11::list ts_maxnet_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int r, std::string classes, int knots, double regmult, std::string formulation, bool add_samples, double thresh, double max_pass, int n_lambda, bool one_se, cpp11::sexp fold, cpp11::integers n_fold, int threads, double max_design);
+extern "C" SEXP _timesift_ts_maxnet_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP r, SEXP classes, SEXP knots, SEXP regmult, SEXP formulation, SEXP add_samples, SEXP thresh, SEXP max_pass, SEXP n_lambda, SEXP one_se, SEXP fold, SEXP n_fold, SEXP threads, SEXP max_design) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_maxnet_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(classes), cpp11::as_cpp<cpp11::decay_t<int>>(knots), cpp11::as_cpp<cpp11::decay_t<double>>(regmult), cpp11::as_cpp<cpp11::decay_t<std::string>>(formulation), cpp11::as_cpp<cpp11::decay_t<bool>>(add_samples), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<double>>(max_pass), cpp11::as_cpp<cpp11::decay_t<int>>(n_lambda), cpp11::as_cpp<cpp11::decay_t<bool>>(one_se), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<int>>(n_fold), cpp11::as_cpp<cpp11::decay_t<int>>(threads), cpp11::as_cpp<cpp11::decay_t<double>>(max_design)));
+    return cpp11::as_sexp(ts_maxnet_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<int>>(r), cpp11::as_cpp<cpp11::decay_t<std::string>>(classes), cpp11::as_cpp<cpp11::decay_t<int>>(knots), cpp11::as_cpp<cpp11::decay_t<double>>(regmult), cpp11::as_cpp<cpp11::decay_t<std::string>>(formulation), cpp11::as_cpp<cpp11::decay_t<bool>>(add_samples), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<double>>(max_pass), cpp11::as_cpp<cpp11::decay_t<int>>(n_lambda), cpp11::as_cpp<cpp11::decay_t<bool>>(one_se), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<cpp11::integers>>(n_fold), cpp11::as_cpp<cpp11::decay_t<int>>(threads), cpp11::as_cpp<cpp11::decay_t<double>>(max_design)));
   END_CPP11
 }
 // ts_r.cpp
@@ -281,7 +281,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_mars_fit_",             (DL_FUNC) &_timesift_ts_mars_fit_,             17},
     {"_timesift_ts_mars_predict_",         (DL_FUNC) &_timesift_ts_mars_predict_,          4},
     {"_timesift_ts_maxnet_design_",        (DL_FUNC) &_timesift_ts_maxnet_design_,        10},
-    {"_timesift_ts_maxnet_fit_",           (DL_FUNC) &_timesift_ts_maxnet_fit_,           18},
+    {"_timesift_ts_maxnet_fit_",           (DL_FUNC) &_timesift_ts_maxnet_fit_,           19},
     {"_timesift_ts_maxnet_predict_",       (DL_FUNC) &_timesift_ts_maxnet_predict_,        6},
     {"_timesift_ts_penalised_coef_",       (DL_FUNC) &_timesift_ts_penalised_coef_,        5},
     {"_timesift_ts_penalised_cv_",         (DL_FUNC) &_timesift_ts_penalised_cv_,         17},

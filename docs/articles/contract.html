@@ -1648,7 +1648,10 @@ it settled at, and <code>stalled</code> says where it stopped; maxnet
 stops with an error there instead.</li>
 <li>A design of more than <code>max_design</code> gigabytes, rows fitted
 times features times eight bytes, is refused before it is allocated,
-with its size in the message.</li>
+with its size in the message. Each response’s fit is its own, and
+<code>threads</code> fit that many responses at once, the designs held
+at once sharing <code>max_design</code> equally, or a lone response’s
+folds at once.</li>
 </ul>
 <div class="section level3">
 <h3 id="the-fixtures-1">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-1"></a>
