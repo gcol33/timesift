@@ -185,7 +185,7 @@ def test_the_count_head_refuses_a_response_it_cannot_hold():
 def test_each_learner_that_fits_a_family_fits_a_count_under_the_poisson_one():
     x, _, _, rate, count, y = count_data()
     for learner in (elasticnet(), forest(trees=30), boosting(trees=30),
-                    boosting(trees=30, newton=True, depth=2), tree(), linear(), mars(),
+                    boosting(method="xgboost", trees=30, depth=2), tree(), linear(), mars(),
                     ts.additive(k=5)):
         fit = fit_learner(learner, x, y, response="count")
         p = fit.predict(x)[:, 0]

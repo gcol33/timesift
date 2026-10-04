@@ -10,6 +10,10 @@
   max_terms = 3)`. The learner registers and reports as `linear`.
 * `maxnet()` is `maxent()`, named after the model rather than the package whose formulation it
   follows. Its arguments, defaults and numbers are unchanged; it registers and reports as `maxent`.
+* `boosting(newton = TRUE)` is `boosting(method = "xgboost")`. The flag switched the whole
+  algorithm, the tree growth, the split criterion, what `depth` and `min_leaf` count and the
+  default set, where its name described the leaf step alone, which gbm's trees take as well.
+  `method = "gbm"`, Friedman's gradient boosting machine, is the default as before.
 
 ## Other changes
 

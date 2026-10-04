@@ -111,18 +111,18 @@ def test_the_boosting_core_refuses_what_it_cannot_fit():
 
 
 def test_a_preset_fills_the_settings_left_open_as_gbm_xgboost_and_biomod2_have_them():
-    p = _boost_settings("package", False, *[None] * 9)
+    p = _boost_settings("package", "gbm", *[None] * 9)
     assert (p["trees"], p["depth"], p["shrinkage"], p["min_leaf"], p["subsample"],
             p["n_inner"]) == (100, 1, 0.1, 10, 0.5, 0)
-    b = _boost_settings("bigboss", False, *[None] * 9)
+    b = _boost_settings("bigboss", "gbm", *[None] * 9)
     assert (b["trees"], b["depth"], b["shrinkage"], b["min_leaf"], b["n_inner"]) == (
         2500, 7, 0.001, 5, 3)
-    xg = _boost_settings("package", True, *[None] * 9)
+    xg = _boost_settings("package", "xgboost", *[None] * 9)
     assert (xg["trees"], xg["depth"], xg["shrinkage"], xg["lambda_"], xg["subsample"]) == (
         100, 6, 0.3, 1, 1)
-    xb = _boost_settings("bigboss", True, *[None] * 9)
+    xb = _boost_settings("bigboss", "xgboost", *[None] * 9)
     assert (xb["trees"], xb["depth"], xb["shrinkage"]) == (4, 2, 1)
-    with pytest.raises(ValueError, match="newton=True"):
+    with pytest.raises(ValueError, match="method=.xgboost."):
         boosting(lambda_=1)
 
 
@@ -149,8 +149,8 @@ def test_boosting_fits_predicts_survives_a_round_trip_and_reads_the_flattened_co
     assert roc_auc(y.values[:, 0], p[:, 0]) > 0.75
     assert fit.model["n_col"] == flatten(x).shape[1]
     np.testing.assert_array_equal(pickle.loads(pickle.dumps(fit)).predict(x), p)
-    newton = fit_learner(boosting(newton=True, trees=30), x, y).predict(x)
-    assert roc_auc(y.values[:, 0], newton[:, 0]) > 0.75
+    second = fit_learner(boosting(method="xgboost", trees=30), x, y).predict(x)
+    assert roc_auc(y.values[:, 0], second[:, 0]) > 0.75
     cv = fit_learner(boosting(trees=60, n_inner=3), x, y).model["models"][0]
     assert len(cv["cv_error"]) == 60
     assert len(cv["offset"]) - 1 == int(np.argmin(cv["cv_error"])) + 1

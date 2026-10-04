@@ -1,25 +1,25 @@
 # Coming from biomod2
 
-biomod2 fits a set of species distribution algorithms on one table of
-predictors and combines them. `timesift` fits the same algorithms, and
-the representation of the predictors becomes a second axis of the
-comparison. When the predictors are a sensor record (hourly soil
-temperature, daily air temperature), the table biomod2 starts from is
-already a reduction of it, to monthly means or growing-degree-days. Here
-the algorithms run at every temporal grain the record supports, are
-scored on one set of held-out folds, and are combined afterwards.
+biomod2 fits several species distribution algorithms to one table of
+predictors and combines their predictions. When the predictors come from
+a sensor record, such as hourly soil temperature or daily air
+temperature, that table is already a summary of the record, for example
+monthly means or growing-degree-days. `timesift` fits the same
+algorithms to the record summarised at every temporal grain it supports,
+scores all of them on the same held-out folds, and then combines them.
 
-Each algorithm is one implementation in the compiled core that R and
-Python both call, so a model fitted from either language returns the
-same numbers. The cores reproduce the reference packages biomod2 itself
-calls (rpart, randomForest, gbm, xgboost, maxnet, MASS, earth, mda,
-mgcv), and each is pinned against the reference’s own output in the test
-fixtures. Nothing is fitted through biomod2 or through those packages.
+Each algorithm is implemented once, in a compiled core that the R and
+the Python interface both call, so a model fitted from either language
+gives the same predictions. Each core reproduces the package biomod2
+itself calls (rpart, randomForest, gbm, xgboost, maxnet, MASS, earth,
+mda, mgcv), and the test fixtures check it against that package’s
+output. `timesift` calls neither biomod2 nor these packages when it fits
+a model.
 
 ## The mapping
 
-Every biomod2 algorithm is a learner constructor. A variant of an
-algorithm is an argument of its constructor.
+Each biomod2 algorithm corresponds to a learner constructor, and a
+variant of an algorithm is an argument of that constructor.
 
 | biomod2 | `timesift` | notes |
 |----|----|----|
@@ -27,7 +27,7 @@ algorithm is an argument of its constructor.
 | `RF` | [`forest()`](https://gillescolling.com/timesift/reference/forest.md) | randomForest’s defaults |
 | `RFd` | `forest(balance = TRUE)` | each tree draws as many units from each class as the smaller class holds |
 | `GBM` | [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md) | gbm’s trees and Newton step |
-| `XGBOOST` | `boosting(newton = TRUE)` | xgboost’s exact greedy trees; `lambda` and `gamma` are its penalties |
+| `XGBOOST` | `boosting(method = "xgboost")` | xgboost’s exact greedy trees; `lambda` and `gamma` are its penalties |
 | `MAXNET`, `MAXENT` | [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md) | `classes`, `regmult` and `knots` are maxnet’s; the model is the background formulation by default |
 | `GLM` | [`linear()`](https://gillescolling.com/timesift/reference/linear.md) | `y ~ x + I(x^2)` over every column, searched by AIC as [`MASS::stepAIC()`](https://rdrr.io/pkg/MASS/man/stepAIC.html) does |
 | `GAM` | [`additive()`](https://gillescolling.com/timesift/reference/additive.md) | mgcv’s `gam(method = "GCV.Cp")`, `k = 10` |
@@ -36,42 +36,47 @@ algorithm is an argument of its constructor.
 | `SRE` | [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md) | `quantile = 0.025`, as `bm_SRE()` |
 | `ANN`, `DNN` | [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md) | a torch encoder with a joint head over all responses |
 
-`ANN` and `DNN` map to a learner by architecture, and not to numbers:
+For `ANN` and `DNN` the table matches the network architecture, and the
+fitted networks differ. biomod2 fits `ANN` with nnet, which minimises an
+L2-penalised loss by BFGS, and `DNN` with cito, which uses a stochastic
+optimiser.
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
-is a different network from the one biomod2 fits, `hidden` sets the
-layer widths, `activation` the nonlinearity and `dropout` the
-regularisation, and the training settings live in
-[`train_control()`](https://gillescolling.com/timesift/reference/train_control.md).
-nnet minimises an L2-penalised loss by BFGS and cito by a stochastic
-optimiser, where
+trains with AdamW, whose weight decay penalises the weights differently,
+so the same architecture gives a comparable network but not the same
+one. In
+[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md),
+`hidden` sets the layer widths, `activation` the nonlinearity and
+`dropout` the regularisation. The training settings are arguments of
+[`train_control()`](https://gillescolling.com/timesift/reference/train_control.md),
+which
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
-uses AdamW, whose weight decay acts differently, so a fit under the same
-architecture is a comparable network and not the same one. biomod2’s
-tuned `ANN` (`size = 5`, `decay = 0.1`, `maxit = 200`) is
+also accepts directly. biomod2’s tuned `ANN` (`size = 5`, `decay = 0.1`,
+`maxit = 200`) corresponds to
 `mlp(hidden = 5, epochs = 200, weight_decay = 0.1)`, and its tuned `DNN`
 (`hidden = c(100, 100)`, `activation = "selu"`, 150 epochs, batch size
-100) is
+100) to
 `mlp(hidden = c(100, 100), activation = "selu", epochs = 150, batch_size = 100)`.
 
-biomod2 ships two option sets, its defaults and a tuned set called
-`"bigboss"`. Where the two differ, the learners carry both as
-`preset = "package"` (the fitting package’s own defaults, which
-biomod2’s default set uses) and `preset = "bigboss"`, so
-`tree(preset = "bigboss")` is `min_split = 5`, `min_leaf = 5`,
+biomod2 ships two option sets: its defaults and a tuned set called
+`"bigboss"`. Where the two differ, the learners offer both, as
+`preset = "package"` (the defaults of the fitting package, which
+biomod2’s default set uses) and `preset = "bigboss"`. For example,
+`tree(preset = "bigboss")` sets `min_split = 5`, `min_leaf = 5`,
 `cp = 0.001`, `max_depth = 10` and five inner folds. A setting given
 explicitly overrides either preset.
 [`mars()`](https://gillescolling.com/timesift/reference/mars.md),
 [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
 and
 [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
-have one set, which both of biomod2’s share.
+have a single set, because biomod2 uses the same settings for them in
+both.
 
 ## One run
 
-The record is simulated: 200 units, a year of readings every six hours,
-three responses that read the record through a lagged, weekly-grain
-mechanism. The true grain is known to be the week, which makes the
-comparison below checkable.
+The example uses a simulated record: 200 units with readings every six
+hours for a year, and three responses that depend on the record through
+a lagged mechanism acting at weekly grain. Because the simulation puts
+the signal at the week, the comparison below can be checked against it.
 
 ``` r
 
@@ -85,9 +90,10 @@ str(sim$readings)
 #>  $ reading: num  9.09 11.63 7.07 8.92 9.2 ...
 ```
 
-`models` is a named list, so each candidate reports under the biomod2
-name. A learner left open runs at every grain of `sift`; one given
-`data =` runs at that representation alone.
+`models` is a named list, so each candidate is reported under its
+biomod2 name. A learner without a `data =` argument runs at every grain
+listed in `sift`; a learner with `data =` runs only at that
+representation.
 
 ``` r
 
@@ -96,7 +102,7 @@ models <- list(
   RF = forest(),
   RFd = forest(balance = TRUE),
   GBM = boosting(),
-  XGBOOST = boosting(newton = TRUE),
+  XGBOOST = boosting(method = "xgboost"),
   MAXNET = maxent(),
   GLM = linear(),
   GAM = additive(data = grain("season"), k = 5L),
@@ -106,14 +112,14 @@ models <- list(
 )
 ```
 
-Two of them are pinned to the seasonal grain. An additive model holds
-`k - 1` coefficients per column, and the 53 weekly columns of this
-record would need 478 coefficients for 160 training units, which
+Two learners are fixed to the seasonal grain. An additive model fits
+`k - 1` coefficients per column. At weekly grain this record has 53
+columns, which would need 478 coefficients for 160 training units, and
 [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
-refuses; four seasonal columns need 17. The envelope shuts out one
-presence in twenty at each end of every column, so the more columns, the
-fewer units fall inside every band, and a coarse grain is what it is
-meant for.
+refuses such a fit; the four seasonal columns need 17. The envelope
+excludes one presence in twenty at each end of every column, so each
+added column leaves fewer units inside all the bands, and the envelope
+is suited to a coarse grain.
 
 ``` r
 
@@ -136,10 +142,10 @@ fit$candidates[c("candidate", "grain", "bins", "status")][1:6, ]
 #> 6  RF / season season    4 fitted
 ```
 
-29 candidates were fitted: nine learners at three grains and the two
-pinned ones at one. All of them were cross-validated on the same five
-outer folds and scored on the same cells, so their means share a
-denominator.
+The run fitted 29 candidates: nine learners at three grains each and the
+two fixed learners at one. All of them were cross-validated on the same
+five outer folds and scored on the same cells, so their mean scores are
+directly comparable.
 
 ``` r
 
@@ -187,14 +193,14 @@ fit
 #> weights on every target  MAXNET / week 0.38   MARS / week 0.23   GBM / week 0.15   FDA / week 0.09   MAXNET / month 0.06   RF / week 0.04   XGBOOST / week 0.02   GLM / month 0.01   RFd / week 0.01   MARS / month 0.01
 ```
 
-The AUC of each candidate, the number of responses it scored highest on,
-and the held-out score of the procedure that chose among them and of the
-weighted combination are in the report above. The four highest means
-belong to weekly candidates, the grain the simulation puts the signal
-at. Where a biomod2 run reads off which algorithm wins on one table,
-this run also reads off the grain at which each algorithm does best, and
-the ordering across grains for one algorithm does not have to follow the
-ordering across algorithms.
+The report gives the AUC of each candidate, the number of responses on
+which it scored highest, and the held-out scores of the selection
+procedure and of the weighted ensemble. The four highest mean AUCs
+belong to weekly candidates, the grain at which the simulation places
+the signal. A biomod2 run shows which algorithm performs best on one
+table. Here the run also gives the grain at which each algorithm does
+best, and the ranking of grains within one algorithm need not match the
+ranking of algorithms.
 
 ``` r
 
@@ -207,10 +213,9 @@ read.](biomod2_files/figure-html/plot-fit-1.svg)
 ## Side by side
 
 A biomod2 run formats the data, fits the algorithms under a
-cross-validation strategy and then builds the ensembles. The calls below
-are the same run in each package, over one table of predictors for
-biomod2 and over a record for `timesift`. The biomod2 chunk is not
-evaluated.
+cross-validation strategy and then builds the ensembles. The two calls
+below set up the same run in each package: biomod2 on a table of
+predictors, `timesift` on a record. Neither chunk is evaluated.
 
 ``` r
 
@@ -231,7 +236,7 @@ ens <- BIOMOD_EnsembleModeling(mod, models.chosen = "all",
 
 fit <- timesift(targets, series, y = starts_with("sp"), id = plot_id, time = datetime,
                 models = list(CTA = tree(), RF = forest(), GBM = boosting(),
-                              XGBOOST = boosting(newton = TRUE), MAXNET = maxent(),
+                              XGBOOST = boosting(method = "xgboost"), MAXNET = maxent(),
                               GLM = linear(),
                               MARS = mars(), FDA = discriminant()),
                 sift = grains("week", "month", "season"),
@@ -239,22 +244,23 @@ fit <- timesift(targets, series, y = starts_with("sp"), id = plot_id, time = dat
                 resampling = cv(v = 5))
 ```
 
-The Python call takes the same constructors and the same arguments:
+The Python interface takes the same constructors and arguments:
 
 ``` python
 import timesift as ts
 
 fit = ts.timesift(targets, series, y="sp_*", id="plot_id", time="datetime",
-                  models=[ts.tree(), ts.forest(), ts.boosting(newton=True), ts.maxent(),
+                  models=[ts.tree(), ts.forest(), ts.boosting(method="xgboost"), ts.maxent(),
                           ts.mars(), ts.discriminant()],
                   sift=ts.grains("week", "month", "season"),
                   ensemble=ts.ensemble("weighted", min_score=0.5),
                   resampling=ts.cv(v=5))
 ```
 
-`y` takes every response column at once. biomod2 fits one species per
-call; here the responses share one fold map, one set of scorable cells
-and one set of candidates, and a response is a column of the result.
+biomod2 fits one species per call. In `timesift`, `y` selects all
+response columns at once, and the responses share one fold map, one set
+of scorable cells and one set of candidates. Each response is a column
+of the result.
 
 ## Ensembling
 
@@ -271,14 +277,14 @@ biomod2’s ensemble algorithms are options of
 | `metric.select`, `metric.select.thresh` | `metric =`, `min_score =` |
 | none | `ensemble("stack")` |
 
-The stack, `timesift`’s default, fits non-negative weights summing to
-one on the out-of-fold predictions alone, minimising the response head’s
-loss over the scorable cells. The weights are therefore never fitted on
-a prediction the member made for a unit it had been trained on.
+The stack is `timesift`’s default. It fits non-negative weights that sum
+to one, using only the out-of-fold predictions, and minimises the loss
+of the response head over the scorable cells. No weight is therefore
+fitted on a prediction a member made for a unit it was trained on.
 
-`min_score = 0.5` made a candidate ineligible when its mean AUC was
-below 0.5, which is the role `metric.select.thresh` plays. The weights
-the run settled on:
+`min_score = 0.5` excluded any candidate whose mean AUC was below 0.5,
+the role `metric.select.thresh` plays in biomod2. The six largest
+weights in this run:
 
 ``` r
 
@@ -289,9 +295,9 @@ round(sort(fit$weights, decreasing = TRUE)[1:6], 3)
 #>          0.036
 ```
 
-Committee averaging binarises each member at its own threshold, learned
-from that member’s out-of-fold predictions, and averages the votes. A
-smaller run on one grain shows it:
+Committee averaging converts each member’s predictions to presence or
+absence at a threshold learned from that member’s out-of-fold
+predictions, then averages these votes. A smaller run at one grain:
 
 ``` r
 
@@ -312,9 +318,10 @@ subset(fit_ca$estimate, metric %in% c("roc_auc", "tss"), c(arm, metric, score, s
 #> 54 ensemble     tss 0.4526556 0.05909692
 ```
 
-`EMcv` and `EMci` read the members of the ensemble side by side.
-`type = "spread"` returns the weighted mean, the standard deviation, the
-coefficient of variation and an interval for every target and response:
+`EMcv` and `EMci` summarise how much the ensemble members disagree.
+`type = "spread"` returns, for every target and response, the weighted
+mean, the standard deviation, the coefficient of variation and an
+interval:
 
 ``` r
 
@@ -328,19 +335,19 @@ round(sp[1:3, 1, ], 3)
 #> d001u00003 0.211 0.090 0.429 0.122 0.299
 ```
 
-On one target per map cell this is an uncertainty map in the way `EMcv`
-is.
+With one target per map cell, the coefficient of variation gives an
+uncertainty map like the one `EMcv` produces.
 
 ## Scores and thresholds
 
-biomod2 reports TSS at a threshold chosen on the same predictions it
-scores, and so does most species distribution code. Where presences are
-thin that choice inflates TSS. `timesift` reads the threshold of a
-candidate from its out-of-fold predictions and reports the expected
-inflation for a user’s own presence counts with
-[`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md).
-For the three responses above and five folds the inflation at two
-population skills reads:
+biomod2, like most species distribution code, reports TSS at a threshold
+chosen on the same predictions it scores. When presences are few, this
+choice inflates TSS. `timesift` chooses each candidate’s threshold from
+its out-of-fold predictions, and
+[`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
+estimates how large the inflation would be for a given set of presence
+counts. For the three responses above, five folds and two levels of true
+skill:
 
 ``` r
 
@@ -351,14 +358,15 @@ tss_inflation(sim$y, fold_map(sim$y, v = 5), skill = c(0.6, 0.9), replicates = 4
 ```
 
 [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
-returns the cuts a binary prediction uses, and `rule` picks the
-criterion: `"youden"` for TSS, `"kappa"`, `"prevalence"` or `"mpa"`, the
-minimum predicted area cut that keeps `perc` of the presences.
+returns the cut that turns a prediction into presence or absence, and
+`rule` selects the criterion: `"youden"` (the cut that maximises TSS),
+`"kappa"`, `"prevalence"`, or `"mpa"`, the minimum predicted area cut
+that keeps `perc` of the presences.
 
-biomod2’s other evaluation statistics come from
+biomod2’s other evaluation statistics are computed by
 [`table_metric()`](https://gillescolling.com/timesift/reference/table_metric.md),
-which cuts the predictions by a rule and reads the table of decisions
-against observations:
+which cuts the predictions by a rule and compares the resulting
+presences and absences with the observations:
 
 | biomod2 | `timesift` |
 |----|----|
@@ -367,56 +375,60 @@ against observations:
 | `BOYCE` | [`boyce_index()`](https://gillescolling.com/timesift/reference/boyce_index.md) |
 | `MPA` | `decision_threshold(rule = "mpa")` |
 
-biomod2 reads each statistic at the cut that brings that statistic
-closest to its own optimum on a grid of 100 cuts.
+biomod2 evaluates each statistic at the cut, out of a grid of 100, that
+brings that statistic closest to its optimum, so each statistic uses its
+own cut.
 [`table_metric()`](https://gillescolling.com/timesift/reference/table_metric.md)
-reads it at the cut of the `rule` given, `"youden"` by default, so the
-statistics are comparable at one operating point. Every name is a
-registered metric, so `grain_ladder(metric = "csi")` reads it.
+evaluates every statistic at the cut given by `rule`, `"youden"` by
+default, so all statistics refer to the same threshold. Every name is a
+registered metric, so `grain_ladder(metric = "csi")` can use it.
 
 ## Abundance, ordinal, continuous and count responses
 
-biomod2 4.3 also models abundances, ordinal classes and counts. The
-response head decides what a response is, and four ship beside
-presence-absence: `response = "continuous"` for any real number,
-`"abundance"` for a non-negative one, `"ordinal"` for whole-number
-classes and `"count"` for whole numbers of zero or more. The first three
-are fitted under squared error through an identity output, so every
-learner but the three above and the combiner read them unchanged.
-`r_squared` is what a continuous or abundance comparison reads by
-default, and
+biomod2 4.3 also models abundances, ordinal classes and counts. In
+`timesift` the response head defines the type of response, and four
+heads are available besides presence-absence: `response = "continuous"`
+for any real number, `"abundance"` for a non-negative number,
+`"ordinal"` for whole-number classes and `"count"` for non-negative
+whole numbers. The first three are fitted under squared error with an
+identity output, so every learner except
+[`maxent()`](https://gillescolling.com/timesift/reference/maxent.md),
+[`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
+and
+[`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md),
+as well as the ensemble, fits them without change. Continuous and
+abundance responses are compared by `r_squared` by default.
 [`regression_metric()`](https://gillescolling.com/timesift/reference/regression_metric.md)
-carries biomod2’s `RMSE`, `MSE`, `MAE` and `Max_error` (registered as
-`neg_rmse`, `neg_mse`, `neg_mae` and `neg_max_error`, since the highest
-score is the best).
+provides biomod2’s `RMSE`, `MSE`, `MAE` and `Max_error`, registered as
+`neg_rmse`, `neg_mse`, `neg_mae` and `neg_max_error` with the sign
+reversed so that the highest score is the best.
 [`ordinal_metric()`](https://gillescolling.com/timesift/reference/ordinal_metric.md)
-carries `Accuracy`, `Recall`, `Precision` and `F1`, each prediction
-being read as the observed class nearest to it. A multiclass response is
-one presence-absence column per class.
+provides `Accuracy`, `Recall`, `Precision` and `F1`, reading each
+prediction as the observed class nearest to it. A multiclass response is
+fitted as one presence-absence column per class.
 
-A count is fitted under the Poisson deviance through a log link and an
-exponential output, and a comparison reads `neg_poisson_deviance`, the
-mean deviance with its sign reversed. The elastic net, the generalised
-linear model, MARS, the additive model, the tree and the boosted trees
-each fit the Poisson family on their own core, pinned against glmnet,
-MASS and [`glm()`](https://rdrr.io/r/stats/glm.html), earth, mgcv, rpart
-and gbm or xgboost’s `count:poisson`. The forest cuts a count on its
-variance, the networks train under the deviance and the combiner
-minimises it. A tree shrinks a leaf’s rate towards the rate of the units
-it is grown on, as rpart does, and `tree(shrink = 0)` takes the
-shrinkage away.
+A count is fitted under the Poisson deviance with a log link and an
+exponential output, and is compared by `neg_poisson_deviance`, the mean
+deviance with the sign reversed. The elastic net, the generalised linear
+model, MARS, the additive model, the tree and the boosted trees each fit
+the Poisson family in their own core, checked against glmnet, MASS and
+[`glm()`](https://rdrr.io/r/stats/glm.html), earth, mgcv, rpart, and gbm
+or xgboost’s `count:poisson`, respectively. The forest splits a count on
+its variance, the networks train under the deviance, and the ensemble
+minimises it. As in rpart, a tree shrinks the rate in each leaf towards
+the rate of the units the tree was grown on; `tree(shrink = 0)` turns
+this shrinkage off.
 
 ## Maps
 
-`BIOMOD_Projection()` and `BIOMOD_EnsembleForecasting()` apply the fit
-to a stack of rasters.
+`BIOMOD_Projection()` and `BIOMOD_EnsembleForecasting()` apply a fit to
+a stack of rasters.
 [`project()`](https://gillescolling.com/timesift/reference/project.md)
-applies it to one target per cell, each carrying the record of its own
-cell, and returns a raster with a layer per response. A map for a later
-period is the same call with the later record, and `BIOMOD_RangeSize()`
-is
+applies it to one target per raster cell, each carrying the record for
+its own cell, and returns a raster with one layer per response. A map
+for a later period uses the same call with the later record, and
 [`range_change()`](https://gillescolling.com/timesift/reference/range_change.md)
-on the two binary maps.
+on the two binary maps replaces `BIOMOD_RangeSize()`.
 
 ``` r
 
@@ -427,13 +439,13 @@ range_change(now, later)$table
 
 ## Tuning
 
-`BIOMOD_Tuning()` searches a grid per algorithm.
+`BIOMOD_Tuning()` searches a grid of settings for each algorithm.
 [`tune()`](https://gillescolling.com/timesift/reference/tune.md) wraps a
-learner so that it searches a grid of its own settings on the units it
-is fitted on, by cross-validation inside them, and fits the best. Inside
-a run each outer fold chooses from its own training units, so the score
-a tuned candidate is read at is not selected on. The settings it chose
-are in the candidate table.
+learner so that, on the units it is fitted to, it cross-validates a grid
+of its own settings and fits the best one. In a run, each outer fold
+tunes on its own training units only, so the settings are never chosen
+on the units that score the tuned candidate. The chosen settings are
+listed in the candidate table.
 
 ``` r
 
@@ -444,25 +456,27 @@ timesift(targets, series, y = starts_with("sp"), id = plot, time = t, x = temp,
 ## Variable importance
 
 biomod2’s `bm_VariablesImportance()` permutes one predictor and reports
-one minus its correlation with the prediction made without the
+one minus the correlation between the predictions with and without the
 permutation.
 [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md)
-does the same on the models a run kept per fold, on the units each held
-out, and reports it as `importance` beside the fall in score. A
-predictor is a bin of the representation, or with `over = "channel"` one
-statistic of it across the record, which is where a column named in
-`static` sits when the run has a record.
-`occlusion(fit, "ensemble", over = "channel")` reads the combination.
+computes the same quantity on the models a run kept for each fold,
+evaluated on that fold’s held-out units, and reports it as `importance`
+alongside the drop in score. A predictor is one bin of the
+representation, or, with `over = "channel"`, one statistic of the record
+across all bins. When the run has a record, a column named in `static`
+is treated as a channel. `occlusion(fit, "ensemble", over = "channel")`
+computes importance for the ensemble.
 
 ## Response curves
 
 [`response_curve()`](https://gillescolling.com/timesift/reference/response_curve.md)
-is `bm_PlotResponseCurves()`: one predictor is moved across the range it
-takes while the others sit at their `fixed` summary (`"mean"`,
-`"median"`, `"min"` or `"max"`, as `fixed.var`), and a second predictor
-`with` gives the bivariate surface (`do.bivariate`). A predictor is a
-statistic of the representation, so the curve of `"warm_day"` is the
-prediction as the warmest day moves in every bin together.
+corresponds to `bm_PlotResponseCurves()`. One predictor varies across
+its observed range while the others are held at the summary given by
+`fixed` (`"mean"`, `"median"`, `"min"` or `"max"`, as `fixed.var`), and
+a second predictor given in `with` produces the bivariate surface
+(`do.bivariate`). A predictor is a statistic of the representation, so
+the curve for `"warm_day"` shows the prediction as the warmest day
+changes in all bins at once.
 
 ``` r
 
@@ -470,70 +484,70 @@ rc <- response_curve(fit, "ensemble", "warm_day", spread = TRUE)
 plot(rc)
 ```
 
-## What differs from a biomod2 run
+## Differences from a biomod2 run
 
-- **Absences.** The learners read the absences they are given, and
+- **Absences.** The learners use the absences they are given.
   [`pseudo_absences()`](https://gillescolling.com/timesift/reference/pseudo_absences.md)
-  draws them from a pool of background units by biomod2’s `random`,
-  `sre` and `disk` strategies, with repeated draws, before the fit. A
-  drawn unit is a row of the targets like any other: it is not flagged
-  in the score, and a set of one’s own is the rows of the pool it names.
+  draws absences from a pool of background units before the fit, using
+  biomod2’s `random`, `sre` and `disk` strategies, with repeated draws.
+  A drawn unit is an ordinary row of the targets and is not marked in
+  the scores; to use a set of one’s own, name those rows of the pool.
   [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md)
-  offers both formulations: the default treats every unit as background,
-  as biomod2’s `MAXNET` does, and `formulation = "absence"` reads the
-  absences as absences under the response head’s case weights.
-- **Folds.** One fold map is dealt once and read by every candidate and
-  the ensemble.
-  [`cv()`](https://gillescolling.com/timesift/reference/cv.md) deals
-  units balanced on a stratifying value,
+  offers both formulations. By default it treats every unit as
+  background, as biomod2’s `MAXNET` does; `formulation = "absence"`
+  treats absences as absences, weighted by the response head’s case
+  weights.
+- **Folds.** One fold map is drawn once and used by every candidate and
+  by the ensemble.
+  [`cv()`](https://gillescolling.com/timesift/reference/cv.md) balances
+  units on a stratifying variable,
   [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md)
-  keeps units that share a group on one side of each split, and
+  keeps units that share a group on the same side of each split, and
   [`block_cv()`](https://gillescolling.com/timesift/reference/cv.md) and
   [`env_cv()`](https://gillescolling.com/timesift/reference/cv.md) hold
-  out a block of space or of predictor space. biomod2’s `nb.rep` is
-  `repeats =` on
+  out a block of geographic or predictor space. biomod2’s `nb.rep` is
+  `repeats =` in
   [`cv()`](https://gillescolling.com/timesift/reference/cv.md) and
   [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md):
-  every repeat is a full run on its own fold map, and a response is
-  averaged over its folds and its repeats. biomod2’s `kfold` is
+  each repeat is a full run on its own fold map, and each response is
+  averaged over its folds and repeats. biomod2’s `kfold` is
   [`cv()`](https://gillescolling.com/timesift/reference/cv.md), `strat`
   is `cv(by = )`, `block` is
   [`block_cv()`](https://gillescolling.com/timesift/reference/cv.md),
   `env` is
-  [`env_cv()`](https://gillescolling.com/timesift/reference/cv.md) and
+  [`env_cv()`](https://gillescolling.com/timesift/reference/cv.md), and
   `user.defined` is a fold map passed as `resampling`.
 - **Scorable cells.** A response is scored only on folds whose held-out
-  units hold both classes, and only fitted on training units that hold
-  both. The mask follows from the response and the fold map and involves
-  no model, so every paired comparison runs on matched cells.
+  units contain both classes, and fitted only on training sets that
+  contain both. This mask depends only on the response and the fold map,
+  not on any model, so every paired comparison uses the same cells.
 - **Case weights.** The response head sets them, and
   [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
-  gives the presence-absence head’s. A learner that cannot use them (the
-  background
+  returns those of the presence-absence head. The documentation of each
+  learner that cannot use case weights (the background
   [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md),
   [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md))
-  says so in its documentation.
+  says so.
 - **Presence-absence only for three algorithms.**
   [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md),
   [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md)
   and
   [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
-  need a binary response and refuse a head fitted under squared error.
-  The other learners follow the head’s loss, and
-  [`mars()`](https://gillescolling.com/timesift/reference/mars.md) is
-  among them.
+  require a binary response and refuse a head fitted under squared
+  error. The other learners, including
+  [`mars()`](https://gillescolling.com/timesift/reference/mars.md), fit
+  under whatever loss the head uses.
 - **Predictors.** The columns of a representation are the predictors,
-  one per bin and channel, and a column of `targets` such as elevation
-  reaches the model where `static` names it.
+  one per bin and channel. A column of `targets` such as elevation
+  enters the model when `static` names it.
 
 ## When biomod2 is the better tool
 
-A study whose predictors are a stack of environmental rasters, with no
-record behind them, has nothing for the representation axis to vary, and
-biomod2’s projection onto rasters, its pseudo-absence sampling
-strategies and its response curves are built for that setting.
-`timesift` predicts rows of a target table, so a map is a prediction
-with one target per cell and each cell carrying its own series at the
-grain the fit reads. Which grain a record should be read at is the
-question the package answers, and a study that does not ask it gains
+When the predictors are a stack of environmental rasters with no record
+behind them, there is no grain to compare, and biomod2’s raster
+projection, pseudo-absence strategies and response curves are designed
+for that case. `timesift` predicts rows of a target table, so a map is a
+prediction with one target per cell, each with its own record at the
+grain the fit uses. The package is built to find the grain at which a
+record should be read; a study that does not need that comparison gains
 little from switching.

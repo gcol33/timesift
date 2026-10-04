@@ -6,13 +6,13 @@
 \usage{
 boosting(
   data = NULL,
+  method = c("gbm", "xgboost"),
   trees = NULL,
   depth = NULL,
   shrinkage = NULL,
   min_leaf = NULL,
   subsample = NULL,
   colsample = NULL,
-  newton = FALSE,
   lambda = NULL,
   gamma = NULL,
   n_inner = NULL,
@@ -25,21 +25,23 @@ boosting(
 \item{data}{A representation the learner is pinned to, or \code{NULL} to run across every
 representation of the run.}
 
+\item{method}{\code{"gbm"} for first-order trees grown best first, \code{"xgboost"} for second-order trees
+grown level by level.}
+
 \item{trees}{Trees fitted.}
 
-\item{depth}{Splits in a tree under gbm, its depth under xgboost.}
+\item{depth}{Splits in a tree under \code{"gbm"}, its depth under \code{"xgboost"}.}
 
 \item{shrinkage}{The scale each tree is added to the score at.}
 
-\item{min_leaf}{Units each side of a split keeps under gbm, hessian under xgboost.}
+\item{min_leaf}{Units each side of a split keeps under \code{"gbm"}, hessian under \code{"xgboost"}.}
 
 \item{subsample}{Share of the units each tree is grown on.}
 
 \item{colsample}{Share of the columns each tree reads.}
 
-\item{newton}{Whether the trees are xgboost's second-order ones rather than gbm's.}
-
-\item{lambda, gamma}{xgboost's L2 penalty on a leaf and least gain of a split; zero under gbm.}
+\item{lambda, gamma}{The L2 penalty on a leaf and the least gain of a split under \code{"xgboost"};
+zero under \code{"gbm"}.}
 
 \item{n_inner}{Folds of the inner cross-validation choosing how many trees are kept, or 0 to
 keep them all.}
@@ -64,10 +66,11 @@ it scaled by \code{shrinkage}. Each tree is grown on a subsample of the units dr
 replacement, and reads a subsample of the columns.
 }
 \details{
-\code{newton} picks the trees. Off, they are gbm's, which is what biomod2 fits as \code{GBM}: \code{depth}
-splits grown best first, each the one that most reduces the weighted squared error of the
+\code{method} picks the trees. Under \code{"gbm"} they are Friedman's gradient boosting machine as the gbm
+package grows it, which is what biomod2 fits as \code{GBM}: \code{depth} splits grown best first, each the one that most reduces the weighted squared error of the
 working response with at least \code{min_leaf} units on each side, and a leaf that takes one Newton
-step on the loss. On, they are xgboost's exact greedy trees, which biomod2 fits as \code{XGBOOST}:
+step on the loss. Under \code{"xgboost"} they are XGBoost's exact greedy trees (Chen and Guestrin 2016),
+which biomod2 fits as \code{XGBOOST}:
 grown level by level to \code{depth}, each split chosen by the second-order gain under the L2 penalty
 \code{lambda} with at least \code{min_leaf} of hessian on each side, pruned where a split gains less than
 \code{gamma}, and a leaf the step \code{-G / (H + lambda)}. Either way \code{depth} is the order of interaction
@@ -95,6 +98,6 @@ weigh the gradient and every sum a tree is grown on; \code{min_leaf} counts unit
 \examples{
 boosting()
 boosting(preset = "bigboss")
-boosting(newton = TRUE, depth = 3L)
+boosting(method = "xgboost", depth = 3L)
 
 }

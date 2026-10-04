@@ -2078,14 +2078,14 @@ observation keeps its trees up to the first of least error.</p>
 <div class="section level3">
 <h3 id="the-settings-1">The settings<a class="anchor" aria-label="anchor" href="#the-settings-1"></a>
 </h3>
-<p>With <code>newton</code> off, <code>preset = "package"</code> is
+<p>Under <code>method = "gbm"</code>, <code>preset = "package"</code> is
 gbm’s defaults as biomod2 passes them: 100 trees of one split,
 <code>shrinkage = 0.1</code>, <code>min_leaf = 10</code>,
 <code>subsample = 0.5</code>, no inner folds. <code>"bigboss"</code> is
 2500 trees of seven splits, <code>shrinkage = 0.001</code>,
 <code>min_leaf = 5</code>, <code>subsample = 0.5</code> and three inner
-folds. With <code>newton</code> on, <code>"package"</code> is xgboost’s:
-100 trees of depth 6, <code>shrinkage = 0.3</code>,
+folds. Under <code>method = "xgboost"</code>, <code>"package"</code> is
+xgboost’s: 100 trees of depth 6, <code>shrinkage = 0.3</code>,
 <code>min_leaf = 1</code>, <code>lambda = 1</code>,
 <code>gamma = 0</code>, every observation and column;
 <code>"bigboss"</code> four trees of depth 2 at

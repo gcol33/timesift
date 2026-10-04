@@ -78,6 +78,8 @@
 <code>stepwise()</code> is <code><a href="../reference/linear.html">linear()</a></code>, named after the model it fits as <code><a href="../reference/additive.html">additive()</a></code> is, and its defaults are biomod2’s <code>GLM</code>: every column as <code>x + I(x^2)</code>, searched both ways by AIC as <code><a href="https://rdrr.io/pkg/MASS/man/stepAIC.html" class="external-link">MASS::stepAIC()</a></code> searches, with no bound on the terms kept. The search is the <code>select</code> argument (<code>"both"</code>, <code>"forward"</code>, <code>"backward"</code> or <code>"none"</code>), formerly <code>direction</code>. The old defaults were the study’s forward arm, which is now <code>linear(select = "forward", terms = "column", max_terms = 3)</code>. The learner registers and reports as <code>linear</code>.</li>
 <li>
 <code>maxnet()</code> is <code><a href="../reference/maxent.html">maxent()</a></code>, named after the model rather than the package whose formulation it follows. Its arguments, defaults and numbers are unchanged; it registers and reports as <code>maxent</code>.</li>
+<li>
+<code>boosting(newton = TRUE)</code> is <code>boosting(method = "xgboost")</code>. The flag switched the whole algorithm, the tree growth, the split criterion, what <code>depth</code> and <code>min_leaf</code> count and the default set, where its name described the leaf step alone, which gbm’s trees take as well. <code>method = "gbm"</code>, Friedman’s gradient boosting machine, is the default as before.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="other-changes-development-version">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-development-version"></a></h3>

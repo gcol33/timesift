@@ -86,7 +86,7 @@ def default_grids() -> dict:
         return {"mtry": list(range(1, min(10, flatten(x).shape[1]) + 1))}
 
     def boosting_grid(learner, x):
-        if learner.params.get("newton"):
+        if learner.params.get("method") == "xgboost":
             return {"trees": [50], "depth": [1], "shrinkage": [0.3, 0.4], "min_leaf": [1.0],
                     "subsample": [0.5], "colsample": [0.6, 0.8], "gamma": [0.0]}
         return {"trees": [500, 1000, 2500], "depth": [2, 5, 8], "shrinkage": [0.001, 0.01, 0.1]}

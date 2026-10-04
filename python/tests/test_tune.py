@@ -125,7 +125,7 @@ def test_a_learner_with_no_grid_of_its_own_is_searched_over_the_one_registered_f
 
     assert _registered_grid(boosting(), x) == {"trees": [500, 1000, 2500], "depth": [2, 5, 8],
                                                "shrinkage": [0.001, 0.01, 0.1]}
-    xgb = _registered_grid(boosting(newton=True), x)
+    xgb = _registered_grid(boosting(method="xgboost"), x)
     assert xgb["shrinkage"] == [0.3, 0.4] and xgb["colsample"] == [0.6, 0.8]
     assert _registered_grid(mars(), x)["nprune"] == list(range(2, max(21, 2 * columns + 1) + 1))
     assert _registered_grid(envelope(), x)["quantile"] == [0.0, 0.0125, 0.025, 0.05, 0.1]

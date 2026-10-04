@@ -882,8 +882,8 @@ def _rf_predict(model, x):
     return _predict_columns(model["models"], flatten(x), forest_predict)
 
 
-def boosting(data=None, trees=None, depth=None, shrinkage=None, min_leaf=None, subsample=None,
-             colsample=None, newton=False, lambda_=None, gamma=None, n_inner=None,
+def boosting(data=None, method="gbm", trees=None, depth=None, shrinkage=None, min_leaf=None,
+             subsample=None, colsample=None, lambda_=None, gamma=None, n_inner=None,
              preset="package", seed=1, threads=1) -> Learner:
     """One boosted model per variable, over every bin-by-channel column: a logistic model under a
     presence-absence head, a squared-error one under a head with a squared-error loss and a Poisson
@@ -893,11 +893,11 @@ def boosting(data=None, trees=None, depth=None, shrinkage=None, min_leaf=None, s
     Each tree is grown on a subsample of the units drawn without replacement, and reads a subsample
     of the columns.
 
-    ``newton`` picks the trees. Off, they are gbm's, which is what biomod2 fits as ``GBM``:
-    ``depth`` splits grown best first, each the one that most reduces the weighted squared error of
+    ``method`` picks the trees. Under ``"gbm"`` they are Friedman's gradient boosting machine as the
+    gbm package grows it, which is what biomod2 fits as ``GBM``: ``depth`` splits grown best first, each the one that most reduces the weighted squared error of
     the working response with at least ``min_leaf`` units on each side, and a leaf that takes one
-    Newton step on the loss. On, they are xgboost's exact greedy trees, which biomod2 fits as
-    ``XGBOOST``: grown level by level to ``depth``, each split chosen by the second-order gain under
+    Newton step on the loss. Under ``"xgboost"`` they are XGBoost's exact greedy trees (Chen and
+    Guestrin 2016), which biomod2 fits as ``XGBOOST``: grown level by level to ``depth``, each split chosen by the second-order gain under
     the L2 penalty ``lambda_`` with at least ``min_leaf`` of hessian on each side, pruned where a
     split gains less than ``gamma``, and a leaf the step ``-G / (H + lambda)``. Either way
     ``depth`` is the order of interaction a tree can hold. With ``subsample=1`` the first-order fit
@@ -922,38 +922,40 @@ def boosting(data=None, trees=None, depth=None, shrinkage=None, min_leaf=None, s
     the gradient and every sum a tree is grown on; ``min_leaf`` counts units under gbm, as
     ``n.minobsinnode`` does.
     """
+    if method not in ("gbm", "xgboost"):
+        raise ValueError(f'`method` is "gbm" or "xgboost", got {method!r}.')
     if preset not in ("package", "bigboss"):
         raise ValueError(f'`preset` is "package" or "bigboss", got {preset!r}.')
-    settings = _boost_settings(preset, bool(newton), trees, depth, shrinkage, min_leaf, subsample,
+    settings = _boost_settings(preset, method, trees, depth, shrinkage, min_leaf, subsample,
                                colsample, lambda_, gamma, n_inner)
     return Learner(name="boosting", fit=_boost_fit, predict=_boost_predict, data=data,
                    reads="tabular", multi="separate",
-                   params=dict(settings, newton=bool(newton), seed=int(seed),
+                   params=dict(settings, method=method, seed=int(seed),
                                threads=int(threads)))
 
 
 _BOOST_PRESETS = {
-    ("package", False): dict(trees=100, depth=1, shrinkage=0.1, min_leaf=10, subsample=0.5,
+    ("package", "gbm"): dict(trees=100, depth=1, shrinkage=0.1, min_leaf=10, subsample=0.5,
                              colsample=1, lambda_=0, gamma=0, n_inner=0),
-    ("bigboss", False): dict(trees=2500, depth=7, shrinkage=0.001, min_leaf=5, subsample=0.5,
+    ("bigboss", "gbm"): dict(trees=2500, depth=7, shrinkage=0.001, min_leaf=5, subsample=0.5,
                              colsample=1, lambda_=0, gamma=0, n_inner=3),
-    ("package", True): dict(trees=100, depth=6, shrinkage=0.3, min_leaf=1, subsample=1,
+    ("package", "xgboost"): dict(trees=100, depth=6, shrinkage=0.3, min_leaf=1, subsample=1,
                             colsample=1, lambda_=1, gamma=0, n_inner=0),
-    ("bigboss", True): dict(trees=4, depth=2, shrinkage=1, min_leaf=1, subsample=1, colsample=1,
+    ("bigboss", "xgboost"): dict(trees=4, depth=2, shrinkage=1, min_leaf=1, subsample=1, colsample=1,
                             lambda_=1, gamma=0, n_inner=0),
 }
 
 
-def _boost_settings(preset, newton, trees, depth, shrinkage, min_leaf, subsample, colsample,
+def _boost_settings(preset, method, trees, depth, shrinkage, min_leaf, subsample, colsample,
                     lambda_, gamma, n_inner) -> dict:
     """The settings boosted trees are fitted under: those given, and the preset's for the rest,
-    which are gbm's or xgboost's as ``newton`` picks. gbm's trees take no penalty and no least
+    which are gbm's or xgboost's as ``method`` picks. gbm's trees take no penalty and no least
     gain."""
     penalised = any(v is not None and v != 0 for v in (lambda_, gamma))
-    if not newton and penalised:
+    if method == "gbm" and penalised:
         raise ValueError("`lambda_` and `gamma` are the second-order trees' settings; "
-                         "set `newton=True` to use them.")
-    base = _BOOST_PRESETS[(preset, newton)]
+                         'set `method="xgboost"` to use them.')
+    base = _BOOST_PRESETS[(preset, method)]
     given = dict(trees=trees, depth=depth, shrinkage=shrinkage, min_leaf=min_leaf,
                  subsample=subsample, colsample=colsample, lambda_=lambda_, gamma=gamma,
                  n_inner=n_inner)
@@ -965,7 +967,7 @@ def _boost_settings(preset, newton, trees, depth, shrinkage, min_leaf, subsample
     return out
 
 
-def _boost_fit(x, y, trees, depth, shrinkage, min_leaf, subsample, colsample, newton, lambda_,
+def _boost_fit(x, y, trees, depth, shrinkage, min_leaf, subsample, colsample, method, lambda_,
                gamma, n_inner, seed, threads, head, variables, group=None, **_):
     from ._tree import boost_fit
     family = _family(head)
@@ -977,7 +979,8 @@ def _boost_fit(x, y, trees, depth, shrinkage, min_leaf, subsample, colsample, ne
             fold = _inner_folds(yj, n_inner, seed_j, group)
             n_fold = int(fold.max()) + 1
         return boost_fit(design, yj, w, family, trees, depth, shrinkage, min_leaf, subsample,
-                         colsample, newton, lambda_, gamma, seed_j, fold, n_fold, threads)
+                         colsample, method == "xgboost", lambda_, gamma, seed_j, fold, n_fold,
+                         threads)
 
     return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables),
                                     _head_weights(head, y)),

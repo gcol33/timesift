@@ -183,7 +183,7 @@ tunings <- function() .tuning_reg$names()
   list(
     forest = function(learner, x) list(mtry = seq_len(min(10L, ncol(.flatten(x))))),
     boosting = function(learner, x) {
-      if (isTRUE(learner$params$newton)) {
+      if (identical(learner$params$method, "xgboost")) {
         list(trees = 50L, depth = 1L, shrinkage = c(0.3, 0.4), min_leaf = 1, subsample = 0.5,
              colsample = c(0.6, 0.8), gamma = 0)
       } else {

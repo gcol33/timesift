@@ -15,13 +15,13 @@ subsample of the columns.
 ``` r
 boosting(
   data = NULL,
+  method = c("gbm", "xgboost"),
   trees = NULL,
   depth = NULL,
   shrinkage = NULL,
   min_leaf = NULL,
   subsample = NULL,
   colsample = NULL,
-  newton = FALSE,
   lambda = NULL,
   gamma = NULL,
   n_inner = NULL,
@@ -38,13 +38,18 @@ boosting(
   A representation the learner is pinned to, or `NULL` to run across
   every representation of the run.
 
+- method:
+
+  `"gbm"` for first-order trees grown best first, `"xgboost"` for
+  second-order trees grown level by level.
+
 - trees:
 
   Trees fitted.
 
 - depth:
 
-  Splits in a tree under gbm, its depth under xgboost.
+  Splits in a tree under `"gbm"`, its depth under `"xgboost"`.
 
 - shrinkage:
 
@@ -52,7 +57,8 @@ boosting(
 
 - min_leaf:
 
-  Units each side of a split keeps under gbm, hessian under xgboost.
+  Units each side of a split keeps under `"gbm"`, hessian under
+  `"xgboost"`.
 
 - subsample:
 
@@ -62,14 +68,10 @@ boosting(
 
   Share of the columns each tree reads.
 
-- newton:
-
-  Whether the trees are xgboost's second-order ones rather than gbm's.
-
 - lambda, gamma:
 
-  xgboost's L2 penalty on a leaf and least gain of a split; zero under
-  gbm.
+  The L2 penalty on a leaf and the least gain of a split under
+  `"xgboost"`; zero under `"gbm"`.
 
 - n_inner:
 
@@ -97,19 +99,21 @@ A
 
 ## Details
 
-`newton` picks the trees. Off, they are gbm's, which is what biomod2
-fits as `GBM`: `depth` splits grown best first, each the one that most
+`method` picks the trees. Under `"gbm"` they are Friedman's gradient
+boosting machine as the gbm package grows it, which is what biomod2 fits
+as `GBM`: `depth` splits grown best first, each the one that most
 reduces the weighted squared error of the working response with at least
 `min_leaf` units on each side, and a leaf that takes one Newton step on
-the loss. On, they are xgboost's exact greedy trees, which biomod2 fits
-as `XGBOOST`: grown level by level to `depth`, each split chosen by the
-second-order gain under the L2 penalty `lambda` with at least `min_leaf`
-of hessian on each side, pruned where a split gains less than `gamma`,
-and a leaf the step `-G / (H + lambda)`. Either way `depth` is the order
-of interaction a tree can hold. With `subsample = 1` the first-order fit
-is gbm's own to rounding, and the second-order one xgboost's to its
-single-precision storage; the model is grown by the core the Python
-package calls, so the two languages fit the same model.
+the loss. Under `"xgboost"` they are XGBoost's exact greedy trees (Chen
+and Guestrin 2016), which biomod2 fits as `XGBOOST`: grown level by
+level to `depth`, each split chosen by the second-order gain under the
+L2 penalty `lambda` with at least `min_leaf` of hessian on each side,
+pruned where a split gains less than `gamma`, and a leaf the step
+`-G / (H + lambda)`. Either way `depth` is the order of interaction a
+tree can hold. With `subsample = 1` the first-order fit is gbm's own to
+rounding, and the second-order one xgboost's to its single-precision
+storage; the model is grown by the core the Python package calls, so the
+two languages fit the same model.
 
 `n_inner` folds, when above zero, choose how many trees are kept: the
 fit is repeated on each fold's complement, and the number of trees of
@@ -137,5 +141,5 @@ grown on; `min_leaf` counts units under gbm, as `n.minobsinnode` does.
 ``` r
 boosting()
 boosting(preset = "bigboss")
-boosting(newton = TRUE, depth = 3L)
+boosting(method = "xgboost", depth = 3L)
 ```

@@ -110,15 +110,15 @@ test_that("a preset fills the settings left open, as gbm, xgboost and biomod2 ha
   expect_identical(b[c("trees", "depth", "n_inner")],
                    list(trees = 2500L, depth = 7L, n_inner = 3L))
   expect_equal(unlist(b[c("shrinkage", "min_leaf")]), c(shrinkage = 0.001, min_leaf = 5))
-  xg <- boosting(newton = TRUE)$params
+  xg <- boosting(method = "xgboost")$params
   expect_identical(xg[c("trees", "depth")], list(trees = 100L, depth = 6L))
   expect_equal(unlist(xg[c("shrinkage", "min_leaf", "lambda", "subsample")]),
                c(shrinkage = 0.3, min_leaf = 1, lambda = 1, subsample = 1))
-  xb <- boosting(newton = TRUE, preset = "bigboss")$params
+  xb <- boosting(method = "xgboost", preset = "bigboss")$params
   expect_identical(xb[c("trees", "depth")], list(trees = 4L, depth = 2L))
   expect_equal(xb$shrinkage, 1)
   expect_identical(boosting(preset = "bigboss", trees = 300L)$params$trees, 300L)
-  expect_error(boosting(lambda = 1), "newton = TRUE")
+  expect_error(boosting(lambda = 1), "method = \"xgboost\"", fixed = TRUE)
 })
 
 test_that("boosting fits, predicts, survives a round trip and refuses a different representation", {
@@ -137,8 +137,8 @@ test_that("boosting fits, predicts, survives a round trip and refuses a differen
   expect_identical(stats::predict(readRDS(path), x), p)
   other <- grain_matrix(sim$readings, plot, t, temp, grain = "month")
   expect_error(stats::predict(fit, other), "different channels or bins")
-  newton <- stats::predict(fit_learner(boosting(newton = TRUE, trees = 30L), x, y), x)
-  expect_gt(tss(y[, 1], newton[, 1]), 0.4)
+  second <- stats::predict(fit_learner(boosting(method = "xgboost", trees = 30L), x, y), x)
+  expect_gt(tss(y[, 1], second[, 1]), 0.4)
   cv <- fit_learner(boosting(trees = 60L, n_inner = 3L), x, y)$model$models[[1L]]
   expect_length(cv$cv_error, 60L)
   expect_identical(length(cv$offset) - 1L, which.min(cv$cv_error))

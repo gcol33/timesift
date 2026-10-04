@@ -55,7 +55,7 @@ test_that("the count head refuses a response it cannot hold", {
 test_that("each learner that fits a family fits a count under the Poisson one", {
   d <- count_data()
   for (l in list(elasticnet(), forest(trees = 30L), boosting(trees = 30L),
-                 boosting(trees = 30L, newton = TRUE, depth = 2L), tree(), linear(), mars(),
+                 boosting(method = "xgboost", trees = 30L, depth = 2L), tree(), linear(), mars(),
                  additive(k = 5L))) {
     fit <- fit_learner(l, d$x, d$y, response = "count")
     p <- stats::predict(fit, d$x)[, 1L]

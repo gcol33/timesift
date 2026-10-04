@@ -116,7 +116,7 @@ test_that("a learner with no grid of its own is searched over the one registered
   gbm <- timesift:::.registered_grid(boosting(), d$x)
   expect_equal(gbm, list(trees = c(500L, 1000L, 2500L), depth = c(2L, 5L, 8L),
                          shrinkage = c(0.001, 0.01, 0.1)))
-  xgb <- timesift:::.registered_grid(boosting(newton = TRUE), d$x)
+  xgb <- timesift:::.registered_grid(boosting(method = "xgboost"), d$x)
   expect_equal(xgb$shrinkage, c(0.3, 0.4))
   expect_equal(xgb$colsample, c(0.6, 0.8))
   expect_equal(timesift:::.registered_grid(mars(), d$x)$nprune,

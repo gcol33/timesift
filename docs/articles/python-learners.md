@@ -223,13 +223,13 @@ error are read on the shrunk ones.
 ``` python
 boosting(
     data=None,
+    method='gbm',
     trees=None,
     depth=None,
     shrinkage=None,
     min_leaf=None,
     subsample=None,
     colsample=None,
-    newton=False,
     lambda_=None,
     gamma=None,
     n_inner=None,
@@ -248,19 +248,21 @@ gradient at the current score and added to it scaled by `shrinkage`.
 Each tree is grown on a subsample of the units drawn without
 replacement, and reads a subsample of the columns.
 
-`newton` picks the trees. Off, they are gbm’s, which is what biomod2
-fits as `GBM`: `depth` splits grown best first, each the one that most
+`method` picks the trees. Under `"gbm"` they are Friedman’s gradient
+boosting machine as the gbm package grows it, which is what biomod2 fits
+as `GBM`: `depth` splits grown best first, each the one that most
 reduces the weighted squared error of the working response with at least
 `min_leaf` units on each side, and a leaf that takes one Newton step on
-the loss. On, they are xgboost’s exact greedy trees, which biomod2 fits
-as `XGBOOST`: grown level by level to `depth`, each split chosen by the
-second-order gain under the L2 penalty `lambda_` with at least
-`min_leaf` of hessian on each side, pruned where a split gains less than
-`gamma`, and a leaf the step `-G / (H + lambda)`. Either way `depth` is
-the order of interaction a tree can hold. With `subsample=1` the
-first-order fit is gbm’s own to rounding, and the second-order one
-xgboost’s to its single-precision storage; the model is grown by the
-core the R package calls, so the two languages fit the same model.
+the loss. Under `"xgboost"` they are XGBoost’s exact greedy trees (Chen
+and Guestrin 2016), which biomod2 fits as `XGBOOST`: grown level by
+level to `depth`, each split chosen by the second-order gain under the
+L2 penalty `lambda_` with at least `min_leaf` of hessian on each side,
+pruned where a split gains less than `gamma`, and a leaf the step
+`-G / (H + lambda)`. Either way `depth` is the order of interaction a
+tree can hold. With `subsample=1` the first-order fit is gbm’s own to
+rounding, and the second-order one xgboost’s to its single-precision
+storage; the model is grown by the core the R package calls, so the two
+languages fit the same model.
 
 `n_inner` folds, when above zero, choose how many trees are kept: the
 fit is repeated on each fold’s complement, and the number of trees of

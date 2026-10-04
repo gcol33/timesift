@@ -323,13 +323,13 @@ shrunk ones.</p>
 </h2>
 <div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>boosting(</span>
 <span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>    trees<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>    depth<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>    shrinkage<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    min_leaf<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>    subsample<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>    colsample<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>    newton<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>    method<span class="op">=</span><span class="st">'gbm'</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>    trees<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>    depth<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    shrinkage<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>    min_leaf<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>    subsample<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>    colsample<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>    lambda_<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>    gamma<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="va">None</span>,</span>
@@ -345,12 +345,14 @@ presences, or the weighted mean, and each tree is fitted to the loss’s
 gradient at the current score and added to it scaled by
 <code>shrinkage</code>. Each tree is grown on a subsample of the units
 drawn without replacement, and reads a subsample of the columns.</p>
-<p><code>newton</code> picks the trees. Off, they are gbm’s, which is
-what biomod2 fits as <code>GBM</code>: <code>depth</code> splits grown
-best first, each the one that most reduces the weighted squared error of
-the working response with at least <code>min_leaf</code> units on each
-side, and a leaf that takes one Newton step on the loss. On, they are
-xgboost’s exact greedy trees, which biomod2 fits as
+<p><code>method</code> picks the trees. Under <code>"gbm"</code> they
+are Friedman’s gradient boosting machine as the gbm package grows it,
+which is what biomod2 fits as <code>GBM</code>: <code>depth</code>
+splits grown best first, each the one that most reduces the weighted
+squared error of the working response with at least
+<code>min_leaf</code> units on each side, and a leaf that takes one
+Newton step on the loss. Under <code>"xgboost"</code> they are XGBoost’s
+exact greedy trees (Chen and Guestrin 2016), which biomod2 fits as
 <code>XGBOOST</code>: grown level by level to <code>depth</code>, each
 split chosen by the second-order gain under the L2 penalty
 <code>lambda_</code> with at least <code>min_leaf</code> of hessian on

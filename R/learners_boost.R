@@ -8,10 +8,11 @@
 #' it scaled by `shrinkage`. Each tree is grown on a subsample of the units drawn without
 #' replacement, and reads a subsample of the columns.
 #'
-#' `newton` picks the trees. Off, they are gbm's, which is what biomod2 fits as `GBM`: `depth`
-#' splits grown best first, each the one that most reduces the weighted squared error of the
+#' `method` picks the trees. Under `"gbm"` they are Friedman's gradient boosting machine as the gbm
+#' package grows it, which is what biomod2 fits as `GBM`: `depth` splits grown best first, each the one that most reduces the weighted squared error of the
 #' working response with at least `min_leaf` units on each side, and a leaf that takes one Newton
-#' step on the loss. On, they are xgboost's exact greedy trees, which biomod2 fits as `XGBOOST`:
+#' step on the loss. Under `"xgboost"` they are XGBoost's exact greedy trees (Chen and Guestrin 2016),
+#' which biomod2 fits as `XGBOOST`:
 #' grown level by level to `depth`, each split chosen by the second-order gain under the L2 penalty
 #' `lambda` with at least `min_leaf` of hessian on each side, pruned where a split gains less than
 #' `gamma`, and a leaf the step `-G / (H + lambda)`. Either way `depth` is the order of interaction
@@ -38,13 +39,15 @@
 #'
 #' @inheritParams elasticnet
 #' @param trees Trees fitted.
-#' @param depth Splits in a tree under gbm, its depth under xgboost.
+#' @param method `"gbm"` for first-order trees grown best first, `"xgboost"` for second-order trees
+#'   grown level by level.
+#' @param depth Splits in a tree under `"gbm"`, its depth under `"xgboost"`.
 #' @param shrinkage The scale each tree is added to the score at.
-#' @param min_leaf Units each side of a split keeps under gbm, hessian under xgboost.
+#' @param min_leaf Units each side of a split keeps under `"gbm"`, hessian under `"xgboost"`.
 #' @param subsample Share of the units each tree is grown on.
 #' @param colsample Share of the columns each tree reads.
-#' @param newton Whether the trees are xgboost's second-order ones rather than gbm's.
-#' @param lambda,gamma xgboost's L2 penalty on a leaf and least gain of a split; zero under gbm.
+#' @param lambda,gamma The L2 penalty on a leaf and the least gain of a split under `"xgboost"`;
+#'   zero under `"gbm"`.
 #' @param n_inner Folds of the inner cross-validation choosing how many trees are kept, or 0 to
 #'   keep them all.
 #' @param preset Whose defaults the settings left `NULL` take: `"package"` or `"bigboss"`.
@@ -57,22 +60,23 @@
 #' @examples
 #' boosting()
 #' boosting(preset = "bigboss")
-#' boosting(newton = TRUE, depth = 3L)
+#' boosting(method = "xgboost", depth = 3L)
 #'
 #' @export
-boosting <- function(data = NULL, trees = NULL, depth = NULL, shrinkage = NULL, min_leaf = NULL,
-                     subsample = NULL, colsample = NULL, newton = FALSE, lambda = NULL,
-                     gamma = NULL, n_inner = NULL, preset = c("package", "bigboss"), seed = 1L,
-                     threads = 1L) {
+boosting <- function(data = NULL, method = c("gbm", "xgboost"), trees = NULL, depth = NULL,
+                     shrinkage = NULL, min_leaf = NULL, subsample = NULL, colsample = NULL,
+                     lambda = NULL, gamma = NULL, n_inner = NULL,
+                     preset = c("package", "bigboss"), seed = 1L, threads = 1L) {
+  method <- match.arg(method)
   preset <- match.arg(preset)
-  settings <- .boost_settings(preset, isTRUE(newton), trees, depth, shrinkage, min_leaf,
+  settings <- .boost_settings(preset, method, trees, depth, shrinkage, min_leaf,
                               subsample, colsample, lambda, gamma, n_inner)
   learner(
     name = "boosting",
     data = data, reads = "tabular", multi = "separate",
-    params = c(settings, list(newton = isTRUE(newton), seed = as.integer(seed),
+    params = c(settings, list(method = method, seed = as.integer(seed),
                               threads = as.integer(threads))),
-    fit = function(x, y, trees, depth, shrinkage, min_leaf, subsample, colsample, newton, lambda,
+    fit = function(x, y, trees, depth, shrinkage, min_leaf, subsample, colsample, method, lambda,
                    gamma, n_inner, seed, threads, head, weights, group = NULL, ...) {
       family <- .head_family(head)
       m <- .flatten(x)
@@ -91,7 +95,8 @@ boosting <- function(data = NULL, trees = NULL, depth = NULL, shrinkage = NULL, 
           n_fold <- length(labels)
         }
         .boost_fit(m, yj, weights[, j], family, trees, depth, shrinkage, min_leaf, subsample,
-                   colsample, newton, lambda, gamma, seeds[j], fold, n_fold, threads)
+                   colsample, method == "xgboost", lambda, gamma, seeds[j], fold, n_fold,
+                   threads)
       })
       list(models = models, columns = colnames(m), family = family)
     },
@@ -105,15 +110,15 @@ boosting <- function(data = NULL, trees = NULL, depth = NULL, shrinkage = NULL, 
 }
 
 # The settings boosted trees are fitted under: those given, and the preset's for the rest, which
-# are gbm's or xgboost's as `newton` picks. gbm's trees take no penalty and no least gain.
-.boost_settings <- function(preset, newton, trees, depth, shrinkage, min_leaf, subsample,
+# are gbm's or xgboost's as `method` picks. gbm's trees take no penalty and no least gain.
+.boost_settings <- function(preset, method, trees, depth, shrinkage, min_leaf, subsample,
                             colsample, lambda, gamma, n_inner) {
-  if (!newton && ((!is.null(lambda) && lambda != 0) || (!is.null(gamma) && gamma != 0))) {
+  if (method == "gbm" && ((!is.null(lambda) && lambda != 0) || (!is.null(gamma) && gamma != 0))) {
     stop("`lambda` and `gamma` are the second-order trees' settings; ",
-         "set `newton = TRUE` to use them.", call. = FALSE)
+         "set `method = \"xgboost\"` to use them.", call. = FALSE)
   }
   base <- switch(
-    paste(preset, if (newton) "xgboost" else "gbm"),
+    paste(preset, method),
     "package gbm" = list(trees = 100L, depth = 1L, shrinkage = 0.1, min_leaf = 10,
                          subsample = 0.5, colsample = 1, lambda = 0, gamma = 0, n_inner = 0L),
     "bigboss gbm" = list(trees = 2500L, depth = 7L, shrinkage = 0.001, min_leaf = 5,

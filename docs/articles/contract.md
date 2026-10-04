@@ -1573,15 +1573,15 @@ keeps its trees up to the first of least error.
 
 ### The settings
 
-With `newton` off, `preset = "package"` is gbm’s defaults as biomod2
-passes them: 100 trees of one split, `shrinkage = 0.1`, `min_leaf = 10`,
-`subsample = 0.5`, no inner folds. `"bigboss"` is 2500 trees of seven
-splits, `shrinkage = 0.001`, `min_leaf = 5`, `subsample = 0.5` and three
-inner folds. With `newton` on, `"package"` is xgboost’s: 100 trees of
-depth 6, `shrinkage = 0.3`, `min_leaf = 1`, `lambda = 1`, `gamma = 0`,
-every observation and column; `"bigboss"` four trees of depth 2 at
-`shrinkage = 1`. `lambda` and `gamma` are zero under gbm’s trees and an
-error to set otherwise.
+Under `method = "gbm"`, `preset = "package"` is gbm’s defaults as
+biomod2 passes them: 100 trees of one split, `shrinkage = 0.1`,
+`min_leaf = 10`, `subsample = 0.5`, no inner folds. `"bigboss"` is 2500
+trees of seven splits, `shrinkage = 0.001`, `min_leaf = 5`,
+`subsample = 0.5` and three inner folds. Under `method = "xgboost"`,
+`"package"` is xgboost’s: 100 trees of depth 6, `shrinkage = 0.3`,
+`min_leaf = 1`, `lambda = 1`, `gamma = 0`, every observation and column;
+`"bigboss"` four trees of depth 2 at `shrinkage = 1`. `lambda` and
+`gamma` are zero under gbm’s trees and an error to set otherwise.
 
 ### The fixtures
 
