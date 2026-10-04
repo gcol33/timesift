@@ -3,6 +3,9 @@
 One fold map read by everything that scores, and the cells a score is
 defined on, computed with no model involved.
 
+[All of the Python
+reference](https://gillescolling.com/timesift/articles/python-reference.md)
+
 ## `cv()`
 
 ``` python
@@ -138,76 +141,6 @@ A fold map reaches the fitting path as an integer vector in the row
 order of the representation, whether it arrived as a `Folds`, a mapping
 of unit to fold, or a bare vector already in that order.
 
-## `as_response()`
-
-``` python
-as_response(y)
-```
-
-The response reaches everything downstream as a `Response`, whether it
-arrived as one, as a mapping of variable name to values, or as a
-two-dimensional array with no names at all.
-
-## `Response`
-
-``` python
-Response(values, units, variables)
-```
-
-A `[unit, variable]` matrix of observed values, with the units named.
-
-Attributes:
-
-- `values` - np.ndarray
-- `units` - tuple\[str, …\]
-- `variables` - tuple\[str, …\]
-
-### `from_columns()`
-
-``` python
-from_columns(cls, data, id: str, variables=None)
-```
-
-A response from a table of one unit column and one column per variable.
-
-### `take_units()`
-
-``` python
-take_units(self, index)
-```
-
-The response restricted to a subset of its units, in the order given.
-
-### `take_variables()`
-
-``` python
-take_variables(self, index)
-```
-
-The response restricted to a subset of its variables, in the order
-given.
-
-A learner covering one response at a time is handed them through this,
-so the matrix a candidate emits is assembled from the same names each
-part was fitted on.
-
-### `align()`
-
-``` python
-align(self, units)
-```
-
-Put the response into the row order of a representation, by unit and
-never by position.
-
-### `check_presence_absence()`
-
-``` python
-check_presence_absence(self)
-```
-
-Error unless every value is 0 or 1 and none is missing.
-
 ## `Folds`
 
 ``` python
@@ -284,62 +217,3 @@ is_scorable(self, variable: str, fold: int)
 ```
 
 Whether one `(variable, fold)` cell admits a score.
-
-## `PRESENCE_ABSENCE`
-
-``` python
-PRESENCE_ABSENCE = dict(prepare=lambda y: as_response(y).check_presence_absence(), activation='sigmoid', loss='binary_cross_entropy', metric='roc_auc', weights=lambda y, fitting: positive_weights(y, fitting=fitting), cells=lambda y, folds: scorable_cells(y, folds))
-```
-
-## `CONTINUOUS`
-
-``` python
-CONTINUOUS = _numeric_head(lambda v: None, 'r_squared')
-```
-
-## `ABUNDANCE`
-
-``` python
-ABUNDANCE = _numeric_head(_check_abundance, 'r_squared')
-```
-
-## `ORDINAL`
-
-``` python
-ORDINAL = _numeric_head(_check_ordinal, 'ordinal_f1')
-```
-
-## `COUNT`
-
-``` python
-COUNT = _numeric_head(_check_count, 'neg_poisson_deviance', activation='exp', loss='poisson_deviance')
-```
-
-## `positive_weights()`
-
-``` python
-positive_weights(y, cap: float = 50.0, fitting=None)
-```
-
-Case weights that balance a rare response.
-
-The weight every learner that ships fits a presence-absence response
-under: each presence of a response weighs the ratio of absences to
-presences among the fitting units, capped, and each absence weighs one.
-A response with a presence in one target of a hundred is otherwise
-fitted away by any learner that minimises a mean loss.
-
-The ratio is read off the units the model is fitted on and the weight
-applies to every unit handed in. An encoder holds part of its units back
-as an inner validation set and reads the loss it stops on under the same
-weights, so the loss that stops the fit is the loss the fit minimises; a
-unit held back that way is not in the count the ratio is made from.
-`fitting` is a boolean vector over the rows of `y`, True for the units
-the model is fitted on, or None for all of them.
-
-The weights are the response head’s: the shipped presence-absence head
-carries this function as its `weights`, and a head registered with
-`weights=lambda y, fitting: positive_weights(y, cap=20, fitting=fitting)`
-weights every learner by that cap instead. A head without `weights` is
-fitted unweighted. Returns a `[unit, variable]` array of case weights,
-one per cell of `y`.

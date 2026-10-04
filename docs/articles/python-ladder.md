@@ -1,0 +1,291 @@
+# Python: one grain at a time
+
+Fitting across a set of grains on its own split, and reading the grain a
+ladder saturates at.
+
+[All of the Python
+reference](https://gillescolling.com/timesift/articles/python-reference.md)
+
+## `grain_ladder()`
+
+``` python
+grain_ladder(
+    x,
+    y,
+    learners,
+    folds=None,
+    response: str = 'presence_absence',
+    metric=None,
+    control=None,
+    keep_fits: bool = False,
+    interval: str = 'variables',
+    repeats: int = 1,
+    seed: int = 1,
+    verbose: bool = True,
+)
+```
+
+Cross-validate every learner at every grain, on one fold map and one
+mask of cells.
+
+Every arm sees identical splits and is restricted to identical cells, so
+the arms’ means share a denominator and any two of them can be compared
+with `paired_contrast`.
+
+`folds` left at `None` builds one with the defaults of `fold_map`. Where
+both languages must see the same splits, build it once and read it in
+the other with `read_folds`.
+
+`control` is the `train_control` every neural learner of the ladder
+trains under; a learner carrying settings of its own overrides it on the
+ones it names.
+
+`interval="nested_cv"` refits every arm inside every outer training set
+of every repetition, which is what
+`paired_contrast(interval="nested_cv")` reads an interval for the
+difference in risk off. Two tables whose contrast is to be read take the
+same `folds`, `repeats` and `seed`.
+
+## `fit_learner()`
+
+``` python
+fit_learner(
+    learner,
+    x: TimesiftMatrix,
+    y,
+    response: str = 'presence_absence',
+    control=None,
+    group=None,
+    **kwargs,
+)
+```
+
+Fit one learner at one grain, under one registered response head.
+
+A `fit` that declares a `head` argument is handed the registered head,
+whose `loss` and `activation` say what it is fitting toward; the
+learners that ship read both from there and hold no response of their
+own. A `fit` that declares a `control` is handed the run’s training
+settings the same way, and one that declares `weights` the head’s case
+weights, an array of the response’s shape, which is what a rare response
+weighs in every learner that ships; a fit that declares none fits
+unweighted.
+
+## `Fit`
+
+``` python
+Fit(learner, model, variables, response, bins, channels)
+```
+
+A fitted learner, the variables it was fitted on, and the bins and
+channels of the representation it was made on.
+
+A representation asked to predict is checked against those once, before
+any learner sees it: a calendar grain’s bins are named by their starts,
+so a record from another period is refused by the first bin that differs
+rather than read by position.
+
+Attributes:
+
+- `learner` - Learner
+- `model` - object
+- `variables` - tuple\[str, …\]
+- `response` - str
+- `bins` - tuple\[str, …\]
+- `channels` - tuple\[str, …\]
+
+### `predict()`
+
+``` python
+predict(self, x: TimesiftMatrix)
+```
+
+Predictions for a representation, as a `[unit, variable]` matrix.
+
+## `Ladder`
+
+``` python
+Ladder(
+    grain,
+    learner,
+    variable,
+    fold,
+    score,
+    scorable,
+    predictions,
+    cells,
+    folds,
+    metric,
+    scorer,
+    response,
+    fits,
+    ncv,
+)
+```
+
+One score per `(grain, learner, variable, fold)` cell, and what produced
+it.
+
+Attributes:
+
+- `grain` - np.ndarray
+- `learner` - np.ndarray
+- `variable` - np.ndarray
+- `fold` - np.ndarray
+- `score` - np.ndarray
+- `scorable` - np.ndarray
+- `predictions` - dict
+- `cells` - object
+- `folds` - Folds
+- `metric` - str
+- `scorer` - object
+- `response` - str
+- `fits` - dict
+- `ncv` - dict \| None
+
+### `arm()`
+
+``` python
+arm(self, name: str)
+```
+
+A mask over the rows of one grain-and-learner arm, named
+`grain|learner`.
+
+### `summary()`
+
+``` python
+summary(self)
+```
+
+The across-variable mean of the per-variable score, one row per arm.
+
+## `select_grain()`
+
+``` python
+select_grain(
+    x,
+    y,
+    learners,
+    folds=None,
+    inner=5,
+    rule: str = 'argmax',
+    threshold: str | None = None,
+    interval: str = 'variables',
+    repeats: int = 1,
+    response: str = 'presence_absence',
+    metric=None,
+    compare: Ladder | None = None,
+    control=None,
+    seed: int = 1,
+    verbose: bool = True,
+)
+```
+
+Choose the grain inside each outer fold’s training units, then score the
+whole procedure.
+
+Within each outer fold the training units are split again, every
+candidate is fitted on part of them and scored on the rest, the best is
+refitted on the whole outer training set, and the outer test fold is
+predicted once. The estimate that comes back is therefore of the
+procedure including its choice of grain, which is what an ecologist
+applying it to a new site would run.
+
+What the estimate is of: the expected held-out score of the whole
+pipeline, selection included, on units drawn as these were. What it is
+not: the score of the winning grain. That is higher, by the amount
+selection buys itself, and the difference between the two is the
+quantity this function exists to keep out of a reported number.
+
+The cost is the ladder’s, multiplied by the number of inner folds:
+`v_outer * (v_inner * candidates + 1)` fits.
+
+`control` is the `train_control` every neural learner trains under, in
+the inner search and in the refit alike; a learner carrying settings of
+its own overrides it on the ones it names.
+
+Inside each outer fold every candidate carries an inner score, the mean
+over variables of its per-variable mean over the inner folds, and a
+standard error, the standard deviation over the inner folds of the
+fold’s own score divided by the square root of their number. `rule`
+chooses among them. `"argmax"` takes the highest score, and on an exact
+tie the candidate declared first. `"coarsest_adequate"` is the
+one-standard-error rule (Breiman, Friedman, Olshen and Stone 1984;
+Hastie, Tibshirani and Friedman 2009, section 7.10) with coarseness in
+place of complexity: every candidate scoring at least the highest minus
+its standard error is adequate, and the one with the fewest bins wins,
+then the fewest channels, then the higher score, then the one declared
+first. A standard error that cannot be computed is taken as zero.
+
+`threshold` names a rule of `decision_threshold` (`"youden"`, the cut
+that maximises TSS, `"kappa"` or `"prevalence"`). With it set, each
+outer fold learns one cut per variable on the inner out-of-fold
+predictions of the candidate it selected, which cover the outer training
+units and nothing else, freezes it, and reads the outer test fold’s
+predictions at it with `tss`. The estimate then carries a row
+`tss_inner_cut`, `thresholds` the cut of every outer fold and variable,
+and `cut_scores` the per-cell rows.
+
+The estimate carries the interval across the response variables, which
+is the spread between the variables of this dataset rather than an
+interval for what the procedure would score on a new sample.
+`interval="nested_cv"` adds one that is meant to be, by the nested
+cross-validation of Bates, Hastie and Tibshirani (2024): each outer
+training set is cross-validated again over the remaining folds of the
+same map, over `repeats` fold maps, which gives the mean squared error
+of a cross-validation estimate, and the centre carries the paper’s bias
+correction, so `final` holds the procedure fitted on every unit, whose
+risk the interval is for. The width departs from the paper in one
+respect: the paper’s is the mean squared error of the plain estimate and
+takes the correction as a shift with no spread, and in the package’s
+benchmark that spread exceeded the estimate’s where the sample was small
+or the signal absent; the width here is the same identity applied to the
+corrected estimator, from a cross-validation one level further down,
+held above the corrected centre’s own naive standard error, and the
+paper’s is kept beside it as `se_bates`. One repetition costs one fit of
+the procedure per unordered pair and per unordered triple of outer
+folds.
+
+## `Selection`
+
+``` python
+Selection(
+    selected,
+    estimate,
+    contrast,
+    candidates,
+    scores,
+    inner,
+    metric,
+    response,
+    rule,
+    threshold,
+    thresholds,
+    cut_scores,
+    interval,
+    nested_cv,
+    final,
+)
+```
+
+What a nested selection chose, what it scores, and what it was searched
+over.
+
+Attributes:
+
+- `selected` - list\[dict\]
+- `estimate` - list\[dict\]
+- `contrast` - list\[dict\] \| None
+- `candidates` - list\[dict\]
+- `scores` - Ladder
+- `inner` - list\[dict\]
+- `metric` - str
+- `response` - str
+- `rule` - str
+- `threshold` - str \| None
+- `thresholds` - list\[dict\] \| None
+- `cut_scores` - Ladder \| None
+- `interval` - str
+- `nested_cv` - list\[dict\] \| None
+- `final` - dict \| None

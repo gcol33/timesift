@@ -44,12 +44,28 @@ class TrainControl:
         if not 0 <= self.swa_start < 1:
             raise ValueError(f"`swa_start` must be in [0, 1), got {self.swa_start}")
 
+    def __repr__(self) -> str:  # pragma: no cover - display only
+        lines = ["<timesift control>"]
+        for f in fields(self):
+            value = getattr(self, f.name)
+            lines.append(f"  {f.name:<15} {describe(value)}"
+                         + ("   (default)" if value == f.default else ""))
+        return "\n".join(lines)
+
     def override(self, settings: dict) -> "TrainControl":
         """The control with the settings a learner or a call gave applied on top of it."""
         return replace(self, **check_settings(settings))
 
 
 CONTROL_SETTINGS = tuple(f.name for f in fields(TrainControl))
+
+
+def describe(value) -> str:
+    """A setting as the printed forms of a control and a learner show it: a sequence joined by
+    slashes, as R's ``format()`` of a vector is."""
+    if isinstance(value, (tuple, list)):
+        return "/".join(str(v) for v in value)
+    return str(value)
 
 
 def check_settings(settings: dict) -> dict:

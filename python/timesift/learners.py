@@ -64,6 +64,26 @@ class Learner:
             raise ValueError(f"the {self.name} learner's `data` must be a representation, such as "
                              f"grain(\"week\"), or None, got {type(self.data).__name__}.")
 
+    def __repr__(self) -> str:  # pragma: no cover - display only
+        from .control import describe
+        lines = [f"<timesift learner> {self.name}",
+                 f"reads   : {self.reads} ; one model per response: "
+                 + ("no, joint" if self.multi == "joint" else "yes, separate"),
+                 "data    : " + ("every representation of the run" if self.data is None
+                                 else self.data.label)]
+        # An encoder's fit carries its architecture, and what else it was given is training; any
+        # other learner's settings are its own, a seed of its inner search among them.
+        arch = getattr(self.fit, "arch", None)
+        trains = [k for k in self.params if arch is not None and k not in arch]
+        for title, names in (("settings", [k for k in self.params if k not in trains]),
+                             ("training", trains)):
+            if names:
+                lines.append(f"{title}: " + ", ".join(f"{k} = {describe(self.params[k])}"
+                                                      for k in names))
+        if self.needs:
+            lines.append("needs   : " + ", ".join(self.needs))
+        return "\n".join(lines)
+
     def require(self) -> None:
         """Error, naming the install, unless what the learner needs is importable."""
         missing = [p for p in self.needs if importlib.util.find_spec(p) is None]

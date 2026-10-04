@@ -244,8 +244,8 @@ scored by AUC by default, with TSS beside it.
 holds a synthetic series with the digest of every grain-by-statistic
 combination. Both test suites assert the same digests, so R and Python
 cannot drift apart on the one thing the package is about. [The Python
-pages](https://gillescolling.com/timesift/articles/python.html) are that
-side, and [the
+reference](https://gillescolling.com/timesift/articles/python-reference.html)
+is that side, and [the
 contract](https://gillescolling.com/timesift/articles/contract.html)
 says what each language carries.
 

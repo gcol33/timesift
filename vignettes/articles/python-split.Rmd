@@ -6,7 +6,9 @@ title: "Python: the split and the cells"
 
 One fold map read by everything that scores, and the cells a score is defined on, computed with no model involved.
 
-## `cv()`
+[All of the Python reference](python-reference.html)
+
+## `cv()` {#cv}
 
 ```python
 cv(v: int = 10, seed: int = 1, strata: int = 5, by=None, repeats: int = 1)
@@ -20,7 +22,7 @@ and so on). In `timesift` every repeat is a full run on its own fold map: a scor
 fit's held-out score, the report averages a response's scores over folds and repeats, and the
 combiner is fitted on the out-of-fold predictions of all the repeats together.
 
-## `grouped_cv()`
+## `grouped_cv()` {#grouped_cv}
 
 ```python
 grouped_cv(group, v: int = 10, seed: int = 1, repeats: int = 1)
@@ -32,7 +34,7 @@ It is what repeated targets on the same unit need: two visits to a plot a fortni
 not two independent held-out units, and splitting them across folds scores a model on a unit
 it has already read.
 
-## `block_cv()`
+## `block_cv()` {#block_cv}
 
 ```python
 block_cv(by, v: int = 4)
@@ -46,7 +48,7 @@ units as another to within one. Nothing is drawn. Under the nested selection the
 keep blocks whole too, so `inner` is at most `v - 1`. `by` is column names, or a numeric
 array with one row per target.
 
-## `env_cv()`
+## `env_cv()` {#env_cv}
 
 ```python
 env_cv(by, v: int = 4)
@@ -54,7 +56,7 @@ env_cv(by, v: int = 4)
 
 As `block_cv`, on columns centred and scaled first: blocks of predictor space.
 
-## `Resampling`
+## `Resampling` {#Resampling}
 
 ```python
 Resampling(kind, v, seed, strata, group, folds, by, scale, repeats)
@@ -74,7 +76,7 @@ Attributes:
 - `scale` - bool
 - `repeats` - int
 
-## `as_resampling()`
+## `as_resampling()` {#as_resampling}
 
 ```python
 as_resampling(x)
@@ -82,7 +84,7 @@ as_resampling(x)
 
 A resampling spec, or a fold map somebody else built, read as a spec that returns it.
 
-## `resolve_folds()`
+## `resolve_folds()` {#resolve_folds}
 
 ```python
 resolve_folds(resampling, y, targets, spec)
@@ -90,7 +92,7 @@ resolve_folds(resampling, y, targets, spec)
 
 Draw the fold map a resampling spec names, in the row order of the response.
 
-## `fold_map()`
+## `fold_map()` {#fold_map}
 
 ```python
 fold_map(y: Response, v: int = 10, seed: int = 1, strata: int = 5, by=None, group=None)
@@ -107,7 +109,7 @@ The stream is numpy's, so a map built here is not the map the R side builds from
 Where both languages must see identical splits, build the map once, write it with
 `write_folds` and read it in the other with `read_folds`.
 
-## `scorable_cells()`
+## `scorable_cells()` {#scorable_cells}
 
 ```python
 scorable_cells(y: Response, folds)
@@ -119,7 +121,7 @@ A cell needs both classes among the held-out units and both classes among the un
 fitted on. Computing the mask without a model is what lets every arm be restricted to the same
 cells, so their means share a denominator and every paired difference runs on matched cells.
 
-## `align_folds()`
+## `align_folds()` {#align_folds}
 
 ```python
 align_folds(folds, units)
@@ -129,73 +131,7 @@ A fold map reaches the fitting path as an integer vector in the row order of the
 representation, whether it arrived as a `Folds`, a mapping of unit to fold, or a bare vector
 already in that order.
 
-## `as_response()`
-
-```python
-as_response(y)
-```
-
-The response reaches everything downstream as a `Response`, whether it arrived as one, as
-a mapping of variable name to values, or as a two-dimensional array with no names at all.
-
-## `Response`
-
-```python
-Response(values, units, variables)
-```
-
-A `[unit, variable]` matrix of observed values, with the units named.
-
-Attributes:
-
-- `values` - np.ndarray
-- `units` - tuple[str, ...]
-- `variables` - tuple[str, ...]
-
-### `from_columns()`
-
-```python
-from_columns(cls, data, id: str, variables=None)
-```
-
-A response from a table of one unit column and one column per variable.
-
-### `take_units()`
-
-```python
-take_units(self, index)
-```
-
-The response restricted to a subset of its units, in the order given.
-
-### `take_variables()`
-
-```python
-take_variables(self, index)
-```
-
-The response restricted to a subset of its variables, in the order given.
-
-A learner covering one response at a time is handed them through this, so the matrix a
-candidate emits is assembled from the same names each part was fitted on.
-
-### `align()`
-
-```python
-align(self, units)
-```
-
-Put the response into the row order of a representation, by unit and never by position.
-
-### `check_presence_absence()`
-
-```python
-check_presence_absence(self)
-```
-
-Error unless every value is 0 or 1 and none is missing.
-
-## `Folds`
+## `Folds` {#Folds}
 
 ```python
 Folds(fold, units, grouped, group)
@@ -213,11 +149,11 @@ Attributes:
 - `grouped` - bool
 - `group` - tuple[str, ...] | None
 
-### `v`
+### `v` {#Folds.v}
 
 How many folds the map holds.
 
-### `coerce()`
+### `coerce()` {#Folds.coerce}
 
 ```python
 coerce(cls, x, units=None)
@@ -225,7 +161,7 @@ coerce(cls, x, units=None)
 
 A `Folds`, a mapping of unit to fold, or a bare vector read in `units` order.
 
-### `align()`
+### `align()` {#Folds.align}
 
 ```python
 align(self, units)
@@ -233,7 +169,7 @@ align(self, units)
 
 Put the map into the row order of a representation, by unit and never by position.
 
-### `as_dict()`
+### `as_dict()` {#Folds.as_dict}
 
 ```python
 as_dict(self)
@@ -241,7 +177,7 @@ as_dict(self)
 
 The map as unit to fold.
 
-## `Cells`
+## `Cells` {#Cells}
 
 ```python
 Cells(variable, fold, n_occ, pres_train, abs_train, pres_test, abs_test, scorable)
@@ -260,66 +196,10 @@ Attributes:
 - `abs_test` - np.ndarray
 - `scorable` - np.ndarray
 
-### `is_scorable()`
+### `is_scorable()` {#Cells.is_scorable}
 
 ```python
 is_scorable(self, variable: str, fold: int)
 ```
 
 Whether one `(variable, fold)` cell admits a score.
-
-## `PRESENCE_ABSENCE`
-
-```python
-PRESENCE_ABSENCE = dict(prepare=lambda y: as_response(y).check_presence_absence(), activation='sigmoid', loss='binary_cross_entropy', metric='roc_auc', weights=lambda y, fitting: positive_weights(y, fitting=fitting), cells=lambda y, folds: scorable_cells(y, folds))
-```
-
-## `CONTINUOUS`
-
-```python
-CONTINUOUS = _numeric_head(lambda v: None, 'r_squared')
-```
-
-## `ABUNDANCE`
-
-```python
-ABUNDANCE = _numeric_head(_check_abundance, 'r_squared')
-```
-
-## `ORDINAL`
-
-```python
-ORDINAL = _numeric_head(_check_ordinal, 'ordinal_f1')
-```
-
-## `COUNT`
-
-```python
-COUNT = _numeric_head(_check_count, 'neg_poisson_deviance', activation='exp', loss='poisson_deviance')
-```
-
-## `positive_weights()`
-
-```python
-positive_weights(y, cap: float = 50.0, fitting=None)
-```
-
-Case weights that balance a rare response.
-
-The weight every learner that ships fits a presence-absence response under: each presence of
-a response weighs the ratio of absences to presences among the fitting units, capped, and
-each absence weighs one. A response with a presence in one target of a hundred is otherwise
-fitted away by any learner that minimises a mean loss.
-
-The ratio is read off the units the model is fitted on and the weight applies to every unit
-handed in. An encoder holds part of its units back as an inner validation set and reads the
-loss it stops on under the same weights, so the loss that stops the fit is the loss the fit
-minimises; a unit held back that way is not in the count the ratio is made from. `fitting`
-is a boolean vector over the rows of `y`, True for the units the model is fitted on, or
-None for all of them.
-
-The weights are the response head's: the shipped presence-absence head carries this function
-as its `weights`, and a head registered with `weights=lambda y, fitting:
-positive_weights(y, cap=20, fitting=fitting)` weights every learner by that cap instead. A
-head without `weights` is fitted unweighted. Returns a `[unit, variable]` array of case
-weights, one per cell of `y`.

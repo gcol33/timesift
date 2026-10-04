@@ -60,3 +60,7 @@ jobs:
       # compiled core nor numpy.
       - name: Check the generated Python reference
         run: python tools/python_reference.py --check
+
+      # Compares each article's recorded source digest with its source, without running it.
+      - name: Check the generated Python articles
+        run: python tools/python_articles.py --check

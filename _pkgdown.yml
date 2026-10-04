@@ -34,6 +34,7 @@ navbar:
     left:
     - r
     - python
+    - articles
     - contract
     - news
     right:
@@ -48,31 +49,20 @@ navbar:
         href: articles/timesift.html
       - text: Reference
         href: reference/index.html
-      - text: '-------'
+    python:
+      text: Python
+      menu:
+      - text: Get started
+        href: articles/python.html
+      - text: Reference
+        href: articles/python-reference.html
+    articles:
+      text: Articles
+      menu:
       - text: Reproducing the study
         href: articles/reproducing-schrankogel.html
       - text: Coming from biomod2
         href: articles/biomod2.html
-    python:
-      text: Python
-      menu:
-      - text: Overview
-        href: articles/python.html
-      - text: '-------'
-      - text: The representation
-        href: articles/python-representation.html
-      - text: The split and the cells
-        href: articles/python-split.html
-      - text: Fitting
-        href: articles/python-fitting.html
-      - text: Learners
-        href: articles/python-learners.html
-      - text: Scoring and comparison
-        href: articles/python-scoring.html
-      - text: Extending
-        href: articles/python-extending.html
-      - text: What crosses the boundary
-        href: articles/python-artifacts.html
     contract:
       text: Contract
       href: articles/contract.html
@@ -137,6 +127,8 @@ reference:
   - ensemble_spread
   - ensemble_weights
 - title: Scoring and comparison
+  desc: |
+    The metrics, the paired contrast between two arms on matched cells, every grain against a learner's best, the inflation of a score read at its own best threshold, and what a fitted model read.
   contents:
   - tss
   - roc_auc
@@ -189,30 +181,40 @@ reference:
   - artifacts
   - digest_array
 - title: A record to test on
+  desc: |
+    A simulated record with a grain planted in it, to test a run against a known answer.
   contents: simulate_records
 - title: The package
   contents: timesift-package
 articles:
-- title: Articles
-  navbar: ~
-  contents: reproducing-schrankogel
-- title: Coming from biomod2
+- title: Get started
   desc: |
-    The biomod2 algorithms and ensembles as learners and options of `ensemble()`, fitted across grains.
-  contents: articles/biomod2
+    The whole path on a small simulated record, from two tables to a scored comparison and the prediction that follows from it.
+  contents:
+  - timesift
+  - articles/python
+- title: Articles
+  contents:
+  - reproducing-schrankogel
+  - articles/biomod2
 - title: The contract
   desc: |
     What both implementations answer to, and what each language carries.
   contents: articles/contract
-- title: Python
+- title: Python reference
   desc: |
-    The same calls from Python, returning the same numbers.
+    The Python package's functions, classes and values, under the sections of the R reference.
+  navbar: ~
   contents:
-  - articles/python
-  - articles/python-representation
-  - articles/python-split
-  - articles/python-fitting
+  - articles/python-reference
+  - articles/python-one-call
+  - articles/python-representations
   - articles/python-learners
+  - articles/python-split
+  - articles/python-combining
   - articles/python-scoring
+  - articles/python-arrays
+  - articles/python-ladder
   - articles/python-extending
   - articles/python-artifacts
+  - articles/python-simulate

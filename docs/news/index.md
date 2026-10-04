@@ -1,5 +1,15 @@
 # Changelog
 
+## timesift (development version)
+
+- In Python a representation, a learner and a training control print as
+  they do in R, where they printed as their dataclass fields and a
+  learner’s functions.
+- The site’s Python side has a Get started article, the R walkthrough
+  section by section and run against the package, and a reference laid
+  out under the sections of the R reference with an index page, so the
+  two language menus carry the same pages.
+
 ## timesift 0.5.0
 
 ### New

@@ -3,6 +3,9 @@
 The three artifacts a split is carried in, and the digest that says two
 arrays are the same array.
 
+[All of the Python
+reference](https://gillescolling.com/timesift/articles/python-reference.md)
+
 ## `write_folds()`
 
 ``` python

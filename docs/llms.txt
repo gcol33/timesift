@@ -244,8 +244,8 @@ scored by AUC by default, with TSS beside it.
 holds a synthetic series with the digest of every grain-by-statistic
 combination. Both test suites assert the same digests, so R and Python
 cannot drift apart on the one thing the package is about. [The Python
-pages](https://gillescolling.com/timesift/articles/python.html) are that
-side, and [the
+reference](https://gillescolling.com/timesift/articles/python-reference.html)
+is that side, and [the
 contract](https://gillescolling.com/timesift/articles/contract.html)
 says what each language carries.
 
@@ -386,6 +386,10 @@ Weights fitted on the out-of-fold predictions alone.
 
 ## Scoring and comparison
 
+The metrics, the paired contrast between two arms on matched cells,
+every grain against a learner’s best, the inflation of a score read at
+its own best threshold, and what a fitted model read.
+
 - [`tss()`](https://gillescolling.com/timesift/reference/tss.md) : The
   true skill statistic
 - [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md)
@@ -494,6 +498,9 @@ arrays are the same array.
 
 ## A record to test on
 
+A simulated record with a grain planted in it, to test a run against a
+known answer.
+
 - [`simulate_records()`](https://gillescolling.com/timesift/reference/simulate_records.md)
   : Simulate sensor records whose response acts at a known temporal
   grain
@@ -505,17 +512,20 @@ arrays are the same array.
 
 # Articles
 
+### Get started
+
+The whole path on a small simulated record, from two tables to a scored
+comparison and the prediction that follows from it.
+
+- [Choosing how a record is
+  read](https://gillescolling.com/timesift/articles/timesift.md):
+- [Choosing how a record is read, in
+  Python](https://gillescolling.com/timesift/articles/python.md):
+
 ### Articles
 
 - [Reproducing the Schrankogel
   grid](https://gillescolling.com/timesift/articles/reproducing-schrankogel.md):
-
-### Coming from biomod2
-
-The biomod2 algorithms and ensembles as learners and options of
-[`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md),
-fitted across grains.
-
 - [Coming from
   biomod2](https://gillescolling.com/timesift/articles/biomod2.md):
 
@@ -526,22 +536,32 @@ What both implementations answer to, and what each language carries.
 - [The representation
   contract](https://gillescolling.com/timesift/articles/contract.md):
 
-### Python
+### Python reference
 
-The same calls from Python, returning the same numbers.
+The Python package’s functions, classes and values, under the sections
+of the R reference.
 
-- [Python](https://gillescolling.com/timesift/articles/python.md):
-- [Python: the
-  representation](https://gillescolling.com/timesift/articles/python-representation.md):
-- [Python: the split and the
-  cells](https://gillescolling.com/timesift/articles/python-split.md):
+- [Python
+  reference](https://gillescolling.com/timesift/articles/python-reference.md):
+- [Python: the one
+  call](https://gillescolling.com/timesift/articles/python-one-call.md):
 - [Python:
-  fitting](https://gillescolling.com/timesift/articles/python-fitting.md):
+  representations](https://gillescolling.com/timesift/articles/python-representations.md):
 - [Python:
   learners](https://gillescolling.com/timesift/articles/python-learners.md):
+- [Python: the split and the
+  cells](https://gillescolling.com/timesift/articles/python-split.md):
+- [Python: combining the
+  candidates](https://gillescolling.com/timesift/articles/python-combining.md):
 - [Python: scoring and
   comparison](https://gillescolling.com/timesift/articles/python-scoring.md):
+- [Python: the arrays
+  themselves](https://gillescolling.com/timesift/articles/python-arrays.md):
+- [Python: one grain at a
+  time](https://gillescolling.com/timesift/articles/python-ladder.md):
 - [Python:
   extending](https://gillescolling.com/timesift/articles/python-extending.md):
 - [Python: what crosses the
   boundary](https://gillescolling.com/timesift/articles/python-artifacts.md):
+- [Python: a record to test
+  on](https://gillescolling.com/timesift/articles/python-simulate.md):

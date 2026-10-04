@@ -4,9 +4,11 @@ title: "Python: scoring and comparison"
 
 <!-- Written by tools/python_reference.py from the Python sources. Do not edit. -->
 
-The metrics, the paired contrast between two arms on matched cells, every grain against a learner's best, the inflation of a score read at its own best threshold, what a fitted model read, and a record with a planted grain to test all of it on.
+The metrics, the paired contrast between two arms on matched cells, every grain against a learner's best, the inflation of a score read at its own best threshold, and what a fitted model read.
 
-## `tss()`
+[All of the Python reference](python-reference.html)
+
+## `tss()` {#tss}
 
 ```python
 tss(y, p, threshold=None)
@@ -17,7 +19,7 @@ Sensitivity plus specificity minus one, at the threshold that maximises it.
 Given a `threshold` learned elsewhere, the score is read at that cut instead, presence being
 predicted at `p >= threshold`.
 
-## `roc_auc()`
+## `roc_auc()` {#roc_auc}
 
 ```python
 roc_auc(y, p)
@@ -25,7 +27,7 @@ roc_auc(y, p)
 
 The area under the ROC curve, as the rank sum of the presences. Ties take the average rank.
 
-## `average_precision()`
+## `average_precision()` {#average_precision}
 
 ```python
 average_precision(y, p)
@@ -38,7 +40,7 @@ weighted by the share of presences that cut adds. Units sharing a prediction ent
 Its floor is the prevalence rather than one half, which makes it the reading of how well
 presences are ranked above absences where presences are rare.
 
-## `kappa_score()`
+## `kappa_score()` {#kappa_score}
 
 ```python
 kappa_score(y, p, rule: str = 'youden')
@@ -46,7 +48,7 @@ kappa_score(y, p, rule: str = 'youden')
 
 Cohen's kappa of a model's decisions against the observed response.
 
-## `table_metric()`
+## `table_metric()` {#table_metric}
 
 ```python
 table_metric(y, p, metric: str, rule: str = 'youden', threshold=None, perc: float = 0.9)
@@ -60,7 +62,7 @@ A metric of the two-by-two table of decisions against observations.
 at `p >= cut`. A value the table does not define, a zero denominator, is NaN, as is a cell
 of one class.
 
-## `boyce_index()`
+## `boyce_index()` {#boyce_index}
 
 ```python
 boyce_index(y, p, resolution: int = 100, width: float = 0.1)
@@ -76,7 +78,7 @@ the index is the Spearman correlation of that ratio with the window's midpoint. 
 repeated values. NaN where the cell defines none, the predictions are all equal, the ratio is
 defined in fewer than three windows or takes one value.
 
-## `regression_metric()`
+## `regression_metric()` {#regression_metric}
 
 ```python
 regression_metric(y, p, metric: str)
@@ -91,7 +93,7 @@ prediction is negative or is zero beside a count above zero). A comparison reads
 score as the best, so the five errors are registered as `neg_rmse`, `neg_mse`,
 `neg_mae`, `neg_max_error` and `neg_poisson_deviance` with their sign reversed.
 
-## `ordinal_metric()`
+## `ordinal_metric()` {#ordinal_metric}
 
 ```python
 ordinal_metric(y, p, metric: str)
@@ -109,7 +111,7 @@ means. A class with no unit, or in which nothing is predicted, adds zero to its 
 registered as `ordinal_accuracy`, `ordinal_recall`, `ordinal_precision` and
 `ordinal_f1`.
 
-## `cohen_kappa()`
+## `cohen_kappa()` {#cohen_kappa}
 
 ```python
 cohen_kappa(a, b)
@@ -117,7 +119,7 @@ cohen_kappa(a, b)
 
 Chance-corrected agreement of two labellings of the same units, in either order.
 
-## `decision_threshold()`
+## `decision_threshold()` {#decision_threshold}
 
 ```python
 decision_threshold(
@@ -138,7 +140,7 @@ Given a `timesift()` fit in place of `y` and no `p`, one cut per response, learn
 `candidate`'s out-of-fold predictions of the fit's own targets, as a dict keyed by the
 response; that is the cut `predict(type="binary")` applies to new targets.
 
-## `model_agreement()`
+## `model_agreement()` {#model_agreement}
 
 ```python
 model_agreement(y, p_a, p_b, rule: str = 'youden')
@@ -146,7 +148,7 @@ model_agreement(y, p_a, p_b, rule: str = 'youden')
 
 Agreement between two models' decisions, with how often each is right where they differ.
 
-## `score_predictions()`
+## `score_predictions()` {#score_predictions}
 
 ```python
 score_predictions(y, p, folds, cells=None, metric: str = 'roc_auc')
@@ -160,7 +162,7 @@ fitted outside the package, predictions read back from a file. A cell is one res
 fold, and the mask is computed from the response and the fold map alone, never from a model,
 which is what keeps two arms comparable.
 
-## `paired_contrast()`
+## `paired_contrast()` {#paired_contrast}
 
 ```python
 paired_contrast(ladder: Ladder, a: str, b: str, interval: str = 'variables')
@@ -189,7 +191,7 @@ risk on a new sample, by the nested cross-validation of Bates, Hastie and Tibshi
 read on the difference of the two arms' cell scores, which needs a ladder fitted with
 `grain_ladder(interval="nested_cv")`.
 
-## `grain_contrasts()`
+## `grain_contrasts()` {#grain_contrasts}
 
 ```python
 grain_contrasts(
@@ -217,7 +219,7 @@ Returns one row per grain other than the reference: `learner`, `grain`, `referen
 the difference from the reference `diff`, its interval `lower` and `upper`, and the
 adjusted `p_value`. Needs scipy.
 
-## `tss_inflation()`
+## `tss_inflation()` {#tss_inflation}
 
 ```python
 tss_inflation(
@@ -238,7 +240,7 @@ average, not a bound every reading sits above. The model planted is one distribu
 predictions, and another at the same skill inflates by a different amount, which is also why a
 paired difference is not free of it.
 
-## `implied_skill()`
+## `implied_skill()` {#implied_skill}
 
 ```python
 implied_skill(
@@ -258,7 +260,7 @@ that map, under the distribution of predictions `tss_inflation` plants; a model 
 predictions are distributed otherwise is inflated by a different amount. It does not correct a
 difference between two arms, whose inflations need not be equal.
 
-## `occlusion()`
+## `occlusion()` {#occlusion}
 
 ```python
 occlusion(x, *args, **kwargs)
@@ -270,7 +272,7 @@ Takes a `timesift.fit.timesift` run or a `timesift.ladder.grain_ladder` result,
 and the profile itself is one implementation either way. The models kept per fold are the ones
 read, so the profile is measured where the score was: on the units each model held out.
 
-## `response_curve()`
+## `response_curve()` {#response_curve}
 
 ```python
 response_curve(
@@ -299,7 +301,7 @@ is held at the reference, and the members' predictions are combined by the stack
 adds the members' standard deviation and interval. `with_` is a second predictor, and the
 prediction is then read over the grid of the two; it is `with` in R, which Python reserves.
 
-## `ResponseCurve`
+## `ResponseCurve` {#ResponseCurve}
 
 ```python
 ResponseCurve(
@@ -336,171 +338,3 @@ Attributes:
 - `sd` - np.ndarray | None
 - `lower` - np.ndarray | None
 - `upper` - np.ndarray | None
-
-## `project()`
-
-```python
-project(
-    fit,
-    series=None,
-    static=None,
-    candidate: str = 'ensemble',
-    type: str = 'response',
-    chunk: int = 5000,
-    **kwargs,
-)
-```
-
-Predict one target per cell of a grid, each carrying the record of its own cell.
-
-This is `BIOMOD_Projection()` and `BIOMOD_EnsembleForecasting()`: a map is the fit applied
-to one target per cell, at the grain the fit reads. `series` is an `xarray.DataArray` with
-a `time` dimension and two spatial ones, or a mapping of the fit's `x` column names to
-such; `static` is an `xarray.Dataset`, or a mapping of the fit's `static` column names to
-`DataArray` over the two spatial dimensions. Every input shares one grid, and one set of
-instants. Cells are predicted in chunks of `chunk`, and a cell is predicted where every
-input holds a value at that cell: a cell with a missing reading anywhere is NaN in every
-layer. `candidate`, `type` and the other keywords are those of `Timesift.predict`.
-
-Returns an `xarray.DataArray` over `response` and the two spatial dimensions of the
-inputs; for `type="spread"` a `statistic` dimension as well.
-
-## `range_change()`
-
-```python
-range_change(now, later, threshold=None)
-```
-
-How the range of each response changes between two maps.
-
-Counts the cells a response is lost from, kept in and gained, as `BIOMOD_RangeSize()` does,
-a cell being in the range where the response is predicted present. With `L` the cells lost,
-`K` kept, `G` gained and `A` absent in both: the current range is `L + K`, the later
-one `K + G`, `percent_loss` is `100 L / (L + K)`, `percent_gain` is `100 G / (L + K)`
-and `change` is `percent_gain - percent_loss`. A cell that is NaN in either map is left out
-of every count. `now` and `later` are `xarray.DataArray` with a `response` dimension,
-such as `project()` returns, or arrays of cells by responses. `threshold` is None where the
-maps are already 0 and 1, and otherwise one cut per response, or one for all.
-
-## `RangeChange`
-
-```python
-RangeChange(table, map, variables)
-```
-
-The change in range of each response: a `table` of counts, and the `map` of codes
-(-2 lost, -1 kept, 0 absent in both, 1 gained) of the shape of the inputs.
-
-Attributes:
-
-- `table` - list
-- `map` - np.ndarray
-- `variables` - tuple
-
-## `pseudo_absences()`
-
-```python
-pseudo_absences(
-    pool,
-    presences,
-    n: int,
-    strategy: str = 'random',
-    id=None,
-    env=None,
-    quantile: float = 0.025,
-    coords=None,
-    dist_min: float = 0.0,
-    dist_max: float = np.inf,
-    lonlat: bool = False,
-    repeats: int = 1,
-    seed: int = 1,
-)
-```
-
-Draw pseudo-absences from a pool of background units.
-
-Presence-only records give a response of ones. A model needs units where the response is
-zero, and these are drawn from `pool`, a mapping of column to array of background units that
-carry the same columns as the targets. The strategies are `bm_PseudoAbsences()`'s:
-`"random"` admits any unit of the pool that is not a presence; `"sre"` a unit outside the
-envelope of the presences, the band between the `quantile` and `1 - quantile` quantiles of
-each of the `env` columns over the presences, a unit being outside where it leaves the band
-in at least one column; `"disk"` a unit whose distance to the nearest presence lies between
-`dist_min` and `dist_max`, both included, on the two `coords` columns, planar in the
-units of the coordinates or in metres from longitude and latitude in degrees where `lonlat`
-is true, on a sphere of radius 6371008.8 m.
-
-A presence is never its own absence: a unit of the pool whose `id` is one of the presences'
-is not a candidate. The units a strategy admits are the same in both languages; which `n` of
-them are drawn depends on the language's generator, as the folds of `fold_map` do. The result
-is a mapping of column to array holding the drawn rows of the pool, with `set` (the draw,
-from 1) and `pseudo` (true) added; draw `r` uses `seed + r - 1`.
-
-## `simulate_records()`
-
-```python
-simulate_records(
-    n: int = 300,
-    mechanism: str = 'none',
-    variables: int = 10,
-    prevalence: float = 0.1,
-    auc: float = 0.75,
-    from_: str = '2021-09-01',
-    days: int = 365,
-    step_hours: float = 3,
-    seasonal: float = 8,
-    offset_sd: float = 1,
-    anomaly_sd: float = 1,
-    anomaly_days: float = 2,
-    offset_effect: float = 0,
-    sensor_sd: float = 0.3,
-    year_start: str = '09-01',
-    seed: int = 1,
-    draw: int = 1,
-)
-```
-
-Draw units carrying a record and a presence-absence response acting at one known grain.
-
-The response is driven by `g_ij = sum_t w_j(t) a_i(t)`, a weighted mean of unit `i`'s
-latent anomaly: the record with the shared seasonal cycle and the unit's own offset taken out.
-The weights are constant within the bins of one grain and zero outside a short stretch of them,
-so the true grain is the coarsest grain at which `g` is still an exact linear functional of
-the representation. `"none"` draws the driver independently of the record; `"event"` reads
-three consecutive days, `"season"` one whole season, and `"lag"` four consecutive weeks
-under a geometric decay.
-
-The driver is standardised by its population mean and standard deviation, computed in closed
-form from the settings, and the response is `Bernoulli(expit(b0 + b1 z))` with `b0` and
-`b1` solved so the marginal prevalence is `prevalence` and the population area under the
-ROC curve of `z` is `auc`. `auc` is a ceiling no fitted model reaches.
-
-`seed` fixes the design and `draw` the units, so two calls with one `seed` and two
-`draw` values are two samples of one population. `from_` is R's `from`, renamed because
-`from` is a Python keyword.
-
-## `Simulation`
-
-```python
-Simulation(readings, y, driver, grain, weights, link, design, grain_stat, anchor)
-```
-
-A simulated record, its response, and everything the draw is reproducible from.
-
-`readings` is the long table `grain_matrix` takes, as a mapping of `unit`, `time`
-and `reading`. `y` is the `[unit, variable]` 0/1 response and `driver` the
-standardised driver `z` behind it. `grain` is the true grain, or `None` where the
-response does not read the record. `weights` is the `[reading, variable]` matrix defining
-the driver, `link` the solved `b0` and `b1`, and `design` the settings of the draw.
-
-Attributes:
-
-- `readings` - dict
-- `y` - Response
-- `driver` - np.ndarray
-- `grain` - str | None
-- `weights` - np.ndarray
-- `link` - dict
-- `design` - dict
-- `grain_stat` - str
-- `anchor` - np.ndarray

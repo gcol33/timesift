@@ -6,31 +6,9 @@ title: "Python: extending"
 
 The response head and the metric are registrations, never a fork of the fitting code.
 
-## `register_learner()`
+[All of the Python reference](python-reference.html)
 
-```python
-register_learner(name: str, constructor: Callable, overwrite: bool = False)
-```
-
-Make a learner available by name. The learners that ship are registered the same way.
-
-`constructor` is called with no arguments and returns a `Learner`, so a learner asked for
-by name is built with its own defaults.
-
-## `register_metric()`
-
-```python
-register_metric(name: str, fn: Callable, overwrite: bool = False)
-```
-
-Register a metric: a function of `(y, p)` on one held-out cell.
-
-`y` and `p` are the observed values of the units in one fold and a model's predictions for
-them, both the same length. It returns one number, or a value that is not finite where the cell
-defines none. Registering one makes it available to `grain_ladder` by name, with no change
-to the fitting code.
-
-## `register_response()`
+## `register_response()` {#register_response}
 
 ```python
 register_response(name: str, spec: dict, overwrite: bool = False)
@@ -54,45 +32,7 @@ weights every row, so an encoder's inner validation loss is weighted as its fit 
 shipped head's is `timesift.response.positive_weights`, and a head without one fits
 unweighted.
 
-## `register_tuning()`
-
-```python
-register_tuning(name: str, grid, overwrite: bool = False)
-```
-
-Register the grid a learner is tuned over when `tune` is given none.
-
-`name` is the learner's, as it reports under. `grid` is a dict of the values to try, or a
-function of `(learner, x)` returning one, where `x` is the representation the learner is
-fitted on: the second form is for a grid that depends on the data, as the number of columns
-does, or on a setting the learner carries. The grids of the learners that ship are registered
-the same way.
-
-## `tunings()`
-
-```python
-tunings()
-```
-
-The learners a grid is registered for.
-
-## `learners()`
-
-```python
-learners()
-```
-
-The learners registered under this session.
-
-## `metrics()`
-
-```python
-metrics()
-```
-
-The metrics registered under this session.
-
-## `responses()`
+## `responses()` {#responses}
 
 ```python
 responses()
@@ -100,15 +40,150 @@ responses()
 
 The response heads registered under this session.
 
-## `get_learner()`
+## `as_response()` {#as_response}
 
 ```python
-get_learner(learner)
+as_response(y)
 ```
 
-A `Learner`, whether it arrived as one or as the name of a registered one.
+The response reaches everything downstream as a `Response`, whether it arrived as one, as
+a mapping of variable name to values, or as a two-dimensional array with no names at all.
 
-## `resolve_metric()`
+## `Response` {#Response}
+
+```python
+Response(values, units, variables)
+```
+
+A `[unit, variable]` matrix of observed values, with the units named.
+
+Attributes:
+
+- `values` - np.ndarray
+- `units` - tuple[str, ...]
+- `variables` - tuple[str, ...]
+
+### `from_columns()` {#Response.from_columns}
+
+```python
+from_columns(cls, data, id: str, variables=None)
+```
+
+A response from a table of one unit column and one column per variable.
+
+### `take_units()` {#Response.take_units}
+
+```python
+take_units(self, index)
+```
+
+The response restricted to a subset of its units, in the order given.
+
+### `take_variables()` {#Response.take_variables}
+
+```python
+take_variables(self, index)
+```
+
+The response restricted to a subset of its variables, in the order given.
+
+A learner covering one response at a time is handed them through this, so the matrix a
+candidate emits is assembled from the same names each part was fitted on.
+
+### `align()` {#Response.align}
+
+```python
+align(self, units)
+```
+
+Put the response into the row order of a representation, by unit and never by position.
+
+### `check_presence_absence()` {#Response.check_presence_absence}
+
+```python
+check_presence_absence(self)
+```
+
+Error unless every value is 0 or 1 and none is missing.
+
+## `PRESENCE_ABSENCE` {#PRESENCE_ABSENCE}
+
+```python
+PRESENCE_ABSENCE = dict(prepare=lambda y: as_response(y).check_presence_absence(), activation='sigmoid', loss='binary_cross_entropy', metric='roc_auc', weights=lambda y, fitting: positive_weights(y, fitting=fitting), cells=lambda y, folds: scorable_cells(y, folds))
+```
+
+## `CONTINUOUS` {#CONTINUOUS}
+
+```python
+CONTINUOUS = _numeric_head(lambda v: None, 'r_squared')
+```
+
+## `ABUNDANCE` {#ABUNDANCE}
+
+```python
+ABUNDANCE = _numeric_head(_check_abundance, 'r_squared')
+```
+
+## `ORDINAL` {#ORDINAL}
+
+```python
+ORDINAL = _numeric_head(_check_ordinal, 'ordinal_f1')
+```
+
+## `COUNT` {#COUNT}
+
+```python
+COUNT = _numeric_head(_check_count, 'neg_poisson_deviance', activation='exp', loss='poisson_deviance')
+```
+
+## `positive_weights()` {#positive_weights}
+
+```python
+positive_weights(y, cap: float = 50.0, fitting=None)
+```
+
+Case weights that balance a rare response.
+
+The weight every learner that ships fits a presence-absence response under: each presence of
+a response weighs the ratio of absences to presences among the fitting units, capped, and
+each absence weighs one. A response with a presence in one target of a hundred is otherwise
+fitted away by any learner that minimises a mean loss.
+
+The ratio is read off the units the model is fitted on and the weight applies to every unit
+handed in. An encoder holds part of its units back as an inner validation set and reads the
+loss it stops on under the same weights, so the loss that stops the fit is the loss the fit
+minimises; a unit held back that way is not in the count the ratio is made from. `fitting`
+is a boolean vector over the rows of `y`, True for the units the model is fitted on, or
+None for all of them.
+
+The weights are the response head's: the shipped presence-absence head carries this function
+as its `weights`, and a head registered with `weights=lambda y, fitting:
+positive_weights(y, cap=20, fitting=fitting)` weights every learner by that cap instead. A
+head without `weights` is fitted unweighted. Returns a `[unit, variable]` array of case
+weights, one per cell of `y`.
+
+## `register_metric()` {#register_metric}
+
+```python
+register_metric(name: str, fn: Callable, overwrite: bool = False)
+```
+
+Register a metric: a function of `(y, p)` on one held-out cell.
+
+`y` and `p` are the observed values of the units in one fold and a model's predictions for
+them, both the same length. It returns one number, or a value that is not finite where the cell
+defines none. Registering one makes it available to `grain_ladder` by name, with no change
+to the fitting code.
+
+## `metrics()` {#metrics}
+
+```python
+metrics()
+```
+
+The metrics registered under this session.
+
+## `resolve_metric()` {#resolve_metric}
 
 ```python
 resolve_metric(metric, default: str | None = None)

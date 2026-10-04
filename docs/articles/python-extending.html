@@ -55,23 +55,20 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-r">
 <li><a class="dropdown-item" href="../articles/timesift.html">Get started</a></li>
     <li><a class="dropdown-item" href="../reference/index.html">Reference</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><a class="dropdown-item" href="../articles/reproducing-schrankogel.html">Reproducing the study</a></li>
-    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-python" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Python</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-python">
-<li><a class="dropdown-item" href="../articles/python.html">Overview</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><a class="dropdown-item" href="../articles/python-representation.html">The representation</a></li>
-    <li><a class="dropdown-item" href="../articles/python-split.html">The split and the cells</a></li>
-    <li><a class="dropdown-item" href="../articles/python-fitting.html">Fitting</a></li>
-    <li><a class="dropdown-item" href="../articles/python-learners.html">Learners</a></li>
-    <li><a class="dropdown-item" href="../articles/python-scoring.html">Scoring and comparison</a></li>
-    <li><a class="dropdown-item" href="../articles/python-extending.html">Extending</a></li>
-    <li><a class="dropdown-item" href="../articles/python-artifacts.html">What crosses the boundary</a></li>
+<li><a class="dropdown-item" href="../articles/python.html">Get started</a></li>
+    <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
+  </ul>
+</li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="../articles/reproducing-schrankogel.html">Reproducing the study</a></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../articles/contract.html">Contract</a></li>
@@ -115,36 +112,12 @@
 <!-- Written by tools/python_reference.py from the Python sources. Do not edit. -->
 <p>The response head and the metric are registrations, never a fork of
 the fitting code.</p>
-<div class="section level2">
-<h2 id="register_learner">
-<code>register_learner()</code><a class="anchor" aria-label="anchor" href="#register_learner"></a>
-</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>register_learner(name: <span class="bu">str</span>, constructor: Callable, overwrite: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>)</span></code></pre></div>
-<p>Make a learner available by name. The learners that ship are
-registered the same way.</p>
-<p><code>constructor</code> is called with no arguments and returns a
-<code>Learner</code>, so a learner asked for by name is built with its
-own defaults.</p>
-</div>
-<div class="section level2">
-<h2 id="register_metric">
-<code>register_metric()</code><a class="anchor" aria-label="anchor" href="#register_metric"></a>
-</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>register_metric(name: <span class="bu">str</span>, fn: Callable, overwrite: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>)</span></code></pre></div>
-<p>Register a metric: a function of <code>(y, p)</code> on one held-out
-cell.</p>
-<p><code>y</code> and <code>p</code> are the observed values of the
-units in one fold and a model’s predictions for them, both the same
-length. It returns one number, or a value that is not finite where the
-cell defines none. Registering one makes it available to
-<code>grain_ladder</code> by name, with no change to the fitting
-code.</p>
-</div>
+<p><a href="python-reference.html">All of the Python reference</a></p>
 <div class="section level2">
 <h2 id="register_response">
 <code>register_response()</code><a class="anchor" aria-label="anchor" href="#register_response"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>register_response(name: <span class="bu">str</span>, spec: <span class="bu">dict</span>, overwrite: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>register_response(name: <span class="bu">str</span>, spec: <span class="bu">dict</span>, overwrite: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>)</span></code></pre></div>
 <p>Register a response head: what the values being predicted are and
 where a score is defined.</p>
 <p><code>spec</code> is a mapping with <code>prepare(y)</code>,
@@ -172,61 +145,165 @@ weighted as its fit is. The shipped head’s is
 fits unweighted.</p>
 </div>
 <div class="section level2">
-<h2 id="register_tuning">
-<code>register_tuning()</code><a class="anchor" aria-label="anchor" href="#register_tuning"></a>
+<h2 id="responses">
+<code>responses()</code><a class="anchor" aria-label="anchor" href="#responses"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>register_tuning(name: <span class="bu">str</span>, grid, overwrite: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>)</span></code></pre></div>
-<p>Register the grid a learner is tuned over when <code>tune</code> is
-given none.</p>
-<p><code>name</code> is the learner’s, as it reports under.
-<code>grid</code> is a dict of the values to try, or a function of
-<code>(learner, x)</code> returning one, where <code>x</code> is the
-representation the learner is fitted on: the second form is for a grid
-that depends on the data, as the number of columns does, or on a setting
-the learner carries. The grids of the learners that ship are registered
-the same way.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>responses()</span></code></pre></div>
+<p>The response heads registered under this session.</p>
 </div>
 <div class="section level2">
-<h2 id="tunings">
-<code>tunings()</code><a class="anchor" aria-label="anchor" href="#tunings"></a>
+<h2 id="as_response">
+<code>as_response()</code><a class="anchor" aria-label="anchor" href="#as_response"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>tunings()</span></code></pre></div>
-<p>The learners a grid is registered for.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>as_response(y)</span></code></pre></div>
+<p>The response reaches everything downstream as a
+<code>Response</code>, whether it arrived as one, as a mapping of
+variable name to values, or as a two-dimensional array with no names at
+all.</p>
 </div>
 <div class="section level2">
-<h2 id="learners">
-<code>learners()</code><a class="anchor" aria-label="anchor" href="#learners"></a>
+<h2 id="Response">
+<code>Response</code><a class="anchor" aria-label="anchor" href="#Response"></a>
 </h2>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>learners()</span></code></pre></div>
-<p>The learners registered under this session.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>Response(values, units, variables)</span></code></pre></div>
+<p>A <code>[unit, variable]</code> matrix of observed values, with the
+units named.</p>
+<p>Attributes:</p>
+<ul>
+<li>
+<code>values</code> - np.ndarray</li>
+<li>
+<code>units</code> - tuple[str, …]</li>
+<li>
+<code>variables</code> - tuple[str, …]</li>
+</ul>
+<div class="section level3">
+<h3 id="Response-from_columns">
+<code>from_columns()</code><a class="anchor" aria-label="anchor" href="#Response-from_columns"></a>
+</h3>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>from_columns(cls, data, <span class="bu">id</span>: <span class="bu">str</span>, variables<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
+<p>A response from a table of one unit column and one column per
+variable.</p>
+</div>
+<div class="section level3">
+<h3 id="Response-take_units">
+<code>take_units()</code><a class="anchor" aria-label="anchor" href="#Response-take_units"></a>
+</h3>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>take_units(<span class="va">self</span>, index)</span></code></pre></div>
+<p>The response restricted to a subset of its units, in the order
+given.</p>
+</div>
+<div class="section level3">
+<h3 id="Response-take_variables">
+<code>take_variables()</code><a class="anchor" aria-label="anchor" href="#Response-take_variables"></a>
+</h3>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>take_variables(<span class="va">self</span>, index)</span></code></pre></div>
+<p>The response restricted to a subset of its variables, in the order
+given.</p>
+<p>A learner covering one response at a time is handed them through
+this, so the matrix a candidate emits is assembled from the same names
+each part was fitted on.</p>
+</div>
+<div class="section level3">
+<h3 id="Response-align">
+<code>align()</code><a class="anchor" aria-label="anchor" href="#Response-align"></a>
+</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>align(<span class="va">self</span>, units)</span></code></pre></div>
+<p>Put the response into the row order of a representation, by unit and
+never by position.</p>
+</div>
+<div class="section level3">
+<h3 id="Response-check_presence_absence">
+<code>check_presence_absence()</code><a class="anchor" aria-label="anchor" href="#Response-check_presence_absence"></a>
+</h3>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>check_presence_absence(<span class="va">self</span>)</span></code></pre></div>
+<p>Error unless every value is 0 or 1 and none is missing.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="PRESENCE_ABSENCE">
+<code>PRESENCE_ABSENCE</code><a class="anchor" aria-label="anchor" href="#PRESENCE_ABSENCE"></a>
+</h2>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>PRESENCE_ABSENCE <span class="op">=</span> <span class="bu">dict</span>(prepare<span class="op">=</span><span class="kw">lambda</span> y: as_response(y).check_presence_absence(), activation<span class="op">=</span><span class="st">'sigmoid'</span>, loss<span class="op">=</span><span class="st">'binary_cross_entropy'</span>, metric<span class="op">=</span><span class="st">'roc_auc'</span>, weights<span class="op">=</span><span class="kw">lambda</span> y, fitting: positive_weights(y, fitting<span class="op">=</span>fitting), cells<span class="op">=</span><span class="kw">lambda</span> y, folds: scorable_cells(y, folds))</span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="CONTINUOUS">
+<code>CONTINUOUS</code><a class="anchor" aria-label="anchor" href="#CONTINUOUS"></a>
+</h2>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>CONTINUOUS <span class="op">=</span> _numeric_head(<span class="kw">lambda</span> v: <span class="va">None</span>, <span class="st">'r_squared'</span>)</span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="ABUNDANCE">
+<code>ABUNDANCE</code><a class="anchor" aria-label="anchor" href="#ABUNDANCE"></a>
+</h2>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>ABUNDANCE <span class="op">=</span> _numeric_head(_check_abundance, <span class="st">'r_squared'</span>)</span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="ORDINAL">
+<code>ORDINAL</code><a class="anchor" aria-label="anchor" href="#ORDINAL"></a>
+</h2>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>ORDINAL <span class="op">=</span> _numeric_head(_check_ordinal, <span class="st">'ordinal_f1'</span>)</span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="COUNT">
+<code>COUNT</code><a class="anchor" aria-label="anchor" href="#COUNT"></a>
+</h2>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>COUNT <span class="op">=</span> _numeric_head(_check_count, <span class="st">'neg_poisson_deviance'</span>, activation<span class="op">=</span><span class="st">'exp'</span>, loss<span class="op">=</span><span class="st">'poisson_deviance'</span>)</span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="positive_weights">
+<code>positive_weights()</code><a class="anchor" aria-label="anchor" href="#positive_weights"></a>
+</h2>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>positive_weights(y, cap: <span class="bu">float</span> <span class="op">=</span> <span class="fl">50.0</span>, fitting<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
+<p>Case weights that balance a rare response.</p>
+<p>The weight every learner that ships fits a presence-absence response
+under: each presence of a response weighs the ratio of absences to
+presences among the fitting units, capped, and each absence weighs one.
+A response with a presence in one target of a hundred is otherwise
+fitted away by any learner that minimises a mean loss.</p>
+<p>The ratio is read off the units the model is fitted on and the weight
+applies to every unit handed in. An encoder holds part of its units back
+as an inner validation set and reads the loss it stops on under the same
+weights, so the loss that stops the fit is the loss the fit minimises; a
+unit held back that way is not in the count the ratio is made from.
+<code>fitting</code> is a boolean vector over the rows of
+<code>y</code>, True for the units the model is fitted on, or None for
+all of them.</p>
+<p>The weights are the response head’s: the shipped presence-absence
+head carries this function as its <code>weights</code>, and a head
+registered with
+<code>weights=lambda y, fitting: positive_weights(y, cap=20, fitting=fitting)</code>
+weights every learner by that cap instead. A head without
+<code>weights</code> is fitted unweighted. Returns a
+<code>[unit, variable]</code> array of case weights, one per cell of
+<code>y</code>.</p>
+</div>
+<div class="section level2">
+<h2 id="register_metric">
+<code>register_metric()</code><a class="anchor" aria-label="anchor" href="#register_metric"></a>
+</h2>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>register_metric(name: <span class="bu">str</span>, fn: Callable, overwrite: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>)</span></code></pre></div>
+<p>Register a metric: a function of <code>(y, p)</code> on one held-out
+cell.</p>
+<p><code>y</code> and <code>p</code> are the observed values of the
+units in one fold and a model’s predictions for them, both the same
+length. It returns one number, or a value that is not finite where the
+cell defines none. Registering one makes it available to
+<code>grain_ladder</code> by name, with no change to the fitting
+code.</p>
 </div>
 <div class="section level2">
 <h2 id="metrics">
 <code>metrics()</code><a class="anchor" aria-label="anchor" href="#metrics"></a>
 </h2>
-<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>metrics()</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>metrics()</span></code></pre></div>
 <p>The metrics registered under this session.</p>
-</div>
-<div class="section level2">
-<h2 id="responses">
-<code>responses()</code><a class="anchor" aria-label="anchor" href="#responses"></a>
-</h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>responses()</span></code></pre></div>
-<p>The response heads registered under this session.</p>
-</div>
-<div class="section level2">
-<h2 id="get_learner">
-<code>get_learner()</code><a class="anchor" aria-label="anchor" href="#get_learner"></a>
-</h2>
-<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>get_learner(learner)</span></code></pre></div>
-<p>A <code>Learner</code>, whether it arrived as one or as the name of a
-registered one.</p>
 </div>
 <div class="section level2">
 <h2 id="resolve_metric">
 <code>resolve_metric()</code><a class="anchor" aria-label="anchor" href="#resolve_metric"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>resolve_metric(metric, default: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>resolve_metric(metric, default: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>)</span></code></pre></div>
 <p>The function that scores and the name a report prints, from either
 way a metric is given.</p>
 <p>A metric reaches a run as a registered name or as a function of

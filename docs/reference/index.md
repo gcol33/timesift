@@ -123,6 +123,10 @@ Weights fitted on the out-of-fold predictions alone.
 
 ## Scoring and comparison
 
+The metrics, the paired contrast between two arms on matched cells,
+every grain against a learner’s best, the inflation of a score read at
+its own best threshold, and what a fitted model read.
+
 - [`tss()`](https://gillescolling.com/timesift/reference/tss.md) : The
   true skill statistic
 - [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md)
@@ -230,6 +234,9 @@ arrays are the same array.
   : The cross-language digest of a representation
 
 ## A record to test on
+
+A simulated record with a grain planted in it, to test a run against a
+known answer.
 
 - [`simulate_records()`](https://gillescolling.com/timesift/reference/simulate_records.md)
   : Simulate sensor records whose response acts at a known temporal

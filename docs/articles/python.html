@@ -5,13 +5,13 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Python • timesift</title>
+<title>Choosing how a record is read, in Python • timesift</title>
 <script src="../lightswitch.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
-<meta property="og:title" content="Python">
+<meta property="og:title" content="Choosing how a record is read, in Python">
 <style>
 .lang-split { table-layout: fixed; width: 100%; border: 0; }
 .lang-split > tbody > tr > td { border: 0; padding: 0 1rem 0 0; }
@@ -55,23 +55,20 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-r">
 <li><a class="dropdown-item" href="../articles/timesift.html">Get started</a></li>
     <li><a class="dropdown-item" href="../reference/index.html">Reference</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><a class="dropdown-item" href="../articles/reproducing-schrankogel.html">Reproducing the study</a></li>
-    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
   </ul>
 </li>
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-python" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Python</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-python">
-<li><a class="dropdown-item" href="../articles/python.html">Overview</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><a class="dropdown-item" href="../articles/python-representation.html">The representation</a></li>
-    <li><a class="dropdown-item" href="../articles/python-split.html">The split and the cells</a></li>
-    <li><a class="dropdown-item" href="../articles/python-fitting.html">Fitting</a></li>
-    <li><a class="dropdown-item" href="../articles/python-learners.html">Learners</a></li>
-    <li><a class="dropdown-item" href="../articles/python-scoring.html">Scoring and comparison</a></li>
-    <li><a class="dropdown-item" href="../articles/python-extending.html">Extending</a></li>
-    <li><a class="dropdown-item" href="../articles/python-artifacts.html">What crosses the boundary</a></li>
+<li><a class="dropdown-item" href="../articles/python.html">Get started</a></li>
+    <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
+  </ul>
+</li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="../articles/reproducing-schrankogel.html">Reproducing the study</a></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../articles/contract.html">Contract</a></li>
@@ -103,7 +100,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
 
-      <h1>Python</h1>
+      <h1>Choosing how a record is read, in Python</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/gcol33/timesift/blob/HEAD/vignettes/articles/python.Rmd" class="external-link"><code>vignettes/articles/python.Rmd</code></a></small>
@@ -112,71 +109,1585 @@
 
     
     
-<!-- Written by tools/python_reference.py from the Python sources. Do not edit. -->
-<p><code><a href="../reference/timesift.html">timesift()</a></code> here and <code><a href="../reference/timesift.html">timesift()</a></code> in R take
-the same two tables and do the same thing: build every candidate
-representation, fit the learners that can read each one, score them all
-on one set of held-out folds, and stack the out-of-fold predictions. The
-binning, the statistics and the array assembly are <code>src/</code>,
-compiled into both languages and answering to <a href="contract.html">the representation contract</a>, and the fixtures
-under <code>inst/spec/fixtures/</code> hold the two to the same
-numbers.</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(plots, logger, y<span class="op">=</span><span class="st">"sp_*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot_id"</span>, time<span class="op">=</span><span class="st">"datetime"</span>,</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>                  models<span class="op">=</span>[ts.elasticnet(), ts.forest()],</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>                  sift<span class="op">=</span>ts.grains(<span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span>))</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="bu">print</span>(ts.summary(fit))</span></code></pre></div>
-<p><code>y</code>, <code>x</code> and <code>static</code> are selections
-over their own table: a column name, a list of names, a glob such as
-<code>"sp_*"</code>, or a function of a name. The contract’s last
-section says what each language carries, so a difference between the two
-is a recorded decision.</p>
+<!-- Written by tools/python_articles.py from python/articles/python.md (md5 08ce7df7063ca4aeabf1a9680960440f). Do not edit. -->
+<p>A sensor records every hour for years. Before any model sees it, the
+record is reduced: to monthly means, to growing-degree-days, to whatever
+the analyst settled on once. <code>timesift</code> makes that reduction
+an argument, fits at each setting of it, and shows how much of the
+record the prediction actually needed.</p>
+<p>This article runs the whole path on a small simulated record, from
+two tables to a scored comparison and the prediction that follows from
+it. It follows <a href="timesift.html">the R walkthrough</a> section by
+section. The binning, the statistics and the penalised fit under both
+languages are one compiled core, held to the same numbers by <a href="contract.html">the contract</a>.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="ex">pip</span> install timesift</span></code></pre></div>
 <div class="section level2">
-<h2 id="the-pages">The pages<a class="anchor" aria-label="anchor" href="#the-pages"></a>
+<h2 id="two-tables">Two tables<a class="anchor" aria-label="anchor" href="#two-tables"></a>
 </h2>
-<dl>
-<dt><a href="python-representation.html">The representation</a></dt>
-<dd>
-<p>What a representation is before any record has been read, and the
-array it becomes.</p>
-</dd>
-<dt><a href="python-split.html">The split and the cells</a></dt>
-<dd>
-<p>One fold map read by everything that scores, and the cells a score is
-defined on, computed with no model involved.</p>
-</dd>
-<dt><a href="python-fitting.html">Fitting</a></dt>
-<dd>
-<p>The run from targets and series, the combiner over its candidates,
-and fitting across a set of grains on its own.</p>
-</dd>
-<dt><a href="python-learners.html">Learners</a></dt>
-<dd>
-<p>The arms that ship, how they are trained, and the interface a learner
-of your own goes through.</p>
-</dd>
-<dt><a href="python-scoring.html">Scoring and comparison</a></dt>
-<dd>
-<p>The metrics, the paired contrast between two arms on matched cells,
-every grain against a learner’s best, the inflation of a score read at
-its own best threshold, what a fitted model read, and a record with a
-planted grain to test all of it on.</p>
-</dd>
-<dt><a href="python-extending.html">Extending</a></dt>
-<dd>
-<p>The response head and the metric are registrations, never a fork of
-the fitting code.</p>
-</dd>
-<dt><a href="python-artifacts.html">What crosses the boundary</a></dt>
-<dd>
-<p>The three artifacts a split is carried in, and the digest that says
-two arrays are the same array.</p>
-</dd>
-</dl>
+<p><code>targets</code> is one row per thing to predict.
+<code>series</code> is the long, time-stamped record belonging to those
+rows, and the two are linked by an identifier both carry. Either is a
+mapping of column name to array, which a pandas or polars data frame
+is.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">1</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>hours <span class="op">=</span> pd.date_range(<span class="st">"2021-09-01"</span>, periods<span class="op">=</span><span class="dv">24</span> <span class="op">*</span> <span class="dv">120</span>, freq<span class="op">=</span><span class="st">"h"</span>)</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>ids <span class="op">=</span> [<span class="ss">f"p</span><span class="sc">{</span>i<span class="sc">:03d}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">61</span>)]</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>warmth <span class="op">=</span> rng.normal(size<span class="op">=</span><span class="dv">60</span>)</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>season <span class="op">=</span> <span class="dv">6</span> <span class="op">*</span> np.sin(np.arange(<span class="dv">1</span>, <span class="bu">len</span>(hours) <span class="op">+</span> <span class="dv">1</span>) <span class="op">/</span> (<span class="dv">24</span> <span class="op">*</span> <span class="dv">40</span>))</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>series <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>    <span class="st">"plot"</span>: np.repeat(ids, <span class="bu">len</span>(hours)),</span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>    <span class="st">"t"</span>: np.tile(hours, <span class="dv">60</span>),</span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>    <span class="st">"temp"</span>: np.concatenate([<span class="fl">1.5</span> <span class="op">*</span> w <span class="op">+</span> season <span class="op">+</span> rng.normal(scale<span class="op">=</span><span class="dv">12</span>, size<span class="op">=</span><span class="bu">len</span>(hours))</span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>                            <span class="cf">for</span> w <span class="kw">in</span> warmth]),</span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>})</span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>targets <span class="op">=</span> pd.DataFrame({<span class="st">"plot"</span>: ids, <span class="st">"elevation"</span>: <span class="dv">2000</span> <span class="op">+</span> <span class="dv">300</span> <span class="op">*</span> rng.normal(size<span class="op">=</span><span class="dv">60</span>)})</span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="cf">for</span> k, sign <span class="kw">in</span> <span class="bu">enumerate</span>([<span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>], start<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a>    targets[<span class="ss">f"sp</span><span class="sc">{</span>k<span class="sc">}</span><span class="ss">"</span>] <span class="op">=</span> rng.binomial(<span class="dv">1</span>, <span class="dv">1</span> <span class="op">/</span> (<span class="dv">1</span> <span class="op">+</span> np.exp(<span class="op">-</span><span class="dv">3</span> <span class="op">*</span> sign <span class="op">*</span> warmth)))</span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a>targets.iloc[:, :<span class="dv">4</span>].head()</span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="co">#&gt;    plot    elevation  sp1  sp2</span></span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="co">#&gt; 0  p001  2159.960722    1    0</span></span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a><span class="co">#&gt; 1  p002  1516.179723    1    0</span></span>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a><span class="co">#&gt; 2  p003  1818.289129    1    0</span></span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a><span class="co">#&gt; 3  p004  2233.373010    0    1</span></span>
+<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a><span class="co">#&gt; 4  p005  1779.544877    1    0</span></span></code></pre></div>
+<p>Each plot has a level of its own, and that level is buried in
+hour-to-hour noise an order of magnitude larger.</p>
 </div>
-  </main>
+<div class="section level2">
+<h2 id="one-call">One call<a class="anchor" aria-label="anchor" href="#one-call"></a>
+</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    targets, series,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    y<span class="op">=</span><span class="st">"sp*"</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    static<span class="op">=</span><span class="st">"elevation"</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    sift<span class="op">=</span>ts.grains(<span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span>),</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">5</span>),</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    verbose<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>)</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>fit</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt; timesift  60 targets, 6 responses, 5-fold random CV, roc_auc</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt; candidates, scored on the outer folds</span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="co">#&gt; candidate                    mean    won  responses</span></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co">#&gt; elasticnet / day            0.879      1  separate</span></span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#&gt; elasticnet / week           0.906      1  separate</span></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt; elasticnet / month          0.910      4  separate</span></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="co">#&gt; procedure, chosen and weighted inside each outer training fold</span></span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="co">#&gt; selected                    0.912  se 0.014</span></span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="co">#&gt; ensemble                    0.916  se 0.012</span></span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="co">#&gt; selected elasticnet / month in 4, elasticnet / week in 1 of 5 folds</span></span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a><span class="co">#&gt; choice on every target  elasticnet / month</span></span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a><span class="co">#&gt; weights on every target  elasticnet / month 0.72   elasticnet / week 0.28</span></span></code></pre></div>
+<p>Every representation named in <code>sift</code> was built, and with
+<code>models</code> left at its default of
+<code>[ts.elasticnet()]</code>, a penalised logistic regression was
+fitted on each of them over the same five folds. The report has two
+parts.</p>
+<p>The candidates are the comparison. Each is scored on the five outer
+folds, on the same cells, so their means can be read against each other
+across grains. <code>won</code> is how many responses a candidate scored
+highest on, and <code>responses</code> says whether one fitted model
+covered them all or one was fitted per response. The highest of those
+means was picked out on the folds it is scored on, so it is not the
+number to report.</p>
+<p>The procedure rows are. Inside each outer training fold the
+candidates were cross-validated again on five inner folds, one was
+chosen on its inner score and the stack’s weights were fitted on the
+inner out-of-fold predictions; the choice and the weights then predicted
+the outer test fold once. <code>selected</code> and
+<code>ensemble</code> are those held-out scores, choosing and weighting
+included.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>pd.DataFrame(fit.estimate)[[<span class="st">"arm"</span>, <span class="st">"metric"</span>, <span class="st">"score"</span>, <span class="st">"se"</span>, <span class="st">"lower"</span>, <span class="st">"upper"</span>]]</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co">#&gt;          arm                metric      score        se      lower      upper</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; 0   selected              accuracy   0.902778  0.011719   0.872652   0.932904</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt; 1   selected     average_precision   0.912736  0.023887   0.851332   0.974140</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; 2   selected                  bias   0.987235  0.046206   0.868460   1.106011</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt; 3   selected                 boyce   0.661197  0.028310   0.588424   0.733970</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co">#&gt; 4   selected                   csi   0.817593  0.025308   0.752536   0.882649</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt; 5   selected                   ets   0.682243  0.036524   0.588354   0.776131</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt; 6   selected                   far   0.081706  0.027808   0.010224   0.153189</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co">#&gt; 7   selected                 kappa   0.686667  0.036028   0.594054   0.779279</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#&gt; 8   selected          kappa_youden   0.797754  0.024534   0.734687   0.860820</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt; 9   selected               neg_mae  -0.280351  0.015292  -0.319660  -0.241042</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co">#&gt; 10  selected         neg_max_error  -0.735800  0.012070  -0.766827  -0.704773</span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="co">#&gt; 11  selected               neg_mse  -0.131604  0.008301  -0.152942  -0.110266</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co">#&gt; 12  selected  neg_poisson_deviance  -0.443547  0.028867  -0.517753  -0.369342</span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="co">#&gt; 13  selected              neg_rmse  -0.358039  0.012266  -0.389570  -0.326508</span></span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="co">#&gt; 14  selected                    or  24.000000  0.577350  21.515862  26.484138</span></span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="co">#&gt; 15  selected      ordinal_accuracy   0.816667  0.012172   0.785379   0.847955</span></span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a><span class="co">#&gt; 16  selected            ordinal_f1   0.826092  0.010342   0.799507   0.852677</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="co">#&gt; 17  selected     ordinal_precision   0.820331  0.010924   0.792248   0.848413</span></span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="co">#&gt; 18  selected        ordinal_recall   0.832712  0.010828   0.804879   0.860545</span></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="co">#&gt; 19  selected                  orss   0.986508  0.006571   0.969618   1.003399</span></span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="co">#&gt; 20  selected               pearson   0.707152  0.023807   0.645953   0.768350</span></span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="co">#&gt; 21  selected                   pod   0.889378  0.019559   0.839101   0.939655</span></span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a><span class="co">#&gt; 22  selected                  pofd   0.069616  0.025054   0.005214   0.134019</span></span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a><span class="co">#&gt; 23  selected             r_squared   0.419123  0.034854   0.329528   0.508718</span></span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="co">#&gt; 24  selected               roc_auc   0.911593  0.014499   0.874321   0.948865</span></span>
+<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a><span class="co">#&gt; 25  selected                    sr   0.918294  0.027808   0.846811   0.989776</span></span>
+<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a><span class="co">#&gt; 26  selected                   tss   0.819762  0.023356   0.759723   0.879801</span></span>
+<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a><span class="co">#&gt; 27  ensemble              accuracy   0.897222  0.009044   0.873974   0.920470</span></span>
+<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a><span class="co">#&gt; 28  ensemble     average_precision   0.918701  0.018726   0.870564   0.966838</span></span>
+<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a><span class="co">#&gt; 29  ensemble                  bias   1.044537  0.044212   0.930887   1.158188</span></span>
+<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a><span class="co">#&gt; 30  ensemble                 boyce   0.687740  0.029985   0.610661   0.764820</span></span>
+<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a><span class="co">#&gt; 31  ensemble                   csi   0.813479  0.018509   0.765900   0.861057</span></span>
+<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a><span class="co">#&gt; 32  ensemble                   ets   0.666883  0.028104   0.594640   0.739126</span></span>
+<span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a><span class="co">#&gt; 33  ensemble                   far   0.109749  0.027043   0.040232   0.179266</span></span>
+<span id="cb4-37"><a href="#cb4-37" tabindex="-1"></a><span class="co">#&gt; 34  ensemble                 kappa   0.663810  0.037109   0.568417   0.759202</span></span>
+<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a><span class="co">#&gt; 35  ensemble          kappa_youden   0.786277  0.019087   0.737211   0.835343</span></span>
+<span id="cb4-39"><a href="#cb4-39" tabindex="-1"></a><span class="co">#&gt; 36  ensemble               neg_mae  -0.282437  0.014369  -0.319374  -0.245499</span></span>
+<span id="cb4-40"><a href="#cb4-40" tabindex="-1"></a><span class="co">#&gt; 37  ensemble         neg_max_error  -0.739320  0.008787  -0.761909  -0.716732</span></span>
+<span id="cb4-41"><a href="#cb4-41" tabindex="-1"></a><span class="co">#&gt; 38  ensemble               neg_mse  -0.131707  0.006787  -0.149153  -0.114261</span></span>
+<span id="cb4-42"><a href="#cb4-42" tabindex="-1"></a><span class="co">#&gt; 39  ensemble  neg_poisson_deviance  -0.444870  0.024573  -0.508036  -0.381704</span></span>
+<span id="cb4-43"><a href="#cb4-43" tabindex="-1"></a><span class="co">#&gt; 40  ensemble              neg_rmse  -0.359284  0.009496  -0.383695  -0.334874</span></span>
+<span id="cb4-44"><a href="#cb4-44" tabindex="-1"></a><span class="co">#&gt; 41  ensemble                    or  21.000000  2.846050  13.098099  28.901901</span></span>
+<span id="cb4-45"><a href="#cb4-45" tabindex="-1"></a><span class="co">#&gt; 42  ensemble      ordinal_accuracy   0.822222  0.014055   0.786094   0.858351</span></span>
+<span id="cb4-46"><a href="#cb4-46" tabindex="-1"></a><span class="co">#&gt; 43  ensemble            ordinal_f1   0.826303  0.015320   0.786922   0.865684</span></span>
+<span id="cb4-47"><a href="#cb4-47" tabindex="-1"></a><span class="co">#&gt; 44  ensemble     ordinal_precision   0.819517  0.014959   0.781065   0.857970</span></span>
+<span id="cb4-48"><a href="#cb4-48" tabindex="-1"></a><span class="co">#&gt; 45  ensemble        ordinal_recall   0.833929  0.016250   0.792157   0.875700</span></span>
+<span id="cb4-49"><a href="#cb4-49" tabindex="-1"></a><span class="co">#&gt; 46  ensemble                  orss   0.983114  0.004731   0.970953   0.995276</span></span>
+<span id="cb4-50"><a href="#cb4-50" tabindex="-1"></a><span class="co">#&gt; 47  ensemble               pearson   0.709169  0.020091   0.657523   0.760815</span></span>
+<span id="cb4-51"><a href="#cb4-51" tabindex="-1"></a><span class="co">#&gt; 48  ensemble                   pod   0.911918  0.012180   0.880608   0.943228</span></span>
+<span id="cb4-52"><a href="#cb4-52" tabindex="-1"></a><span class="co">#&gt; 49  ensemble                  pofd   0.102474  0.025343   0.037327   0.167620</span></span>
+<span id="cb4-53"><a href="#cb4-53" tabindex="-1"></a><span class="co">#&gt; 50  ensemble             r_squared   0.419408  0.025940   0.352727   0.486090</span></span>
+<span id="cb4-54"><a href="#cb4-54" tabindex="-1"></a><span class="co">#&gt; 51  ensemble               roc_auc   0.915733  0.011500   0.886170   0.945296</span></span>
+<span id="cb4-55"><a href="#cb4-55" tabindex="-1"></a><span class="co">#&gt; 52  ensemble                    sr   0.890251  0.027043   0.820734   0.959768</span></span>
+<span id="cb4-56"><a href="#cb4-56" tabindex="-1"></a><span class="co">#&gt; 53  ensemble                   tss   0.809444  0.017458   0.764568   0.854321</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>pd.DataFrame(fit.selected)[[<span class="st">"fold"</span>, <span class="st">"candidate"</span>, <span class="st">"inner_score"</span>]]</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">#&gt;    fold           candidate  inner_score</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt; 0     1  elasticnet / month     0.882041</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt; 1     2  elasticnet / month     0.897021</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#&gt; 2     3  elasticnet / month     0.887111</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; 3     4  elasticnet / month     0.902577</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt; 4     5   elasticnet / week     0.888307</span></span></code></pre></div>
+<p>The interval is across the six responses of this dataset, all fitted
+and scored on the same plots and folds, so it does not carry the error
+those share.</p>
+<p>A column of <code>targets</code> reaches the model only where
+<code>static</code> names it: <code>elevation</code> is a predictor here
+because it was asked for, and a column of notes sitting beside it would
+not be.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>pd.DataFrame(fit.candidates)[[<span class="st">"candidate"</span>, <span class="st">"representation"</span>, <span class="st">"bins"</span>, <span class="st">"channels"</span>]]</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="co">#&gt;             candidate representation  bins  channels</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co">#&gt; 0    elasticnet / day            day   120         2</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt; 1   elasticnet / week           week    18         2</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="co">#&gt; 2  elasticnet / month          month     4         2</span></span></code></pre></div>
+<p>Two channels at every grain: the binned temperature, and elevation
+held constant across the bins.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>ts.plot(fit)<span class="op">;</span></span></code></pre></div>
+<p><div class="svg-container"><button type="button" class="btn btn-primary btn-copy-svg" title="Copy SVG to clipboard" aria-label="Copy SVG to clipboard" data-bs-toggle="tooltip" data-bs-placement="left"><i class="fa fa-copy"></i></button>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="460.8pt" height="345.6pt" viewBox="0 0 460.8 345.6" xmlns="http://www.w3.org/2000/svg" version="1.1" class="inline-svg" style="width:100%;height:auto;">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 345.6 
+L 460.8 345.6 
+L 460.8 0 
+L 0 0 
+L 0 345.6 
+z
+" style="fill: none"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 57.6 307.584 
+L 414.72 307.584 
+L 414.72 41.472 
+L 57.6 41.472 
+L 57.6 307.584 
+z
+" style="fill: none"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <defs>
+       <path id="m0903beaa60" d="M 0 0 
+L 0 3.5 
+" style="stroke: currentColor; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m0903beaa60" x="117.12" y="307.584" style="fill: currentColor; stroke: currentColor; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <!-- day -->
+      <g style="fill: currentColor" transform="translate(107.922344 322.182437) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-64" d="M 2906 2969 
+L 2906 4863 
+L 3481 4863 
+L 3481 0 
+L 2906 0 
+L 2906 525 
+Q 2725 213 2448 61 
+Q 2172 -91 1784 -91 
+Q 1150 -91 751 415 
+Q 353 922 353 1747 
+Q 353 2572 751 3078 
+Q 1150 3584 1784 3584 
+Q 2172 3584 2448 3432 
+Q 2725 3281 2906 2969 
+z
+M 947 1747 
+Q 947 1113 1208 752 
+Q 1469 391 1925 391 
+Q 2381 391 2643 752 
+Q 2906 1113 2906 1747 
+Q 2906 2381 2643 2742 
+Q 2381 3103 1925 3103 
+Q 1469 3103 1208 2742 
+Q 947 2381 947 1747 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-61" d="M 2194 1759 
+Q 1497 1759 1228 1600 
+Q 959 1441 959 1056 
+Q 959 750 1161 570 
+Q 1363 391 1709 391 
+Q 2188 391 2477 730 
+Q 2766 1069 2766 1631 
+L 2766 1759 
+L 2194 1759 
+z
+M 3341 1997 
+L 3341 0 
+L 2766 0 
+L 2766 531 
+Q 2569 213 2275 61 
+Q 1981 -91 1556 -91 
+Q 1019 -91 701 211 
+Q 384 513 384 1019 
+Q 384 1609 779 1909 
+Q 1175 2209 1959 2209 
+L 2766 2209 
+L 2766 2266 
+Q 2766 2663 2505 2880 
+Q 2244 3097 1772 3097 
+Q 1472 3097 1187 3025 
+Q 903 2953 641 2809 
+L 641 3341 
+Q 956 3463 1253 3523 
+Q 1550 3584 1831 3584 
+Q 2591 3584 2966 3190 
+Q 3341 2797 3341 1997 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-79" d="M 2059 -325 
+Q 1816 -950 1584 -1140 
+Q 1353 -1331 966 -1331 
+L 506 -1331 
+L 506 -850 
+L 844 -850 
+Q 1081 -850 1212 -737 
+Q 1344 -625 1503 -206 
+L 1606 56 
+L 191 3500 
+L 800 3500 
+L 1894 763 
+L 2988 3500 
+L 3597 3500 
+L 2059 -325 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-64"/>
+       <use xlink:href="#DejaVuSans-61" transform="translate(63.476562 0)"/>
+       <use xlink:href="#DejaVuSans-79" transform="translate(124.755859 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2">
+      <g>
+       <use xlink:href="#m0903beaa60" x="236.16" y="307.584" style="fill: currentColor; stroke: currentColor; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <!-- week -->
+      <g style="fill: currentColor" transform="translate(223.0225 322.182437) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-77" d="M 269 3500 
+L 844 3500 
+L 1563 769 
+L 2278 3500 
+L 2956 3500 
+L 3675 769 
+L 4391 3500 
+L 4966 3500 
+L 4050 0 
+L 3372 0 
+L 2619 2869 
+L 1863 0 
+L 1184 0 
+L 269 3500 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-65" d="M 3597 1894 
+L 3597 1613 
+L 953 1613 
+Q 991 1019 1311 708 
+Q 1631 397 2203 397 
+Q 2534 397 2845 478 
+Q 3156 559 3463 722 
+L 3463 178 
+Q 3153 47 2828 -22 
+Q 2503 -91 2169 -91 
+Q 1331 -91 842 396 
+Q 353 884 353 1716 
+Q 353 2575 817 3079 
+Q 1281 3584 2069 3584 
+Q 2775 3584 3186 3129 
+Q 3597 2675 3597 1894 
+z
+M 3022 2063 
+Q 3016 2534 2758 2815 
+Q 2500 3097 2075 3097 
+Q 1594 3097 1305 2825 
+Q 1016 2553 972 2059 
+L 3022 2063 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-6b" d="M 581 4863 
+L 1159 4863 
+L 1159 1991 
+L 2875 3500 
+L 3609 3500 
+L 1753 1863 
+L 3688 0 
+L 2938 0 
+L 1159 1709 
+L 1159 0 
+L 581 0 
+L 581 4863 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-77"/>
+       <use xlink:href="#DejaVuSans-65" transform="translate(81.787109 0)"/>
+       <use xlink:href="#DejaVuSans-65" transform="translate(143.310547 0)"/>
+       <use xlink:href="#DejaVuSans-6b" transform="translate(204.833984 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_3">
+      <g>
+       <use xlink:href="#m0903beaa60" x="355.2" y="307.584" style="fill: currentColor; stroke: currentColor; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <!-- month -->
+      <g style="fill: currentColor" transform="translate(338.972656 322.182437) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-6d" d="M 3328 2828 
+Q 3544 3216 3844 3400 
+Q 4144 3584 4550 3584 
+Q 5097 3584 5394 3201 
+Q 5691 2819 5691 2113 
+L 5691 0 
+L 5113 0 
+L 5113 2094 
+Q 5113 2597 4934 2840 
+Q 4756 3084 4391 3084 
+Q 3944 3084 3684 2787 
+Q 3425 2491 3425 1978 
+L 3425 0 
+L 2847 0 
+L 2847 2094 
+Q 2847 2600 2669 2842 
+Q 2491 3084 2119 3084 
+Q 1678 3084 1418 2786 
+Q 1159 2488 1159 1978 
+L 1159 0 
+L 581 0 
+L 581 3500 
+L 1159 3500 
+L 1159 2956 
+Q 1356 3278 1631 3431 
+Q 1906 3584 2284 3584 
+Q 2666 3584 2933 3390 
+Q 3200 3197 3328 2828 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-6f" d="M 1959 3097 
+Q 1497 3097 1228 2736 
+Q 959 2375 959 1747 
+Q 959 1119 1226 758 
+Q 1494 397 1959 397 
+Q 2419 397 2687 759 
+Q 2956 1122 2956 1747 
+Q 2956 2369 2687 2733 
+Q 2419 3097 1959 3097 
+z
+M 1959 3584 
+Q 2709 3584 3137 3096 
+Q 3566 2609 3566 1747 
+Q 3566 888 3137 398 
+Q 2709 -91 1959 -91 
+Q 1206 -91 779 398 
+Q 353 888 353 1747 
+Q 353 2609 779 3096 
+Q 1206 3584 1959 3584 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-6e" d="M 3513 2113 
+L 3513 0 
+L 2938 0 
+L 2938 2094 
+Q 2938 2591 2744 2837 
+Q 2550 3084 2163 3084 
+Q 1697 3084 1428 2787 
+Q 1159 2491 1159 1978 
+L 1159 0 
+L 581 0 
+L 581 3500 
+L 1159 3500 
+L 1159 2956 
+Q 1366 3272 1645 3428 
+Q 1925 3584 2291 3584 
+Q 2894 3584 3203 3211 
+Q 3513 2838 3513 2113 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-74" d="M 1172 4494 
+L 1172 3500 
+L 2356 3500 
+L 2356 3053 
+L 1172 3053 
+L 1172 1153 
+Q 1172 725 1289 603 
+Q 1406 481 1766 481 
+L 2356 481 
+L 2356 0 
+L 1766 0 
+Q 1100 0 847 248 
+Q 594 497 594 1153 
+L 594 3053 
+L 172 3053 
+L 172 3500 
+L 594 3500 
+L 594 4494 
+L 1172 4494 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-68" d="M 3513 2113 
+L 3513 0 
+L 2938 0 
+L 2938 2094 
+Q 2938 2591 2744 2837 
+Q 2550 3084 2163 3084 
+Q 1697 3084 1428 2787 
+Q 1159 2491 1159 1978 
+L 1159 0 
+L 581 0 
+L 581 4863 
+L 1159 4863 
+L 1159 2956 
+Q 1366 3272 1645 3428 
+Q 1925 3584 2291 3584 
+Q 2894 3584 3203 3211 
+Q 3513 2838 3513 2113 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-6d"/>
+       <use xlink:href="#DejaVuSans-6f" transform="translate(97.412109 0)"/>
+       <use xlink:href="#DejaVuSans-6e" transform="translate(158.59375 0)"/>
+       <use xlink:href="#DejaVuSans-74" transform="translate(221.972656 0)"/>
+       <use xlink:href="#DejaVuSans-68" transform="translate(261.181641 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="text_4">
+     <!-- representation -->
+     <g style="fill: currentColor" transform="translate(199.495156 335.860562) scale(0.1 -0.1)">
+      <defs>
+       <path id="DejaVuSans-72" d="M 2631 2963 
+Q 2534 3019 2420 3045 
+Q 2306 3072 2169 3072 
+Q 1681 3072 1420 2755 
+Q 1159 2438 1159 1844 
+L 1159 0 
+L 581 0 
+L 581 3500 
+L 1159 3500 
+L 1159 2956 
+Q 1341 3275 1631 3429 
+Q 1922 3584 2338 3584 
+Q 2397 3584 2469 3576 
+Q 2541 3569 2628 3553 
+L 2631 2963 
+z
+" transform="scale(0.015625)"/>
+       <path id="DejaVuSans-70" d="M 1159 525 
+L 1159 -1331 
+L 581 -1331 
+L 581 3500 
+L 1159 3500 
+L 1159 2969 
+Q 1341 3281 1617 3432 
+Q 1894 3584 2278 3584 
+Q 2916 3584 3314 3078 
+Q 3713 2572 3713 1747 
+Q 3713 922 3314 415 
+Q 2916 -91 2278 -91 
+Q 1894 -91 1617 61 
+Q 1341 213 1159 525 
+z
+M 3116 1747 
+Q 3116 2381 2855 2742 
+Q 2594 3103 2138 3103 
+Q 1681 3103 1420 2742 
+Q 1159 2381 1159 1747 
+Q 1159 1113 1420 752 
+Q 1681 391 2138 391 
+Q 2594 391 2855 752 
+Q 3116 1113 3116 1747 
+z
+" transform="scale(0.015625)"/>
+       <path id="DejaVuSans-73" d="M 2834 3397 
+L 2834 2853 
+Q 2591 2978 2328 3040 
+Q 2066 3103 1784 3103 
+Q 1356 3103 1142 2972 
+Q 928 2841 928 2578 
+Q 928 2378 1081 2264 
+Q 1234 2150 1697 2047 
+L 1894 2003 
+Q 2506 1872 2764 1633 
+Q 3022 1394 3022 966 
+Q 3022 478 2636 193 
+Q 2250 -91 1575 -91 
+Q 1294 -91 989 -36 
+Q 684 19 347 128 
+L 347 722 
+Q 666 556 975 473 
+Q 1284 391 1588 391 
+Q 1994 391 2212 530 
+Q 2431 669 2431 922 
+Q 2431 1156 2273 1281 
+Q 2116 1406 1581 1522 
+L 1381 1569 
+Q 847 1681 609 1914 
+Q 372 2147 372 2553 
+Q 372 3047 722 3315 
+Q 1072 3584 1716 3584 
+Q 2034 3584 2315 3537 
+Q 2597 3491 2834 3397 
+z
+" transform="scale(0.015625)"/>
+       <path id="DejaVuSans-69" d="M 603 3500 
+L 1178 3500 
+L 1178 0 
+L 603 0 
+L 603 3500 
+z
+M 603 4863 
+L 1178 4863 
+L 1178 4134 
+L 603 4134 
+L 603 4863 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#DejaVuSans-72"/>
+      <use xlink:href="#DejaVuSans-65" transform="translate(38.863281 0)"/>
+      <use xlink:href="#DejaVuSans-70" transform="translate(100.386719 0)"/>
+      <use xlink:href="#DejaVuSans-72" transform="translate(163.863281 0)"/>
+      <use xlink:href="#DejaVuSans-65" transform="translate(202.726562 0)"/>
+      <use xlink:href="#DejaVuSans-73" transform="translate(264.25 0)"/>
+      <use xlink:href="#DejaVuSans-65" transform="translate(316.349609 0)"/>
+      <use xlink:href="#DejaVuSans-6e" transform="translate(377.873047 0)"/>
+      <use xlink:href="#DejaVuSans-74" transform="translate(441.251953 0)"/>
+      <use xlink:href="#DejaVuSans-61" transform="translate(480.460938 0)"/>
+      <use xlink:href="#DejaVuSans-74" transform="translate(541.740234 0)"/>
+      <use xlink:href="#DejaVuSans-69" transform="translate(580.949219 0)"/>
+      <use xlink:href="#DejaVuSans-6f" transform="translate(608.732422 0)"/>
+      <use xlink:href="#DejaVuSans-6e" transform="translate(669.914062 0)"/>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_4">
+      <path d="M 57.6 284.147123 
+L 414.72 284.147123 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_5">
+      <defs>
+       <path id="mca1e475d1e" d="M 0 0 
+L -3.5 0 
+" style="stroke: currentColor; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#mca1e475d1e" x="57.6" y="284.147123" style="fill: currentColor; stroke: currentColor; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <!-- 0.84 -->
+      <g style="fill: currentColor" transform="translate(28.334375 287.946342) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-30" d="M 2034 4250 
+Q 1547 4250 1301 3770 
+Q 1056 3291 1056 2328 
+Q 1056 1369 1301 889 
+Q 1547 409 2034 409 
+Q 2525 409 2770 889 
+Q 3016 1369 3016 2328 
+Q 3016 3291 2770 3770 
+Q 2525 4250 2034 4250 
+z
+M 2034 4750 
+Q 2819 4750 3233 4129 
+Q 3647 3509 3647 2328 
+Q 3647 1150 3233 529 
+Q 2819 -91 2034 -91 
+Q 1250 -91 836 529 
+Q 422 1150 422 2328 
+Q 422 3509 836 4129 
+Q 1250 4750 2034 4750 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-2e" d="M 684 794 
+L 1344 794 
+L 1344 0 
+L 684 0 
+L 684 794 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-38" d="M 2034 2216 
+Q 1584 2216 1326 1975 
+Q 1069 1734 1069 1313 
+Q 1069 891 1326 650 
+Q 1584 409 2034 409 
+Q 2484 409 2743 651 
+Q 3003 894 3003 1313 
+Q 3003 1734 2745 1975 
+Q 2488 2216 2034 2216 
+z
+M 1403 2484 
+Q 997 2584 770 2862 
+Q 544 3141 544 3541 
+Q 544 4100 942 4425 
+Q 1341 4750 2034 4750 
+Q 2731 4750 3128 4425 
+Q 3525 4100 3525 3541 
+Q 3525 3141 3298 2862 
+Q 3072 2584 2669 2484 
+Q 3125 2378 3379 2068 
+Q 3634 1759 3634 1313 
+Q 3634 634 3220 271 
+Q 2806 -91 2034 -91 
+Q 1263 -91 848 271 
+Q 434 634 434 1313 
+Q 434 1759 690 2068 
+Q 947 2378 1403 2484 
+z
+M 1172 3481 
+Q 1172 3119 1398 2916 
+Q 1625 2713 2034 2713 
+Q 2441 2713 2670 2916 
+Q 2900 3119 2900 3481 
+Q 2900 3844 2670 4047 
+Q 2441 4250 2034 4250 
+Q 1625 4250 1398 4047 
+Q 1172 3844 1172 3481 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-34" d="M 2419 4116 
+L 825 1625 
+L 2419 1625 
+L 2419 4116 
+z
+M 2253 4666 
+L 3047 4666 
+L 3047 1625 
+L 3713 1625 
+L 3713 1100 
+L 3047 1100 
+L 3047 0 
+L 2419 0 
+L 2419 1100 
+L 313 1100 
+L 313 1709 
+L 2253 4666 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-30"/>
+       <use xlink:href="#DejaVuSans-2e" transform="translate(63.623047 0)"/>
+       <use xlink:href="#DejaVuSans-38" transform="translate(95.410156 0)"/>
+       <use xlink:href="#DejaVuSans-34" transform="translate(159.033203 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_6">
+      <path d="M 57.6 241.778216 
+L 414.72 241.778216 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_7">
+      <g>
+       <use xlink:href="#mca1e475d1e" x="57.6" y="241.778216" style="fill: currentColor; stroke: currentColor; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <!-- 0.86 -->
+      <g style="fill: currentColor" transform="translate(28.334375 245.577435) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-36" d="M 2113 2584 
+Q 1688 2584 1439 2293 
+Q 1191 2003 1191 1497 
+Q 1191 994 1439 701 
+Q 1688 409 2113 409 
+Q 2538 409 2786 701 
+Q 3034 994 3034 1497 
+Q 3034 2003 2786 2293 
+Q 2538 2584 2113 2584 
+z
+M 3366 4563 
+L 3366 3988 
+Q 3128 4100 2886 4159 
+Q 2644 4219 2406 4219 
+Q 1781 4219 1451 3797 
+Q 1122 3375 1075 2522 
+Q 1259 2794 1537 2939 
+Q 1816 3084 2150 3084 
+Q 2853 3084 3261 2657 
+Q 3669 2231 3669 1497 
+Q 3669 778 3244 343 
+Q 2819 -91 2113 -91 
+Q 1303 -91 875 529 
+Q 447 1150 447 2328 
+Q 447 3434 972 4092 
+Q 1497 4750 2381 4750 
+Q 2619 4750 2861 4703 
+Q 3103 4656 3366 4563 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-30"/>
+       <use xlink:href="#DejaVuSans-2e" transform="translate(63.623047 0)"/>
+       <use xlink:href="#DejaVuSans-38" transform="translate(95.410156 0)"/>
+       <use xlink:href="#DejaVuSans-36" transform="translate(159.033203 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_8">
+      <path d="M 57.6 199.409309 
+L 414.72 199.409309 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_9">
+      <g>
+       <use xlink:href="#mca1e475d1e" x="57.6" y="199.409309" style="fill: currentColor; stroke: currentColor; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_7">
+      <!-- 0.88 -->
+      <g style="fill: currentColor" transform="translate(28.334375 203.208528) scale(0.1 -0.1)">
+       <use xlink:href="#DejaVuSans-30"/>
+       <use xlink:href="#DejaVuSans-2e" transform="translate(63.623047 0)"/>
+       <use xlink:href="#DejaVuSans-38" transform="translate(95.410156 0)"/>
+       <use xlink:href="#DejaVuSans-38" transform="translate(159.033203 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_10">
+      <path d="M 57.6 157.040403 
+L 414.72 157.040403 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_11">
+      <g>
+       <use xlink:href="#mca1e475d1e" x="57.6" y="157.040403" style="fill: currentColor; stroke: currentColor; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_8">
+      <!-- 0.90 -->
+      <g style="fill: currentColor" transform="translate(28.334375 160.839621) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-39" d="M 703 97 
+L 703 672 
+Q 941 559 1184 500 
+Q 1428 441 1663 441 
+Q 2288 441 2617 861 
+Q 2947 1281 2994 2138 
+Q 2813 1869 2534 1725 
+Q 2256 1581 1919 1581 
+Q 1219 1581 811 2004 
+Q 403 2428 403 3163 
+Q 403 3881 828 4315 
+Q 1253 4750 1959 4750 
+Q 2769 4750 3195 4129 
+Q 3622 3509 3622 2328 
+Q 3622 1225 3098 567 
+Q 2575 -91 1691 -91 
+Q 1453 -91 1209 -44 
+Q 966 3 703 97 
+z
+M 1959 2075 
+Q 2384 2075 2632 2365 
+Q 2881 2656 2881 3163 
+Q 2881 3666 2632 3958 
+Q 2384 4250 1959 4250 
+Q 1534 4250 1286 3958 
+Q 1038 3666 1038 3163 
+Q 1038 2656 1286 2365 
+Q 1534 2075 1959 2075 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-30"/>
+       <use xlink:href="#DejaVuSans-2e" transform="translate(63.623047 0)"/>
+       <use xlink:href="#DejaVuSans-39" transform="translate(95.410156 0)"/>
+       <use xlink:href="#DejaVuSans-30" transform="translate(159.033203 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_12">
+      <path d="M 57.6 114.671496 
+L 414.72 114.671496 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_13">
+      <g>
+       <use xlink:href="#mca1e475d1e" x="57.6" y="114.671496" style="fill: currentColor; stroke: currentColor; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_9">
+      <!-- 0.92 -->
+      <g style="fill: currentColor" transform="translate(28.334375 118.470714) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-32" d="M 1228 531 
+L 3431 531 
+L 3431 0 
+L 469 0 
+L 469 531 
+Q 828 903 1448 1529 
+Q 2069 2156 2228 2338 
+Q 2531 2678 2651 2914 
+Q 2772 3150 2772 3378 
+Q 2772 3750 2511 3984 
+Q 2250 4219 1831 4219 
+Q 1534 4219 1204 4116 
+Q 875 4013 500 3803 
+L 500 4441 
+Q 881 4594 1212 4672 
+Q 1544 4750 1819 4750 
+Q 2544 4750 2975 4387 
+Q 3406 4025 3406 3419 
+Q 3406 3131 3298 2873 
+Q 3191 2616 2906 2266 
+Q 2828 2175 2409 1742 
+Q 1991 1309 1228 531 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-30"/>
+       <use xlink:href="#DejaVuSans-2e" transform="translate(63.623047 0)"/>
+       <use xlink:href="#DejaVuSans-39" transform="translate(95.410156 0)"/>
+       <use xlink:href="#DejaVuSans-32" transform="translate(159.033203 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_6">
+     <g id="line2d_14">
+      <path d="M 57.6 72.302589 
+L 414.72 72.302589 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_15">
+      <g>
+       <use xlink:href="#mca1e475d1e" x="57.6" y="72.302589" style="fill: currentColor; stroke: currentColor; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_10">
+      <!-- 0.94 -->
+      <g style="fill: currentColor" transform="translate(28.334375 76.101808) scale(0.1 -0.1)">
+       <use xlink:href="#DejaVuSans-30"/>
+       <use xlink:href="#DejaVuSans-2e" transform="translate(63.623047 0)"/>
+       <use xlink:href="#DejaVuSans-39" transform="translate(95.410156 0)"/>
+       <use xlink:href="#DejaVuSans-34" transform="translate(159.033203 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="text_11">
+     <!-- roc_auc -->
+     <g style="fill: currentColor" transform="translate(21.976562 193.761594) rotate(-90) scale(0.1 -0.1)">
+      <defs>
+       <path id="DejaVuSans-63" d="M 3122 3366 
+L 3122 2828 
+Q 2878 2963 2633 3030 
+Q 2388 3097 2138 3097 
+Q 1578 3097 1268 2742 
+Q 959 2388 959 1747 
+Q 959 1106 1268 751 
+Q 1578 397 2138 397 
+Q 2388 397 2633 464 
+Q 2878 531 3122 666 
+L 3122 134 
+Q 2881 22 2623 -34 
+Q 2366 -91 2075 -91 
+Q 1284 -91 818 406 
+Q 353 903 353 1747 
+Q 353 2603 823 3093 
+Q 1294 3584 2113 3584 
+Q 2378 3584 2631 3529 
+Q 2884 3475 3122 3366 
+z
+" transform="scale(0.015625)"/>
+       <path id="DejaVuSans-5f" d="M 3263 -1063 
+L 3263 -1509 
+L -63 -1509 
+L -63 -1063 
+L 3263 -1063 
+z
+" transform="scale(0.015625)"/>
+       <path id="DejaVuSans-75" d="M 544 1381 
+L 544 3500 
+L 1119 3500 
+L 1119 1403 
+Q 1119 906 1312 657 
+Q 1506 409 1894 409 
+Q 2359 409 2629 706 
+Q 2900 1003 2900 1516 
+L 2900 3500 
+L 3475 3500 
+L 3475 0 
+L 2900 0 
+L 2900 538 
+Q 2691 219 2414 64 
+Q 2138 -91 1772 -91 
+Q 1169 -91 856 284 
+Q 544 659 544 1381 
+z
+M 1991 3584 
+L 1991 3584 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#DejaVuSans-72"/>
+      <use xlink:href="#DejaVuSans-6f" transform="translate(38.863281 0)"/>
+      <use xlink:href="#DejaVuSans-63" transform="translate(100.044922 0)"/>
+      <use xlink:href="#DejaVuSans-5f" transform="translate(155.025391 0)"/>
+      <use xlink:href="#DejaVuSans-61" transform="translate(205.025391 0)"/>
+      <use xlink:href="#DejaVuSans-75" transform="translate(266.304688 0)"/>
+      <use xlink:href="#DejaVuSans-63" transform="translate(329.683594 0)"/>
+     </g>
+    </g>
+   </g>
+   <g id="line2d_16">
+    <path d="M 57.6 123.71085 
+L 414.72 123.71085 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke-dasharray: 7.4,3.2; stroke-dashoffset: 0; stroke: #666666; stroke-width: 2"/>
+   </g>
+   <g id="LineCollection_1">
+    <path d="M 117.12 297.728 
+L 117.12 106.970519 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke: #e16a86"/>
+    <path d="M 236.16 238.112334 
+L 236.16 51.328 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke: #e16a86"/>
+    <path d="M 355.2 211.259566 
+L 355.2 59.424867 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke: #e16a86"/>
+   </g>
+   <g id="line2d_17">
+    <defs>
+     <path id="m22d286b595" d="M 3 0 
+L -3 -0 
+" style="stroke: #e16a86"/>
+    </defs>
+    <g clip-path="url(#pf7b4cee91b)">
+     <use xlink:href="#m22d286b595" x="117.12" y="297.728" style="fill: #1f77b4; stroke: #e16a86"/>
+     <use xlink:href="#m22d286b595" x="236.16" y="238.112334" style="fill: #1f77b4; stroke: #e16a86"/>
+     <use xlink:href="#m22d286b595" x="355.2" y="211.259566" style="fill: #1f77b4; stroke: #e16a86"/>
+    </g>
+   </g>
+   <g id="line2d_18">
+    <g clip-path="url(#pf7b4cee91b)">
+     <use xlink:href="#m22d286b595" x="117.12" y="106.970519" style="fill: #1f77b4; stroke: #e16a86"/>
+     <use xlink:href="#m22d286b595" x="236.16" y="51.328" style="fill: #1f77b4; stroke: #e16a86"/>
+     <use xlink:href="#m22d286b595" x="355.2" y="59.424867" style="fill: #1f77b4; stroke: #e16a86"/>
+    </g>
+   </g>
+   <g id="line2d_19">
+    <path d="M 117.12 202.34926 
+L 236.16 144.720167 
+L 355.2 135.342217 
+" clip-path="url(#pf7b4cee91b)" style="fill: none; stroke: #e16a86; stroke-width: 2; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_20">
+    <defs>
+     <path id="m82aa2cbdc9" d="M 0 2.5 
+C 0.663008 2.5 1.29895 2.236584 1.767767 1.767767 
+C 2.236584 1.29895 2.5 0.663008 2.5 0 
+C 2.5 -0.663008 2.236584 -1.29895 1.767767 -1.767767 
+C 1.29895 -2.236584 0.663008 -2.5 0 -2.5 
+C -0.663008 -2.5 -1.29895 -2.236584 -1.767767 -1.767767 
+C -2.236584 -1.29895 -2.5 -0.663008 -2.5 0 
+C -2.5 0.663008 -2.236584 1.29895 -1.767767 1.767767 
+C -1.29895 2.236584 -0.663008 2.5 0 2.5 
+z
+" style="stroke: #e16a86"/>
+    </defs>
+    <g clip-path="url(#pf7b4cee91b)">
+     <use xlink:href="#m82aa2cbdc9" x="117.12" y="202.34926" style="fill: #e16a86; stroke: #e16a86"/>
+     <use xlink:href="#m82aa2cbdc9" x="236.16" y="144.720167" style="fill: #e16a86; stroke: #e16a86"/>
+     <use xlink:href="#m82aa2cbdc9" x="355.2" y="135.342217" style="fill: #e16a86; stroke: #e16a86"/>
+    </g>
+   </g>
+   <g id="line2d_21">
+    <defs>
+     <path id="ma2163d072e" d="M 0 7.5 
+C 1.989023 7.5 3.896849 6.709753 5.303301 5.303301 
+C 6.709753 3.896849 7.5 1.989023 7.5 0 
+C 7.5 -1.989023 6.709753 -3.896849 5.303301 -5.303301 
+C 3.896849 -6.709753 1.989023 -7.5 0 -7.5 
+C -1.989023 -7.5 -3.896849 -6.709753 -5.303301 -5.303301 
+C -6.709753 -3.896849 -7.5 -1.989023 -7.5 0 
+C -7.5 1.989023 -6.709753 3.896849 -5.303301 5.303301 
+C -3.896849 6.709753 -1.989023 7.5 0 7.5 
+z
+" style="stroke: #e16a86; stroke-width: 2"/>
+    </defs>
+    <g clip-path="url(#pf7b4cee91b)">
+     <use xlink:href="#ma2163d072e" x="355.2" y="135.342217" style="fill-opacity: 0; stroke: #e16a86; stroke-width: 2"/>
+    </g>
+   </g>
+   <g id="patch_3">
+    <path d="M 57.6 307.584 
+L 57.6 41.472 
+" style="fill: none; stroke: currentColor; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 414.72 307.584 
+L 414.72 41.472 
+" style="fill: none; stroke: currentColor; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 57.6 307.584 
+L 414.72 307.584 
+" style="fill: none; stroke: currentColor; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 57.6 41.472 
+L 414.72 41.472 
+" style="fill: none; stroke: currentColor; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="legend_1">
+    <g id="line2d_22">
+     <path d="M 66.6 278.326187 
+L 76.6 278.326187 
+L 86.6 278.326187 
+" style="fill: none; stroke-dasharray: 7.4,3.2; stroke-dashoffset: 0; stroke: #666666; stroke-width: 2"/>
+    </g>
+    <g id="text_12">
+     <!-- ensemble -->
+     <g style="fill: currentColor" transform="translate(94.6 281.826187) scale(0.1 -0.1)">
+      <defs>
+       <path id="DejaVuSans-62" d="M 3116 1747 
+Q 3116 2381 2855 2742 
+Q 2594 3103 2138 3103 
+Q 1681 3103 1420 2742 
+Q 1159 2381 1159 1747 
+Q 1159 1113 1420 752 
+Q 1681 391 2138 391 
+Q 2594 391 2855 752 
+Q 3116 1113 3116 1747 
+z
+M 1159 2969 
+Q 1341 3281 1617 3432 
+Q 1894 3584 2278 3584 
+Q 2916 3584 3314 3078 
+Q 3713 2572 3713 1747 
+Q 3713 922 3314 415 
+Q 2916 -91 2278 -91 
+Q 1894 -91 1617 61 
+Q 1341 213 1159 525 
+L 1159 0 
+L 581 0 
+L 581 4863 
+L 1159 4863 
+L 1159 2969 
+z
+" transform="scale(0.015625)"/>
+       <path id="DejaVuSans-6c" d="M 603 4863 
+L 1178 4863 
+L 1178 0 
+L 603 0 
+L 603 4863 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#DejaVuSans-65"/>
+      <use xlink:href="#DejaVuSans-6e" transform="translate(61.523438 0)"/>
+      <use xlink:href="#DejaVuSans-73" transform="translate(124.902344 0)"/>
+      <use xlink:href="#DejaVuSans-65" transform="translate(177.001953 0)"/>
+      <use xlink:href="#DejaVuSans-6d" transform="translate(238.525391 0)"/>
+      <use xlink:href="#DejaVuSans-62" transform="translate(335.9375 0)"/>
+      <use xlink:href="#DejaVuSans-6c" transform="translate(399.414062 0)"/>
+      <use xlink:href="#DejaVuSans-65" transform="translate(427.197266 0)"/>
+     </g>
+    </g>
+    <g id="line2d_23">
+     <path d="M 66.6 293.004312 
+L 76.6 293.004312 
+L 86.6 293.004312 
+" style="fill: none; stroke: #e16a86; stroke-width: 2; stroke-linecap: square"/>
+    </g>
+    <g id="text_13">
+     <!-- elasticnet -->
+     <g style="fill: currentColor" transform="translate(94.6 296.504312) scale(0.1 -0.1)">
+      <use xlink:href="#DejaVuSans-65"/>
+      <use xlink:href="#DejaVuSans-6c" transform="translate(61.523438 0)"/>
+      <use xlink:href="#DejaVuSans-61" transform="translate(89.306641 0)"/>
+      <use xlink:href="#DejaVuSans-73" transform="translate(150.585938 0)"/>
+      <use xlink:href="#DejaVuSans-74" transform="translate(202.685547 0)"/>
+      <use xlink:href="#DejaVuSans-69" transform="translate(241.894531 0)"/>
+      <use xlink:href="#DejaVuSans-63" transform="translate(269.677734 0)"/>
+      <use xlink:href="#DejaVuSans-6e" transform="translate(324.658203 0)"/>
+      <use xlink:href="#DejaVuSans-65" transform="translate(388.037109 0)"/>
+      <use xlink:href="#DejaVuSans-74" transform="translate(449.560547 0)"/>
+     </g>
+    </g>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pf7b4cee91b">
+   <rect x="57.6" y="41.472" width="357.12" height="266.112"/>
+  </clipPath>
+ </defs>
+</svg></div></p>
+<p><code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> rebuilds each member’s representation for new
+rows from the settings its own arm was built with, and combines them
+through the ensemble refitted on every target;
+<code>candidate="selected"</code> predicts with the candidate the rule
+chose on every target instead.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>p <span class="op">=</span> fit.predict(targets, series)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>p[:<span class="dv">3</span>, :<span class="dv">4</span>].<span class="bu">round</span>(<span class="dv">3</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">#&gt; array([[0.588, 0.362, 0.638, 0.16 ],</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">#&gt;        [0.841, 0.063, 0.818, 0.062],</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">#&gt;        [0.731, 0.153, 0.701, 0.313]])</span></span></code></pre></div>
+<p><code>type="binary"</code> cuts each response into presence and
+absence. The cut is learned from the same candidate’s out-of-fold
+predictions of the fit’s own targets, so it comes from predictions of
+plots the model had not been fitted on.
+<code>ts.decision_threshold()</code> on the fit returns the cuts
+themselves, and <code>rule</code> picks how they are learned:
+<code>"youden"</code> maximises sensitivity plus specificity,
+<code>"kappa"</code> maximises Cohen’s kappa, and
+<code>"prevalence"</code> predicts as many presences as were
+observed.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>pd.Series(ts.decision_threshold(fit, rule<span class="op">=</span><span class="st">"prevalence"</span>))</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="co">#&gt; sp1    0.511295</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co">#&gt; sp2    0.498009</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt; sp3    0.543913</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; sp4    0.448653</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co">#&gt; sp5    0.494650</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co">#&gt; sp6    0.465196</span></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>fit.predict(targets, series, <span class="bu">type</span><span class="op">=</span><span class="st">"binary"</span>, rule<span class="op">=</span><span class="st">"prevalence"</span>)[:<span class="dv">3</span>, :<span class="dv">4</span>]</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="co">#&gt; array([[1., 0., 1., 0.],</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">#&gt;        [1., 0., 1., 0.],</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt;        [1., 0., 1., 0.]])</span></span></code></pre></div>
+<p>A binary map is this prediction with one target per map cell, each
+carrying a series of its own at the grain the fit reads.</p>
+</div>
+<div class="section level2">
+<h2 id="representations">Representations<a class="anchor" aria-label="anchor" href="#representations"></a>
+</h2>
+<p>A representation carries the settings and nothing else, so the same
+object describes an arm before any record has been read and rebuilds
+itself for new targets afterwards.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>ts.native()</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="co">#&gt; &lt;timesift representation&gt; native</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co">#&gt; kind    : grain (a sequence)</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt; grain   : native</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co">#&gt; stats   : mean</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>ts.grain(<span class="st">"week"</span>, stats<span class="op">=</span>(<span class="st">"cold_day"</span>, <span class="st">"mean"</span>, <span class="st">"warm_day"</span>))</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a><span class="co">#&gt; &lt;timesift representation&gt; week</span></span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="co">#&gt; kind    : grain (a sequence)</span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="co">#&gt; grain   : week</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a><span class="co">#&gt; stats   : cold_day, mean, warm_day</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>ts.multigrain((<span class="st">"week"</span>, <span class="st">"month"</span>))</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a><span class="co">#&gt; &lt;timesift representation&gt; multigrain(week+month)</span></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="co">#&gt; kind    : multigrain (a block of features)</span></span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="co">#&gt; grains  : week, month</span></span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a><span class="co">#&gt; stats   : mean</span></span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>ts.lookback(<span class="st">"30 days"</span>, bins<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a><span class="co">#&gt; &lt;timesift representation&gt; 30 days x3</span></span>
+<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a><span class="co">#&gt; kind    : lookback (a sequence)</span></span>
+<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a><span class="co">#&gt; span    : 30 days in 3 bins ending 0 days before the target</span></span>
+<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a><span class="co">#&gt; stats   : mean</span></span></code></pre></div>
+<p><code>ts.grains()</code> and <code>ts.lookbacks()</code> are sets of
+them, and <code>ts.grains("auto")</code> reads off the record every
+named grain it gives at least two bins. <code>ts.multigrain()</code>
+flattens several grains side by side into one block of features;
+<code>ts.lookback()</code> is a fixed span ending at each target’s own
+instant, which is what a plot carrying several targets through time
+needs, given as <code>target_time</code>.</p>
+<p>A learner runs across the whole set, or at one representation it is
+pinned to:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>ts.elasticnet(data<span class="op">=</span>ts.grain(<span class="st">"month"</span>))</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="co">#&gt; &lt;timesift learner&gt; elasticnet</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co">#&gt; reads   : tabular ; one model per response: yes, separate</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; data    : month</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="co">#&gt; settings: alpha = 0.5, n_inner = 5, squares = True, s = lambda.min, n_lambda = 100, thresh = 1e-08, threads = 1, seed = 1</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="what-a-learner-may-be-handed">What a learner may be handed<a class="anchor" aria-label="anchor" href="#what-a-learner-may-be-handed"></a>
+</h2>
+<p>A learner declares whether the bins reach it as a block of predictors
+or as a sequence whose order in time is what it reads. A tabular learner
+given <code>ts.native()</code> is refused before any record is touched,
+since building the array it would have been handed is the expensive half
+of the call; a sequence learner is refused a representation that turns
+out to hold one bin, once the array says how many it has.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>            models<span class="op">=</span>[ts.elasticnet()], sift<span class="op">=</span>ts.native(), verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="co">#&gt; ValueError: no learner can read any of the representations:</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt;   elasticnet() reads a tabular representation; native gives it one column per reading. Use grain(), multigrain() or lookback().</span></span></code></pre></div>
+<p>Inside a set such a pair is skipped and listed as
+<code>not applicable</code> by <code>ts.summary()</code>; named through
+a learner’s own <code>data=</code> it is an error, because a
+representation named by hand is a decision.</p>
+</div>
+<div class="section level2">
+<h2 id="the-split-and-the-cells-a-score-is-defined-on">The split, and the cells a score is defined on<a class="anchor" aria-label="anchor" href="#the-split-and-the-cells-a-score-is-defined-on"></a>
+</h2>
+<p>One fold map is read by everything that scores, so every candidate is
+fitted and scored on identical splits. <code>ts.cv()</code> deals units
+into folds balanced on a stratifying value and
+<code>ts.grouped_cv()</code> keeps every target sharing a group value on
+one side of each split; <code>resampling</code> also takes a fold vector
+or a <code>ts.fold_map()</code> result directly.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>fit.folds</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="co">#&gt; &lt;timesift folds&gt; 60 units in 5 folds</span></span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="co">#&gt; 1: 12  2: 12  3: 12  4: 12  5: 12</span></span></code></pre></div>
+<p>A per-response score needs both classes among the held-out units, and
+a per-response model needs both classes among the units it was fitted
+on. The mask says which cells those are, from the response and the fold
+map alone.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>fit.cells</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="co">#&gt; &lt;timesift cells&gt; 30 cells over 6 variables</span></span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="co">#&gt; scorable: 30 (100.0%); variables with at least one scorable fold: 6 of 6</span></span></code></pre></div>
+<p>Because it involves no model, every candidate is restricted to the
+same cells: their means share one denominator and every paired
+difference runs on matched cells.</p>
+</div>
+<div class="section level2">
+<h2 id="learners-and-how-they-are-trained">Learners, and how they are trained<a class="anchor" aria-label="anchor" href="#learners-and-how-they-are-trained"></a>
+</h2>
+<p><code>ts.elasticnet()</code> and <code>ts.stepwise()</code> read a
+block of features, <code>ts.forest()</code> grows a probability forest
+over one, and the <code>torch</code> encoders <code>ts.mlp()</code>,
+<code>ts.cnn()</code> and <code>ts.rescnn()</code> read a sequence with
+a joint multi-label head, so every response is predicted together from a
+shared embedding. Pooling strength across responses is what makes the
+rarer ones learnable at these sample sizes.</p>
+<p><code>ts.elasticnet()</code> is the arm a network is measured
+against, so it is fitted by the same compiled core the R package calls
+rather than by a fitter on either side: the penalty path, the
+standardisation and the cross-validated choice of penalty are one
+implementation, and the two languages return the same coefficients for
+the same design. <code>s</code> reads that fit at
+<code>"lambda.min"</code>, at <code>"lambda.1se"</code>, or at a penalty
+of your own, and <code>thresh</code> trades how close the descent
+settles to the optimum against what it costs.</p>
+<p>Architecture belongs to the constructor and training belongs to
+<code>ts.train_control()</code>, which every neural learner of a run
+reads. A learner given a control of its own overrides the run’s on the
+settings it names and takes the rest from it.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>ts.train_control(epochs<span class="op">=</span><span class="dv">200</span>, device<span class="op">=</span><span class="st">"cpu"</span>)</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="co">#&gt; &lt;timesift control&gt;</span></span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#&gt;   epochs          200</span></span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co">#&gt;   batch_size      64   (default)</span></span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="co">#&gt;   learning_rate   0.001   (default)</span></span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a><span class="co">#&gt;   weight_decay    0.0001   (default)</span></span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a><span class="co">#&gt;   early_stopping  10   (default)</span></span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a><span class="co">#&gt;   val_frac        0.0   (default)</span></span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a><span class="co">#&gt;   device          cpu</span></span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a><span class="co">#&gt;   seed            1   (default)</span></span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a><span class="co">#&gt;   swa             False   (default)</span></span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a><span class="co">#&gt;   swa_start       0.7   (default)</span></span>
+<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a>ts.cnn(channels<span class="op">=</span>(<span class="dv">16</span>, <span class="dv">32</span>), epochs<span class="op">=</span><span class="dv">300</span>)</span>
+<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a><span class="co">#&gt; &lt;timesift learner&gt; cnn</span></span>
+<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a><span class="co">#&gt; reads   : sequence ; one model per response: no, joint</span></span>
+<span id="cb16-16"><a href="#cb16-16" tabindex="-1"></a><span class="co">#&gt; data    : every representation of the run</span></span>
+<span id="cb16-17"><a href="#cb16-17" tabindex="-1"></a><span class="co">#&gt; settings: channels = 16/32, kernel = 7, dropout = 0.3</span></span>
+<span id="cb16-18"><a href="#cb16-18" tabindex="-1"></a><span class="co">#&gt; training: epochs = 300</span></span>
+<span id="cb16-19"><a href="#cb16-19" tabindex="-1"></a><span class="co">#&gt; needs   : torch</span></span></code></pre></div>
+<p>A learner of your own is a fit and a predict pair, and it goes
+through the same folds, the same cells and the same scoring as the ones
+that ship. <code>ts.flatten()</code> lays a representation out as the
+block of predictors the tabular learners read, one column per bin of
+each channel. A fit that declares a <code>weights</code> argument is
+handed the case weights every shipped learner fits under, which weight a
+presence by how rare it is.</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="kw">def</span> nn_fit(x, y, <span class="op">**</span>_):</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"x"</span>: ts.flatten(x), <span class="st">"y"</span>: y}</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a><span class="kw">def</span> nn_predict(model, x):</span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>    m <span class="op">=</span> ts.flatten(x)</span>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>    d <span class="op">=</span> ((m[:, <span class="va">None</span>, :] <span class="op">-</span> model[<span class="st">"x"</span>][<span class="va">None</span>, :, :]) <span class="op">**</span> <span class="dv">2</span>).<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>    <span class="cf">return</span> model[<span class="st">"y"</span>][d.argmin(axis<span class="op">=</span><span class="dv">1</span>)].astype(<span class="bu">float</span>)</span>
+<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a></span>
+<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a>nearest_neighbour <span class="op">=</span> ts.Learner(<span class="st">"1nn"</span>, fit<span class="op">=</span>nn_fit, predict<span class="op">=</span>nn_predict, multi<span class="op">=</span><span class="st">"joint"</span>)</span>
+<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a></span>
+<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a></span>
+<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a><span class="kw">def</span> irls(design, y, w):</span>
+<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a>    beta <span class="op">=</span> np.zeros(design.shape[<span class="dv">1</span>])</span>
+<span id="cb17-14"><a href="#cb17-14" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">100</span>):</span>
+<span id="cb17-15"><a href="#cb17-15" tabindex="-1"></a>        p <span class="op">=</span> <span class="dv">1</span> <span class="op">/</span> (<span class="dv">1</span> <span class="op">+</span> np.exp(<span class="op">-</span>design <span class="op">@</span> beta))</span>
+<span id="cb17-16"><a href="#cb17-16" tabindex="-1"></a>        step <span class="op">=</span> np.linalg.solve(design.T <span class="op">@</span> ((w <span class="op">*</span> p <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> p))[:, <span class="va">None</span>] <span class="op">*</span> design),</span>
+<span id="cb17-17"><a href="#cb17-17" tabindex="-1"></a>                               design.T <span class="op">@</span> (w <span class="op">*</span> (y <span class="op">-</span> p)))</span>
+<span id="cb17-18"><a href="#cb17-18" tabindex="-1"></a>        beta <span class="op">+=</span> step</span>
+<span id="cb17-19"><a href="#cb17-19" tabindex="-1"></a>        <span class="cf">if</span> np.<span class="bu">abs</span>(step).<span class="bu">max</span>() <span class="op">&lt;</span> <span class="fl">1e-8</span>:</span>
+<span id="cb17-20"><a href="#cb17-20" tabindex="-1"></a>            <span class="cf">break</span></span>
+<span id="cb17-21"><a href="#cb17-21" tabindex="-1"></a>    <span class="cf">return</span> beta</span>
+<span id="cb17-22"><a href="#cb17-22" tabindex="-1"></a></span>
+<span id="cb17-23"><a href="#cb17-23" tabindex="-1"></a><span class="kw">def</span> logistic_fit(x, y, weights, <span class="op">**</span>_):</span>
+<span id="cb17-24"><a href="#cb17-24" tabindex="-1"></a>    m <span class="op">=</span> ts.flatten(x)</span>
+<span id="cb17-25"><a href="#cb17-25" tabindex="-1"></a>    centre, scale <span class="op">=</span> m.mean(axis<span class="op">=</span><span class="dv">0</span>), m.std(axis<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb17-26"><a href="#cb17-26" tabindex="-1"></a>    design <span class="op">=</span> np.column_stack([np.ones(<span class="bu">len</span>(m)), (m <span class="op">-</span> centre) <span class="op">/</span> scale])</span>
+<span id="cb17-27"><a href="#cb17-27" tabindex="-1"></a>    betas <span class="op">=</span> np.column_stack([irls(design, y[:, j], weights[:, j]) <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(y.shape[<span class="dv">1</span>])])</span>
+<span id="cb17-28"><a href="#cb17-28" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"centre"</span>: centre, <span class="st">"scale"</span>: scale, <span class="st">"betas"</span>: betas}</span>
+<span id="cb17-29"><a href="#cb17-29" tabindex="-1"></a></span>
+<span id="cb17-30"><a href="#cb17-30" tabindex="-1"></a><span class="kw">def</span> logistic_predict(model, x):</span>
+<span id="cb17-31"><a href="#cb17-31" tabindex="-1"></a>    m <span class="op">=</span> (ts.flatten(x) <span class="op">-</span> model[<span class="st">"centre"</span>]) <span class="op">/</span> model[<span class="st">"scale"</span>]</span>
+<span id="cb17-32"><a href="#cb17-32" tabindex="-1"></a>    design <span class="op">=</span> np.column_stack([np.ones(<span class="bu">len</span>(m)), m])</span>
+<span id="cb17-33"><a href="#cb17-33" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">1</span> <span class="op">/</span> (<span class="dv">1</span> <span class="op">+</span> np.exp(<span class="op">-</span>design <span class="op">@</span> model[<span class="st">"betas"</span>]))</span>
+<span id="cb17-34"><a href="#cb17-34" tabindex="-1"></a></span>
+<span id="cb17-35"><a href="#cb17-35" tabindex="-1"></a>weighted_logistic <span class="op">=</span> ts.Learner(<span class="st">"weighted_logistic"</span>, fit<span class="op">=</span>logistic_fit,</span>
+<span id="cb17-36"><a href="#cb17-36" tabindex="-1"></a>                               predict<span class="op">=</span>logistic_predict, data<span class="op">=</span>ts.grain(<span class="st">"month"</span>))</span>
+<span id="cb17-37"><a href="#cb17-37" tabindex="-1"></a></span>
+<span id="cb17-38"><a href="#cb17-38" tabindex="-1"></a>both <span class="op">=</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb17-39"><a href="#cb17-39" tabindex="-1"></a>                   models<span class="op">=</span>[ts.elasticnet(), nearest_neighbour, weighted_logistic],</span>
+<span id="cb17-40"><a href="#cb17-40" tabindex="-1"></a>                   sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>), resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">5</span>), verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb17-41"><a href="#cb17-41" tabindex="-1"></a><span class="bu">print</span>(ts.summary(both))</span>
+<span id="cb17-42"><a href="#cb17-42" tabindex="-1"></a><span class="co">#&gt; timesift  60 targets, 6 responses, 5-fold random CV, roc_auc</span></span>
+<span id="cb17-43"><a href="#cb17-43" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb17-44"><a href="#cb17-44" tabindex="-1"></a><span class="co">#&gt; candidates, scored on the outer folds</span></span>
+<span id="cb17-45"><a href="#cb17-45" tabindex="-1"></a><span class="co">#&gt; candidate                           mean    won  responses</span></span>
+<span id="cb17-46"><a href="#cb17-46" tabindex="-1"></a><span class="co">#&gt; 1nn / week                         0.744      0  joint</span></span>
+<span id="cb17-47"><a href="#cb17-47" tabindex="-1"></a><span class="co">#&gt; 1nn / month                        0.757      0  joint</span></span>
+<span id="cb17-48"><a href="#cb17-48" tabindex="-1"></a><span class="co">#&gt; weighted_logistic / month          0.900      1  separate</span></span>
+<span id="cb17-49"><a href="#cb17-49" tabindex="-1"></a><span class="co">#&gt; elasticnet / month                 0.903      2  separate</span></span>
+<span id="cb17-50"><a href="#cb17-50" tabindex="-1"></a><span class="co">#&gt; elasticnet / week                  0.906      3  separate</span></span>
+<span id="cb17-51"><a href="#cb17-51" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb17-52"><a href="#cb17-52" tabindex="-1"></a><span class="co">#&gt; procedure, chosen and weighted inside each outer training fold</span></span>
+<span id="cb17-53"><a href="#cb17-53" tabindex="-1"></a><span class="co">#&gt; selected                           0.904  se 0.015</span></span>
+<span id="cb17-54"><a href="#cb17-54" tabindex="-1"></a><span class="co">#&gt; ensemble                           0.917  se 0.012</span></span>
+<span id="cb17-55"><a href="#cb17-55" tabindex="-1"></a><span class="co">#&gt; selected elasticnet / month in 3, elasticnet / week in 2 of 5 folds</span></span>
+<span id="cb17-56"><a href="#cb17-56" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb17-57"><a href="#cb17-57" tabindex="-1"></a><span class="co">#&gt; choice on every target  elasticnet / week</span></span>
+<span id="cb17-58"><a href="#cb17-58" tabindex="-1"></a><span class="co">#&gt; weights on every target  elasticnet / month 0.48   elasticnet / week 0.34   weighted_logistic / month 0.18</span></span></code></pre></div>
+<p>Either way a fit is handed every response as the columns of
+<code>y</code> and returns a model that predicts all of them, one column
+each. <code>multi="joint"</code> says that one model covers them
+together, as the nearest neighbour does; the default,
+<code>"separate"</code>, says the fit holds one model per response, as
+the logistic regression does, and it is what the report’s
+<code>responses</code> column reads.</p>
+</div>
+<div class="section level2">
+<h2 id="the-combination">The combination<a class="anchor" aria-label="anchor" href="#the-combination"></a>
+</h2>
+<p>The combiner is handed out-of-fold predictions, the response, the
+mask and the fold map, and never a model. <code>"stack"</code> fits
+non-negative weights summing to one by minimising the response head’s
+own loss over the scorable cells; <code>"mean"</code>,
+<code>"median"</code> and <code>"weighted"</code> combine without
+fitting anything, and <code>"committee"</code> is the share of members
+voting presence, each at the cut its own out-of-fold predictions give.
+The weights below are fitted on the outer out-of-fold predictions of
+every target and are what <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> uses. The ensemble’s
+score is not read with them, because they were fitted to the responses
+it would be scored against; each outer fold’s weights are in
+<code>fit.fold_weights</code>.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>pd.Series(ts.ensemble_weights(fit))</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="co">#&gt; elasticnet / day      3.833293e-14</span></span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a><span class="co">#&gt; elasticnet / week     2.785812e-01</span></span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co">#&gt; elasticnet / month    7.214188e-01</span></span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
+<p>The weights say how much of the combination each candidate carries,
+and a weight at zero is one the combination reached past. Where the
+ensemble line of the plot above sits over every curve the candidates are
+carrying different parts of the signal, and where it sits on the best
+curve they are not.</p>
+</div>
+<div class="section level2">
+<h2 id="reading-a-level-honestly">Reading a level honestly<a class="anchor" aria-label="anchor" href="#reading-a-level-honestly"></a>
+</h2>
+<p>The true skill statistic is read at the threshold that maximises it,
+chosen on the same units the score is then read on. That inflates the
+level, and by more the fewer presences a cell holds.
+<code>ts.tss_inflation()</code> measures the inflation for the presence
+counts of the design in hand.</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>pd.DataFrame(ts.tss_inflation(fit.y, fit.folds, skill<span class="op">=</span>(<span class="fl">0.6</span>, <span class="fl">0.9</span>), replicates<span class="op">=</span><span class="dv">100</span>))</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="co">#&gt;    skill  reported  inflation     lower     upper  replicates</span></span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="co">#&gt; 0    0.6  0.769709   0.169709  0.718532  0.835235         100</span></span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a><span class="co">#&gt; 1    0.9  0.966596   0.066596  0.942541  0.987280         100</span></span></code></pre></div>
+<p>The inflation is an average over the planted model’s predictions: a
+level is optimistic in expectation, and <code>ts.implied_skill()</code>
+inverts the map to say which population skills a level read is
+consistent with. Its size depends on how a model’s predictions are
+distributed as well as on the presence counts, so two candidates of
+equal skill scored on the same cells can be inflated by different
+amounts, and a paired difference in TSS is not free of it. That is why a
+run is scored by AUC unless told otherwise.</p>
+</div>
+<div class="section level2">
+<h2 id="the-arrays-on-their-own">The arrays on their own<a class="anchor" aria-label="anchor" href="#the-arrays-on-their-own"></a>
+</h2>
+<p><code>ts.grain_matrix()</code> is the representation without the
+fitting layer around it. It bins the readings by the calendar and
+summarises every bin.</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>x <span class="op">=</span> ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>,</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>                    stats<span class="op">=</span>(<span class="st">"cold_day"</span>, <span class="st">"mean"</span>, <span class="st">"warm_day"</span>))</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>x</span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="co">#&gt; &lt;timesift matrix&gt; 60 units x 18 bins x 3 channels</span></span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a><span class="co">#&gt; grain: week  stats: cold_day, mean, warm_day</span></span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a><span class="co">#&gt; from  : 2021-08-30T00:00:00Z to 2021-12-27T00:00:00Z</span></span></code></pre></div>
+<p>Bins follow the calendar. A month is 28, 30 or 31 days, and a week
+starts on a Monday, so a bin is a real month or a real week and not a
+drifting block of 730 or 168 hours.</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"month"</span>).bin_n[<span class="dv">0</span>]</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a><span class="co">#&gt; array([720, 744, 720, 696], dtype=int32)</span></span></code></pre></div>
+<div class="section level3">
+<h3 id="an-extreme-day-is-not-an-extreme-reading">An extreme day is not an extreme reading<a class="anchor" aria-label="anchor" href="#an-extreme-day-is-not-an-extreme-reading"></a>
+</h3>
+<p><code>min</code> and <code>max</code> take the coldest and warmest
+single reading of a bin. <code>cold_day</code> and <code>warm_day</code>
+reduce each day to its own mean first and then take the extreme over
+days. <code>mean_daily_min</code> and <code>mean_daily_max</code> take
+the mean of the daily extremes, which is the exposure a typical day of
+the bin brought. One hour at -50 sets <code>min</code> to -50 outright;
+it reaches the day-level statistics only through its twenty-fourth of
+that day’s mean.</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>week <span class="op">=</span> ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>,</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>                       stats<span class="op">=</span>(<span class="st">"min"</span>, <span class="st">"mean_daily_min"</span>, <span class="st">"cold_day"</span>, <span class="st">"mean"</span>,</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>                              <span class="st">"warm_day"</span>, <span class="st">"mean_daily_max"</span>, <span class="st">"max"</span>))</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>pd.Series(week.values[<span class="dv">0</span>, <span class="dv">0</span>], index<span class="op">=</span>week.stats).<span class="bu">round</span>(<span class="dv">2</span>)</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a><span class="co">#&gt; min              -28.68</span></span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="co">#&gt; mean_daily_min   -22.30</span></span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a><span class="co">#&gt; cold_day          -1.73</span></span>
+<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a><span class="co">#&gt; mean              -0.13</span></span>
+<span id="cb22-9"><a href="#cb22-9" tabindex="-1"></a><span class="co">#&gt; warm_day           0.94</span></span>
+<span id="cb22-10"><a href="#cb22-10" tabindex="-1"></a><span class="co">#&gt; mean_daily_max    21.54</span></span>
+<span id="cb22-11"><a href="#cb22-11" tabindex="-1"></a><span class="co">#&gt; max               31.50</span></span>
+<span id="cb22-12"><a href="#cb22-12" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
+<p>An encoder that ends in global pooling discards when a thermal event
+happened, so the position of a bin in the year is given to it as
+input.</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>week_mean <span class="op">=</span> ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>)</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>ts.bind_channels(week_mean, ts.calendar_channels(week_mean)).stats</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a><span class="co">#&gt; ('mean', 'year_sin', 'year_cos')</span></span></code></pre></div>
+</div>
+</div>
+<div class="section level2">
+<h2 id="one-grain-at-a-time">One grain at a time<a class="anchor" aria-label="anchor" href="#one-grain-at-a-time"></a>
+</h2>
+<p>Where the arrays are already built, <code>ts.grain_ladder()</code>
+fits every learner at every grain of a set on one split and one mask. It
+is the ladder a run reports as a curve, reachable on its own.</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>grain_set <span class="op">=</span> ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span>(<span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span>))</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>lad <span class="op">=</span> ts.grain_ladder(grain_set, fit.y, [ts.elasticnet()], folds<span class="op">=</span>fit.folds, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>pd.DataFrame(lad.summary())</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a><span class="co">#&gt;       learner  grain     score  n_variable   best</span></span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a><span class="co">#&gt; 0  elasticnet    day  0.882663           6  False</span></span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a><span class="co">#&gt; 1  elasticnet   week  0.905958           6   True</span></span>
+<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a><span class="co">#&gt; 2  elasticnet  month  0.902628           6  False</span></span></code></pre></div>
+<p>A claim about one step of that curve rests on the paired contrast.
+The difference is taken inside each cell both arms scored, averaged
+within a response, and summarised across the responses, which are the
+independent replicates. Six responses is few, so the interval is wide
+and the rank test behind <code>p_value</code> has few values to work
+with.</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a>pd.Series(ts.paired_contrast(lad, <span class="st">"month|elasticnet"</span>, <span class="st">"day|elasticnet"</span>))</span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a><span class="co">#&gt; a             month|elasticnet</span></span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a><span class="co">#&gt; b               day|elasticnet</span></span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a><span class="co">#&gt; diff                  0.019965</span></span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a><span class="co">#&gt; center                0.019965</span></span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a><span class="co">#&gt; lower                -0.011869</span></span>
+<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a><span class="co">#&gt; upper                 0.051799</span></span>
+<span id="cb25-8"><a href="#cb25-8" tabindex="-1"></a><span class="co">#&gt; n_variable                   6</span></span>
+<span id="cb25-9"><a href="#cb25-9" tabindex="-1"></a><span class="co">#&gt; n_cell                      30</span></span>
+<span id="cb25-10"><a href="#cb25-10" tabindex="-1"></a><span class="co">#&gt; n_favour                     4</span></span>
+<span id="cb25-11"><a href="#cb25-11" tabindex="-1"></a><span class="co">#&gt; p_value                0.21875</span></span>
+<span id="cb25-12"><a href="#cb25-12" tabindex="-1"></a><span class="co">#&gt; p_method                 exact</span></span>
+<span id="cb25-13"><a href="#cb25-13" tabindex="-1"></a><span class="co">#&gt; interval             variables</span></span>
+<span id="cb25-14"><a href="#cb25-14" tabindex="-1"></a><span class="co">#&gt; dtype: object</span></span></code></pre></div>
+<p>Where the whole curve is the question rather than one step of it,
+<code>ts.grain_contrasts()</code> fits a mixed model on the per-cell
+scores and compares every grain against the best one, correcting for the
+comparisons made and no others. It needs scipy, the
+<code>contrasts</code> extra of the wheel.</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a>pd.DataFrame(ts.grain_contrasts(lad))</span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a><span class="co">#&gt;       learner  grain reference      diff     lower     upper   p_value</span></span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a><span class="co">#&gt; 0  elasticnet    day      week -0.023295 -0.066035  0.019446  0.367568</span></span>
+<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a><span class="co">#&gt; 1  elasticnet  month      week -0.003330 -0.046071  0.039411  0.977668</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="what-was-read">What was read<a class="anchor" aria-label="anchor" href="#what-was-read"></a>
+</h2>
+<p>With the per-fold fits kept, <code>ts.occlusion()</code> holds each
+bin of the record back in turn, rescores the held-out units, and records
+the fall in score as that bin’s weight, one row per bin and one column
+per response. Nothing is refitted.</p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>kept <span class="op">=</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>                   sift<span class="op">=</span>ts.grains(<span class="st">"month"</span>), resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">5</span>), ensemble<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>                   keep_fits<span class="op">=</span><span class="va">True</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>profile <span class="op">=</span> ts.occlusion(kept, <span class="st">"elasticnet / month"</span>, permutations<span class="op">=</span><span class="dv">5</span>)</span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a>weight <span class="op">=</span> pd.DataFrame(profile[<span class="st">"weight"</span>], index<span class="op">=</span>profile[<span class="st">"part"</span>], columns<span class="op">=</span>profile[<span class="st">"variable"</span>])</span>
+<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a>weight.mean(axis<span class="op">=</span><span class="dv">1</span>).head(<span class="dv">4</span>)</span>
+<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a><span class="co">#&gt; 2021-09-01T00:00:00Z    0.124983</span></span>
+<span id="cb27-8"><a href="#cb27-8" tabindex="-1"></a><span class="co">#&gt; 2021-10-01T00:00:00Z    0.093020</span></span>
+<span id="cb27-9"><a href="#cb27-9" tabindex="-1"></a><span class="co">#&gt; 2021-11-01T00:00:00Z    0.023396</span></span>
+<span id="cb27-10"><a href="#cb27-10" tabindex="-1"></a><span class="co">#&gt; 2021-12-01T00:00:00Z    0.028906</span></span>
+<span id="cb27-11"><a href="#cb27-11" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
+<p>Holding a channel back instead asks what each statistic of a grain
+carries, which is the question behind keeping a bin’s extremes at
+all.</p>
+</div>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside>
 </div>
 
 
@@ -196,5 +1707,83 @@ two arrays are the same array.</p>
 
 
 
-  </body>
+  <script>
+/* SVG Copy Button Functionality */
+(function() {
+  "use strict";
+
+  // Initialize SVG copy buttons after DOM is ready
+  document.addEventListener("DOMContentLoaded", function() {
+    if (typeof ClipboardJS === "undefined") {
+      console.warn("ClipboardJS not loaded - SVG copy buttons disabled");
+      return;
+    }
+
+    // Initialize clipboard for SVG copy buttons
+    var svgClipboard = new ClipboardJS(".btn-copy-svg", {
+      text: function(trigger) {
+        var container = trigger.closest(".svg-container");
+        if (!container) return "";
+
+        var svg = container.querySelector("svg");
+        if (!svg) return "";
+
+        // Clone SVG to avoid modifying the original
+        var clone = svg.cloneNode(true);
+
+        // Remove inline-svg class (not needed in copied version)
+        clone.classList.remove("inline-svg");
+
+        // Add XML declaration and serialize
+        var serializer = new XMLSerializer();
+        var svgString = serializer.serializeToString(clone);
+
+        // Add XML declaration if not present
+        if (!svgString.startsWith("<?xml")) {
+          svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgString;
+        }
+
+        return svgString;
+      }
+    });
+
+    // Handle success
+    svgClipboard.on("success", function(e) {
+      var btn = e.trigger;
+      var originalTitle = btn.getAttribute("data-bs-original-title") || btn.getAttribute("title");
+
+      // Update tooltip to show "Copied!"
+      btn.setAttribute("data-bs-original-title", "Copied!");
+      var tooltip = bootstrap.Tooltip.getInstance(btn);
+      if (tooltip) {
+        tooltip.show();
+      }
+
+      // Reset after delay
+      setTimeout(function() {
+        btn.setAttribute("data-bs-original-title", originalTitle);
+      }, 1500);
+
+      e.clearSelection();
+    });
+
+    // Handle error
+    svgClipboard.on("error", function(e) {
+      var btn = e.trigger;
+      btn.setAttribute("data-bs-original-title", "Press Ctrl+C to copy");
+      var tooltip = bootstrap.Tooltip.getInstance(btn);
+      if (tooltip) {
+        tooltip.show();
+      }
+    });
+
+    // Initialize tooltips for SVG copy buttons
+    var svgCopyButtons = document.querySelectorAll(".btn-copy-svg");
+    svgCopyButtons.forEach(function(btn) {
+      new bootstrap.Tooltip(btn, { container: "body" });
+    });
+  });
+})();
+</script>
+</body>
 </html>

@@ -55,23 +55,20 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-r">
 <li><a class="dropdown-item" href="../articles/timesift.html">Get started</a></li>
     <li><a class="dropdown-item" href="../reference/index.html">Reference</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><a class="dropdown-item" href="../articles/reproducing-schrankogel.html">Reproducing the study</a></li>
-    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-python" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Python</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-python">
-<li><a class="dropdown-item" href="../articles/python.html">Overview</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><a class="dropdown-item" href="../articles/python-representation.html">The representation</a></li>
-    <li><a class="dropdown-item" href="../articles/python-split.html">The split and the cells</a></li>
-    <li><a class="dropdown-item" href="../articles/python-fitting.html">Fitting</a></li>
-    <li><a class="dropdown-item" href="../articles/python-learners.html">Learners</a></li>
-    <li><a class="dropdown-item" href="../articles/python-scoring.html">Scoring and comparison</a></li>
-    <li><a class="dropdown-item" href="../articles/python-extending.html">Extending</a></li>
-    <li><a class="dropdown-item" href="../articles/python-artifacts.html">What crosses the boundary</a></li>
+<li><a class="dropdown-item" href="../articles/python.html">Get started</a></li>
+    <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
+  </ul>
+</li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="../articles/reproducing-schrankogel.html">Reproducing the study</a></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../articles/contract.html">Contract</a></li>
@@ -115,8 +112,8 @@
 <!-- Written by tools/python_reference.py from the Python sources. Do not edit. -->
 <p>The metrics, the paired contrast between two arms on matched cells,
 every grain against a learner’s best, the inflation of a score read at
-its own best threshold, what a fitted model read, and a record with a
-planted grain to test all of it on.</p>
+its own best threshold, and what a fitted model read.</p>
+<p><a href="python-reference.html">All of the Python reference</a></p>
 <div class="section level2">
 <h2 id="tss">
 <code>tss()</code><a class="anchor" aria-label="anchor" href="#tss"></a>
@@ -434,8 +431,8 @@ predictor, and the prediction is then read over the grid of the two; it
 is <code>with</code> in R, which Python reserves.</p>
 </div>
 <div class="section level2">
-<h2 id="responsecurve">
-<code>ResponseCurve</code><a class="anchor" aria-label="anchor" href="#responsecurve"></a>
+<h2 id="ResponseCurve">
+<code>ResponseCurve</code><a class="anchor" aria-label="anchor" href="#ResponseCurve"></a>
 </h2>
 <div class="sourceCode" id="cb19"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>ResponseCurve(</span>
 <span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>    value,</span>
@@ -481,209 +478,6 @@ was not asked.</p>
 <code>lower</code> - np.ndarray | None</li>
 <li>
 <code>upper</code> - np.ndarray | None</li>
-</ul>
-</div>
-<div class="section level2">
-<h2 id="project">
-<code>project()</code><a class="anchor" aria-label="anchor" href="#project"></a>
-</h2>
-<div class="sourceCode" id="cb20"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>project(</span>
-<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>    fit,</span>
-<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>    series<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>    static<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>    candidate: <span class="bu">str</span> <span class="op">=</span> <span class="st">'ensemble'</span>,</span>
-<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>    <span class="bu">type</span>: <span class="bu">str</span> <span class="op">=</span> <span class="st">'response'</span>,</span>
-<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a>    chunk: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5000</span>,</span>
-<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
-<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a>)</span></code></pre></div>
-<p>Predict one target per cell of a grid, each carrying the record of
-its own cell.</p>
-<p>This is <code>BIOMOD_Projection()</code> and
-<code>BIOMOD_EnsembleForecasting()</code>: a map is the fit applied to
-one target per cell, at the grain the fit reads. <code>series</code> is
-an <code>xarray.DataArray</code> with a <code>time</code> dimension and
-two spatial ones, or a mapping of the fit’s <code>x</code> column names
-to such; <code>static</code> is an <code>xarray.Dataset</code>, or a
-mapping of the fit’s <code>static</code> column names to
-<code>DataArray</code> over the two spatial dimensions. Every input
-shares one grid, and one set of instants. Cells are predicted in chunks
-of <code>chunk</code>, and a cell is predicted where every input holds a
-value at that cell: a cell with a missing reading anywhere is NaN in
-every layer. <code>candidate</code>, <code>type</code> and the other
-keywords are those of <code>Timesift.predict</code>.</p>
-<p>Returns an <code>xarray.DataArray</code> over <code>response</code>
-and the two spatial dimensions of the inputs; for
-<code>type="spread"</code> a <code>statistic</code> dimension as
-well.</p>
-</div>
-<div class="section level2">
-<h2 id="range_change">
-<code>range_change()</code><a class="anchor" aria-label="anchor" href="#range_change"></a>
-</h2>
-<div class="sourceCode" id="cb21"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>range_change(now, later, threshold<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
-<p>How the range of each response changes between two maps.</p>
-<p>Counts the cells a response is lost from, kept in and gained, as
-<code>BIOMOD_RangeSize()</code> does, a cell being in the range where
-the response is predicted present. With <code>L</code> the cells lost,
-<code>K</code> kept, <code>G</code> gained and <code>A</code> absent in
-both: the current range is <code>L + K</code>, the later one
-<code>K + G</code>, <code>percent_loss</code> is
-<code>100 L / (L + K)</code>, <code>percent_gain</code> is
-<code>100 G / (L + K)</code> and <code>change</code> is
-<code>percent_gain - percent_loss</code>. A cell that is NaN in either
-map is left out of every count. <code>now</code> and <code>later</code>
-are <code>xarray.DataArray</code> with a <code>response</code>
-dimension, such as <code><a href="../reference/project.html">project()</a></code> returns, or arrays of cells by
-responses. <code>threshold</code> is None where the maps are already 0
-and 1, and otherwise one cut per response, or one for all.</p>
-</div>
-<div class="section level2">
-<h2 id="rangechange">
-<code>RangeChange</code><a class="anchor" aria-label="anchor" href="#rangechange"></a>
-</h2>
-<div class="sourceCode" id="cb22"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>RangeChange(table, <span class="bu">map</span>, variables)</span></code></pre></div>
-<p>The change in range of each response: a <code>table</code> of counts,
-and the <code>map</code> of codes (-2 lost, -1 kept, 0 absent in both, 1
-gained) of the shape of the inputs.</p>
-<p>Attributes:</p>
-<ul>
-<li>
-<code>table</code> - list</li>
-<li>
-<code>map</code> - np.ndarray</li>
-<li>
-<code>variables</code> - tuple</li>
-</ul>
-</div>
-<div class="section level2">
-<h2 id="pseudo_absences">
-<code>pseudo_absences()</code><a class="anchor" aria-label="anchor" href="#pseudo_absences"></a>
-</h2>
-<div class="sourceCode" id="cb23"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>pseudo_absences(</span>
-<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>    pool,</span>
-<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>    presences,</span>
-<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>    n: <span class="bu">int</span>,</span>
-<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a>    strategy: <span class="bu">str</span> <span class="op">=</span> <span class="st">'random'</span>,</span>
-<span id="cb23-6"><a href="#cb23-6" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb23-7"><a href="#cb23-7" tabindex="-1"></a>    env<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb23-8"><a href="#cb23-8" tabindex="-1"></a>    quantile: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.025</span>,</span>
-<span id="cb23-9"><a href="#cb23-9" tabindex="-1"></a>    coords<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb23-10"><a href="#cb23-10" tabindex="-1"></a>    dist_min: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.0</span>,</span>
-<span id="cb23-11"><a href="#cb23-11" tabindex="-1"></a>    dist_max: <span class="bu">float</span> <span class="op">=</span> np.inf,</span>
-<span id="cb23-12"><a href="#cb23-12" tabindex="-1"></a>    lonlat: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>,</span>
-<span id="cb23-13"><a href="#cb23-13" tabindex="-1"></a>    repeats: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb23-14"><a href="#cb23-14" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb23-15"><a href="#cb23-15" tabindex="-1"></a>)</span></code></pre></div>
-<p>Draw pseudo-absences from a pool of background units.</p>
-<p>Presence-only records give a response of ones. A model needs units
-where the response is zero, and these are drawn from <code>pool</code>,
-a mapping of column to array of background units that carry the same
-columns as the targets. The strategies are
-<code>bm_PseudoAbsences()</code>’s: <code>"random"</code> admits any
-unit of the pool that is not a presence; <code>"sre"</code> a unit
-outside the envelope of the presences, the band between the
-<code>quantile</code> and <code>1 - quantile</code> quantiles of each of
-the <code>env</code> columns over the presences, a unit being outside
-where it leaves the band in at least one column; <code>"disk"</code> a
-unit whose distance to the nearest presence lies between
-<code>dist_min</code> and <code>dist_max</code>, both included, on the
-two <code>coords</code> columns, planar in the units of the coordinates
-or in metres from longitude and latitude in degrees where
-<code>lonlat</code> is true, on a sphere of radius 6371008.8 m.</p>
-<p>A presence is never its own absence: a unit of the pool whose
-<code>id</code> is one of the presences’ is not a candidate. The units a
-strategy admits are the same in both languages; which <code>n</code> of
-them are drawn depends on the language’s generator, as the folds of
-<code>fold_map</code> do. The result is a mapping of column to array
-holding the drawn rows of the pool, with <code>set</code> (the draw,
-from 1) and <code>pseudo</code> (true) added; draw <code>r</code> uses
-<code>seed + r - 1</code>.</p>
-</div>
-<div class="section level2">
-<h2 id="simulate_records">
-<code>simulate_records()</code><a class="anchor" aria-label="anchor" href="#simulate_records"></a>
-</h2>
-<div class="sourceCode" id="cb24"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>simulate_records(</span>
-<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>    n: <span class="bu">int</span> <span class="op">=</span> <span class="dv">300</span>,</span>
-<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>    mechanism: <span class="bu">str</span> <span class="op">=</span> <span class="st">'none'</span>,</span>
-<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>    variables: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>,</span>
-<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>    prevalence: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.1</span>,</span>
-<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a>    auc: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.75</span>,</span>
-<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a>    from_: <span class="bu">str</span> <span class="op">=</span> <span class="st">'2021-09-01'</span>,</span>
-<span id="cb24-8"><a href="#cb24-8" tabindex="-1"></a>    days: <span class="bu">int</span> <span class="op">=</span> <span class="dv">365</span>,</span>
-<span id="cb24-9"><a href="#cb24-9" tabindex="-1"></a>    step_hours: <span class="bu">float</span> <span class="op">=</span> <span class="dv">3</span>,</span>
-<span id="cb24-10"><a href="#cb24-10" tabindex="-1"></a>    seasonal: <span class="bu">float</span> <span class="op">=</span> <span class="dv">8</span>,</span>
-<span id="cb24-11"><a href="#cb24-11" tabindex="-1"></a>    offset_sd: <span class="bu">float</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb24-12"><a href="#cb24-12" tabindex="-1"></a>    anomaly_sd: <span class="bu">float</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb24-13"><a href="#cb24-13" tabindex="-1"></a>    anomaly_days: <span class="bu">float</span> <span class="op">=</span> <span class="dv">2</span>,</span>
-<span id="cb24-14"><a href="#cb24-14" tabindex="-1"></a>    offset_effect: <span class="bu">float</span> <span class="op">=</span> <span class="dv">0</span>,</span>
-<span id="cb24-15"><a href="#cb24-15" tabindex="-1"></a>    sensor_sd: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.3</span>,</span>
-<span id="cb24-16"><a href="#cb24-16" tabindex="-1"></a>    year_start: <span class="bu">str</span> <span class="op">=</span> <span class="st">'09-01'</span>,</span>
-<span id="cb24-17"><a href="#cb24-17" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb24-18"><a href="#cb24-18" tabindex="-1"></a>    draw: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb24-19"><a href="#cb24-19" tabindex="-1"></a>)</span></code></pre></div>
-<p>Draw units carrying a record and a presence-absence response acting
-at one known grain.</p>
-<p>The response is driven by <code>g_ij = sum_t w_j(t) a_i(t)</code>, a
-weighted mean of unit <code>i</code>’s latent anomaly: the record with
-the shared seasonal cycle and the unit’s own offset taken out. The
-weights are constant within the bins of one grain and zero outside a
-short stretch of them, so the true grain is the coarsest grain at which
-<code>g</code> is still an exact linear functional of the
-representation. <code>"none"</code> draws the driver independently of
-the record; <code>"event"</code> reads three consecutive days,
-<code>"season"</code> one whole season, and <code>"lag"</code> four
-consecutive weeks under a geometric decay.</p>
-<p>The driver is standardised by its population mean and standard
-deviation, computed in closed form from the settings, and the response
-is <code>Bernoulli(expit(b0 + b1 z))</code> with <code>b0</code> and
-<code>b1</code> solved so the marginal prevalence is
-<code>prevalence</code> and the population area under the ROC curve of
-<code>z</code> is <code>auc</code>. <code>auc</code> is a ceiling no
-fitted model reaches.</p>
-<p><code>seed</code> fixes the design and <code>draw</code> the units,
-so two calls with one <code>seed</code> and two <code>draw</code> values
-are two samples of one population. <code>from_</code> is R’s
-<code>from</code>, renamed because <code>from</code> is a Python
-keyword.</p>
-</div>
-<div class="section level2">
-<h2 id="simulation">
-<code>Simulation</code><a class="anchor" aria-label="anchor" href="#simulation"></a>
-</h2>
-<div class="sourceCode" id="cb25"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a>Simulation(readings, y, driver, grain, weights, link, design, grain_stat, anchor)</span></code></pre></div>
-<p>A simulated record, its response, and everything the draw is
-reproducible from.</p>
-<p><code>readings</code> is the long table <code>grain_matrix</code>
-takes, as a mapping of <code>unit</code>, <code>time</code> and
-<code>reading</code>. <code>y</code> is the
-<code>[unit, variable]</code> 0/1 response and <code>driver</code> the
-standardised driver <code>z</code> behind it. <code>grain</code> is the
-true grain, or <code>None</code> where the response does not read the
-record. <code>weights</code> is the <code>[reading, variable]</code>
-matrix defining the driver, <code>link</code> the solved <code>b0</code>
-and <code>b1</code>, and <code>design</code> the settings of the
-draw.</p>
-<p>Attributes:</p>
-<ul>
-<li>
-<code>readings</code> - dict</li>
-<li>
-<code>y</code> - Response</li>
-<li>
-<code>driver</code> - np.ndarray</li>
-<li>
-<code>grain</code> - str | None</li>
-<li>
-<code>weights</code> - np.ndarray</li>
-<li>
-<code>link</code> - dict</li>
-<li>
-<code>design</code> - dict</li>
-<li>
-<code>grain_stat</code> - str</li>
-<li>
-<code>anchor</code> - np.ndarray</li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

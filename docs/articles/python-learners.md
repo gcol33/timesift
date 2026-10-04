@@ -3,6 +3,9 @@
 The arms that ship, how they are trained, and the interface a learner of
 your own goes through.
 
+[All of the Python
+reference](https://gillescolling.com/timesift/articles/python-reference.md)
+
 ## `elasticnet()`
 
 ``` python
@@ -110,6 +113,55 @@ search runs on the core the R package calls, so the two select the same
 terms and return the same coefficients; `threads` runs one step’s
 candidate fits at once and does not change what comes back.
 
+## `forest()`
+
+``` python
+forest(
+    data=None,
+    trees=None,
+    mtry=None,
+    min_node=None,
+    balance=False,
+    preset='package',
+    seed=1,
+    threads=1,
+)
+```
+
+One random forest per variable, over every bin-by-channel column: a
+probability forest under a presence-absence head and a regression forest
+under a head with a squared-error loss or a count head, a count being
+cut on its variance and a leaf reporting its mean. Trees split on one
+column at a time and pay nothing for columns that carry nothing, so a
+forest reads a wide tabular representation without a penalty path and
+without a selection step.
+
+Each tree is grown on a bootstrap draw of the units, as many draws as
+there are units, and each node is split on the best of `mtry` columns
+drawn for it, by the Gini index or the sum of squares `tree` splits by.
+A tree is grown out: a node is split while it holds at least twice
+`min_node` units and its responses differ. A leaf reports the share of
+presences among the draws it holds, or their mean, and the forest the
+mean over its trees. The forest is grown by the core the R package
+calls, and every draw comes from one generator seeded per tree, so the
+two languages grow the same forest on any number of threads.
+
+`balance=True` is the down-sampled forest biomod2 fits as `RFd`: each
+tree draws as many units from each class as the smaller class holds.
+
+`preset` says whose defaults the settings left `None` take. `"package"`
+is randomForest’s own, which is what biomod2’s default option set fits:
+500 trees, `mtry` the square root of the column count under
+presence-absence and a third of it under a squared-error loss, and
+`min_node` 1 and 5 under the two. `"bigboss"` is biomod2’s tuned option
+set: 500 trees, `mtry=2` and `min_node=5`. A setting given explicitly
+beats either, and an `mtry` above the column count is the column count.
+
+The case weights are the response head’s,
+`timesift.response.positive_weights` under presence-absence, and weight
+the bootstrap draw: a unit is drawn in proportion to its weight, and
+within its class under `balance`.
+
 ## `tree()`
 
 ``` python
@@ -168,55 +220,6 @@ whose coefficient of variation is `shrink`, `0` for none and rpart’s
 default `1`. A split is chosen on the deviance of the unshrunk rates,
 and a subtree’s risk, its complexity and the pruning’s cross-validated
 error are read on the shrunk ones.
-
-## `forest()`
-
-``` python
-forest(
-    data=None,
-    trees=None,
-    mtry=None,
-    min_node=None,
-    balance=False,
-    preset='package',
-    seed=1,
-    threads=1,
-)
-```
-
-One random forest per variable, over every bin-by-channel column: a
-probability forest under a presence-absence head and a regression forest
-under a head with a squared-error loss or a count head, a count being
-cut on its variance and a leaf reporting its mean. Trees split on one
-column at a time and pay nothing for columns that carry nothing, so a
-forest reads a wide tabular representation without a penalty path and
-without a selection step.
-
-Each tree is grown on a bootstrap draw of the units, as many draws as
-there are units, and each node is split on the best of `mtry` columns
-drawn for it, by the Gini index or the sum of squares `tree` splits by.
-A tree is grown out: a node is split while it holds at least twice
-`min_node` units and its responses differ. A leaf reports the share of
-presences among the draws it holds, or their mean, and the forest the
-mean over its trees. The forest is grown by the core the R package
-calls, and every draw comes from one generator seeded per tree, so the
-two languages grow the same forest on any number of threads.
-
-`balance=True` is the down-sampled forest biomod2 fits as `RFd`: each
-tree draws as many units from each class as the smaller class holds.
-
-`preset` says whose defaults the settings left `None` take. `"package"`
-is randomForest’s own, which is what biomod2’s default option set fits:
-500 trees, `mtry` the square root of the column count under
-presence-absence and a third of it under a squared-error loss, and
-`min_node` 1 and 5 under the two. `"bigboss"` is biomod2’s tuned option
-set: 500 trees, `mtry=2` and `min_node=5`. A setting given explicitly
-beats either, and an `mtry` above the column count is the column count.
-
-The case weights are the response head’s,
-`timesift.response.positive_weights` under presence-absence, and weight
-the bootstrap draw: a unit is drawn in proportion to its weight, and
-within its class under `balance`.
 
 ## `boosting()`
 
@@ -586,55 +589,6 @@ held out whole is predicted from its record and its place alone.
 Both languages call one C++ core, so the same input gives the same fit
 in either.
 
-## `tune()`
-
-``` python
-tune(learner, grid: dict | None = None, metric=None, inner: int = 5, seed: int = 1)
-```
-
-A learner that searches `grid` on the units it is fitted on and fits the
-best setting.
-
-The search is a cross-validation inside those units, so in a run the
-outer folds never see it: each fold chooses from its own training units,
-and the score it is then read at is not selected on. biomod2’s
-`BIOMOD_Tuning()` searches a grid per algorithm by the same device.
-
-With `grid` left unset the learner is searched over the grid registered
-under its name by `register_tuning`, which for the learners that ship is
-the one `BIOMOD_Tuning()` searches: `mtry` of a forest from 1 to the
-smaller of 10 and the number of columns; `trees`, `depth` and
-`shrinkage` of a gbm-style boosting, `shrinkage` and `colsample` of the
-second-order one; `degree` and `nprune` of `mars`; `degree` of
-`discriminant`; `regmult` of `maxnet`; `quantile` of `envelope`; and the
-layer width of `mlp` at 2, 4, 6 and 8. biomod2’s weight decay is a
-training setting here, which the control holds.
-
-A learner’s settings are the ones it carries as `params`. `grid` names
-some of them and gives the values to try, and the grid is every
-combination, the first setting varying fastest as in R, so a tie between
-two combinations falls to the same one on both sides. A setting is
-scored by the mean over the responses of the mean over inner folds of
-`metric` on the cells a score is defined on. The inner folds keep the
-grouping the outer fold map keeps whole. What was chosen is on the
-fitted model as `chosen` and `table` and in the `settings` column of a
-run’s candidate table.
-
-## `Tuned`
-
-``` python
-Tuned(model, chosen, table)
-```
-
-What a tuned learner fitted: the model, the setting chosen, and every
-setting’s score.
-
-Attributes:
-
-- `model` - object
-- `chosen` - dict
-- `table` - list
-
 ## `mlp()`
 
 ``` python
@@ -674,41 +628,6 @@ rescnn(
 
 Dilated residual blocks with channel gates, pooling average and maximum
 together.
-
-## `Learner`
-
-``` python
-Learner(name, fit, predict, needs, params, data, reads, multi)
-```
-
-A name, a fit and a predict, what has to be installed for them to run,
-and what the learner reads.
-
-The one interface every arm goes through, the ones that ship and a pair
-of your own alike. `data` pins the learner to one representation, or is
-`None` to run it across every representation offered. `reads` is whether
-it takes a tabular block or an ordered sequence of bins, and `multi` is
-whether one fitted model covers every response or one is fitted per
-response and the matrix assembled from them.
-
-Attributes:
-
-- `name` - str
-- `fit` - Callable
-- `predict` - Callable
-- `needs` - tuple\[str, …\]
-- `params` - dict
-- `data` - object
-- `reads` - str
-- `multi` - str
-
-### `require()`
-
-``` python
-require(self)
-```
-
-Error, naming the install, unless what the learner needs is importable.
 
 ## `train_control()`
 
@@ -780,6 +699,41 @@ override(self, settings: dict)
 The control with the settings a learner or a call gave applied on top of
 it.
 
+## `Learner`
+
+``` python
+Learner(name, fit, predict, needs, params, data, reads, multi)
+```
+
+A name, a fit and a predict, what has to be installed for them to run,
+and what the learner reads.
+
+The one interface every arm goes through, the ones that ship and a pair
+of your own alike. `data` pins the learner to one representation, or is
+`None` to run it across every representation offered. `reads` is whether
+it takes a tabular block or an ordered sequence of bins, and `multi` is
+whether one fitted model covers every response or one is fitted per
+response and the matrix assembled from them.
+
+Attributes:
+
+- `name` - str
+- `fit` - Callable
+- `predict` - Callable
+- `needs` - tuple\[str, …\]
+- `params` - dict
+- `data` - object
+- `reads` - str
+- `multi` - str
+
+### `require()`
+
+``` python
+require(self)
+```
+
+Error, naming the install, unless what the learner needs is importable.
+
 ## `flatten()`
 
 ``` python
@@ -794,3 +748,104 @@ own and is one predictor, read once: repeating it would put the same
 column in front of a penalised fit as often as the grain has bins, and
 give it that many chances of being drawn by a forest or picked by a
 forward search.
+
+## `register_learner()`
+
+``` python
+register_learner(name: str, constructor: Callable, overwrite: bool = False)
+```
+
+Make a learner available by name. The learners that ship are registered
+the same way.
+
+`constructor` is called with no arguments and returns a `Learner`, so a
+learner asked for by name is built with its own defaults.
+
+## `get_learner()`
+
+``` python
+get_learner(learner)
+```
+
+A `Learner`, whether it arrived as one or as the name of a registered
+one.
+
+## `learners()`
+
+``` python
+learners()
+```
+
+The learners registered under this session.
+
+## `tune()`
+
+``` python
+tune(learner, grid: dict | None = None, metric=None, inner: int = 5, seed: int = 1)
+```
+
+A learner that searches `grid` on the units it is fitted on and fits the
+best setting.
+
+The search is a cross-validation inside those units, so in a run the
+outer folds never see it: each fold chooses from its own training units,
+and the score it is then read at is not selected on. biomod2’s
+`BIOMOD_Tuning()` searches a grid per algorithm by the same device.
+
+With `grid` left unset the learner is searched over the grid registered
+under its name by `register_tuning`, which for the learners that ship is
+the one `BIOMOD_Tuning()` searches: `mtry` of a forest from 1 to the
+smaller of 10 and the number of columns; `trees`, `depth` and
+`shrinkage` of a gbm-style boosting, `shrinkage` and `colsample` of the
+second-order one; `degree` and `nprune` of `mars`; `degree` of
+`discriminant`; `regmult` of `maxnet`; `quantile` of `envelope`; and the
+layer width of `mlp` at 2, 4, 6 and 8. biomod2’s weight decay is a
+training setting here, which the control holds.
+
+A learner’s settings are the ones it carries as `params`. `grid` names
+some of them and gives the values to try, and the grid is every
+combination, the first setting varying fastest as in R, so a tie between
+two combinations falls to the same one on both sides. A setting is
+scored by the mean over the responses of the mean over inner folds of
+`metric` on the cells a score is defined on. The inner folds keep the
+grouping the outer fold map keeps whole. What was chosen is on the
+fitted model as `chosen` and `table` and in the `settings` column of a
+run’s candidate table.
+
+## `Tuned`
+
+``` python
+Tuned(model, chosen, table)
+```
+
+What a tuned learner fitted: the model, the setting chosen, and every
+setting’s score.
+
+Attributes:
+
+- `model` - object
+- `chosen` - dict
+- `table` - list
+
+## `register_tuning()`
+
+``` python
+register_tuning(name: str, grid, overwrite: bool = False)
+```
+
+Register the grid a learner is tuned over when `tune` is given none.
+
+`name` is the learner’s, as it reports under. `grid` is a dict of the
+values to try, or a function of `(learner, x)` returning one, where `x`
+is the representation the learner is fitted on: the second form is for a
+grid that depends on the data, as the number of columns does, or on a
+setting the learner carries. The grids of the learners that ship are
+registered the same way.
+
+## `tunings()`
+
+``` python
+tunings()
+```
+
+The learners a grid is registered for.

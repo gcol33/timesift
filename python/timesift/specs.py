@@ -53,6 +53,22 @@ class Representation:
     sequence: bool = True
     year_start: str = "09-01"
 
+    def __repr__(self) -> str:  # pragma: no cover - display only
+        lines = [f"<timesift representation> {self.label}",
+                 f"kind    : {self.kind} "
+                 + ("(a sequence)" if self.sequence else "(a block of features)")]
+        if self.kind == "grain":
+            lines.append("grain   : "
+                         + ("a supplied calendar" if callable(self.grain) else str(self.grain)))
+        if self.kind == "multigrain":
+            lines.append("grains  : " + ("chosen from the record" if self.grains is None
+                                         else ", ".join(self.grains)))
+        if self.kind == "lookback":
+            lines.append(f"span    : {self.span} in {self.bins} bin{'' if self.bins == 1 else 's'} "
+                         f"ending {self.lag} before the target")
+        lines.append("stats   : " + ", ".join(self.stats))
+        return "\n".join(lines)
+
 
 def native(stats="mean", year_start="09-01") -> Representation:
     """The record unreduced: one bin per reading."""

@@ -55,23 +55,20 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-r">
 <li><a class="dropdown-item" href="../articles/timesift.html">Get started</a></li>
     <li><a class="dropdown-item" href="../reference/index.html">Reference</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><a class="dropdown-item" href="../articles/reproducing-schrankogel.html">Reproducing the study</a></li>
-    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-python" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Python</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-python">
-<li><a class="dropdown-item" href="../articles/python.html">Overview</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><a class="dropdown-item" href="../articles/python-representation.html">The representation</a></li>
-    <li><a class="dropdown-item" href="../articles/python-split.html">The split and the cells</a></li>
-    <li><a class="dropdown-item" href="../articles/python-fitting.html">Fitting</a></li>
-    <li><a class="dropdown-item" href="../articles/python-learners.html">Learners</a></li>
-    <li><a class="dropdown-item" href="../articles/python-scoring.html">Scoring and comparison</a></li>
-    <li><a class="dropdown-item" href="../articles/python-extending.html">Extending</a></li>
-    <li><a class="dropdown-item" href="../articles/python-artifacts.html">What crosses the boundary</a></li>
+<li><a class="dropdown-item" href="../articles/python.html">Get started</a></li>
+    <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
+  </ul>
+</li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="../articles/reproducing-schrankogel.html">Reproducing the study</a></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../articles/contract.html">Contract</a></li>
@@ -115,6 +112,7 @@
 <!-- Written by tools/python_reference.py from the Python sources. Do not edit. -->
 <p>The arms that ship, how they are trained, and the interface a learner
 of your own goes through.</p>
+<p><a href="python-reference.html">All of the Python reference</a></p>
 <div class="section level2">
 <h2 id="elasticnet">
 <code>elasticnet()</code><a class="anchor" aria-label="anchor" href="#elasticnet"></a>
@@ -218,21 +216,69 @@ one step’s candidate fits at once and does not change what comes
 back.</p>
 </div>
 <div class="section level2">
+<h2 id="forest">
+<code>forest()</code><a class="anchor" aria-label="anchor" href="#forest"></a>
+</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>forest(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    trees<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    mtry<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    min_node<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    balance<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'package'</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>)</span></code></pre></div>
+<p>One random forest per variable, over every bin-by-channel column: a
+probability forest under a presence-absence head and a regression forest
+under a head with a squared-error loss or a count head, a count being
+cut on its variance and a leaf reporting its mean. Trees split on one
+column at a time and pay nothing for columns that carry nothing, so a
+forest reads a wide tabular representation without a penalty path and
+without a selection step.</p>
+<p>Each tree is grown on a bootstrap draw of the units, as many draws as
+there are units, and each node is split on the best of <code>mtry</code>
+columns drawn for it, by the Gini index or the sum of squares
+<code>tree</code> splits by. A tree is grown out: a node is split while
+it holds at least twice <code>min_node</code> units and its responses
+differ. A leaf reports the share of presences among the draws it holds,
+or their mean, and the forest the mean over its trees. The forest is
+grown by the core the R package calls, and every draw comes from one
+generator seeded per tree, so the two languages grow the same forest on
+any number of threads.</p>
+<p><code>balance=True</code> is the down-sampled forest biomod2 fits as
+<code>RFd</code>: each tree draws as many units from each class as the
+smaller class holds.</p>
+<p><code>preset</code> says whose defaults the settings left
+<code>None</code> take. <code>"package"</code> is randomForest’s own,
+which is what biomod2’s default option set fits: 500 trees,
+<code>mtry</code> the square root of the column count under
+presence-absence and a third of it under a squared-error loss, and
+<code>min_node</code> 1 and 5 under the two. <code>"bigboss"</code> is
+biomod2’s tuned option set: 500 trees, <code>mtry=2</code> and
+<code>min_node=5</code>. A setting given explicitly beats either, and an
+<code>mtry</code> above the column count is the column count.</p>
+<p>The case weights are the response head’s,
+<code>timesift.response.positive_weights</code> under presence-absence,
+and weight the bootstrap draw: a unit is drawn in proportion to its
+weight, and within its class under <code>balance</code>.</p>
+</div>
+<div class="section level2">
 <h2 id="tree">
 <code>tree()</code><a class="anchor" aria-label="anchor" href="#tree"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>tree(</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    min_split<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    min_leaf<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    cp<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    max_depth<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    prune<span class="op">=</span><span class="st">'se_sum'</span>,</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'package'</span>,</span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>    shrink<span class="op">=</span><span class="fl">1.0</span>,</span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>tree(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    min_split<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    min_leaf<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    cp<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    max_depth<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    prune<span class="op">=</span><span class="st">'se_sum'</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'package'</span>,</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>    shrink<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>)</span></code></pre></div>
 <p>One classification or regression tree per variable, over every
 bin-by-channel column, grown under rpart’s rules: the Gini index under a
 presence-absence head, the sum of squares under a head with a
@@ -276,54 +322,6 @@ gamma prior whose coefficient of variation is <code>shrink</code>,
 chosen on the deviance of the unshrunk rates, and a subtree’s risk, its
 complexity and the pruning’s cross-validated error are read on the
 shrunk ones.</p>
-</div>
-<div class="section level2">
-<h2 id="forest">
-<code>forest()</code><a class="anchor" aria-label="anchor" href="#forest"></a>
-</h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>forest(</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    trees<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    mtry<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    min_node<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    balance<span class="op">=</span><span class="va">False</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'package'</span>,</span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>)</span></code></pre></div>
-<p>One random forest per variable, over every bin-by-channel column: a
-probability forest under a presence-absence head and a regression forest
-under a head with a squared-error loss or a count head, a count being
-cut on its variance and a leaf reporting its mean. Trees split on one
-column at a time and pay nothing for columns that carry nothing, so a
-forest reads a wide tabular representation without a penalty path and
-without a selection step.</p>
-<p>Each tree is grown on a bootstrap draw of the units, as many draws as
-there are units, and each node is split on the best of <code>mtry</code>
-columns drawn for it, by the Gini index or the sum of squares
-<code>tree</code> splits by. A tree is grown out: a node is split while
-it holds at least twice <code>min_node</code> units and its responses
-differ. A leaf reports the share of presences among the draws it holds,
-or their mean, and the forest the mean over its trees. The forest is
-grown by the core the R package calls, and every draw comes from one
-generator seeded per tree, so the two languages grow the same forest on
-any number of threads.</p>
-<p><code>balance=True</code> is the down-sampled forest biomod2 fits as
-<code>RFd</code>: each tree draws as many units from each class as the
-smaller class holds.</p>
-<p><code>preset</code> says whose defaults the settings left
-<code>None</code> take. <code>"package"</code> is randomForest’s own,
-which is what biomod2’s default option set fits: 500 trees,
-<code>mtry</code> the square root of the column count under
-presence-absence and a third of it under a squared-error loss, and
-<code>min_node</code> 1 and 5 under the two. <code>"bigboss"</code> is
-biomod2’s tuned option set: 500 trees, <code>mtry=2</code> and
-<code>min_node=5</code>. A setting given explicitly beats either, and an
-<code>mtry</code> above the column count is the column count.</p>
-<p>The case weights are the response head’s,
-<code>timesift.response.positive_weights</code> under presence-absence,
-and weight the bootstrap draw: a unit is drawn in proportion to its
-weight, and within its class under <code>balance</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="boosting">
@@ -693,10 +691,203 @@ record and its place alone.</p>
 fit in either.</p>
 </div>
 <div class="section level2">
+<h2 id="mlp">
+<code>mlp()</code><a class="anchor" aria-label="anchor" href="#mlp"></a>
+</h2>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>mlp(data<span class="op">=</span><span class="va">None</span>, hidden<span class="op">=</span>(<span class="dv">512</span>, <span class="dv">256</span>), dropout<span class="op">=</span><span class="fl">0.3</span>, activation<span class="op">=</span><span class="st">'relu'</span>, <span class="op">**</span>settings)</span></code></pre></div>
+<p>Flattens the channels and builds in no temporal geometry.</p>
+<p><code>hidden</code>, <code>dropout</code> and <code>activation</code>
+(<code>"relu"</code>, <code>"gelu"</code> or <code>"selu"</code>) are
+the architecture; anything else named is a training setting applied on
+top of the <code><a href="../reference/train_control.html">train_control()</a></code> the learner is fitted under.</p>
+</div>
+<div class="section level2">
+<h2 id="cnn">
+<code>cnn()</code><a class="anchor" aria-label="anchor" href="#cnn"></a>
+</h2>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>cnn(data<span class="op">=</span><span class="va">None</span>, channels<span class="op">=</span>(<span class="dv">16</span>, <span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>), kernel<span class="op">=</span><span class="dv">7</span>, dropout<span class="op">=</span><span class="fl">0.3</span>, <span class="op">**</span>settings)</span></code></pre></div>
+<p>Convolution, batch normalisation, activation and pooling, then global
+average pooling.</p>
+</div>
+<div class="section level2">
+<h2 id="rescnn">
+<code>rescnn()</code><a class="anchor" aria-label="anchor" href="#rescnn"></a>
+</h2>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>rescnn(</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>    channels<span class="op">=</span>(<span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>, <span class="dv">256</span>),</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>    blocks_per_stage<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>    kernel<span class="op">=</span><span class="dv">7</span>,</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>    dilations<span class="op">=</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>),</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>    dropout<span class="op">=</span><span class="fl">0.3</span>,</span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>    <span class="op">**</span>settings,</span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>)</span></code></pre></div>
+<p>Dilated residual blocks with channel gates, pooling average and
+maximum together.</p>
+</div>
+<div class="section level2">
+<h2 id="train_control">
+<code>train_control()</code><a class="anchor" aria-label="anchor" href="#train_control"></a>
+</h2>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>train_control(<span class="op">**</span>settings)</span></code></pre></div>
+<p>The settings every neural learner reads, with anything named here
+replacing its default.</p>
+<p><code>epochs</code>, <code>batch_size</code>,
+<code>learning_rate</code>, <code>weight_decay</code>,
+<code>early_stopping</code>, <code>val_frac</code>, <code>device</code>
+and <code>seed</code> are the settings a run is described by, and
+<code>swa</code> with <code>swa_start</code> average the weights over
+the tail of the schedule rather than keeping one epoch out of it. What a
+rare response weighs is the response head’s, not a training setting.</p>
+<p><code>batch_size</code> is the most targets an optimiser step reads:
+the fitting targets are cut into as few batches of at most that many as
+they divide into, of as equal a length as they can be.
+<code>val_frac</code> is held back from every fit alike by a plain
+random permutation, the fit on all targets a run ends with included, and
+<code>early_stopping</code> is read only on that set. At the default of
+0 nothing is held back: every fitting target is trained on, the whole
+budget runs, and the fit keeps the last epoch, where the cosine schedule
+has annealed the learning rate to zero.</p>
+<p><code>device</code> is <code>"auto"</code> for the graphics processor
+where there is one, NVIDIA’s or Apple’s, or the name of a device to
+train on. A fitted encoder carries the setting rather than the device it
+resolved to, so a fit made on one machine predicts on another.</p>
+</div>
+<div class="section level2">
+<h2 id="TrainControl">
+<code>TrainControl</code><a class="anchor" aria-label="anchor" href="#TrainControl"></a>
+</h2>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>TrainControl(</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>    epochs,</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>    batch_size,</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>    learning_rate,</span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>    weight_decay,</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>    early_stopping,</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>    val_frac,</span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>    device,</span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>    seed,</span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a>    swa,</span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a>    swa_start,</span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a>)</span></code></pre></div>
+<p>How long to train, on what, and when to stop.</p>
+<p>Attributes:</p>
+<ul>
+<li>
+<code>epochs</code> - int</li>
+<li>
+<code>batch_size</code> - int</li>
+<li>
+<code>learning_rate</code> - float</li>
+<li>
+<code>weight_decay</code> - float</li>
+<li>
+<code>early_stopping</code> - int</li>
+<li>
+<code>val_frac</code> - float</li>
+<li>
+<code>device</code> - str</li>
+<li>
+<code>seed</code> - int</li>
+<li>
+<code>swa</code> - bool</li>
+<li>
+<code>swa_start</code> - float</li>
+</ul>
+<div class="section level3">
+<h3 id="TrainControl-override">
+<code>override()</code><a class="anchor" aria-label="anchor" href="#TrainControl-override"></a>
+</h3>
+<div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>override(<span class="va">self</span>, settings: <span class="bu">dict</span>)</span></code></pre></div>
+<p>The control with the settings a learner or a call gave applied on top
+of it.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="Learner">
+<code>Learner</code><a class="anchor" aria-label="anchor" href="#Learner"></a>
+</h2>
+<div class="sourceCode" id="cb18"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>Learner(name, fit, predict, needs, params, data, reads, multi)</span></code></pre></div>
+<p>A name, a fit and a predict, what has to be installed for them to
+run, and what the learner reads.</p>
+<p>The one interface every arm goes through, the ones that ship and a
+pair of your own alike. <code>data</code> pins the learner to one
+representation, or is <code>None</code> to run it across every
+representation offered. <code>reads</code> is whether it takes a tabular
+block or an ordered sequence of bins, and <code>multi</code> is whether
+one fitted model covers every response or one is fitted per response and
+the matrix assembled from them.</p>
+<p>Attributes:</p>
+<ul>
+<li>
+<code>name</code> - str</li>
+<li>
+<code>fit</code> - Callable</li>
+<li>
+<code>predict</code> - Callable</li>
+<li>
+<code>needs</code> - tuple[str, …]</li>
+<li>
+<code>params</code> - dict</li>
+<li>
+<code>data</code> - object</li>
+<li>
+<code>reads</code> - str</li>
+<li>
+<code>multi</code> - str</li>
+</ul>
+<div class="section level3">
+<h3 id="Learner-require">
+<code>require()</code><a class="anchor" aria-label="anchor" href="#Learner-require"></a>
+</h3>
+<div class="sourceCode" id="cb19"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>require(<span class="va">self</span>)</span></code></pre></div>
+<p>Error, naming the install, unless what the learner needs is
+importable.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="flatten">
+<code>flatten()</code><a class="anchor" aria-label="anchor" href="#flatten"></a>
+</h2>
+<div class="sourceCode" id="cb20"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>flatten(x: TimesiftMatrix)</span></code></pre></div>
+<p><code>[unit, bin, channel]</code> to
+<code>[unit, bin * channel]</code> in the array’s own order.</p>
+<p>A channel that holds the same number in every bin carries no bin of
+its own and is one predictor, read once: repeating it would put the same
+column in front of a penalised fit as often as the grain has bins, and
+give it that many chances of being drawn by a forest or picked by a
+forward search.</p>
+</div>
+<div class="section level2">
+<h2 id="register_learner">
+<code>register_learner()</code><a class="anchor" aria-label="anchor" href="#register_learner"></a>
+</h2>
+<div class="sourceCode" id="cb21"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>register_learner(name: <span class="bu">str</span>, constructor: Callable, overwrite: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>)</span></code></pre></div>
+<p>Make a learner available by name. The learners that ship are
+registered the same way.</p>
+<p><code>constructor</code> is called with no arguments and returns a
+<code>Learner</code>, so a learner asked for by name is built with its
+own defaults.</p>
+</div>
+<div class="section level2">
+<h2 id="get_learner">
+<code>get_learner()</code><a class="anchor" aria-label="anchor" href="#get_learner"></a>
+</h2>
+<div class="sourceCode" id="cb22"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>get_learner(learner)</span></code></pre></div>
+<p>A <code>Learner</code>, whether it arrived as one or as the name of a
+registered one.</p>
+</div>
+<div class="section level2">
+<h2 id="learners">
+<code>learners()</code><a class="anchor" aria-label="anchor" href="#learners"></a>
+</h2>
+<div class="sourceCode" id="cb23"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>learners()</span></code></pre></div>
+<p>The learners registered under this session.</p>
+</div>
+<div class="section level2">
 <h2 id="tune">
 <code>tune()</code><a class="anchor" aria-label="anchor" href="#tune"></a>
 </h2>
-<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>tune(learner, grid: <span class="bu">dict</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>, metric<span class="op">=</span><span class="va">None</span>, inner: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>, seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>tune(learner, grid: <span class="bu">dict</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>, metric<span class="op">=</span><span class="va">None</span>, inner: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>, seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>)</span></code></pre></div>
 <p>A learner that searches <code>grid</code> on the units it is fitted
 on and fits the best setting.</p>
 <p>The search is a cross-validation inside those units, so in a run the
@@ -728,10 +919,10 @@ What was chosen is on the fitted model as <code>chosen</code> and
 candidate table.</p>
 </div>
 <div class="section level2">
-<h2 id="tuned">
-<code>Tuned</code><a class="anchor" aria-label="anchor" href="#tuned"></a>
+<h2 id="Tuned">
+<code>Tuned</code><a class="anchor" aria-label="anchor" href="#Tuned"></a>
 </h2>
-<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>Tuned(model, chosen, table)</span></code></pre></div>
+<div class="sourceCode" id="cb25"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a>Tuned(model, chosen, table)</span></code></pre></div>
 <p>What a tuned learner fitted: the model, the setting chosen, and every
 setting’s score.</p>
 <p>Attributes:</p>
@@ -745,171 +936,26 @@ setting’s score.</p>
 </ul>
 </div>
 <div class="section level2">
-<h2 id="mlp">
-<code>mlp()</code><a class="anchor" aria-label="anchor" href="#mlp"></a>
+<h2 id="register_tuning">
+<code>register_tuning()</code><a class="anchor" aria-label="anchor" href="#register_tuning"></a>
 </h2>
-<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>mlp(data<span class="op">=</span><span class="va">None</span>, hidden<span class="op">=</span>(<span class="dv">512</span>, <span class="dv">256</span>), dropout<span class="op">=</span><span class="fl">0.3</span>, activation<span class="op">=</span><span class="st">'relu'</span>, <span class="op">**</span>settings)</span></code></pre></div>
-<p>Flattens the channels and builds in no temporal geometry.</p>
-<p><code>hidden</code>, <code>dropout</code> and <code>activation</code>
-(<code>"relu"</code>, <code>"gelu"</code> or <code>"selu"</code>) are
-the architecture; anything else named is a training setting applied on
-top of the <code><a href="../reference/train_control.html">train_control()</a></code> the learner is fitted under.</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a>register_tuning(name: <span class="bu">str</span>, grid, overwrite: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>)</span></code></pre></div>
+<p>Register the grid a learner is tuned over when <code>tune</code> is
+given none.</p>
+<p><code>name</code> is the learner’s, as it reports under.
+<code>grid</code> is a dict of the values to try, or a function of
+<code>(learner, x)</code> returning one, where <code>x</code> is the
+representation the learner is fitted on: the second form is for a grid
+that depends on the data, as the number of columns does, or on a setting
+the learner carries. The grids of the learners that ship are registered
+the same way.</p>
 </div>
 <div class="section level2">
-<h2 id="cnn">
-<code>cnn()</code><a class="anchor" aria-label="anchor" href="#cnn"></a>
+<h2 id="tunings">
+<code>tunings()</code><a class="anchor" aria-label="anchor" href="#tunings"></a>
 </h2>
-<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>cnn(data<span class="op">=</span><span class="va">None</span>, channels<span class="op">=</span>(<span class="dv">16</span>, <span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>), kernel<span class="op">=</span><span class="dv">7</span>, dropout<span class="op">=</span><span class="fl">0.3</span>, <span class="op">**</span>settings)</span></code></pre></div>
-<p>Convolution, batch normalisation, activation and pooling, then global
-average pooling.</p>
-</div>
-<div class="section level2">
-<h2 id="rescnn">
-<code>rescnn()</code><a class="anchor" aria-label="anchor" href="#rescnn"></a>
-</h2>
-<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>rescnn(</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>    channels<span class="op">=</span>(<span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>, <span class="dv">256</span>),</span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>    blocks_per_stage<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>    kernel<span class="op">=</span><span class="dv">7</span>,</span>
-<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>    dilations<span class="op">=</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>),</span>
-<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>    dropout<span class="op">=</span><span class="fl">0.3</span>,</span>
-<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>    <span class="op">**</span>settings,</span>
-<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>)</span></code></pre></div>
-<p>Dilated residual blocks with channel gates, pooling average and
-maximum together.</p>
-</div>
-<div class="section level2">
-<h2 id="learner">
-<code>Learner</code><a class="anchor" aria-label="anchor" href="#learner"></a>
-</h2>
-<div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>Learner(name, fit, predict, needs, params, data, reads, multi)</span></code></pre></div>
-<p>A name, a fit and a predict, what has to be installed for them to
-run, and what the learner reads.</p>
-<p>The one interface every arm goes through, the ones that ship and a
-pair of your own alike. <code>data</code> pins the learner to one
-representation, or is <code>None</code> to run it across every
-representation offered. <code>reads</code> is whether it takes a tabular
-block or an ordered sequence of bins, and <code>multi</code> is whether
-one fitted model covers every response or one is fitted per response and
-the matrix assembled from them.</p>
-<p>Attributes:</p>
-<ul>
-<li>
-<code>name</code> - str</li>
-<li>
-<code>fit</code> - Callable</li>
-<li>
-<code>predict</code> - Callable</li>
-<li>
-<code>needs</code> - tuple[str, …]</li>
-<li>
-<code>params</code> - dict</li>
-<li>
-<code>data</code> - object</li>
-<li>
-<code>reads</code> - str</li>
-<li>
-<code>multi</code> - str</li>
-</ul>
-<div class="section level3">
-<h3 id="require">
-<code>require()</code><a class="anchor" aria-label="anchor" href="#require"></a>
-</h3>
-<div class="sourceCode" id="cb18"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>require(<span class="va">self</span>)</span></code></pre></div>
-<p>Error, naming the install, unless what the learner needs is
-importable.</p>
-</div>
-</div>
-<div class="section level2">
-<h2 id="train_control">
-<code>train_control()</code><a class="anchor" aria-label="anchor" href="#train_control"></a>
-</h2>
-<div class="sourceCode" id="cb19"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>train_control(<span class="op">**</span>settings)</span></code></pre></div>
-<p>The settings every neural learner reads, with anything named here
-replacing its default.</p>
-<p><code>epochs</code>, <code>batch_size</code>,
-<code>learning_rate</code>, <code>weight_decay</code>,
-<code>early_stopping</code>, <code>val_frac</code>, <code>device</code>
-and <code>seed</code> are the settings a run is described by, and
-<code>swa</code> with <code>swa_start</code> average the weights over
-the tail of the schedule rather than keeping one epoch out of it. What a
-rare response weighs is the response head’s, not a training setting.</p>
-<p><code>batch_size</code> is the most targets an optimiser step reads:
-the fitting targets are cut into as few batches of at most that many as
-they divide into, of as equal a length as they can be.
-<code>val_frac</code> is held back from every fit alike by a plain
-random permutation, the fit on all targets a run ends with included, and
-<code>early_stopping</code> is read only on that set. At the default of
-0 nothing is held back: every fitting target is trained on, the whole
-budget runs, and the fit keeps the last epoch, where the cosine schedule
-has annealed the learning rate to zero.</p>
-<p><code>device</code> is <code>"auto"</code> for the graphics processor
-where there is one, NVIDIA’s or Apple’s, or the name of a device to
-train on. A fitted encoder carries the setting rather than the device it
-resolved to, so a fit made on one machine predicts on another.</p>
-</div>
-<div class="section level2">
-<h2 id="traincontrol">
-<code>TrainControl</code><a class="anchor" aria-label="anchor" href="#traincontrol"></a>
-</h2>
-<div class="sourceCode" id="cb20"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>TrainControl(</span>
-<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>    epochs,</span>
-<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>    batch_size,</span>
-<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>    learning_rate,</span>
-<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>    weight_decay,</span>
-<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>    early_stopping,</span>
-<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a>    val_frac,</span>
-<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a>    device,</span>
-<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a>    seed,</span>
-<span id="cb20-10"><a href="#cb20-10" tabindex="-1"></a>    swa,</span>
-<span id="cb20-11"><a href="#cb20-11" tabindex="-1"></a>    swa_start,</span>
-<span id="cb20-12"><a href="#cb20-12" tabindex="-1"></a>)</span></code></pre></div>
-<p>How long to train, on what, and when to stop.</p>
-<p>Attributes:</p>
-<ul>
-<li>
-<code>epochs</code> - int</li>
-<li>
-<code>batch_size</code> - int</li>
-<li>
-<code>learning_rate</code> - float</li>
-<li>
-<code>weight_decay</code> - float</li>
-<li>
-<code>early_stopping</code> - int</li>
-<li>
-<code>val_frac</code> - float</li>
-<li>
-<code>device</code> - str</li>
-<li>
-<code>seed</code> - int</li>
-<li>
-<code>swa</code> - bool</li>
-<li>
-<code>swa_start</code> - float</li>
-</ul>
-<div class="section level3">
-<h3 id="override">
-<code>override()</code><a class="anchor" aria-label="anchor" href="#override"></a>
-</h3>
-<div class="sourceCode" id="cb21"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>override(<span class="va">self</span>, settings: <span class="bu">dict</span>)</span></code></pre></div>
-<p>The control with the settings a learner or a call gave applied on top
-of it.</p>
-</div>
-</div>
-<div class="section level2">
-<h2 id="flatten">
-<code>flatten()</code><a class="anchor" aria-label="anchor" href="#flatten"></a>
-</h2>
-<div class="sourceCode" id="cb22"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>flatten(x: TimesiftMatrix)</span></code></pre></div>
-<p><code>[unit, bin, channel]</code> to
-<code>[unit, bin * channel]</code> in the array’s own order.</p>
-<p>A channel that holds the same number in every bin carries no bin of
-its own and is one predictor, read once: repeating it would put the same
-column in front of a penalised fit as often as the grain has bins, and
-give it that many chances of being drawn by a forest or picked by a
-forward search.</p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>tunings()</span></code></pre></div>
+<p>The learners a grid is registered for.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

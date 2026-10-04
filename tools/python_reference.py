@@ -1,8 +1,10 @@
 """Write the Python reference pages of the pkgdown site from the Python sources.
 
 Reads ``python/timesift/*.py`` with ``ast`` rather than importing it, so the pages can be
-written without the compiled core on the machine, and emits one article per section of
-``_pkgdown.yml``'s reference index, so the two languages are read in the same order.
+written without the compiled core on the machine. The reference is laid out as the R one is: one
+page per section of ``_pkgdown.yml``'s reference index, carrying that section's title and
+description, and an index page listing every section and every name, so the two languages are
+read in the same order and under the same headings.
 
     python tools/python_reference.py            write the pages
     python tools/python_reference.py --check    exit 1 if what is on disk differs
@@ -19,111 +21,92 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "python" / "timesift"
 DEST = ROOT / "vignettes" / "articles"
+PKGDOWN = ROOT / "_pkgdown.yml"
 
 UNDOCUMENTED: list[str] = []
 
 BANNER = "<!-- Written by tools/python_reference.py from the Python sources. Do not edit. -->"
+INDEX = "python-reference"
 
-# Each section is one article, and carries the symbols of the matching section of the R
-# reference index. Every name in `timesift.__all__` belongs to exactly one of them; the script
+# One entry per section of the R reference index, keyed by its title and in its order; the title
+# and the description are read from `_pkgdown.yml`, so a section renamed there is renamed here or
+# the script stops. Every name in `timesift.__all__` belongs to exactly one section; the script
 # stops if one is missing or listed twice.
 SECTIONS = (
-    dict(
-        slug="python-representation",
-        title="Python: the representation",
-        desc="What a representation is before any record has been read, and the array it becomes.",
-        names=("native", "grain", "multigrain", "lookback", "grains", "lookbacks",
-               "Representation", "Sift", "as_sift", "expand_sift", "auto_grains",
-               "build_representation", "grain_matrix", "lookback_matrix", "coverage",
-               "timesift_set", "calendar_channels", "bind_channels", "feature_matrix",
-               "TimesiftMatrix", "TimesiftSet", "Coverage", "GRAINS", "STATS",
-               "DAY_LEVEL_STATS"),
-    ),
-    dict(
-        slug="python-split",
-        title="Python: the split and the cells",
-        desc="One fold map read by everything that scores, and the cells a score is defined on, "
-             "computed with no model involved.",
-        names=("cv", "grouped_cv", "block_cv", "env_cv", "Resampling", "as_resampling", "resolve_folds", "fold_map",
-               "scorable_cells", "align_folds", "as_response", "Response", "Folds", "Cells",
-               "PRESENCE_ABSENCE", "CONTINUOUS", "ABUNDANCE", "ORDINAL", "COUNT",
-               "positive_weights"),
-    ),
-    dict(
-        slug="python-fitting",
-        title="Python: fitting",
-        desc="The run from targets and series, the combiner over its candidates, and fitting "
-             "across a set of grains on its own.",
-        names=("timesift", "Timesift", "TimesiftSpec", "n_targets",
-               "target_labels", "select_columns", "column_names", "summary", "candidate_table",
-               "procedure_table", "ensemble", "ensemble_fit", "ensemble_combine",
-               "ensemble_spread", "SPREAD_STATISTICS", "ensemble_weights", "EnsembleSpec", "Stack",
-               "grain_ladder", "fit_learner", "select_grain", "Ladder", "Fit", "Selection", "plot"),
-    ),
-    dict(
-        slug="python-learners",
-        title="Python: learners",
-        desc="The arms that ship, how they are trained, and the interface a learner of your own "
-             "goes through.",
-        names=("elasticnet", "stepwise", "tree", "forest", "boosting", "maxnet", "envelope", "mars",
-               "discriminant", "additive", "hierarchical", "tune", "Tuned",
-               "mlp", "cnn", "rescnn", "Learner", "train_control", "TrainControl", "flatten"),
-    ),
-    dict(
-        slug="python-scoring",
-        title="Python: scoring and comparison",
-        desc="The metrics, the paired contrast between two arms on matched cells, every grain "
-             "against a learner's best, the inflation of a score read at its own best threshold, "
-             "what a fitted model read, and a record with a planted grain to test all of it on.",
-        names=("tss", "roc_auc", "average_precision", "kappa_score", "table_metric", "boyce_index", "regression_metric", "ordinal_metric",
-               "cohen_kappa", "decision_threshold",
-               "model_agreement", "score_predictions", "paired_contrast", "grain_contrasts",
-               "tss_inflation", "implied_skill", "occlusion", "response_curve", "ResponseCurve", "project", "range_change",
-               "RangeChange", "pseudo_absences", "simulate_records", "Simulation"),
-    ),
-    dict(
-        slug="python-extending",
-        title="Python: extending",
-        desc="The response head and the metric are registrations, never a fork of the fitting "
-             "code.",
-        names=("register_learner", "register_metric", "register_response", "register_tuning", "tunings",
-               "learners", "metrics",
-               "responses", "get_learner", "resolve_metric"),
-    ),
-    dict(
-        slug="python-artifacts",
-        title="Python: what crosses the boundary",
-        desc="The three artifacts a split is carried in, and the digest that says two arrays are "
-             "the same array.",
-        names=("write_folds", "read_folds", "write_response", "read_response", "write_cells",
-               "read_cells", "digest_array"),
-    ),
+    ("The one call", "python-one-call",
+     ("timesift", "Timesift", "TimesiftSpec", "summary", "candidate_table", "procedure_table",
+      "plot", "project", "range_change", "RangeChange", "pseudo_absences", "select_columns",
+      "column_names", "n_targets", "target_labels")),
+    ("Representations", "python-representations",
+     ("native", "grain", "multigrain", "lookback", "grains", "lookbacks", "Representation",
+      "Sift", "as_sift", "expand_sift", "auto_grains", "build_representation")),
+    ("Learners", "python-learners",
+     ("elasticnet", "stepwise", "forest", "tree", "boosting", "maxnet", "envelope", "mars",
+      "discriminant", "additive", "hierarchical", "mlp", "cnn", "rescnn", "train_control",
+      "TrainControl", "Learner", "flatten", "register_learner", "get_learner", "learners", "tune",
+      "Tuned", "register_tuning", "tunings")),
+    ("The split and the cells", "python-split",
+     ("cv", "grouped_cv", "block_cv", "env_cv", "Resampling", "as_resampling", "resolve_folds",
+      "fold_map", "scorable_cells", "align_folds", "Folds", "Cells")),
+    ("Combining the candidates", "python-combining",
+     ("ensemble", "ensemble_fit", "ensemble_combine", "ensemble_spread", "SPREAD_STATISTICS",
+      "ensemble_weights", "EnsembleSpec", "Stack")),
+    ("Scoring and comparison", "python-scoring",
+     ("tss", "roc_auc", "average_precision", "kappa_score", "table_metric", "boyce_index",
+      "regression_metric", "ordinal_metric", "cohen_kappa", "decision_threshold",
+      "model_agreement", "score_predictions", "paired_contrast", "grain_contrasts",
+      "tss_inflation", "implied_skill", "occlusion", "response_curve", "ResponseCurve")),
+    ("The arrays themselves", "python-arrays",
+     ("grain_matrix", "lookback_matrix", "coverage", "Coverage", "timesift_set",
+      "calendar_channels", "bind_channels", "feature_matrix", "TimesiftMatrix", "TimesiftSet",
+      "GRAINS", "STATS", "DAY_LEVEL_STATS")),
+    ("One grain at a time", "python-ladder",
+     ("grain_ladder", "fit_learner", "Fit", "Ladder", "select_grain", "Selection")),
+    ("Extending", "python-extending",
+     ("register_response", "responses", "as_response", "Response", "PRESENCE_ABSENCE",
+      "CONTINUOUS", "ABUNDANCE", "ORDINAL", "COUNT", "positive_weights", "register_metric",
+      "metrics", "resolve_metric")),
+    ("What crosses the boundary", "python-artifacts",
+     ("write_folds", "read_folds", "write_response", "read_response", "write_cells",
+      "read_cells", "digest_array")),
+    ("A record to test on", "python-simulate",
+     ("simulate_records", "Simulation")),
 )
 
-OVERVIEW = """`timesift()` here and `timesift()` in R take the same two tables and do the same
-thing: build every candidate representation, fit the learners that can read each one, score them
-all on one set of held-out folds, and stack the out-of-fold predictions. The binning, the
-statistics and the array assembly are `src/`, compiled into both languages and answering to
-[the representation contract](contract.html), and the fixtures under `inst/spec/fixtures/` hold the
-two to the same numbers.
+# Sections of the R index that document the R package itself and have no Python counterpart.
+R_ONLY = ("The package",)
 
-```bash
-pip install git+https://github.com/gcol33/timesift
-```
 
-```python
-import timesift as ts
+def r_sections() -> list[tuple[str, str]]:
+    """The title and description of every section of `_pkgdown.yml`'s reference index.
 
-fit = ts.timesift(plots, logger, y="sp_*", id="plot_id", time="datetime",
-                  models=[ts.elasticnet(), ts.forest()],
-                  sift=ts.grains("day", "week", "month"))
-print(ts.summary(fit))
-```
-
-`y`, `x` and `static` are selections over their own table: a column name, a list of names, a glob
-such as `"sp_*"`, or a function of a name. The contract's last section says what each language
-carries, so a difference between the two is a recorded decision.
-"""
+    The file is read for the one shape the index is written in: a top-level ``reference:`` list
+    whose items open with ``- title:`` and may carry a block-literal ``desc: |``.
+    """
+    out, inside, desc = [], False, None
+    for line in PKGDOWN.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        if not line.startswith((" ", "-")):
+            inside = line.rstrip() == "reference:"
+            desc = None
+            continue
+        if not inside:
+            continue
+        if line.startswith("- title:"):
+            out.append([line.split(":", 1)[1].strip(), ""])
+            desc = None
+        elif line.startswith("  desc:"):
+            rest = line.split(":", 1)[1].strip()
+            desc = [] if rest == "|" else None
+            if rest != "|":
+                out[-1][1] = rest
+        elif desc is not None and line.startswith("    "):
+            desc.append(line.strip())
+            out[-1][1] = " ".join(desc)
+        else:
+            desc = None
+    return [(title, text) for title, text in out]
 
 
 def public_symbols(tree: ast.Module) -> list[str]:
@@ -182,6 +165,12 @@ def prose(doc: str | None) -> str:
     return "\n".join([lines[0].strip()] + [line[indent:] for line in lines[1:]]).strip()
 
 
+def first_sentence(doc: str | None) -> str:
+    """The docstring's opening paragraph on one line, as the index lists it."""
+    text = prose(doc)
+    return " ".join(text.split("\n\n", 1)[0].split()) if text else ""
+
+
 def fields(node: ast.ClassDef) -> list[str]:
     return [
         "`{}`{}".format(item.target.id, annotation(item.annotation).replace(":", " -", 1))
@@ -221,18 +210,30 @@ def collect() -> dict[str, tuple[str, ast.AST]]:
     return found
 
 
+def shown_name(name: str, node: ast.AST) -> str:
+    """A name as its heading and the index show it: a function called, a class or value bare."""
+    return name + "()" if isinstance(node, ast.FunctionDef) else name
+
+
+def heading(level: str, text: str, anchor: str) -> str:
+    """A heading with its anchor written out, so a function and a class differing only in case
+    (`timesift()` and `Timesift`) are linked to separately."""
+    return "{} `{}` {{#{}}}".format(level, text, anchor)
+
+
 def render_function(node: ast.FunctionDef, level: str = "##", owner: str = "") -> list[str]:
     doc = ast.get_docstring(node)
     if not doc:
         UNDOCUMENTED.append(owner + node.name)
+    anchor = owner + node.name
     if decorated(node) == "property":
-        return ["{} `{}`".format(level, node.name), "", prose(doc), ""]
-    return ["{} `{}()`".format(level, node.name), "",
+        return [heading(level, node.name, anchor), "", prose(doc), ""]
+    return [heading(level, node.name + "()", anchor), "",
             "```python", signature(node), "```", "", prose(doc), ""]
 
 
 def render_class(node: ast.ClassDef) -> list[str]:
-    out = ["## `{}`".format(node.name), ""]
+    out = [heading("##", node.name, node.name), ""]
     if not ast.get_docstring(node):
         UNDOCUMENTED.append(node.name)
     if decorated(node) == "dataclass":
@@ -252,14 +253,18 @@ def render_class(node: ast.ClassDef) -> list[str]:
 
 
 def render_value(name: str, node: ast.Assign) -> list[str]:
-    return ["## `{}`".format(name), "",
+    return [heading("##", name, name), "",
             "```python", "{} = {}".format(name, ast.unparse(node.value)), "```", ""]
 
 
-def render(section: dict, found: dict) -> str:
-    out = ["---", 'title: "{}"'.format(section["title"]), "---", "", BANNER, "",
-           section["desc"], ""]
-    for name in section["names"]:
+def page_title(title: str) -> str:
+    return "Python: " + title[0].lower() + title[1:]
+
+
+def render(title: str, desc: str, names, found: dict) -> str:
+    out = ["---", 'title: "{}"'.format(page_title(title)), "---", "", BANNER, "",
+           desc, "", "[All of the Python reference]({}.html)".format(INDEX), ""]
+    for name in names:
         _, node = found[name]
         if isinstance(node, ast.ClassDef):
             out += render_class(node)
@@ -270,12 +275,18 @@ def render(section: dict, found: dict) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
-def overview() -> str:
-    out = ["---", 'title: "Python"', "---", "", BANNER, "", OVERVIEW, "## The pages", ""]
-    for section in SECTIONS:
-        out += ["[{}]({}.html)".format(section["title"].split(": ", 1)[1].capitalize(),
-                                       section["slug"]),
-                "\n: {}\n".format(section["desc"])]
+def render_index(sections, found: dict) -> str:
+    out = ["---", 'title: "Python reference"', "---", "", BANNER, "",
+           "The Python package's functions, classes and values, under the sections of "
+           "[the R reference](../reference/index.html) and in its order. "
+           "[Get started](python.html) runs them on a simulated record.", ""]
+    for title, desc, slug, names in sections:
+        out += ["## [{}]({}.html)".format(title, slug), "", desc, ""]
+        for name in names:
+            _, node = found[name]
+            doc = ast.get_docstring(node) if not isinstance(node, ast.Assign) else None
+            out += ["[`{}`]({}.html#{})".format(shown_name(name, node), slug, name)]
+            out += [": {}".format(first_sentence(doc)) if doc else ": A value.", ""]
     return "\n".join(out).rstrip() + "\n"
 
 
@@ -284,8 +295,21 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
+    r = [(t, d) for t, d in r_sections() if t not in R_ONLY]
+    ours = [title for title, _, _ in SECTIONS]
+    if [t for t, _ in r] != ours:
+        print("SECTIONS and the reference index of _pkgdown.yml disagree.\n"
+              "  R:      " + " | ".join(t for t, _ in r) + "\n"
+              "  Python: " + " | ".join(ours), file=sys.stderr)
+        return 1
+    missing_desc = [t for t, d in r if not d]
+    if missing_desc:
+        print("A reference section of _pkgdown.yml carries no desc: " + ", ".join(missing_desc),
+              file=sys.stderr)
+        return 1
+
     exported = public_symbols(ast.parse((SOURCE / "__init__.py").read_text(encoding="utf-8")))
-    listed = [name for section in SECTIONS for name in section["names"]]
+    listed = [name for _, _, names in SECTIONS for name in names]
     missing = sorted(set(exported) - set(listed))
     extra = sorted(set(listed) - set(exported))
     twice = sorted({name for name in listed if listed.count(name) > 1})
@@ -298,9 +322,15 @@ def main() -> int:
         return 1
 
     found = collect()
-    pages = {"python.Rmd": overview()}
-    for section in SECTIONS:
-        pages[section["slug"] + ".Rmd"] = render(section, found)
+    sections = [(title, desc, slug, names)
+                for (title, desc), (_, slug, names) in zip(r, SECTIONS)]
+    pages = {INDEX + ".Rmd": render_index(sections, found)}
+    for title, desc, slug, names in sections:
+        pages[slug + ".Rmd"] = render(title, desc, names, found)
+
+    # A page this script wrote under a name it no longer writes is removed with it.
+    orphans = [p.name for p in DEST.glob("*.Rmd")
+               if p.name not in pages and BANNER in p.read_text(encoding="utf-8")]
 
     stale = []
     for name, text in pages.items():
@@ -313,6 +343,12 @@ def main() -> int:
         else:
             path.write_text(text, encoding="utf-8", newline="\n")
             print("wrote vignettes/articles/{}".format(name))
+    for name in orphans:
+        if args.check:
+            stale.append(name)
+        else:
+            (DEST / name).unlink()
+            print("removed vignettes/articles/{}".format(name))
 
     if stale:
         print("Out of date, rerun tools/python_reference.py: " + ", ".join(sorted(stale)),
