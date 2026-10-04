@@ -49,6 +49,7 @@ artifact
 artifacts
 binormal
 biomod
+cito's
 climgrain
 cloglog
 contrast's
@@ -86,6 +87,8 @@ mgcv
 mgcv's
 nanobind
 ndarray
+nnet
+nnet's
 nngp
 np
 numpy
