@@ -7,11 +7,11 @@
 \alias{lookback}
 \title{How a series becomes an array a learner reads}
 \usage{
-native(stats = "mean", year_start = "09-01")
+native(stats = "mean", year_start = "01-01")
 
-grain(grain, stats = "mean", year_start = "09-01")
+grain(grain, stats = "mean", year_start = "01-01")
 
-multigrain(grains = NULL, stats = "mean", year_start = "09-01")
+multigrain(grains = NULL, stats = "mean", year_start = "01-01")
 
 lookback(span, lag = "0 days", bins = 1L, stats = "mean")
 }
@@ -19,7 +19,7 @@ lookback(span, lag = "0 days", bins = 1L, stats = "mean")
 \item{stats}{Statistics computed per bin, one channel each, in the order given. See
 \code{\link[=grain_matrix]{grain_matrix()}} for the seven and for what separates an extreme reading from an extreme day.}
 
-\item{year_start}{\code{"MM-DD"} boundary of the hydrological year, used by \code{"season"} and \code{"year"}.}
+\item{year_start}{\code{"MM-DD"} boundary of the year, used by \code{"season"} and \code{"year"}.}
 
 \item{grain}{One of \code{"native"}, \code{"halfday"}, \code{"day"}, \code{"week"}, \code{"month"}, \code{"season"},
 \code{"year"}, or a function of the reading instants returning each reading's bin start. See

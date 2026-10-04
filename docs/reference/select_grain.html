@@ -100,9 +100,9 @@ is what an ecologist applying it to a new site would run.</p>
 <span>  <span class="va">y</span>,</span>
 <span>  <span class="va">learners</span>,</span>
 <span>  folds <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  inner <span class="op">=</span> <span class="fl">5L</span>,</span>
-<span>  rule <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"argmax"</span>, <span class="st">"coarsest_adequate"</span><span class="op">)</span>,</span>
-<span>  threshold <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  n_inner <span class="op">=</span> <span class="fl">5L</span>,</span>
+<span>  choose <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"argmax"</span>, <span class="st">"coarsest_adequate"</span><span class="op">)</span>,</span>
+<span>  cut_rule <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  interval <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"variables"</span>, <span class="st">"nested_cv"</span><span class="op">)</span>,</span>
 <span>  repeats <span class="op">=</span> <span class="fl">1L</span>,</span>
 <span>  response <span class="op">=</span> <span class="st">"presence_absence"</span>,</span>
@@ -140,13 +140,13 @@ takes. Named alongside the grains they form the candidate set.</p></dd>
 defaults of <code><a href="fold_map.html">fold_map()</a></code> when not given.</p></dd>
 
 
-<dt id="arg-inner">inner<a class="anchor" aria-label="anchor" href="#arg-inner"></a></dt>
+<dt id="arg-n-inner">n_inner<a class="anchor" aria-label="anchor" href="#arg-n-inner"></a></dt>
 <dd><p>Number of inner folds the selection is made on, or a function of the outer training
 response returning a fold map for those units. A count deals the inner folds by the grouping
 the outer fold map carries, so what <code><a href="cv.html">grouped_cv()</a></code> kept whole outside stays whole inside.</p></dd>
 
 
-<dt id="arg-rule">rule<a class="anchor" aria-label="anchor" href="#arg-rule"></a></dt>
+<dt id="arg-choose">choose<a class="anchor" aria-label="anchor" href="#arg-choose"></a></dt>
 <dd><p>How a candidate is chosen from its inner scores. <code>"argmax"</code> takes the highest.
 <code>"coarsest_adequate"</code> takes the coarsest candidate whose inner score lies within one standard
 error of the highest, the one-standard-error rule of Breiman, Friedman, Olshen and Stone
@@ -154,7 +154,7 @@ error of the highest, the one-standard-error rule of Breiman, Friedman, Olshen a
 model complexity. See Choosing a candidate.</p></dd>
 
 
-<dt id="arg-threshold">threshold<a class="anchor" aria-label="anchor" href="#arg-threshold"></a></dt>
+<dt id="arg-cut-rule">cut_rule<a class="anchor" aria-label="anchor" href="#arg-cut-rule"></a></dt>
 <dd><p><code>NULL</code>, or the rule of <code><a href="kappa_score.html">decision_threshold()</a></code> a presence-absence cut is learned
 by: <code>"youden"</code>, the cut that maximises TSS, <code>"kappa"</code> or <code>"prevalence"</code>. See A cut learned
 inside the training data.</p></dd>
@@ -218,11 +218,11 @@ registered metric with its standard error across variables; <code>contrast</code
 was searched; and <code>scores</code>, the per-cell rows of the selected procedure under the selection
 metric, in the layout <code><a href="grain_ladder.html">grain_ladder()</a></code> returns. The held-out prediction of every unit is in
 the <code>predictions</code> attribute and the scorable-cell mask in <code>cells</code>. <code>inner</code> holds every
-candidate's inner score and standard error in every outer fold. With <code>threshold</code> set, the
+candidate's inner score and standard error in every outer fold. With <code>cut_rule</code> set, the
 estimate carries the score, its interval and the interval's name in <code>interval</code>, one row per
 metric and interval. With <code>interval = "nested_cv"</code> it also carries <code>nested_cv</code>, the same rows
 with the estimator's own quantities beside them, and <code>final</code>, the procedure fitted on every
-unit, whose risk that interval is for. With <code>threshold</code> set, the
+unit, whose risk that interval is for. With <code>cut_rule</code> set, the
 estimate carries one further row, <code>tss_inner_cut</code>, the procedure's TSS at the learned cuts;
 <code>thresholds</code> holds the cut of every outer fold and variable; and <code>cut_scores</code> the per-cell
 rows it is averaged from, in the layout of <code>scores</code>. Both are <code>NULL</code> otherwise.</p>
@@ -247,9 +247,9 @@ one a mechanism acts at; it says that grain predicted best on the units the sele
 <p>Inside each outer fold every candidate carries an inner score, the mean over variables of its
 per-variable mean over the inner folds, and a standard error, the standard deviation over the
 inner folds of the fold's own score (the mean over the variables scored in that fold) divided by
-the square root of the number of inner folds. <code>rule = "argmax"</code> takes the highest inner score,
+the square root of the number of inner folds. <code>choose = "argmax"</code> takes the highest inner score,
 and on an exact tie the candidate declared first.</p>
-<p><code>rule = "coarsest_adequate"</code> first finds that highest score and its standard error, calls every
+<p><code>choose = "coarsest_adequate"</code> first finds that highest score and its standard error, calls every
 candidate scoring at least the highest minus one standard error adequate, and takes the coarsest
 adequate one. Coarseness is read off the representation as the package holds it: fewer bins is
 coarser, and between two candidates with the same number of bins, fewer channels is coarser.
@@ -311,7 +311,7 @@ network.</p>
 
 
 <p>TSS read at the cut that maximises it on the scored units is biased upward, most where presences
-are few (<code><a href="tss_inflation.html">tss_inflation()</a></code>). With <code>threshold</code> set, each outer fold learns one cut per variable
+are few (<code><a href="tss_inflation.html">tss_inflation()</a></code>). With <code>cut_rule</code> set, each outer fold learns one cut per variable
 on the inner out-of-fold predictions of the candidate it selected, which the inner search has
 already made for every outer training unit, by <code><a href="kappa_score.html">decision_threshold()</a></code> under the rule named. The
 cut is then frozen and the outer test fold's predictions are read at it by <code><a href="tss.html">tss()</a></code>. No unit of
@@ -345,7 +345,7 @@ comparison the <code>contrast</code> element holds.</p></div>
 <span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">120</span>, <span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">warmth</span>, <span class="op">-</span><span class="va">warmth</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, nrow <span class="op">=</span> <span class="fl">60</span>,</span>
 <span>            dimnames <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">units</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sp1"</span>, <span class="st">"sp2"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">d</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"week"</span>, <span class="st">"month"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">sel</span> <span class="op">&lt;-</span> <span class="fu">select_grain</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, <span class="fu"><a href="elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, folds <span class="op">=</span> <span class="fu"><a href="fold_map.html">fold_map</a></span><span class="op">(</span><span class="va">y</span>, v <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>, inner <span class="op">=</span> <span class="fl">3</span>,</span>
+<span><span class="va">sel</span> <span class="op">&lt;-</span> <span class="fu">select_grain</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, <span class="fu"><a href="elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, folds <span class="op">=</span> <span class="fu"><a href="fold_map.html">fold_map</a></span><span class="op">(</span><span class="va">y</span>, v <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>, n_inner <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                    verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="va">sel</span></span>
 <span><span class="va">sel</span><span class="op">$</span><span class="va">estimate</span></span>

@@ -21,9 +21,9 @@ curve_run <- function(models, ensemble = FALSE) {
                         sp2 = stats::rbinom(40, 1L, stats::plogis(-warmth)),
                         stringsAsFactors = FALSE)
   suppressWarnings(timesift(
-    targets, readings, y = c("sp1", "sp2"), id = plot, time = t, x = temp, models = models,
+    targets, readings, y = c("sp1", "sp2"), id = plot, time = t, x = temp, learners = models,
     sift = grains("month", stats = c("cold_day", "mean", "warm_day")),
-    resampling = cv(v = 3L), inner = NULL, ensemble = ensemble, verbose = FALSE))
+    resampling = cv(v = 3L), n_inner = NULL, ensemble = ensemble, verbose = FALSE))
 }
 
 test_that("a curve in a channel is the prediction as that statistic moves in every bin", {

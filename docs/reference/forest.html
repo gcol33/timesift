@@ -98,7 +98,7 @@ an interaction between two bins that a linear model would need the product term 
 <span>  mtry <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  min_node <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  balance <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  preset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"package"</span>, <span class="st">"bigboss"</span><span class="op">)</span>,</span>
+<span>  preset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"default"</span>, <span class="st">"bigboss"</span><span class="op">)</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">1L</span>,</span>
 <span>  threads <span class="op">=</span> <span class="fl">1L</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -130,7 +130,7 @@ representation of the run.</p></dd>
 
 
 <dt id="arg-preset">preset<a class="anchor" aria-label="anchor" href="#arg-preset"></a></dt>
-<dd><p>Whose defaults the settings left <code>NULL</code> take: <code>"package"</code> or <code>"bigboss"</code>.</p></dd>
+<dd><p>Whose defaults the settings left <code>NULL</code> take: <code>"default"</code> or <code>"bigboss"</code>.</p></dd>
 
 
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
@@ -157,7 +157,7 @@ languages grow the same forest on any number of threads.</p>
 <p><code>balance = TRUE</code> is the down-sampled forest biomod2 fits as <code>RFd</code>: each tree draws as many units
 from each class as the smaller class holds, so a rare response's presences are half of every
 tree's draw.</p>
-<p><code>preset</code> says whose defaults the settings left <code>NULL</code> take. <code>"package"</code> is randomForest's own,
+<p><code>preset</code> says whose defaults the settings left <code>NULL</code> take. <code>"default"</code> is randomForest's own,
 which is what biomod2's default option set fits: 500 trees, <code>mtry</code> the square root of the column
 count under presence-absence and a third of it under a squared-error loss, and <code>min_node</code> 1 and
 5 under the two. <code>"bigboss"</code> is biomod2's tuned option set: 500 trees, <code>mtry = 2</code> and
@@ -165,7 +165,10 @@ count under presence-absence and a third of it under a squared-error loss, and <
 the column count.</p>
 <p>The case weights are the response head's, <code><a href="positive_weights.html">positive_weights()</a></code> under presence-absence, and
 weight the bootstrap draw: a unit is drawn in proportion to its weight, and within its class
-under <code>balance</code>.</p>
+under <code>balance</code>.
+Under the shipped presence-absence head those weights are on, so a default <code>forest()</code> is
+randomForest's specification fitted under them; a head registered without <code>weights</code> fits it
+unweighted.</p>
     </div>
 
     <div class="section level2">

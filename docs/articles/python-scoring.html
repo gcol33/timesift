@@ -149,9 +149,11 @@ presences are ranked above absences where presences are rare.</p>
 <h2 id="kappa_score">
 <code>kappa_score()</code><a class="anchor" aria-label="anchor" href="#kappa_score"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>kappa_score(y, p, rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>)</span></code></pre></div>
-<p>Cohen’s kappa of a model’s decisions against the observed
-response.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>kappa_score(y, p, rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'prevalence'</span>)</span></code></pre></div>
+<p>Cohen’s kappa of a model’s decisions against the observed response,
+cut by <code>rule</code>.</p>
+<p>The default cuts at the observed presence rate, the rule the
+registered <code>kappa</code> metric reads.</p>
 </div>
 <div class="section level2">
 <h2 id="table_metric">
@@ -243,9 +245,10 @@ either order.</p>
 <span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>    y,</span>
 <span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>    p<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>,</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    candidate: <span class="bu">str</span> <span class="op">=</span> <span class="st">'ensemble'</span>,</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>    perc: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.9</span>,</span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    <span class="op">*</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>    candidate: <span class="bu">str</span> <span class="op">=</span> <span class="st">'ensemble'</span>,</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>    perc: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.9</span>,</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>)</span></code></pre></div>
 <p>The probability cut a rule selects. Presence is predicted at
 <code>p &gt;= threshold</code>.</p>
 <p><code>"mpa"</code> is the minimum predicted area rule: the highest

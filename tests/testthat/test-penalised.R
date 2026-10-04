@@ -256,7 +256,7 @@ test_that("the penalised learner reads the penalty its `s` names", {
   sim <- sim_series(n_unit = 60L, days = 56L, seed = 93L)
   y <- sim_response(sim, n_var = 1L, seed = 94L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
-  at_min <- stats::predict(fit_learner(elasticnet(), x, y), x)
+  at_min <- stats::predict(fit_learner(elasticnet(s = "lambda.min"), x, y), x)
   at_1se <- stats::predict(fit_learner(elasticnet(s = "lambda.1se"), x, y), x)
   expect_false(isTRUE(all.equal(at_min, at_1se)))
   # The larger penalty shrinks harder, so its predictions sit closer to the prevalence.

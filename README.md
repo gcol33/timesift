@@ -30,7 +30,7 @@ fit <- timesift(
   plots, logger,
   y = starts_with("sp_"),
   id = plot_id, time = datetime,
-  models = c(elasticnet(), forest()),
+  learners = c(elasticnet(), forest()),
   sift = grains("day", "week", "month")
 )
 ```
@@ -50,7 +50,7 @@ fit = ts.timesift(
     plots, logger,
     y="sp_*",
     id="plot_id", time="datetime",
-    models=[ts.elasticnet(), ts.forest()],
+    learners = [ts.elasticnet(), ts.forest()],
     sift=ts.grains("day", "week", "month"),
 )
 ```

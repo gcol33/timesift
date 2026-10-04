@@ -225,7 +225,7 @@ run_fixture <- function(keep_fits = TRUE, stack = TRUE) {
       stringsAsFactors = FALSE),
     scores = scores, oof = oof, representations = x,
     stack = if (stack) ensemble_fit(oof, y, cells, folds, ensemble(), scores) else NULL,
-    models = models, fits = fits, folds = folds, cells = cells, y = y,
+    learners = models, fits = fits, folds = folds, cells = cells, y = y,
     metric = attr(lad, "metric"), scorer = attr(lad, "scorer"),
     response = attr(lad, "response"),
     spec = NULL, call = NULL)
@@ -246,14 +246,14 @@ report_learner <- function(offset = 0) {
 
 # A run through the entry point itself, on the report learners, so the procedure rows are the ones
 # the nested evaluation writes.
-nested_run <- function(ensemble = TRUE, inner = 3L) {
+nested_run <- function(ensemble = TRUE, n_inner = 3L) {
   sim <- sim_series(n_unit = 60L, days = 90L, seed = 96L)
   y <- sim_response(sim, n_var = 4L, seed = 97L)
   targets <- cbind(data.frame(plot = rownames(y), stringsAsFactors = FALSE), as.data.frame(y))
   timesift(targets, sim$readings, y = starts_with("sp"), id = plot, time = t,
-           models = list(constant = report_learner(), tilted = report_learner(0.4)),
+           learners = list(constant = report_learner(), tilted = report_learner(0.4)),
            sift = grains("week", "month"), ensemble = ensemble,
-           resampling = fold_map(y, v = 3L, seed = 4L), inner = inner, control = NULL,
+           resampling = fold_map(y, v = 3L, seed = 4L), n_inner = n_inner, control = NULL,
            verbose = FALSE)
 }
 
@@ -295,6 +295,22 @@ test_that("the ensemble is not scored with weights fitted to the responses it is
                rep(1, nrow(fit$fold_weights)), tolerance = 1e-6)
 })
 
+test_that("a candidate a fold's stack leaves out below min_score is a zero in that fold's row", {
+  inner <- nested_run()$inner
+  # The least of the folds' best inner scores: every fold keeps its best candidate, and a fold
+  # whose others score below it leaves them out.
+  cut <- min(tapply(inner$score, inner$fold, max))
+  fit <- nested_run(ensemble = ensemble("mean", min_score = cut))
+  w <- fit$fold_weights
+  expect_setequal(setdiff(names(w), "fold"), names(fit$oof))
+  expect_equal(rowSums(w[names(fit$oof)]), rep(1, nrow(w)), tolerance = 1e-6)
+  for (k in w$fold) {
+    below <- inner$candidate[inner$fold == k & inner$score < cut - 1e-9]
+    expect_true(all(unlist(w[w$fold == k, below]) == 0), info = k)
+  }
+  expect_true(any(as.matrix(w[names(fit$oof)]) == 0))
+})
+
 test_that("a run with no combiner reports its candidates and the selected arm alone", {
   fit <- nested_run(ensemble = FALSE)
   s <- summary(fit)
@@ -306,7 +322,7 @@ test_that("a run with no combiner reports its candidates and the selected arm al
 })
 
 test_that("a run without an inner split compares the candidates and estimates nothing", {
-  fit <- nested_run(inner = NULL)
+  fit <- nested_run(n_inner = NULL)
   s <- summary(fit)
   expect_null(fit$estimate)
   expect_null(fit$selected)

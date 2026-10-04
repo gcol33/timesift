@@ -20,7 +20,9 @@ table_metric(
 
 \item{metric}{One of the names in the table.}
 
-\item{rule}{Threshold rule: \code{"youden"}, \code{"kappa"}, \code{"prevalence"} or \code{"mpa"}.}
+\item{rule}{Threshold rule: \code{"youden"}, \code{"kappa"}, \code{"prevalence"} or \code{"mpa"}. \code{kappa_score()}
+cuts at \code{"prevalence"} by default, the rule the registered \code{kappa} metric reads, and the other
+functions at \code{"youden"}.}
 
 \item{threshold}{\code{NULL} for the maximum over every cut, or one cut, presence being predicted at
 \code{p >= threshold}.}

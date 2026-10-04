@@ -121,7 +121,9 @@ average_precision <- function(y, p) {
 #' @inheritParams tss
 #' @param y Observed presence-absence, `0`/`1` or logical; for `decision_threshold()`, also a
 #'   [timesift()] fit, which carries its own response and held-out predictions.
-#' @param rule Threshold rule: `"youden"`, `"kappa"`, `"prevalence"` or `"mpa"`.
+#' @param rule Threshold rule: `"youden"`, `"kappa"`, `"prevalence"` or `"mpa"`. `kappa_score()`
+#'   cuts at `"prevalence"` by default, the rule the registered `kappa` metric reads, and the other
+#'   functions at `"youden"`.
 #' @param perc For `rule = "mpa"`, the share of presences the cut must keep, `0.9` by default.
 #'   Where a rule is named without a call to `decision_threshold()` it takes that default.
 #' @param ... Ignored.
@@ -138,7 +140,8 @@ average_precision <- function(y, p) {
 #' model_agreement(y, c(0.1, 0.2, 0.6, 0.4, 0.8, 0.9), c(0.2, 0.1, 0.3, 0.7, 0.9, 0.8))
 #'
 #' @export
-kappa_score <- function(y, p, rule = c("youden", "kappa", "prevalence", "mpa")) {
+kappa_score <- function(y, p, rule = c("prevalence", "youden", "kappa", "mpa")) {
+  rule <- match.arg(rule)
   thr <- decision_threshold(y, p, rule)
   if (!is.finite(thr)) {
     return(NA_real_)
@@ -188,7 +191,8 @@ decision_threshold.default <- function(y, p, rule = c("youden", "kappa", "preval
 #'   `"selected"` or the name of one, as [predict()] takes it.
 #' @export
 decision_threshold.timesift <- function(y, candidate = "ensemble",
-                                        rule = c("youden", "kappa", "prevalence", "mpa"), ...) {
+                                        rule = c("youden", "kappa", "prevalence", "mpa"),
+                                        perc = 0.9, ...) {
   rule <- match.arg(rule)
   observed <- y$y
   if (!all(observed %in% c(0, 1))) {
@@ -197,7 +201,7 @@ decision_threshold.timesift <- function(y, candidate = "ensemble",
   }
   p <- .run_held_out(y, candidate)[rownames(observed), colnames(observed), drop = FALSE]
   variables <- stats::setNames(colnames(observed), colnames(observed))
-  vapply(variables, function(v) decision_threshold.default(observed[, v], p[, v], rule),
+  vapply(variables, function(v) decision_threshold.default(observed[, v], p[, v], rule, perc),
          numeric(1L))
 }
 

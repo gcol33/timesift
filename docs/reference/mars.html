@@ -5,17 +5,17 @@ and at each step multiplies a term already in the model by a pair of hinges on o
 max(0, x - t) and max(0, t - x), taking the parent, the column and the knot t that most
 reduce the residual sum of squares of a least-squares fit to the response. A knot at a column's
 least value enters the column linearly. degree bounds how many hinges a term multiplies, so
-degree = 1 is an additive model and 2 admits pairwise interactions. The pass stops at nk
-terms, when a step raises the R-squared by less than thresh, or when no term reduces the
-residuals."><meta property="og:description" content="One MARS model per response, over every bin-by-channel column of the representation, fitted as
+degree = 1 is an additive model and 2 admits pairwise interactions. The pass stops at
+max_terms terms, when a step raises the R-squared by less than min_gain, or when no term
+reduces the residuals."><meta property="og:description" content="One MARS model per response, over every bin-by-channel column of the representation, fitted as
 the earth package fits it and as biomod2 fits MARS. The forward pass starts from the intercept
 and at each step multiplies a term already in the model by a pair of hinges on one column,
 max(0, x - t) and max(0, t - x), taking the parent, the column and the knot t that most
 reduce the residual sum of squares of a least-squares fit to the response. A knot at a column's
 least value enters the column linearly. degree bounds how many hinges a term multiplies, so
-degree = 1 is an additive model and 2 admits pairwise interactions. The pass stops at nk
-terms, when a step raises the R-squared by less than thresh, or when no term reduces the
-residuals."><style>
+degree = 1 is an additive model and 2 admits pairwise interactions. The pass stops at
+max_terms terms, when a step raises the R-squared by less than min_gain, or when no term
+reduces the residuals."><style>
 .lang-split { table-layout: fixed; width: 100%; border: 0; }
 .lang-split > tbody > tr > td { border: 0; padding: 0 1rem 0 0; }
 .lang-split > tbody > tr > td:last-child { padding-right: 0; }
@@ -94,9 +94,9 @@ and at each step multiplies a term already in the model by a pair of hinges on o
 <code>max(0, x - t)</code> and <code>max(0, t - x)</code>, taking the parent, the column and the knot <code>t</code> that most
 reduce the residual sum of squares of a least-squares fit to the response. A knot at a column's
 least value enters the column linearly. <code>degree</code> bounds how many hinges a term multiplies, so
-<code>degree = 1</code> is an additive model and <code>2</code> admits pairwise interactions. The pass stops at <code>nk</code>
-terms, when a step raises the R-squared by less than <code>thresh</code>, or when no term reduces the
-residuals.</p>
+<code>degree = 1</code> is an additive model and <code>2</code> admits pairwise interactions. The pass stops at
+<code>max_terms</code> terms, when a step raises the R-squared by less than <code>min_gain</code>, or when no term
+reduces the residuals.</p>
     </div>
 
     <div class="section level2">
@@ -105,8 +105,8 @@ residuals.</p>
 <span>  data <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  degree <span class="op">=</span> <span class="fl">1L</span>,</span>
 <span>  penalty <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  nk <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  thresh <span class="op">=</span> <span class="fl">0.001</span>,</span>
+<span>  max_terms <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  min_gain <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  minspan <span class="op">=</span> <span class="fl">0L</span>,</span>
 <span>  endspan <span class="op">=</span> <span class="fl">0L</span>,</span>
 <span>  fast_k <span class="op">=</span> <span class="fl">20L</span>,</span>
@@ -135,12 +135,12 @@ representation of the run.</p></dd>
 degree one and 3 above; -1 charges nothing.</p></dd>
 
 
-<dt id="arg-nk">nk<a class="anchor" aria-label="anchor" href="#arg-nk"></a></dt>
+<dt id="arg-max-terms">max_terms<a class="anchor" aria-label="anchor" href="#arg-max-terms"></a></dt>
 <dd><p>The most terms the forward pass reaches, the intercept included. <code>NULL</code> is
 <code>min(200, max(20, 2 p)) + 1</code> for <code>p</code> columns.</p></dd>
 
 
-<dt id="arg-thresh">thresh<a class="anchor" aria-label="anchor" href="#arg-thresh"></a></dt>
+<dt id="arg-min-gain">min_gain<a class="anchor" aria-label="anchor" href="#arg-min-gain"></a></dt>
 <dd><p>The least rise in R-squared a forward step is kept for.</p></dd>
 
 
@@ -180,15 +180,17 @@ prediction is that model's probability; under a count head they are refitted as 
 with a log link, as earth's <code>glm = list(family = poisson)</code> refits them, and the prediction is its
 mean count; under a squared-error head they are refitted by least squares.</p>
 <p>The defaults are earth's own, which biomod2 uses under its default option set and under
-<code>"bigboss"</code> alike: degree one, <code>penalty = 2</code>, <code>thresh = 0.001</code>, <code>nk = min(200, max(20, 2 p)) + 1</code>
-for <code>p</code> columns, Friedman's rules for the spans between knots, and Fast MARS over the 20 best
-parents. The forward pass, the pruning pass and the refit live in the core the Python package
-calls, pinned against earth in the fixtures, so the two languages keep the same terms and return the same
-coefficients.</p>
+<code>"bigboss"</code> alike: degree one, <code>penalty = 2</code>, <code>min_gain = 0.001</code>,
+<code>max_terms = min(200, max(20, 2 p)) + 1</code> for <code>p</code> columns, Friedman's rules for the spans
+between knots, and Fast MARS over the 20 best parents. The forward pass, the pruning pass and
+the refit live in the core the Python package calls, pinned against earth in the fixtures, so
+the two languages keep the same terms and return the same coefficients.</p>
 <p>The case weights are the response head's, <code><a href="positive_weights.html">positive_weights()</a></code> under presence-absence, and weigh
 both passes and the refit as earth weighs them. earth refits the whole basis by QR at every
 candidate knot of a weighted fit; the core reaches the same residual sums with Friedman's running
-updates, which is what makes a weighted fit over hundreds of columns affordable.</p>
+updates, which is what makes a weighted fit over hundreds of columns affordable.
+Under the shipped presence-absence head those weights are on, so a default <code>mars()</code> is
+earth's specification fitted under them; a head registered without <code>weights</code> fits it unweighted.</p>
 <p>A response holding one value is predicted its mean.</p>
     </div>
 

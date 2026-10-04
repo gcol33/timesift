@@ -11,7 +11,7 @@ How a series becomes the array a learner reads, and the set a run is compared ac
 ## `native()` {#native}
 
 ```python
-native(stats='mean', year_start='09-01')
+native(stats='mean', year_start='01-01')
 ```
 
 The record unreduced: one bin per reading.
@@ -19,7 +19,7 @@ The record unreduced: one bin per reading.
 ## `grain()` {#grain}
 
 ```python
-grain(g, stats='mean', year_start='09-01')
+grain(g, stats='mean', year_start='01-01')
 ```
 
 One calendar grain, named, or supplied as a function of the reading instants returning
@@ -28,7 +28,7 @@ each reading's bin start, which is reported as `custom`.
 ## `multigrain()` {#multigrain}
 
 ```python
-multigrain(grains=None, stats='mean', year_start='09-01')
+multigrain(grains=None, stats='mean', year_start='01-01')
 ```
 
 Several grains flattened and bound side by side into one block of features.
@@ -47,7 +47,7 @@ A stretch of record of fixed length, ending a fixed lag before each target's own
 ## `grains()` {#grains}
 
 ```python
-grains(*g, stats='mean', year_start='09-01')
+grains(*g, stats='mean', year_start='01-01')
 ```
 
 A sift over calendar grains, named or read off the record with `"auto"`.
@@ -108,7 +108,7 @@ The sift with `"auto"` replaced by the grains the record supports.
 ## `auto_grains()` {#auto_grains}
 
 ```python
-auto_grains(series, spec: TimesiftSpec, stats=('mean',), year_start='09-01')
+auto_grains(series, spec: TimesiftSpec, stats=('mean',), year_start='01-01')
 ```
 
 The named grains that give the record at least two bins, from the finest to the coarsest.

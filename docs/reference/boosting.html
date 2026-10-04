@@ -107,7 +107,7 @@ replacement, and reads a subsample of the columns.</p>
 <span>  lambda <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  gamma <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  n_inner <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  preset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"package"</span>, <span class="st">"bigboss"</span><span class="op">)</span>,</span>
+<span>  preset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"default"</span>, <span class="st">"bigboss"</span><span class="op">)</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">1L</span>,</span>
 <span>  threads <span class="op">=</span> <span class="fl">1L</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -162,7 +162,7 @@ keep them all.</p></dd>
 
 
 <dt id="arg-preset">preset<a class="anchor" aria-label="anchor" href="#arg-preset"></a></dt>
-<dd><p>Whose defaults the settings left <code>NULL</code> take: <code>"package"</code> or <code>"bigboss"</code>.</p></dd>
+<dd><p>Whose defaults the settings left <code>NULL</code> take: <code>"default"</code> or <code>"bigboss"</code>.</p></dd>
 
 
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
@@ -195,7 +195,7 @@ Python package calls, so the two languages fit the same model.</p>
 fold's complement, and the number of trees of least held-out deviance, summed over the folds and
 weighted by how many units each holds, is kept, as gbm's <code>cv.folds</code> chooses it. The folds are
 dealt for each response and stratified on it, as the elastic net's are.</p>
-<p><code>preset</code> says whose defaults the settings left <code>NULL</code> take. <code>"package"</code> is the fitting
+<p><code>preset</code> says whose defaults the settings left <code>NULL</code> take. <code>"default"</code> is the fitting
 package's own, which is what biomod2's default option set fits: under gbm 100 trees of one split,
 <code>shrinkage = 0.1</code>, <code>min_leaf = 10</code> and <code>subsample = 0.5</code>; under xgboost 100 trees of depth 6,
 <code>shrinkage = 0.3</code>, <code>min_leaf = 1</code>, <code>lambda = 1</code> and every unit and column. <code>"bigboss"</code> is
@@ -204,7 +204,9 @@ biomod2's tuned option set: under gbm 2500 trees of seven splits, <code>shrinkag
 <code>shrinkage = 1</code>. A setting given explicitly beats either.</p>
 <p>The case weights are the response head's, <code><a href="positive_weights.html">positive_weights()</a></code> under presence-absence, and
 weigh the gradient and every sum a tree is grown on; <code>min_leaf</code> counts units under gbm, as
-<code>n.minobsinnode</code> does.</p>
+<code>n.minobsinnode</code> does.
+Under the shipped presence-absence head those weights are on, so a default <code>boosting()</code> is
+gbm's specification fitted under them; a head registered without <code>weights</code> fits it unweighted.</p>
     </div>
 
     <div class="section level2">

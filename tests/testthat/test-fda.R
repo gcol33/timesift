@@ -67,9 +67,9 @@ test_that("the thread count does not change what the discriminant returns", {
 
 test_that("discriminant refuses settings and responses it has no fit for", {
   expect_error(discriminant(degree = 0), "whole number")
-  expect_error(discriminant(nk = 2), "whole number")
+  expect_error(discriminant(max_terms = 2), "whole number")
   expect_error(discriminant(penalty = -1), "zero or more")
-  expect_error(discriminant(thresh = 1), "\\[0, 1\\)")
+  expect_error(discriminant(min_gain = 1), "\\[0, 1\\)")
   expect_error(discriminant(prune = NA), "TRUE or FALSE")
   expect_error(discriminant(calibrate = "yes"), "TRUE or FALSE")
   x <- matrix(c(1, 3, 2, 5, 4, 6), ncol = 1L)

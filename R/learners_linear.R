@@ -36,13 +36,16 @@
 #' @param data A representation the learner is pinned to, or `NULL` to run across every
 #'   representation of the run.
 #' @param alpha Elastic-net mixing, `1` lasso and `0` ridge.
-#' @param n_inner Folds of the inner cross-validation that chooses the penalty.
+#' @param n_inner Folds of the inner cross-validation that chooses the penalty, ten as in
+#'   `cv.glmnet()`.
 #' @param squares Add the square of every column, giving the same quadratic capacity a
 #'   second-order polynomial term would.
 #' @param s Which penalty of the inner path to predict at: `"lambda.min"`, `"lambda.1se"`, or a
 #'   penalty of its own, which is interpolated between the two points of the path around it.
+#'   `"lambda.1se"`, the largest penalty within one standard error of the least held-out
+#'   deviance, is glmnet's default.
 #' @param n_lambda Points of the penalty path.
-#' @param thresh Where the coordinate descent stops, read off the largest coefficient move of a
+#' @param tol Where the coordinate descent stops, read off the largest coefficient move of a
 #'   pass. The default leaves the fit as close to the optimum as glmnet's own default does; a
 #'   looser one is faster and a tighter one costs time roughly in proportion.
 #' @param threads How many fits of one response's inner cross-validation run at once. The path on
@@ -59,14 +62,14 @@
 #' elasticnet(alpha = 0.5)
 #'
 #' @export
-elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s = "lambda.min",
-                       n_lambda = 100L, thresh = 1e-8, threads = 1L, seed = 1L) {
+elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 10L, squares = TRUE,
+                       s = "lambda.1se", n_lambda = 100L, tol = 1e-8, threads = 1L, seed = 1L) {
   learner(
     name = "elasticnet",
     data = data, reads = "tabular", multi = "separate",
     params = list(alpha = alpha, n_inner = n_inner, squares = squares, s = s,
-                  n_lambda = n_lambda, thresh = thresh, threads = threads, seed = seed),
-    fit = function(x, y, alpha, n_inner, squares, s, n_lambda, thresh, threads, seed, head,
+                  n_lambda = n_lambda, tol = tol, threads = threads, seed = seed),
+    fit = function(x, y, alpha, n_inner, squares, s, n_lambda, tol, threads, seed, head,
                    group = NULL, ...) {
       family <- .head_family(head)
       m <- .design(x, squares)
@@ -93,7 +96,7 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
         }
         labels <- sort(unique(inner))
         .penalised_cv(m, yj, weights[, j], family, alpha, match(inner, labels) - 1L,
-                      length(labels), n_lambda = n_lambda, thresh = thresh, threads = threads)
+                      length(labels), n_lambda = n_lambda, thresh = tol, threads = threads)
       })
       unfitted <- colnames(y)[vapply(models, is.numeric, logical(1L))]
       stopped <- colnames(y)[vapply(models, .penalised_stopped, logical(1L))]
@@ -120,6 +123,9 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 5L, squares = TRUE, s
 #' The defaults are biomod2's `GLM`: every column enters as `x + I(x^2)`, and the terms are
 #' searched in both directions by AIC as `MASS::stepAIC()` searches them, with no bound on how many
 #' are kept.
+#' Under the shipped presence-absence head those weights are on, so a default `linear()` is
+#' biomod2's `GLM` specification fitted under them; a head registered without `weights` fits it
+#' unweighted.
 #'
 #' `terms` says what one term is. Under `"power"` each power of a column, `x`, `x^2` and so on, is
 #' a term of its own, which is how biomod2 writes a quadratic formula and how `stepAIC()` walks it.

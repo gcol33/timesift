@@ -92,8 +92,8 @@ test_that("a run under a numeric head is scored by that head's metric and stacke
   targets <- data.frame(plot = d$units, height = d$height, stringsAsFactors = FALSE)
   run <- suppressWarnings(timesift(
     targets, d$readings, y = height, id = plot, time = t, x = temp, response = "continuous",
-    models = list(en = elasticnet(squares = FALSE), rf = forest(trees = 30L)),
-    sift = grains("week"), resampling = cv(v = 4L), inner = NULL,
+    learners = list(en = elasticnet(squares = FALSE), rf = forest(trees = 30L)),
+    sift = grains("week"), resampling = cv(v = 4L), n_inner = NULL,
     ensemble = ensemble("stack"), verbose = FALSE))
   expect_identical(run$metric, "r_squared")
   expect_true(all(is.finite(run$scores$score[run$scores$scorable])))

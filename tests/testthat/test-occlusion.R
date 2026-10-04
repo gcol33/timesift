@@ -81,7 +81,7 @@ test_that("the profile is read by the metric the fit was scored under", {
   # A run reaches the same profile through its own door, under its own metric.
   run <- suppressWarnings(timesift(
     data.frame(plot = sim$units, y, stringsAsFactors = FALSE), sim$readings,
-    y = c("sp1", "sp2"), id = plot, time = t, x = temp, models = elasticnet(),
+    y = c("sp1", "sp2"), id = plot, time = t, x = temp, learners = elasticnet(),
     sift = grains("month"), resampling = folds, metric = "tss", ensemble = FALSE,
     keep_fits = TRUE, verbose = FALSE))
   through_run <- occlusion(run, "elasticnet / month", permutations = 3L, seed = 4L)
@@ -213,9 +213,9 @@ test_that("the ensemble is held back by channel through the members it combines"
   targets <- data.frame(plot = sim$units, y, stringsAsFactors = FALSE)
   run <- suppressWarnings(timesift(
     targets, sim$readings, y = c("sp1", "sp2"), id = plot, time = t, x = temp,
-    models = list(a = warm_reader("a"), b = warm_reader("b", 2)),
+    learners = list(a = warm_reader("a"), b = warm_reader("b", 2)),
     sift = grains("month", stats = c("cold_day", "mean", "warm_day")),
-    resampling = cv(v = 3L), inner = NULL, ensemble = ensemble("mean"),
+    resampling = cv(v = 3L), n_inner = NULL, ensemble = ensemble("mean"),
     keep_fits = TRUE, verbose = FALSE))
   oc <- occlusion(run, "ensemble", over = "channel", permutations = 3L, seed = 4L)
   expect_identical(attr(oc, "arm"), "ensemble")
@@ -227,8 +227,8 @@ test_that("the ensemble is held back by channel through the members it combines"
   expect_error(occlusion(run, "ensemble", over = "bin"), "different bins")
   no_stack <- suppressWarnings(timesift(
     targets, sim$readings, y = c("sp1", "sp2"), id = plot, time = t, x = temp,
-    models = warm_reader("a"), sift = grains("month", stats = c("cold_day", "mean", "warm_day")),
-    resampling = cv(v = 3L), inner = NULL,
+    learners = warm_reader("a"), sift = grains("month", stats = c("cold_day", "mean", "warm_day")),
+    resampling = cv(v = 3L), n_inner = NULL,
     ensemble = FALSE, keep_fits = TRUE, verbose = FALSE))
   expect_error(occlusion(no_stack, "ensemble", over = "channel"), "no ensemble")
 })

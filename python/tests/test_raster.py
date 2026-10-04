@@ -49,8 +49,8 @@ def run_for(targets, series, models, use_ensemble=False):
     y = Response(np.column_stack([targets["sp1"], targets["sp2"]]).astype(float),
                  tuple(targets["cell"]), ("sp1", "sp2"))
     return timesift(targets, series, y=["sp1", "sp2"], id="cell", time="t", x="temp",
-                    models=models, sift=grains("month"), resampling=fold_map(y, v=3, seed=2),
-                    inner=None, ensemble=ensemble("mean") if use_ensemble else False,
+                    learners=models, sift=grains("month"), resampling=fold_map(y, v=3, seed=2),
+                    n_inner=None, ensemble=ensemble("mean") if use_ensemble else False,
                     verbose=False)
 
 
@@ -92,8 +92,8 @@ def test_static_predictors_are_read_from_the_grids_of_a_dataset():
     temp, static, targets, _, n, _ = case()
     y = Response(np.column_stack([targets["sp1"], targets["sp2"]]).astype(float),
                  tuple(targets["cell"]), ("sp1", "sp2"))
-    fit = timesift(targets, y=["sp1", "sp2"], id="cell", static=["elev"], models="elasticnet",
-                   ensemble=False, resampling=fold_map(y, v=3, seed=2), inner=None, verbose=False)
+    fit = timesift(targets, y=["sp1", "sp2"], id="cell", static=["elev"], learners="elasticnet",
+                   ensemble=False, resampling=fold_map(y, v=3, seed=2), n_inner=None, verbose=False)
     got = project(fit, static=static, candidate="elasticnet / static")
     want = fit.predict(targets, candidate="elasticnet / static")
     assert np.allclose(got.values.reshape(2, n).T, want)

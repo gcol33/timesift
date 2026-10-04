@@ -106,7 +106,7 @@ package calls, so the two languages grow it identically.</p>
 <span>  max_depth <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  prune <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"se_sum"</span>, <span class="st">"one_se"</span>, <span class="st">"min"</span>, <span class="st">"none"</span><span class="op">)</span>,</span>
 <span>  n_inner <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  preset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"package"</span>, <span class="st">"bigboss"</span><span class="op">)</span>,</span>
+<span>  preset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"default"</span>, <span class="st">"bigboss"</span><span class="op">)</span>,</span>
 <span>  shrink <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">1L</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -146,7 +146,7 @@ representation of the run.</p></dd>
 
 
 <dt id="arg-preset">preset<a class="anchor" aria-label="anchor" href="#arg-preset"></a></dt>
-<dd><p>Whose defaults the settings left <code>NULL</code> take: <code>"package"</code> or <code>"bigboss"</code>.</p></dd>
+<dd><p>Whose defaults the settings left <code>NULL</code> take: <code>"default"</code> or <code>"bigboss"</code>.</p></dd>
 
 
 <dt id="arg-shrink">shrink<a class="anchor" aria-label="anchor" href="#arg-shrink"></a></dt>
@@ -171,14 +171,16 @@ error among the rows that keep a split, the last of them where several tie, whic
 biomod2 prunes its classification tree; <code>"one_se"</code> takes the smallest tree within one standard
 error of the least cross-validated error; <code>"min"</code> the first row reaching the least error; and
 <code>"none"</code> keeps the tree as grown.</p>
-<p><code>preset</code> says whose defaults the settings left <code>NULL</code> take. <code>"package"</code> is rpart's own, which is
+<p><code>preset</code> says whose defaults the settings left <code>NULL</code> take. <code>"default"</code> is rpart's own, which is
 what biomod2's default option set fits: <code>min_split = 20</code>, <code>min_leaf = round(min_split / 3)</code>
 (or <code>min_split = 3 * min_leaf</code> where only <code>min_leaf</code> is given), <code>cp = 0.01</code>, <code>max_depth = 30</code>
 and ten inner folds. <code>"bigboss"</code> is biomod2's tuned option set: <code>min_split = 5</code>, <code>min_leaf = 5</code>,
 <code>cp = 0.001</code>, <code>max_depth = 10</code> and five inner folds. A setting given explicitly beats either.</p>
 <p>The case weights are the response head's, <code><a href="positive_weights.html">positive_weights()</a></code> under presence-absence. They
 weigh every class count, sum of squares and event count the tree is grown on; <code>min_split</code> and
-<code>min_leaf</code> count observations, as rpart's do.</p>
+<code>min_leaf</code> count observations, as rpart's do.
+Under the shipped presence-absence head those weights are on, so a default <code>tree()</code> is
+rpart's specification fitted under them; a head registered without <code>weights</code> fits it unweighted.</p>
 <p>Under a count head a leaf predicts a rate, and the rate is shrunk towards the rate of the units
 the tree is grown on, as rpart's <code>method = "poisson"</code> shrinks it: the posterior mean of a gamma
 prior whose coefficient of variation is <code>shrink</code>. A split is chosen on the deviance of the

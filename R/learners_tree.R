@@ -17,7 +17,7 @@
 #' error of the least cross-validated error; `"min"` the first row reaching the least error; and
 #' `"none"` keeps the tree as grown.
 #'
-#' `preset` says whose defaults the settings left `NULL` take. `"package"` is rpart's own, which is
+#' `preset` says whose defaults the settings left `NULL` take. `"default"` is rpart's own, which is
 #' what biomod2's default option set fits: `min_split = 20`, `min_leaf = round(min_split / 3)`
 #' (or `min_split = 3 * min_leaf` where only `min_leaf` is given), `cp = 0.01`, `max_depth = 30`
 #' and ten inner folds. `"bigboss"` is biomod2's tuned option set: `min_split = 5`, `min_leaf = 5`,
@@ -26,6 +26,8 @@
 #' The case weights are the response head's, [positive_weights()] under presence-absence. They
 #' weigh every class count, sum of squares and event count the tree is grown on; `min_split` and
 #' `min_leaf` count observations, as rpart's do.
+#' Under the shipped presence-absence head those weights are on, so a default `tree()` is
+#' rpart's specification fitted under them; a head registered without `weights` fits it unweighted.
 #'
 #' Under a count head a leaf predicts a rate, and the rate is shrunk towards the rate of the units
 #' the tree is grown on, as rpart's `method = "poisson"` shrinks it: the posterior mean of a gamma
@@ -40,7 +42,7 @@
 #' @param max_depth Depth of the deepest node, the root at depth 0; 30 at most.
 #' @param prune How the grown tree is pruned: `"se_sum"`, `"one_se"`, `"min"` or `"none"`.
 #' @param n_inner Folds of the inner cross-validation the pruning reads.
-#' @param preset Whose defaults the settings left `NULL` take: `"package"` or `"bigboss"`.
+#' @param preset Whose defaults the settings left `NULL` take: `"default"` or `"bigboss"`.
 #' @param shrink Under a count head, the coefficient of variation of the gamma prior a leaf's rate
 #'   is shrunk by; `0` for no shrinkage. rpart's default is `1`.
 #' @param seed Seed for the inner cross-validation's fold draw.
@@ -54,7 +56,7 @@
 #' @export
 tree <- function(data = NULL, min_split = NULL, min_leaf = NULL, cp = NULL, max_depth = NULL,
                  prune = c("se_sum", "one_se", "min", "none"), n_inner = NULL,
-                 preset = c("package", "bigboss"), shrink = 1, seed = 1L) {
+                 preset = c("default", "bigboss"), shrink = 1, seed = 1L) {
   prune <- match.arg(prune)
   preset <- match.arg(preset)
   if (!is.numeric(shrink) || length(shrink) != 1L || is.na(shrink) || shrink < 0) {

@@ -135,7 +135,10 @@ depend on it.</p></dd>
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The defaults are biomod2's <code>GLM</code>: every column enters as <code>x + I(x^2)</code>, and the terms are
 searched in both directions by AIC as <code><a href="https://rdrr.io/pkg/MASS/man/stepAIC.html" class="external-link">MASS::stepAIC()</a></code> searches them, with no bound on how many
-are kept.</p>
+are kept.
+Under the shipped presence-absence head those weights are on, so a default <code>linear()</code> is
+biomod2's <code>GLM</code> specification fitted under them; a head registered without <code>weights</code> fits it
+unweighted.</p>
 <p><code>terms</code> says what one term is. Under <code>"power"</code> each power of a column, <code>x</code>, <code>x^2</code> and so on, is
 a term of its own, which is how biomod2 writes a quadratic formula and how <code>stepAIC()</code> walks it.
 Under <code>"column"</code> a term is a column's orthogonal polynomial of degree <code>degree</code>, so a column enters

@@ -72,11 +72,12 @@ Inference is Laplace's method over the coefficients, the intercepts and the fiel
 the hyperparameters are integrated over on a grid of \code{nodes} points per hyperparameter, centred
 on the mode of their posterior and weighted by it (Rue, Martino and Chopin 2009). With an
 intercept alone its standard deviation is set at the mode of its posterior; with neither the
-fit is the posterior mode of the coefficients. A prediction at new units interpolates the field
-to their coordinates, so \code{\link[=predict.timesift]{predict.timesift()}} is given targets that carry the same coordinate
-columns. The head's case weights enter the likelihood in every configuration. A response holding
-one value is predicted its mean and named in \code{unfitted}. The learner fits a presence-absence
-head.
+fit is the posterior mode of the coefficients, so at \code{spatial = "none"} and \code{random = FALSE}
+the learner is a penalised logistic model, every coefficient shrunk towards zero by its prior. A
+prediction at new units interpolates the field to their coordinates, so \code{\link[=predict.timesift]{predict.timesift()}} is
+given targets that carry the same coordinate columns. The head's case weights enter the
+likelihood in every configuration. A response holding one value is predicted its mean and named
+in \code{unfitted}. The learner fits a presence-absence head.
 
 With \code{random = TRUE} each unit, as named by \code{id} in \code{\link[=timesift]{timesift()}}, gets an intercept, which
 absorbs what its several targets share beyond the record: it is identified where a unit carries

@@ -219,7 +219,7 @@ test_that("a training setting is defaulted in the control and nowhere else", {
   expect_equal(cfg$batch_size, 64L)
   expect_equal(cfg$learning_rate, 1e-3)
   expect_equal(cfg$weight_decay, 1e-4)
-  expect_equal(cfg$early_stopping, 10L)
+  expect_equal(cfg$early_stopping, Inf)
   expect_equal(cfg$val_frac, 0)
   expect_equal(cfg$device, "auto")
   expect_equal(cfg$seed, 1L)

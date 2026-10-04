@@ -28,7 +28,7 @@ selection_fixture <- function(v = 4L) {
 
 test_that("a selection reports one winner per outer fold from the candidate set it searched", {
   f <- selection_fixture()
-  sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, inner = 3L,
+  sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                                        verbose = FALSE))
   expect_s3_class(sel, "timesift_selection")
   expect_equal(nrow(sel$selected), 4L)
@@ -40,7 +40,7 @@ test_that("a selection reports one winner per outer fold from the candidate set 
 
 test_that("the estimate is reported under every registered metric on one set of predictions", {
   f <- selection_fixture()
-  sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, inner = 3L,
+  sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                                        verbose = FALSE))
   expect_setequal(sel$estimate$metric, metrics())
   expect_true(all(is.finite(sel$estimate$score)))
@@ -66,7 +66,7 @@ test_that("no outer test unit reaches the selector or the refit of its own fold"
     }
   )
   f <- selection_fixture()
-  sel <- suppressWarnings(select_grain(f$x, f$y, spy, folds = f$folds, inner = 3L, verbose = FALSE))
+  sel <- suppressWarnings(select_grain(f$x, f$y, spy, folds = f$folds, n_inner = 3L, verbose = FALSE))
   outer_fold <- stats::setNames(as.integer(f$folds), names(f$folds))
   # Every unit a model was fitted on during outer fold k, across the inner ladder and the refit,
   # must have come from outside fold k.
@@ -84,7 +84,7 @@ test_that("no outer test unit reaches the selector or the refit of its own fold"
 
 test_that("the summary counts how often each candidate won and print stays terse", {
   f <- selection_fixture()
-  sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, inner = 3L,
+  sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                                        verbose = FALSE))
   s <- summary(sel)
   expect_equal(nrow(s), nrow(sel$candidates))
@@ -96,7 +96,7 @@ test_that("the summary counts how often each candidate won and print stays terse
 
 test_that("the plot draws the inner scores and returns them", {
   f <- selection_fixture()
-  sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, inner = 3L,
+  sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                                        verbose = FALSE))
   path <- tempfile(fileext = ".png")
   grDevices::png(path)
@@ -122,7 +122,7 @@ test_that("the contrast against a ladder runs through paired_contrast on matched
   f <- selection_fixture()
   lad <- suppressWarnings(grain_ladder(f$x, f$y, selection_learner(), folds = f$folds,
                                         verbose = FALSE))
-  sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, inner = 3L,
+  sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                                        compare = lad, verbose = FALSE))
   expect_equal(nrow(sel$contrast), 3L)
   expect_true(all(sel$contrast$a == "selected|selected"))
@@ -135,17 +135,17 @@ test_that("a comparator scored by another metric is refused", {
   f <- selection_fixture()
   lad <- suppressWarnings(grain_ladder(f$x, f$y, selection_learner(), folds = f$folds,
                                         metric = "tss", verbose = FALSE))
-  expect_error(select_grain(f$x, f$y, selection_learner(), folds = f$folds, inner = 3L,
+  expect_error(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                             compare = lad, verbose = FALSE),
                "same metric")
 })
 
 test_that("a candidate set with nothing to choose between is refused", {
   f <- selection_fixture()
-  expect_error(select_grain(f$x[1L], f$y, selection_learner(), folds = f$folds, inner = 3L,
+  expect_error(select_grain(f$x[1L], f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                             verbose = FALSE),
                "at least two candidates")
-  expect_error(select_grain(f$x, f$y, selection_learner(), folds = f$folds, inner = 1L,
+  expect_error(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 1L,
                             verbose = FALSE),
                "at least 2")
 })
@@ -160,9 +160,9 @@ test_that("adding a grain to the set widens the search with no other change", {
                                                             stats = c("cold_day", "mean",
                                                                       "warm_day")))))
   folds <- fold_map(y, v = 3L, seed = 9L)
-  a <- suppressWarnings(select_grain(narrow, y, selection_learner(), folds = folds, inner = 3L,
+  a <- suppressWarnings(select_grain(narrow, y, selection_learner(), folds = folds, n_inner = 3L,
                                      verbose = FALSE))
-  b <- suppressWarnings(select_grain(wide, y, selection_learner(), folds = folds, inner = 3L,
+  b <- suppressWarnings(select_grain(wide, y, selection_learner(), folds = folds, n_inner = 3L,
                                      verbose = FALSE))
   expect_equal(nrow(a$candidates), 2L)
   expect_equal(nrow(b$candidates), 3L)
@@ -202,7 +202,7 @@ test_that("the grain the response was generated at is selected above chance", {
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("day", "week", "month"))
   sel <- suppressWarnings(select_grain(x, y, elasticnet(),
                                        folds = fold_map(y, v = 5L, seed = 7L),
-                                       inner = 4L, seed = 3L, verbose = FALSE))
+                                       n_inner = 4L, seed = 3L, verbose = FALSE))
   picked <- table(factor(sel$selected$grain, levels = names(x)))
   # Chance over three candidates is a third of the five outer folds; the planted grain has to beat
   # that, and the finest grain, where the signal is buried, must not win outright.
@@ -216,7 +216,7 @@ test_that("the nested estimate stays under what choosing on the held-out units w
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("day", "week", "month"))
   folds <- fold_map(y, v = 5L, seed = 7L)
   lad <- suppressWarnings(grain_ladder(x, y, elasticnet(), folds = folds, verbose = FALSE))
-  sel <- suppressWarnings(select_grain(x, y, elasticnet(), folds = folds, inner = 4L,
+  sel <- suppressWarnings(select_grain(x, y, elasticnet(), folds = folds, n_inner = 4L,
                                        seed = 3L, compare = lad, verbose = FALSE))
 
   # The bound the nested estimate must respect is the oracle: the same candidates, the same fits,
@@ -245,7 +245,7 @@ test_that("a fold's held-out predictions are those of the candidate it selected"
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("week", "month"))
   folds <- fold_map(y, v = 3L, seed = 7L)
   lad <- suppressWarnings(grain_ladder(x, y, elasticnet(), folds = folds, verbose = FALSE))
-  sel <- suppressWarnings(select_grain(x, y, elasticnet(), folds = folds, inner = 3L,
+  sel <- suppressWarnings(select_grain(x, y, elasticnet(), folds = folds, n_inner = 3L,
                                        seed = 3L, verbose = FALSE))
   # The refit is the ladder's own fit on the same units at the same grain, so every cell of the
   # selected procedure is a cell of the ladder rather than a number from a second fitting path. It
@@ -267,7 +267,7 @@ test_that("with no signal at any grain the procedure scores at the design's own 
               dimnames = list(sim$units, paste0("sp", 1:4)))
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("week", "month"))
   folds <- fold_map(y, v = 5L, seed = 7L)
-  sel <- suppressWarnings(select_grain(x, y, elasticnet(), folds = folds, inner = 4L,
+  sel <- suppressWarnings(select_grain(x, y, elasticnet(), folds = folds, n_inner = 4L,
                                        seed = 3L, verbose = FALSE))
   # TSS read at the cut that maximises it is biased upward on cells this small, so the floor is what
   # a design with no signal reports rather than zero.
@@ -291,7 +291,7 @@ test_that("a selection hands its control to the inner search and to the refit al
             function(a, b) a)
     },
     multi = "joint")
-  suppressWarnings(select_grain(f$x, f$y, trained, folds = f$folds, inner = 2L,
+  suppressWarnings(select_grain(f$x, f$y, trained, folds = f$folds, n_inner = 2L,
                                 control = train_control(epochs = 7L), verbose = FALSE))
   # Two outer folds, each running an inner ladder over three grains at two inner folds and one
   # refit: nothing in that chain may reach a learner without the control the caller gave.
@@ -330,8 +330,8 @@ test_that("the coarsest adequate grain is the generating grain or coarser where 
   x <- grain_matrix(sim$readings, unit, time, reading,
                     grain = c("month", "season", "year"))
   sel <- select_grain(x, sim$y, elasticnet(), folds = fold_map(sim$y, v = 4L, seed = 5L),
-                      inner = 4L, rule = "coarsest_adequate", seed = 2L, verbose = FALSE)
-  expect_equal(attr(sel, "rule"), "coarsest_adequate")
+                      n_inner = 4L, choose = "coarsest_adequate", seed = 2L, verbose = FALSE)
+  expect_equal(attr(sel, "choose"), "coarsest_adequate")
   bins <- vapply(x, function(m) dim(m)[2L], numeric(1L))
   expect_true(all(bins[sel$selected$grain] <= bins[["season"]]))
   expect_true(all(sel$selected$inner_score >= sel$selected$inner_best - sel$selected$inner_se))
@@ -352,10 +352,10 @@ test_that("where one candidate clearly separates, the coarsest adequate rule is 
                           auc = 0.85, step_hours = 6, seed = 13L)
   x <- grain_matrix(sim$readings, unit, time, reading, grain = c("season", "year"))
   folds <- fold_map(sim$y, v = 4L, seed = 5L)
-  coarse <- select_grain(x, sim$y, elasticnet(), folds = folds, inner = 4L,
-                         rule = "coarsest_adequate", seed = 2L, verbose = FALSE)
-  top <- select_grain(x, sim$y, elasticnet(), folds = folds, inner = 4L, seed = 2L,
-                      verbose = FALSE)
+  reader <- elasticnet(n_inner = 5L, s = "lambda.min")
+  coarse <- select_grain(x, sim$y, reader, folds = folds, n_inner = 4L,
+                         choose = "coarsest_adequate", seed = 2L, verbose = FALSE)
+  top <- select_grain(x, sim$y, reader, folds = folds, n_inner = 4L, seed = 2L, verbose = FALSE)
   year <- coarse$inner[coarse$inner$grain == "year", ]
   best <- coarse$selected$inner_best[match(year$fold, coarse$selected$fold)]
   se <- coarse$selected$inner_se[match(year$fold, coarse$selected$fold)]
@@ -396,10 +396,10 @@ binormal_cut_design <- function(n = 3000L, v = 4L, skill = 0.6, seed = 21L) {
 test_that("a cut learned on the inner folds reads the population skill a maximised cut overstates", {
   d <- binormal_cut_design()
   folds <- fold_map(d$y, v = 5L, seed = 3L)
-  sel <- select_grain(d$x, d$y, d$learner, folds = folds, inner = 5L, threshold = "youden",
+  sel <- select_grain(d$x, d$y, d$learner, folds = folds, n_inner = 5L, cut_rule = "youden",
                       verbose = FALSE)
   expect_true(all(sel$selected$grain == "good"))
-  expect_equal(attr(sel, "threshold"), "youden")
+  expect_equal(attr(sel, "cut_rule"), "youden")
 
   # Every cut is the Youden cut of the outer training units' own scores: the inner out-of-fold
   # predictions of this learner are the score, and no unit of the outer test fold enters it.
@@ -427,11 +427,11 @@ test_that("a cut learned on the inner folds reads the population skill a maximis
 test_that("without a threshold rule no cut is learned and a rule of another name is refused", {
   d <- binormal_cut_design(n = 300L, v = 2L)
   folds <- fold_map(d$y, v = 3L, seed = 3L)
-  sel <- select_grain(d$x, d$y, d$learner, folds = folds, inner = 3L, verbose = FALSE)
+  sel <- select_grain(d$x, d$y, d$learner, folds = folds, n_inner = 3L, verbose = FALSE)
   expect_null(sel$thresholds)
   expect_null(sel$cut_scores)
   expect_false("tss_inner_cut" %in% sel$estimate$metric)
-  expect_error(select_grain(d$x, d$y, d$learner, folds = folds, inner = 3L, threshold = "median",
+  expect_error(select_grain(d$x, d$y, d$learner, folds = folds, n_inner = 3L, cut_rule = "median",
                             verbose = FALSE), "should be one of")
 })
 

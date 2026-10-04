@@ -96,8 +96,8 @@ classes' shares among the fitting units as priors.</p>
 <span>  data <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  degree <span class="op">=</span> <span class="fl">1L</span>,</span>
 <span>  penalty <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  nk <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  thresh <span class="op">=</span> <span class="fl">0.001</span>,</span>
+<span>  max_terms <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  min_gain <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  prune <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  calibrate <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  threads <span class="op">=</span> <span class="fl">1L</span></span>
@@ -122,12 +122,12 @@ representation of the run.</p></dd>
 freedom, taken at half. <code>NULL</code> is mda's, 2 at degree one and 3 above.</p></dd>
 
 
-<dt id="arg-nk">nk<a class="anchor" aria-label="anchor" href="#arg-nk"></a></dt>
+<dt id="arg-max-terms">max_terms<a class="anchor" aria-label="anchor" href="#arg-max-terms"></a></dt>
 <dd><p>The most terms the forward pass reaches, the intercept included. <code>NULL</code> is
 <code>max(21, 2 p + 1)</code> for <code>p</code> columns; an even number is taken one lower.</p></dd>
 
 
-<dt id="arg-thresh">thresh<a class="anchor" aria-label="anchor" href="#arg-thresh"></a></dt>
+<dt id="arg-min-gain">min_gain<a class="anchor" aria-label="anchor" href="#arg-min-gain"></a></dt>
 <dd><p>The least share of the residuals a forward step is kept for.</p></dd>
 
 
@@ -152,25 +152,27 @@ freedom, taken at half. <code>NULL</code> is mda's, 2 at degree one and 3 above.
     <p>The basis is mda's own MARS, which biomod2 reaches through <code>fda()</code> and which differs from earth's
 that <code><a href="mars.html">mars()</a></code> reproduces. Each forward step adds a column linearly or a pair of hinges on it,
 <code>max(0, x - t)</code> and <code>max(0, t - x)</code>, choosing by Friedman's running updates, and the pass stops
-when a step lowers the residuals by less than <code>thresh</code> of them, when they fall to <code>thresh</code> of
-the null model's, when the generalised cross-validation passes ten times the null model's, or at
-<code>nk</code> terms. The pruning pass drops
-the term of least t statistic, one at a time, and keeps the subset of least generalised
-cross-validation, which counts each term beyond the intercept as <code>1 + penalty / 2</code> degrees of
-freedom. The defaults are mda's, which biomod2
-passes unchanged under its default option set and under <code>"bigboss"</code>: degree one,
-<code>penalty = 2</code>, <code>thresh = 0.001</code> and <code>nk = max(21, 2 p + 1)</code> for <code>p</code> columns.</p>
+when a step lowers the residuals by less than <code>min_gain</code> of them, when they fall to <code>min_gain</code>
+of the null model's, when the generalised cross-validation passes ten times the null model's,
+or at <code>max_terms</code> terms. The pruning pass drops the term of least t statistic, one at a time,
+and keeps the subset of least generalised cross-validation, which counts each term beyond the
+intercept as <code>1 + penalty / 2</code> degrees of freedom. The defaults are mda's, which biomod2 passes
+unchanged under its default option set and under <code>"bigboss"</code>: degree one, <code>penalty = 2</code>,
+<code>min_gain = 0.001</code> and <code>max_terms = max(21, 2 p + 1)</code> for <code>p</code> columns.</p>
 <p>The case weights are the response head's, <code><a href="positive_weights.html">positive_weights()</a></code> under presence-absence. They set
 the classes' scores and the variate, as <code>fda()</code> reads them, and not the basis: mda's forward
-pass sets them to one.</p>
+pass sets them to one.
+Under the shipped presence-absence head those weights are on, so a default <code>discriminant()</code> is
+mda's specification fitted under them; a head registered without <code>weights</code> fits it unweighted.</p>
 <p>biomod2 always recalibrates an <code>FDA</code> posterior by a probit regression of the response on it,
 under the case weights, and predicts through that regression. <code>calibrate = TRUE</code> does the same,
 on the units the discriminant was fitted on; <code>FALSE</code> predicts the posterior itself. biomod2
 rounds the posterior to three decimals before recalibrating it, which is not reproduced.</p>
 <p>The forward pass, the pruning, the scoring and the recalibration live in the core the Python
-package calls, pinned against mda and R's <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> in the fixtures, so the two languages keep the same terms and predict the same
-probabilities. A response holding one value is predicted its mean, and so is one whose scored
-response the basis does not reach; both are named in <code>unfitted</code>. The learner needs a
+package calls, pinned against mda and R's <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> in the fixtures, so the two languages keep the
+same terms and predict the same probabilities. A response holding one value is predicted its
+mean, and so is one whose scored response the basis does not reach; both are named in
+<code>unfitted</code>. The learner needs a
 presence-absence response, and a head whose loss is not the binary cross-entropy is refused.</p>
     </div>
 

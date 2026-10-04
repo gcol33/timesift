@@ -16,8 +16,8 @@
 #' @param learning_rate Learning rate.
 #' @param weight_decay AdamW weight decay.
 #' @param early_stopping Epochs without an inner-validation improvement before training stops.
-#'   Read only where `val_frac` holds a validation set back. `Inf` trains the whole budget and
-#'   still restores the epoch with the lowest validation loss.
+#'   Read only where `val_frac` holds a validation set back. `Inf`, the default, never stops: the
+#'   whole budget is trained and the epoch with the lowest validation loss is restored.
 #' @param val_frac Share of the fitting targets held back as an inner validation set, used for
 #'   early stopping and for nothing else. It is never scored as a result. The set is drawn from
 #'   every fit alike by a plain random permutation, so the fit on all targets that a run ends with
@@ -44,18 +44,18 @@
 #'
 #' @export
 train_control <- function(epochs = 60L, batch_size = 64L, learning_rate = 1e-3,
-                          weight_decay = 1e-4, early_stopping = 10L, val_frac = 0,
+                          weight_decay = 1e-4, early_stopping = Inf, val_frac = 0,
                           device = "auto", seed = 1L, swa = FALSE, swa_start = 0.7) {
   given <- names(as.list(match.call()))[-1L]
-  # `early_stopping = Inf` is a patience that never runs out, so the whole budget is trained; an
-  # integer cannot hold it, and the largest one is the same thing.
-  if (is.numeric(early_stopping) && length(early_stopping) == 1L && is.infinite(early_stopping)) {
-    early_stopping <- if (early_stopping > 0) .Machine$integer.max else -1L
+  # `Inf` is a patience that never runs out, which an integer cannot hold, so it is kept as it is.
+  if (!(is.numeric(early_stopping) && length(early_stopping) == 1L &&
+          is.infinite(early_stopping))) {
+    early_stopping <- as.integer(early_stopping)
   }
   settings <- list(
     epochs = as.integer(epochs), batch_size = as.integer(batch_size),
     learning_rate = learning_rate, weight_decay = weight_decay,
-    early_stopping = as.integer(early_stopping), val_frac = val_frac,
+    early_stopping = early_stopping, val_frac = val_frac,
     device = device, seed = as.integer(seed), swa = isTRUE(swa), swa_start = swa_start)
   .check_control(settings)
   structure(settings, given = given, class = "timesift_control")

@@ -117,8 +117,8 @@ real week or a real month rather than a drifting block of 168 or 730 hours.
 | `season` | three calendar months, counted from `year_start` |
 | `year` | the year running from `year_start` |
 
-`year_start` is a `"MM-DD"` string, default `"09-01"`. It sets the boundary of the hydrological
-year and therefore also the phase of the seasonal bins. A seasonal bin is three calendar months
+`year_start` is a `"MM-DD"` string, default `"01-01"`. It sets the boundary of the year, a
+hydrological one where it is not the first of January, and therefore also the phase of the seasonal bins. A seasonal bin is three calendar months
 counted from that anniversary, so a record of three hydrological years beginning on it holds
 twelve of them and no partial one. Cutting seasons anywhere else, at the equinoxes and solstices
 for instance, is a different calendar and is passed as a function; see Custom bins.
@@ -1131,7 +1131,7 @@ Every word is an unsigned 32-bit integer and every operation is taken modulo 2^3
 
 ### The settings
 
-`preset = "package"` is randomForest's own defaults, which is what biomod2's default option set
+`preset = "default"` is randomForest's own defaults, which is what biomod2's default option set
 fits: 500 trees, `mtry` the square root of the column count rounded down under a binomial family
 and a third of it under a Gaussian or a Poisson one, never below one, and `min_node`, the
 `min_leaf` above, one and five under the two. A forest cuts a count as it cuts a continuous
@@ -1234,10 +1234,10 @@ observation keeps its trees up to the first of least error.
 
 ### The settings
 
-Under `method = "gbm"`, `preset = "package"` is gbm's defaults as biomod2 passes them: 100 trees of one
+Under `method = "gbm"`, `preset = "default"` is gbm's defaults as biomod2 passes them: 100 trees of one
 split, `shrinkage = 0.1`, `min_leaf = 10`, `subsample = 0.5`, no inner folds. `"bigboss"` is 2500
 trees of seven splits, `shrinkage = 0.001`, `min_leaf = 5`, `subsample = 0.5` and three inner folds.
-Under `method = "xgboost"`, `"package"` is xgboost's: 100 trees of depth 6, `shrinkage = 0.3`, `min_leaf = 1`,
+Under `method = "xgboost"`, `"default"` is xgboost's: 100 trees of depth 6, `shrinkage = 0.3`, `min_leaf = 1`,
 `lambda = 1`, `gamma = 0`, every observation and column; `"bigboss"` four trees of depth 2 at
 `shrinkage = 1`. `lambda` and `gamma` are zero under gbm's trees and an error to set otherwise.
 

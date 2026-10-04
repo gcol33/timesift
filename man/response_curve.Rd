@@ -77,8 +77,9 @@ d <- data.frame(
 targets <- data.frame(plot = units, sp1 = rbinom(40, 1, plogis(warmth)),
                       sp2 = rbinom(40, 1, plogis(-warmth)))
 fit <- timesift(targets, d, y = starts_with("sp"), id = plot, time = t, x = temp,
-                models = elasticnet(), sift = grains("month", stats = c("cold_day", "warm_day")),
-                ensemble = FALSE, inner = NULL, resampling = cv(v = 3), verbose = FALSE)
+                learners = elasticnet(),
+                sift = grains("month", stats = c("cold_day", "warm_day")),
+                ensemble = FALSE, n_inner = NULL, resampling = cv(v = 3), verbose = FALSE)
 head(response_curve(fit, "elasticnet / month", "warm_day", n = 5))
 
 }

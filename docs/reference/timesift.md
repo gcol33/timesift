@@ -3,7 +3,7 @@
 One call from two tables to a scored comparison and a held-out estimate
 of choosing among it. `targets` is one row per thing to predict and
 `series` is the long, time-stamped record belonging to those rows. Every
-representation in `sift` is built and every learner in `models` is
+representation in `sift` is built and every learner in `learners` is
 paired with the ones it can read; each pair is a candidate.
 
 ## Usage
@@ -19,12 +19,12 @@ timesift(
   target_time = NULL,
   static = NULL,
   coords = NULL,
-  models = NULL,
+  learners = NULL,
   sift = NULL,
   ensemble = TRUE,
   resampling = cv(),
-  inner = 5L,
-  rule = c("argmax", "coarsest_adequate"),
+  n_inner = 5L,
+  choose = c("argmax", "coarsest_adequate"),
   response = "presence_absence",
   metric = NULL,
   control = train_control(),
@@ -83,7 +83,7 @@ timesift(
   They travel with every representation and are not predictors. None by
   default.
 
-- models:
+- learners:
 
   A learner, a set of them from [`c()`](https://rdrr.io/r/base/c.html),
   or a list. Defaults to
@@ -121,7 +121,7 @@ timesift(
   predictions together. The models, the per-fold fits and `folds` are
   the first repeat's.
 
-- inner:
+- n_inner:
 
   Number of inner folds the choice and the stack's weights are made on
   inside each outer training set, a function of the outer training
@@ -131,7 +131,7 @@ timesift(
   [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
   does.
 
-- rule:
+- choose:
 
   How a candidate is chosen from its inner scores, `"argmax"` or
   `"coarsest_adequate"`, as in
@@ -184,13 +184,14 @@ A `timesift` object, a list carrying:
   response variables. An interval across the variables of this dataset,
   not one for a new sample: every variable is fitted and scored on the
   same targets and folds, so the error they share is not in it. `NULL`
-  with `inner = NULL`.
+  with `n_inner = NULL`.
 
 - `selected`: one row per outer fold, the candidate it chose, the inner
   score it chose on, the highest inner score and that score's standard
   error; `inner`: every candidate's inner score in every outer fold;
   `fold_weights`: the stack's weights in every outer fold, one row per
-  fold. All `NULL` with `inner = NULL`.
+  fold and a column per candidate, 0 where that fold's stack left the
+  candidate out. All `NULL` with `n_inner = NULL`.
 
 - `predictions`: the held-out prediction of every target under the
   selected candidate and under the stack.
@@ -201,10 +202,10 @@ A `timesift` object, a list carrying:
 - `choice`, `models`, `stack` and `weights`: the procedure applied to
   every target, which is what
   [`predict()`](https://rdrr.io/r/stats/predict.html) uses. Every
-  candidate is refitted on all of them; `choice` is the candidate the
-  rule takes on the outer scores, with the outer folds as the split it
-  chooses on, and `stack` holds weights fitted on the outer out-of-fold
-  predictions.
+  candidate is refitted on all of them; `choice` is the candidate
+  `choose` takes on the outer scores, with the outer folds as the split
+  it chooses on, and `stack` holds weights fitted on the outer
+  out-of-fold predictions.
 
 - `representations`, `fits`, `folds`, `cells`, `y`, and the `metric`,
   `response`, `spec` and `call` it was asked for.
@@ -212,8 +213,8 @@ A `timesift` object, a list carrying:
 ## Details
 
 Within each outer fold of `resampling` the training targets are split
-again into `inner` folds. Every candidate is cross-validated on that
-inner split, the rule picks one on its inner score, and the stack's
+again into `n_inner` folds. Every candidate is cross-validated on that
+inner split, `choose` picks one on its inner score, and the stack's
 weights are fitted on the inner out-of-fold predictions. Every candidate
 is then refitted on the whole outer training set and predicts the outer
 test fold, and the selected candidate's prediction and the prediction
@@ -227,7 +228,7 @@ outer folds, and `scores` holds those. They say where predictive skill
 saturates as the record is read more coarsely, which is the measurement
 the package exists for, but the highest of them is a number the held-out
 targets helped choose: read the candidates for the shape of the
-comparison and `estimate` for the level. With `inner = NULL` no inner
+comparison and `estimate` for the level. With `n_inner = NULL` no inner
 search is run, the candidates are compared on the outer folds alone and
 no estimate is made.
 

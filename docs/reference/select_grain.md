@@ -19,9 +19,9 @@ select_grain(
   y,
   learners,
   folds = NULL,
-  inner = 5L,
-  rule = c("argmax", "coarsest_adequate"),
-  threshold = NULL,
+  n_inner = 5L,
+  choose = c("argmax", "coarsest_adequate"),
+  cut_rule = NULL,
   interval = c("variables", "nested_cv"),
   repeats = 1L,
   response = "presence_absence",
@@ -65,7 +65,7 @@ summary(object, ...)
   [`fold_map()`](https://gillescolling.com/timesift/reference/fold_map.md)
   when not given.
 
-- inner:
+- n_inner:
 
   Number of inner folds the selection is made on, or a function of the
   outer training response returning a fold map for those units. A count
@@ -74,7 +74,7 @@ summary(object, ...)
   [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md)
   kept whole outside stays whole inside.
 
-- rule:
+- choose:
 
   How a candidate is chosen from its inner scores. `"argmax"` takes the
   highest. `"coarsest_adequate"` takes the coarsest candidate whose
@@ -83,7 +83,7 @@ summary(object, ...)
   and of Hastie, Tibshirani and Friedman (2009, section 7.10) with
   coarseness in place of model complexity. See Choosing a candidate.
 
-- threshold:
+- cut_rule:
 
   `NULL`, or the rule of
   [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
@@ -162,11 +162,11 @@ under the selection metric, in the layout
 returns. The held-out prediction of every unit is in the `predictions`
 attribute and the scorable-cell mask in `cells`. `inner` holds every
 candidate's inner score and standard error in every outer fold. With
-`threshold` set, the estimate carries the score, its interval and the
+`cut_rule` set, the estimate carries the score, its interval and the
 interval's name in `interval`, one row per metric and interval. With
 `interval = "nested_cv"` it also carries `nested_cv`, the same rows with
 the estimator's own quantities beside them, and `final`, the procedure
-fitted on every unit, whose risk that interval is for. With `threshold`
+fitted on every unit, whose risk that interval is for. With `cut_rule`
 set, the estimate carries one further row, `tss_inner_cut`, the
 procedure's TSS at the learned cuts; `thresholds` holds the cut of every
 outer fold and variable; and `cut_scores` the per-cell rows it is
@@ -201,10 +201,10 @@ over variables of its per-variable mean over the inner folds, and a
 standard error, the standard deviation over the inner folds of the
 fold's own score (the mean over the variables scored in that fold)
 divided by the square root of the number of inner folds.
-`rule = "argmax"` takes the highest inner score, and on an exact tie the
-candidate declared first.
+`choose = "argmax"` takes the highest inner score, and on an exact tie
+the candidate declared first.
 
-`rule = "coarsest_adequate"` first finds that highest score and its
+`choose = "coarsest_adequate"` first finds that highest score and its
 standard error, calls every candidate scoring at least the highest minus
 one standard error adequate, and takes the coarsest adequate one.
 Coarseness is read off the representation as the package holds it: fewer
@@ -283,7 +283,7 @@ and is not where a fit is a neural network.
 TSS read at the cut that maximises it on the scored units is biased
 upward, most where presences are few
 ([`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)).
-With `threshold` set, each outer fold learns one cut per variable on the
+With `cut_rule` set, each outer fold learns one cut per variable on the
 inner out-of-fold predictions of the candidate it selected, which the
 inner search has already made for every outer training unit, by
 [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
@@ -324,7 +324,7 @@ d <- data.frame(
 y <- matrix(rbinom(120, 1, plogis(c(warmth, -warmth))), nrow = 60,
             dimnames = list(units, c("sp1", "sp2")))
 x <- grain_matrix(d, plot, t, temp, grain = c("week", "month"))
-sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), inner = 3,
+sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), n_inner = 3,
                     verbose = FALSE)
 sel
 sel$estimate

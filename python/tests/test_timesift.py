@@ -61,7 +61,7 @@ def _predict(model, x):
 
 
 def fitted(**given):
-    settings = dict(y="sp_*", id="plot", time="when", models=[learner()],
+    settings = dict(y="sp_*", id="plot", time="when", learners=[learner()],
                     sift=grains("day", "week"), resampling=FOLDS, ensemble=False, verbose=False)
     settings.update(given)
     return timesift(targets(), series(), **settings)
@@ -86,7 +86,7 @@ def test_every_candidate_emits_a_prediction_for_every_target_and_response():
 
 
 def test_every_candidate_is_scored_on_the_same_cells():
-    fit = fitted(models=[learner("a"), learner("b")])
+    fit = fitted(learners=[learner("a"), learner("b")])
     columns = fit.scores
     cells = {}
     for name, variable, fold, ok in zip(columns["candidate"], columns["variable"],
@@ -109,7 +109,7 @@ def test_a_separate_learner_and_a_joint_one_emit_the_same_shaped_matrix():
     A learner that fits one model per response does that inside its own fit, so the block of
     predictors is built once for the fit rather than once for every response of it.
     """
-    fit = fitted(models=[learner("apart", multi="separate"), learner("together", multi="joint")])
+    fit = fitted(learners=[learner("apart", multi="separate"), learner("together", multi="joint")])
     apart = fit.models[f"apart{SEPARATOR}day"]
     together = fit.models[f"together{SEPARATOR}day"]
     assert apart.variables == together.variables == ("sp_a", "sp_b", "sp_c")
@@ -126,7 +126,7 @@ def test_the_predictor_block_is_built_once_for_a_fit_rather_than_once_per_respon
 
     counting = Learner(name="counting", multi="separate", fit=fit,
                        predict=lambda model, x: np.tile(model["rate"], (x.values.shape[0], 1)))
-    run = fitted(models=[counting], sift=grains("day"))
+    run = fitted(learners=[counting], sift=grains("day"))
     # Three folds and the refit on all targets, whatever the number of responses. Fitting per
     # response inside the layer instead would build the flattened block once for every one of
     # them, which on the published grid is 101 copies of a 47 MB matrix per fold and per arm.
@@ -167,7 +167,7 @@ def test_one_target_row_per_id_unless_the_targets_are_anchored_in_time():
     t = targets()
     t["plot"] = list(PLOTS[:11]) + ["p01"]
     with pytest.raises(ValueError, match="more than one row of `targets`: p01"):
-        timesift(t, series(), y="sp_*", id="plot", time="when", models=[learner()],
+        timesift(t, series(), y="sp_*", id="plot", time="when", learners=[learner()],
                  sift=grains("day"), resampling=FOLDS, ensemble=False, verbose=False)
 
 
@@ -175,14 +175,14 @@ def test_a_calendar_grain_is_refused_where_the_targets_are_anchored_in_time():
     t = repeated_targets()
     with pytest.raises(ValueError, match="must be anchored on the target"):
         timesift(t, series(), y="sp_*", id="plot", time="when", target_time="visit",
-                 models=[learner()], sift=grains("day"), resampling=[1, 2, 3] * 4,
+                 learners=[learner()], sift=grains("day"), resampling=[1, 2, 3] * 4,
                  ensemble=False, verbose=False)
 
 
 def test_there_is_no_default_set_of_spans():
     with pytest.raises(ValueError, match="no defensible default set of spans"):
         timesift(repeated_targets(), series(), y="sp_*", id="plot", time="when",
-                 target_time="visit", models=[learner()], resampling=[1, 2, 3] * 4,
+                 target_time="visit", learners=[learner()], resampling=[1, 2, 3] * 4,
                  ensemble=False, verbose=False)
 
 
@@ -192,14 +192,14 @@ def test_a_lookback_needs_the_column_holding_each_targets_instant():
 
     # The same check sees a representation a learner pinned itself to, which no sift carries.
     with pytest.raises(ValueError, match="`target_time` has to name the column"):
-        fitted(models=[learner(data=lookback("10 days"))], sift=grains("day"))
+        fitted(learners=[learner(data=lookback("10 days"))], sift=grains("day"))
 
 
 def test_a_lookback_fits_on_repeated_targets_grouped_by_their_unit():
     t = repeated_targets()
     fit = timesift(t, series(), y="sp_*", id="plot", time="when", target_time="visit",
-                   models=[learner()], sift=lookbacks("10 days", "20 days"),
-                   resampling=grouped_cv("plot", v=3, seed=2), inner=None, ensemble=False,
+                   learners=[learner()], sift=lookbacks("10 days", "20 days"),
+                   resampling=grouped_cv("plot", v=3, seed=2), n_inner=None, ensemble=False,
                    verbose=False)
     assert fit.y.units == tuple(str(i + 1) for i in range(12))
     assert list(fit.candidates["candidate"]) == [f"stub{SEPARATOR}10 days",
@@ -212,12 +212,12 @@ def test_a_lookback_fits_on_repeated_targets_grouped_by_their_unit():
 
 def test_without_a_series_static_is_the_whole_predictor_block_and_the_sift_is_ignored():
     fit = timesift(targets(), y="sp_*", id="plot", static=["elevation", "aspect"],
-                   models=[learner()], sift=grains("day"), resampling=FOLDS, ensemble=False,
+                   learners=[learner()], sift=grains("day"), resampling=FOLDS, ensemble=False,
                    verbose=False)
     assert list(fit.representations) == ["static"]
     assert fit.representations["static"].values.shape == (12, 1, 2)
     with pytest.raises(ValueError, match="nothing to predict from"):
-        timesift(targets(), y="sp_*", id="plot", models=[learner()], resampling=FOLDS,
+        timesift(targets(), y="sp_*", id="plot", learners=[learner()], resampling=FOLDS,
                  ensemble=False, verbose=False)
 
 
@@ -227,7 +227,7 @@ def test_the_columns_of_each_table_are_named_where_they_are_wrong():
     with pytest.raises(ValueError, match="`y` names no column of `targets`"):
         fitted(y="none_*")
     with pytest.raises(ValueError, match="`time` names the column of reading instants"):
-        timesift(targets(), series(), y="sp_*", id="plot", models=[learner()], sift=grains("day"),
+        timesift(targets(), series(), y="sp_*", id="plot", learners=[learner()], sift=grains("day"),
                  resampling=FOLDS, ensemble=False, verbose=False)
 
 
@@ -240,7 +240,7 @@ def test_a_run_reads_a_pandas_frame_as_it_reads_a_mapping_of_arrays():
     t["sp_a"] = t["sp_a"].astype("Int64")
     s = pd.DataFrame(series())
     s["when"] = pd.to_datetime(s["when"]).dt.tz_localize("UTC").dt.tz_convert("Europe/Vienna")
-    fit = timesift(t, s, y="sp_*", id="plot", time="when", models=[learner()],
+    fit = timesift(t, s, y="sp_*", id="plot", time="when", learners=[learner()],
                    sift=grains("day", "week"), resampling=FOLDS, ensemble=False, verbose=False)
     plain = fitted()
     assert fit.y.units == plain.y.units and fit.y.variables == plain.y.variables
@@ -264,11 +264,11 @@ def test_a_tabular_learner_is_refused_the_unreduced_record():
 
 def test_the_same_pair_named_through_data_is_an_error_rather_than_a_skip():
     with pytest.raises(ValueError, match="one column per reading"):
-        fitted(models=[learner(data=native())])
+        fitted(learners=[learner(data=native())])
 
 
 def test_a_sequence_learner_is_refused_a_block_of_one_bin():
-    fit = fitted(models=[learner("seq", reads="sequence"), learner("flat")],
+    fit = fitted(learners=[learner("seq", reads="sequence"), learner("flat")],
                  sift=[multigrain(grains=("day", "week")), grain("week")])
     reason = dict(zip(fit.candidates["candidate"], fit.candidates["reason"]))
     assert "gives one row of" in reason[f"seq{SEPARATOR}multigrain(day+week)"]
@@ -277,7 +277,7 @@ def test_a_sequence_learner_is_refused_a_block_of_one_bin():
 
 
 def test_a_learner_pinned_to_a_representation_runs_on_that_one_alone():
-    fit = fitted(models=[learner("pinned", data=grain("month")), learner("free")],
+    fit = fitted(learners=[learner("pinned", data=grain("month")), learner("free")],
                  sift=grains("day", "week"))
     assert list(fit.candidates["candidate"]) == [f"pinned{SEPARATOR}month",
                                                  f"free{SEPARATOR}day", f"free{SEPARATOR}week"]
@@ -286,11 +286,11 @@ def test_a_learner_pinned_to_a_representation_runs_on_that_one_alone():
 
 def test_a_pinned_representation_sharing_a_sift_members_label_but_not_its_definition_is_refused():
     with pytest.raises(ValueError, match='reported under the name "week"'):
-        fitted(models=[learner("free"),
+        fitted(learners=[learner("free"),
                        learner("pinned", data=grain("week", stats=("min", "max")))],
                sift=grains("week"))
     # The same representation under the same name is one array, whichever order it is asked in.
-    fit = fitted(models=[learner("pinned", data=grain("week")), learner("free")],
+    fit = fitted(learners=[learner("pinned", data=grain("week")), learner("free")],
                  sift=grains("week"))
     assert list(fit.candidates["candidate"]) == [f"pinned{SEPARATOR}week",
                                                  f"free{SEPARATOR}week"]
@@ -330,7 +330,7 @@ def test_one_candidate_leaves_no_ensemble_to_fit():
 
 
 def test_the_ensemble_is_fitted_on_the_out_of_fold_predictions_and_predicts_through_the_refits():
-    fit = fitted(models=[learner("a"), learner("b", multi="joint")], ensemble=True)
+    fit = fitted(learners=[learner("a"), learner("b", multi="joint")], ensemble=True)
     assert fit.stack is not None
     assert set(fit.weights) <= set(fit.oof)
     assert sum(fit.weights.values()) == pytest.approx(1.0)
@@ -341,11 +341,16 @@ def test_the_ensemble_is_fitted_on_the_out_of_fold_predictions_and_predicts_thro
 def test_a_binary_prediction_cuts_each_response_where_its_held_out_predictions_put_the_cut():
     from timesift.metrics import decision_threshold
     from timesift.stack import ensemble_combine
-    fit = fitted(models=[learner("a"), learner("b", multi="joint")], ensemble=True)
+    fit = fitted(learners=[learner("a"), learner("b", multi="joint")], ensemble=True)
     y = fit.y.values
     held = {"ensemble": ensemble_combine(fit.stack, {m: fit.oof[m] for m in fit.stack.members}),
             "selected": fit.oof[fit.choice],
             f"a{SEPARATOR}week": fit.oof[f"a{SEPARATOR}week"]}
+    for candidate, oof in held.items():
+        mpa = decision_threshold(fit, candidate=candidate, rule="mpa", perc=0.5)
+        for j, v in enumerate(fit.y.variables):
+            expected = decision_threshold(y[:, j], oof[:, j], "mpa", perc=0.5)
+            assert mpa[v] == expected or (np.isnan(mpa[v]) and np.isnan(expected))
     for candidate, oof in held.items():
         for rule in ("youden", "prevalence"):
             cut = decision_threshold(fit, candidate=candidate, rule=rule)
@@ -363,12 +368,14 @@ def test_a_binary_prediction_cuts_each_response_where_its_held_out_predictions_p
         fit.predict(targets(), series(), type="class")
     with pytest.raises(TypeError, match="carries its own held-out predictions"):
         decision_threshold(fit, y)
+    with pytest.raises(TypeError, match="named as candidate="):
+        decision_threshold(fit, "ensemble")
 
 
 def test_a_committee_votes_through_cuts_learned_on_held_out_predictions():
     from timesift.metrics import decision_threshold
     from timesift.stack import SPREAD_STATISTICS, ensemble
-    fit = fitted(models=[learner("a"), learner("b", multi="joint")], sift=grains("week"),
+    fit = fitted(learners=[learner("a"), learner("b", multi="joint")], sift=grains("week"),
                  ensemble=ensemble(method="committee"))
     assert fit.stack.method == "committee"
     # The refitted committee's cuts are the ones decision_threshold() learns for each member.
@@ -405,7 +412,7 @@ def test_a_learner_that_declares_no_control_is_not_handed_the_runs():
 
     plain = Learner(name="plain", fit=two_arguments, predict=_predict, reads="tabular",
                     multi="joint")
-    fit = fitted(models=[plain], sift=grains("week"), control=train_control(epochs=2))
+    fit = fitted(learners=[plain], sift=grains("week"), control=train_control(epochs=2))
     assert set(fit.oof) == {f"plain{SEPARATOR}week"}
 
 
@@ -427,16 +434,16 @@ def test_the_combiner_minimises_the_loss_of_the_head_the_run_was_fitted_under(te
     monkeypatch.setattr(stack_module, "stack_loss", record)
     two = [learner("a"), learner("b", multi="joint")]
 
-    fitted(models=two, ensemble=True, response="gauss_test")
+    fitted(learners=two, ensemble=True, response="gauss_test")
     # Once inside every outer fold and once on every target, and under the run's head each time.
     assert seen == ["gauss_test"] * (len(set(FOLDS)) + 1)
-    fitted(models=two, ensemble=True)
+    fitted(learners=two, ensemble=True)
     assert seen[-1] == "presence_absence"
     # Naming the run's own head is the same thing said twice, and is not a contradiction.
-    fitted(models=two, ensemble=ensemble(response="gauss_test"), response="gauss_test")
+    fitted(learners=two, ensemble=ensemble(response="gauss_test"), response="gauss_test")
     assert seen[-1] == "gauss_test"
     with pytest.raises(ValueError, match="names another"):
-        fitted(models=two, ensemble=ensemble(response="presence_absence"), response="gauss_test")
+        fitted(learners=two, ensemble=ensemble(response="presence_absence"), response="gauss_test")
 
 
 def test_the_summary_reads_the_fit_and_lists_what_could_not_be_paired():
@@ -453,7 +460,7 @@ def test_a_metric_given_as_a_function_scores_the_run_and_everything_that_rescore
     from timesift.representation import grain_matrix
     from timesift.response import Response
 
-    settings = dict(models=[learner("a"), learner("b")], sift=grains("day", "week"),
+    settings = dict(learners=[learner("a"), learner("b")], sift=grains("day", "week"),
                     ensemble=True)
     fit = fitted(metric=lambda y, p: tss(y, p), **settings)
     by_name = fitted(metric="tss", **settings)
@@ -490,10 +497,10 @@ def test_models_takes_one_learner_as_well_as_a_list_of_them():
 
     R's `models` takes a learner, a set of them or a list, and this is the same three forms.
     """
-    one = fitted(models=learner("alone"), sift=grains("day"))
+    one = fitted(learners=learner("alone"), sift=grains("day"))
     assert list(one.candidates["candidate"]) == [f"alone{SEPARATOR}day"]
     assert list(one.oof) == [f"alone{SEPARATOR}day"]
-    listed = fitted(models=[learner("alone")], sift=grains("day"))
+    listed = fitted(learners=[learner("alone")], sift=grains("day"))
     assert np.allclose(one.oof[f"alone{SEPARATOR}day"], listed.oof[f"alone{SEPARATOR}day"])
 
 def test_a_grouped_run_hands_every_fit_the_grouping_of_the_units_it_is_fitted_on():
@@ -508,7 +515,7 @@ def test_a_grouped_run_hands_every_fit_the_grouping_of_the_units_it_is_fitted_on
                        reads="tabular", multi="joint")
     t = repeated_targets()
     timesift(t, series(), y="sp_*", id="plot", time="when", target_time="visit",
-             models=[recorder], sift=lookbacks("10 days"),
+             learners=[recorder], sift=lookbacks("10 days"),
              resampling=grouped_cv("plot", v=3, seed=2), ensemble=False, verbose=False)
     # Three fold fits and the refit on every target, each handed one group value per unit it
     # was fitted on, and the group is the plot the row belongs to.
@@ -517,7 +524,7 @@ def test_a_grouped_run_hands_every_fit_the_grouping_of_the_units_it_is_fitted_on
         assert group is not None and len(group) == len(units)
         assert list(group) == [t["plot"][int(u) - 1] for u in units]
     seen.clear()
-    fitted(models=[recorder])
+    fitted(learners=[recorder])
     assert all(group is None for _, group in seen)
 
 
@@ -572,8 +579,8 @@ def wide_series(days: int = 30) -> dict:
 
 
 def wide(**given):
-    settings = dict(y="sp_*", id="plot", time="when", models=[learner("a"), first_bin("b")],
-                    sift=grains("day", "week"), resampling=WIDE_FOLDS, inner=3,
+    settings = dict(y="sp_*", id="plot", time="when", learners=[learner("a"), first_bin("b")],
+                    sift=grains("day", "week"), resampling=WIDE_FOLDS, n_inner=3,
                     verbose=False)
     settings.update(given)
     return timesift(given.pop("targets", None) or wide_targets(), wide_series(),
@@ -583,9 +590,9 @@ def wide(**given):
 def test_the_selected_arm_is_the_selection_select_grain_makes_on_the_same_split():
     from timesift.representation import timesift_set
     from timesift.selection import SELECTED_ARM, select_grain
-    fit = wide(models=[learner()], ensemble=False, seed=5)
+    fit = wide(learners=[learner()], ensemble=False, seed=5)
     sel = select_grain(timesift_set(fit.representations), fit.y, [learner()], folds=fit.folds,
-                       inner=3, seed=5, metric="roc_auc", verbose=False)
+                       n_inner=3, seed=5, metric="roc_auc", verbose=False)
     assert [r["representation"] for r in fit.selected] == [r["grain"] for r in sel.selected]
     assert np.allclose([r["inner_score"] for r in fit.selected],
                        [r["inner_score"] for r in sel.selected])
@@ -619,8 +626,28 @@ def test_the_ensemble_is_not_scored_with_weights_fitted_to_the_responses_it_is_s
     assert {r["arm"] for r in fit.estimate} == {"selected", "ensemble"}
 
 
+def test_a_candidate_a_folds_stack_leaves_out_below_min_score_is_a_zero_in_that_folds_row():
+    from timesift.stack import ensemble
+    inner = wide().inner
+    # The least of the folds' best inner scores: every fold keeps its best candidate, and a fold
+    # whose others score below it leaves them out.
+    best = {}
+    for r in inner:
+        best[r["fold"]] = max(best.get(r["fold"], -np.inf), r["score"])
+    cut = min(best.values())
+    fit = wide(ensemble=ensemble("mean", min_score=cut))
+    names = set(fit.oof)
+    for w in fit.fold_weights:
+        assert set(w) - {"fold"} == names
+        assert sum(w[n] for n in names) == pytest.approx(1.0, abs=1e-6)
+        for r in inner:
+            if r["fold"] == w["fold"] and r["score"] < cut - 1e-9:
+                assert w[r["candidate"]] == 0
+    assert any(w[n] == 0 for w in fit.fold_weights for n in names)
+
+
 def test_a_run_without_an_inner_split_compares_the_candidates_and_estimates_nothing():
-    fit = wide(inner=None)
+    fit = wide(n_inner=None)
     assert fit.estimate is None and fit.selected is None and fit.fold_weights is None
     assert fit.stack is not None
     assert "procedure" not in repr(fit)
@@ -655,8 +682,8 @@ def test_choosing_among_candidates_that_carry_no_signal_is_not_reported_as_skill
         folds = fold_map(Response(values, plots, tuple(f"sp{j}" for j in range(1, 7))), v=5,
                          seed=r)
         fit = timesift(t, series(days=14, plots=plots), y="sp*", id="plot", time="when",
-                       models=models, sift=grains("week"), ensemble=False, resampling=folds,
-                       inner=4, verbose=False)
+                       learners=models, sift=grains("week"), ensemble=False, resampling=folds,
+                       n_inner=4, verbose=False)
         best.append(max(row["mean"] for row in candidate_table(fit)))
         nested.append(procedure_table(fit)[0]["mean"])
     best, nested = np.asarray(best), np.asarray(nested)

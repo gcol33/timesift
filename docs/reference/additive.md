@@ -75,6 +75,9 @@ The case weights are the response head's,
 under presence-absence, and enter the likelihood as mgcv's prior
 weights. The model holds at most as many coefficients as there are
 units, as mgcv's does: one for the intercept and `k - 1` per column.
+Under the shipped presence-absence head those weights are on, so a
+default `additive()` is mgcv's specification fitted under them; a head
+registered without `weights` fits it unweighted.
 
 The basis, the fit and the choice of the smoothing parameters live in
 the core the Python package calls, pinned against mgcv in the fixtures,

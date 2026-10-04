@@ -27,11 +27,11 @@ repeat_case <- function(n_unit = 30L, days = 60L) {
   list(targets = targets, series = sim$readings)
 }
 
-run_repeat <- function(case, resampling, ensemble = FALSE, inner = NULL, ...) {
+run_repeat <- function(case, resampling, ensemble = FALSE, n_inner = NULL, ...) {
   timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-           models = list(a = repeat_learner("a"), b = repeat_learner("b")),
+           learners = list(a = repeat_learner("a"), b = repeat_learner("b")),
            sift = grains("week", "month"), ensemble = ensemble, resampling = resampling,
-           inner = inner, control = NULL, verbose = FALSE, ...)
+           n_inner = n_inner, control = NULL, verbose = FALSE, ...)
 }
 
 test_that("a repeated resampling says how many times it is drawn", {
@@ -97,7 +97,7 @@ test_that("the stack is fitted on the out-of-fold predictions of all the repeats
 
 test_that("a nested estimate is read off all the repeats", {
   case <- repeat_case()
-  fit <- run_repeat(case, cv(v = 3L, seed = 5L, repeats = 2L), ensemble = ensemble("stack"), inner = 2L)
+  fit <- run_repeat(case, cv(v = 3L, seed = 5L, repeats = 2L), ensemble = ensemble("stack"), n_inner = 2L)
   expect_true(all(c("selected", "ensemble") %in% fit$estimate$arm))
   expect_true(is.finite(fit$estimate$score[fit$estimate$arm == "selected" &
                                               fit$estimate$metric == "roc_auc"]))
@@ -120,7 +120,7 @@ test_that("a grouped split repeats too, and the models are the first repeat's", 
 test_that("a run says which repeat it is on", {
   case <- repeat_case()
   expect_message(timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                          models = list(a = repeat_learner("a")), sift = grains("month"),
-                          ensemble = FALSE, resampling = cv(v = 3L, repeats = 2L), inner = NULL,
+                          learners = list(a = repeat_learner("a")), sift = grains("month"),
+                          ensemble = FALSE, resampling = cv(v = 3L, repeats = 2L), n_inner = NULL,
                           control = NULL, verbose = TRUE), "repeat 2 of 2")
 })

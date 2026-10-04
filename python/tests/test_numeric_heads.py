@@ -103,8 +103,8 @@ def test_a_run_under_a_numeric_head_is_scored_by_that_heads_metric_and_stacked()
     targets = {"plot": units, "height": height.tolist()}
     run = timesift(targets, readings, y="height", id="plot", time="time", x="value",
                    response="continuous",
-                   models=[elasticnet(squares=False), forest(trees=30)], sift=grains("week"),
-                   resampling=fold_map(y, v=4, seed=2), inner=None, ensemble=ensemble("stack"),
+                   learners=[elasticnet(squares=False), forest(trees=30)], sift=grains("week"),
+                   resampling=fold_map(y, v=4, seed=2), n_inner=None, ensemble=ensemble("stack"),
                    verbose=False)
     assert run.metric == "r_squared"
     scored = np.asarray(run.scores["score"], dtype=float)[np.asarray(run.scores["scorable"])]
@@ -216,8 +216,8 @@ def test_a_run_under_the_count_head_is_scored_by_the_poisson_deviance_and_stacke
     targets = {"plot": units, "count": count.tolist()}
     run = timesift(targets, readings, y="count", id="plot", time="time", x="value",
                    response="count",
-                   models=[elasticnet(squares=False), forest(trees=30)], sift=grains("week"),
-                   resampling=fold_map(y, v=4, seed=2), inner=None, ensemble=ensemble("stack"),
+                   learners=[elasticnet(squares=False), forest(trees=30)], sift=grains("week"),
+                   resampling=fold_map(y, v=4, seed=2), n_inner=None, ensemble=ensemble("stack"),
                    verbose=False)
     assert run.metric == "neg_poisson_deviance"
     scored = np.asarray(run.scores["score"], dtype=float)[np.asarray(run.scores["scorable"])]

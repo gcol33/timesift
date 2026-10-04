@@ -51,7 +51,7 @@ class Representation:
     lag: object = "0 days"
     bins: int = 1
     sequence: bool = True
-    year_start: str = "09-01"
+    year_start: str = "01-01"
 
     def __repr__(self) -> str:  # pragma: no cover - display only
         lines = [f"<timesift representation> {self.label}",
@@ -70,12 +70,12 @@ class Representation:
         return "\n".join(lines)
 
 
-def native(stats="mean", year_start="09-01") -> Representation:
+def native(stats="mean", year_start="01-01") -> Representation:
     """The record unreduced: one bin per reading."""
     return grain("native", stats, year_start)
 
 
-def grain(g, stats="mean", year_start="09-01") -> Representation:
+def grain(g, stats="mean", year_start="01-01") -> Representation:
     """One calendar grain, named, or supplied as a function of the reading instants returning
     each reading's bin start, which is reported as ``custom``."""
     name = "custom" if callable(g) else _check_grain(g)
@@ -83,7 +83,7 @@ def grain(g, stats="mean", year_start="09-01") -> Representation:
                           year_start=_year_start(year_start))
 
 
-def multigrain(grains=None, stats="mean", year_start="09-01") -> Representation:
+def multigrain(grains=None, stats="mean", year_start="01-01") -> Representation:
     """Several grains flattened and bound side by side into one block of features.
 
     Left at ``None`` the grains are the ones the record supports, the set :func:`auto_grains`
@@ -141,7 +141,7 @@ class Sift(Mapping):
                 + "\n  ".join(f"{k:<14} {v.kind}" for k, v in self._parts.items()))
 
 
-def grains(*g, stats="mean", year_start="09-01") -> Sift:
+def grains(*g, stats="mean", year_start="01-01") -> Sift:
     """A sift over calendar grains, named or read off the record with ``"auto"``."""
     named = [str(one) for one in _flatten(g)]
     if not named:
@@ -340,7 +340,7 @@ def target_labels(targets, spec: TimesiftSpec) -> tuple[str, ...]:
 
 
 def auto_grains(series, spec: TimesiftSpec, stats=("mean",),
-                year_start="09-01") -> tuple[str, ...]:
+                year_start="01-01") -> tuple[str, ...]:
     """The named grains that give the record at least two bins, from the finest to the coarsest.
 
     The count comes from the calendar in the core rather than from arithmetic here, so a grain is

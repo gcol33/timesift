@@ -40,13 +40,13 @@ def repeat_case(n_unit=30, days=60, seed=17):
     return targets, series
 
 
-def run_repeat(case, resampling, use_ensemble=False, inner=None):
+def run_repeat(case, resampling, use_ensemble=False, n_inner=None):
     targets, series = case
     return timesift(targets, series, y=["sp0", "sp1"], id="plot", time="t", x="temp",
-                    models=[repeat_learner("a"), repeat_learner("b")],
+                    learners=[repeat_learner("a"), repeat_learner("b")],
                     sift=grains("week", "month"),
                     ensemble=ensemble("stack") if use_ensemble else False,
-                    resampling=resampling, inner=inner, verbose=False)
+                    resampling=resampling, n_inner=n_inner, verbose=False)
 
 
 def test_a_repeated_resampling_says_how_many_times_it_is_drawn():
@@ -100,7 +100,7 @@ def test_the_stack_is_fitted_on_the_out_of_fold_predictions_of_all_the_repeats_t
 
 
 def test_a_nested_estimate_is_read_off_all_the_repeats():
-    fit = run_repeat(repeat_case(), cv(v=3, seed=5, repeats=2), use_ensemble=True, inner=2)
+    fit = run_repeat(repeat_case(), cv(v=3, seed=5, repeats=2), use_ensemble=True, n_inner=2)
     arms = {row["arm"] for row in fit.estimate}
     assert {"selected", "ensemble"} <= arms
     roc = [row["score"] for row in fit.estimate if row["arm"] == "selected"
@@ -123,6 +123,6 @@ def test_a_grouped_split_repeats_too_and_the_models_are_the_first_repeats():
 def test_a_run_says_which_repeat_it_is_on(capsys):
     targets, series = repeat_case()
     timesift(targets, series, y=["sp0", "sp1"], id="plot", time="t", x="temp",
-             models=[repeat_learner("a")], sift=grains("month"), ensemble=False,
-             resampling=cv(v=3, repeats=2), inner=None, verbose=True)
+             learners=[repeat_learner("a")], sift=grains("month"), ensemble=False,
+             resampling=cv(v=3, repeats=2), n_inner=None, verbose=True)
     assert "repeat 2 of 2" in capsys.readouterr().out

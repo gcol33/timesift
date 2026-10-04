@@ -95,7 +95,7 @@ def planted_at_month(n_unit=80, days=150, noise=6.0, v=5, seed=41):
 
 def test_a_selection_reports_one_winner_per_outer_fold_from_the_set_it_searched():
     x, y, folds = fixture()
-    sel = select_grain(x, y, linear_learner(), folds=folds, inner=3, verbose=False)
+    sel = select_grain(x, y, linear_learner(), folds=folds, n_inner=3, verbose=False)
     assert len(sel.selected) == 4
     assert {r["fold"] for r in sel.selected} == set(int(k) for k in np.unique(folds.fold))
     assert len(sel.candidates) == 3
@@ -106,7 +106,7 @@ def test_a_selection_reports_one_winner_per_outer_fold_from_the_set_it_searched(
 
 def test_the_estimate_is_reported_under_every_metric_on_one_set_of_predictions():
     x, y, folds = fixture()
-    sel = select_grain(x, y, linear_learner(), folds=folds, inner=3, verbose=False)
+    sel = select_grain(x, y, linear_learner(), folds=folds, n_inner=3, verbose=False)
     assert {r["metric"] for r in sel.estimate} == set(metrics())
     # A metric a cell does not define, such as the odds ratio of a cell with no miss or no false
     # alarm, leaves no variable to average.
@@ -131,7 +131,7 @@ def test_no_outer_test_unit_reaches_the_selector_or_the_refit_of_its_own_fold():
         return 1.0 / (1.0 + np.exp(-(rank[:, None] - 0.5 + model["rate"][None, :])))
 
     spy = Learner(name="spy", fit=fit, predict=predict)
-    sel = select_grain(x, y, spy, folds=folds, inner=3, verbose=False)
+    sel = select_grain(x, y, spy, folds=folds, n_inner=3, verbose=False)
 
     # Every unit a model was fitted on during outer fold k, across the inner ladder and the refit,
     # must have come from outside fold k.
@@ -147,7 +147,7 @@ def test_no_outer_test_unit_reaches_the_selector_or_the_refit_of_its_own_fold():
 def test_a_folds_held_out_predictions_are_those_of_the_candidate_it_selected():
     x, y, folds = fixture()
     lad = grain_ladder(x, y, linear_learner(), folds=folds, verbose=False)
-    sel = select_grain(x, y, linear_learner(), folds=folds, inner=3, verbose=False)
+    sel = select_grain(x, y, linear_learner(), folds=folds, n_inner=3, verbose=False)
     p = sel.scores.predictions[SELECTED_ARM]
     # The refit is the ladder's own fit on the same units at the same grain, so every cell of the
     # selected procedure is a cell of the ladder rather than a number from a second fitting path.
@@ -159,11 +159,11 @@ def test_a_folds_held_out_predictions_are_those_of_the_candidate_it_selected():
 def test_the_contrast_against_a_ladder_runs_through_paired_contrast_on_matched_cells():
     x, y, folds = fixture()
     lad = grain_ladder(x, y, linear_learner(), folds=folds, verbose=False)
-    sel = select_grain(x, y, linear_learner(), folds=folds, inner=3, compare=lad, verbose=False)
+    sel = select_grain(x, y, linear_learner(), folds=folds, n_inner=3, compare=lad, verbose=False)
     assert [r["b"] for r in sel.contrast] == ["day|linear", "week|linear", "month|linear"]
     assert all(r["a"] == SELECTED_ARM for r in sel.contrast)
     assert all(r["n_cell"] > 0 for r in sel.contrast)
-    assert select_grain(x, y, linear_learner(), folds=folds, inner=3,
+    assert select_grain(x, y, linear_learner(), folds=folds, n_inner=3,
                         verbose=False).contrast is None
 
 
@@ -171,16 +171,16 @@ def test_a_comparator_scored_by_another_metric_is_refused():
     x, y, folds = fixture()
     lad = grain_ladder(x, y, linear_learner(), folds=folds, metric="tss", verbose=False)
     with pytest.raises(ValueError, match="scored by tss and the selection by roc_auc"):
-        select_grain(x, y, linear_learner(), folds=folds, inner=3, compare=lad, verbose=False)
+        select_grain(x, y, linear_learner(), folds=folds, n_inner=3, compare=lad, verbose=False)
     with pytest.raises(ValueError, match="grain_ladder"):
-        select_grain(x, y, linear_learner(), folds=folds, inner=3, compare="week|linear",
+        select_grain(x, y, linear_learner(), folds=folds, n_inner=3, compare="week|linear",
                      verbose=False)
 
 
 def test_a_candidate_set_with_nothing_to_choose_between_is_refused():
     x, y, folds = fixture()
     with pytest.raises(ValueError, match="at least two candidates"):
-        select_grain(x["week"], y, linear_learner(), folds=folds, inner=3, verbose=False)
+        select_grain(x["week"], y, linear_learner(), folds=folds, n_inner=3, verbose=False)
 
 
 def test_the_inner_split_is_a_count_of_at_least_two_or_a_splitter_of_ones_own():
@@ -194,13 +194,13 @@ def test_the_inner_split_is_a_count_of_at_least_two_or_a_splitter_of_ones_own():
         calls.append(len(y_train.units))
         return fold_map(y_train, v=2, seed=99)
 
-    sel = select_grain(x, y, linear_learner(), folds=folds, inner=by_hand, verbose=False)
+    sel = select_grain(x, y, linear_learner(), folds=folds, n_inner=by_hand, verbose=False)
     assert len(calls) == len(sel.selected)
 
 
 def test_the_grain_the_response_was_generated_at_is_selected_above_chance():
     x, y, folds = planted_at_month()
-    sel = select_grain(x, y, linear_learner(reduce="coldest"), folds=folds, inner=4,
+    sel = select_grain(x, y, linear_learner(reduce="coldest"), folds=folds, n_inner=4,
                        verbose=False)
     picked = [r["grain"] for r in sel.selected]
     # Chance over three candidates is a third of the five outer folds; the planted grain has to
@@ -212,7 +212,7 @@ def test_the_nested_estimate_stays_under_what_choosing_on_the_held_out_units_wou
     x, y, folds = planted_at_month()
     learner = linear_learner(reduce="coldest")
     lad = grain_ladder(x, y, learner, folds=folds, verbose=False)
-    sel = select_grain(x, y, learner, folds=folds, inner=4, compare=lad, verbose=False)
+    sel = select_grain(x, y, learner, folds=folds, n_inner=4, compare=lad, verbose=False)
 
     # The bound is the oracle: the same candidates, the same fits, but the grain for each cell
     # picked with the held-out score itself. Selection inside the training data cannot beat that.
@@ -235,7 +235,7 @@ def test_with_no_signal_at_any_grain_the_procedure_scores_at_the_designs_own_flo
     x, y, folds = fixture(n_unit=60, days=90, noise=8.0, v=4, seed=57)
     y = Response(rng.binomial(1, 0.4, y.values.shape).astype(float), y.units, y.variables)
     folds = fold_map(y, v=4, seed=6)
-    sel = select_grain(x, y, linear_learner(), folds=folds, inner=3, verbose=False)
+    sel = select_grain(x, y, linear_learner(), folds=folds, n_inner=3, verbose=False)
     # A threshold read at its own maximum is biased upward on cells this small, so the floor is
     # what a design with no signal reports rather than zero.
     floor = tss_inflation(y, folds, skill=(0.0,), replicates=60, seed=12)[0]["reported"]
@@ -283,9 +283,9 @@ def test_the_one_standard_error_rule_takes_the_coarsest_candidate_inside_the_ban
     # A standard error that could not be computed leaves only the ties with the best.
     grid[0]["se"] = float("nan")
     assert _choose_candidate(grid, size, "coarsest_adequate")["grain"] == "day"
-    with pytest.raises(ValueError, match="rule must be one of"):
+    with pytest.raises(ValueError, match="choose must be one of"):
         x, y, folds = fixture()
-        select_grain(x, y, linear_learner(), folds=folds, inner=3, rule="widest", verbose=False)
+        select_grain(x, y, linear_learner(), folds=folds, n_inner=3, choose="widest", verbose=False)
 
 
 def test_where_every_grain_carries_the_signal_equally_the_coarsest_is_taken():
@@ -293,10 +293,10 @@ def test_where_every_grain_carries_the_signal_equally_the_coarsest_is_taken():
     # days, so those two tie exactly and the rule takes the month where the argmax takes the day
     # declared first. The week differs through its partial end bins.
     x, y, folds = fixture()
-    coarse = select_grain(x, y, linear_learner(), folds=folds, inner=3,
-                          rule="coarsest_adequate", verbose=False)
-    top = select_grain(x, y, linear_learner(), folds=folds, inner=3, verbose=False)
-    assert coarse.rule == "coarsest_adequate"
+    coarse = select_grain(x, y, linear_learner(), folds=folds, n_inner=3,
+                          choose="coarsest_adequate", verbose=False)
+    top = select_grain(x, y, linear_learner(), folds=folds, n_inner=3, verbose=False)
+    assert coarse.choose == "coarsest_adequate"
     bins = {w: x[w].values.shape[1] for w in x}
     for c, t in zip(coarse.selected, top.selected):
         rows = [r for r in coarse.inner if r["fold"] == c["fold"]]
@@ -310,9 +310,9 @@ def test_where_every_grain_carries_the_signal_equally_the_coarsest_is_taken():
 def test_where_one_candidate_clearly_separates_the_coarsest_adequate_rule_is_the_argmax():
     x, y, folds = planted_at_month()
     learner = linear_learner(reduce="coldest")
-    coarse = select_grain(x, y, learner, folds=folds, inner=4, rule="coarsest_adequate",
+    coarse = select_grain(x, y, learner, folds=folds, n_inner=4, choose="coarsest_adequate",
                           verbose=False)
-    top = select_grain(x, y, learner, folds=folds, inner=4, verbose=False)
+    top = select_grain(x, y, learner, folds=folds, n_inner=4, verbose=False)
     for c, t in zip(coarse.selected, top.selected):
         rows = [r for r in coarse.inner if r["fold"] == c["fold"]]
         others = [r["score"] for r in rows if r["grain"] != t["grain"]]
@@ -351,9 +351,9 @@ def binormal_cut_design(n=3000, v=4, skill=0.6, seed=21):
 def test_a_cut_learned_on_the_inner_folds_reads_the_population_skill_a_maximised_cut_overstates():
     x, y, score, reader, skill = binormal_cut_design()
     folds = fold_map(y, v=5, seed=3)
-    sel = select_grain(x, y, reader, folds=folds, inner=5, threshold="youden", verbose=False)
+    sel = select_grain(x, y, reader, folds=folds, n_inner=5, cut_rule="youden", verbose=False)
     assert {r["grain"] for r in sel.selected} == {"good"}
-    assert sel.threshold == "youden"
+    assert sel.cut_rule == "youden"
     # Every cut is the Youden cut of the outer training units' own scores.
     for row in sel.thresholds:
         train = folds.fold != row["fold"]
@@ -372,11 +372,11 @@ def test_a_cut_learned_on_the_inner_folds_reads_the_population_skill_a_maximised
 def test_without_a_threshold_rule_no_cut_is_learned_and_another_name_is_refused():
     x, y, _, reader, _ = binormal_cut_design(n=300, v=2)
     folds = fold_map(y, v=3, seed=3)
-    sel = select_grain(x, y, reader, folds=folds, inner=3, verbose=False)
+    sel = select_grain(x, y, reader, folds=folds, n_inner=3, verbose=False)
     assert sel.thresholds is None and sel.cut_scores is None
     assert "tss_inner_cut" not in {r["metric"] for r in sel.estimate}
-    with pytest.raises(ValueError, match="threshold must be None or one of"):
-        select_grain(x, y, reader, folds=folds, inner=3, threshold="median", verbose=False)
+    with pytest.raises(ValueError, match="cut_rule must be None or one of"):
+        select_grain(x, y, reader, folds=folds, n_inner=3, cut_rule="median", verbose=False)
 
 
 def test_a_selection_hands_its_control_to_the_inner_search_and_to_the_refit_alike():
@@ -389,7 +389,7 @@ def test_a_selection_hands_its_control_to_the_inner_search_and_to_the_refit_alik
 
     trained = Learner(name="trained", fit=fit, multi="joint",
                       predict=lambda model, x: np.tile(model["rate"], (x.values.shape[0], 1)))
-    select_grain(x, y, [trained], folds=folds, inner=2,
+    select_grain(x, y, [trained], folds=folds, n_inner=2,
                  control=train_control(epochs=7), verbose=False)
     # Two outer folds, each running an inner ladder over three grains at two inner folds and one
     # refit: nothing in that chain may reach a learner without the control the caller gave.

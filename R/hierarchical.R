@@ -25,11 +25,12 @@
 #' the hyperparameters are integrated over on a grid of `nodes` points per hyperparameter, centred
 #' on the mode of their posterior and weighted by it (Rue, Martino and Chopin 2009). With an
 #' intercept alone its standard deviation is set at the mode of its posterior; with neither the
-#' fit is the posterior mode of the coefficients. A prediction at new units interpolates the field
-#' to their coordinates, so [predict.timesift()] is given targets that carry the same coordinate
-#' columns. The head's case weights enter the likelihood in every configuration. A response holding
-#' one value is predicted its mean and named in `unfitted`. The learner fits a presence-absence
-#' head.
+#' fit is the posterior mode of the coefficients, so at `spatial = "none"` and `random = FALSE`
+#' the learner is a penalised logistic model, every coefficient shrunk towards zero by its prior. A
+#' prediction at new units interpolates the field to their coordinates, so [predict.timesift()] is
+#' given targets that carry the same coordinate columns. The head's case weights enter the
+#' likelihood in every configuration. A response holding one value is predicted its mean and named
+#' in `unfitted`. The learner fits a presence-absence head.
 #'
 #' With `random = TRUE` each unit, as named by `id` in [timesift()], gets an intercept, which
 #' absorbs what its several targets share beyond the record: it is identified where a unit carries

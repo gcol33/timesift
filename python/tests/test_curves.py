@@ -30,8 +30,8 @@ def curve_run(models, use_ensemble=False):
     y = Response(np.column_stack([targets["sp1"], targets["sp2"]]).astype(float), tuple(units),
                  ("sp1", "sp2"))
     return timesift(targets, readings, y=["sp1", "sp2"], id="plot", time="time", x="value",
-                    models=models, sift=grains("month", stats=["cold_day", "mean", "warm_day"]),
-                    resampling=fold_map(y, v=3, seed=2), inner=None,
+                    learners=models, sift=grains("month", stats=["cold_day", "mean", "warm_day"]),
+                    resampling=fold_map(y, v=3, seed=2), n_inner=None,
                     ensemble=ensemble("mean") if use_ensemble else False, verbose=False)
 
 

@@ -20,12 +20,12 @@ timesift(
     target_time=None,
     static=None,
     coords=None,
-    models=None,
+    learners=None,
     sift=None,
     ensemble=True,
     resampling=None,
-    inner=5,
-    rule: str = 'argmax',
+    n_inner=5,
+    choose: str = 'argmax',
     response: str = 'presence_absence',
     metric=None,
     control=None,
@@ -49,8 +49,8 @@ predictors, and a learner that places a spatial field by them,
 `timesift.hierarchical`, reads them off the array.
 
 Within each outer fold of `resampling` the training targets are split
-again into `inner` folds. Every candidate is cross-validated on that
-inner split, `rule` picks one on its inner score (`"argmax"` or
+again into `n_inner` folds. Every candidate is cross-validated on that
+inner split, `choose` picks one on its inner score (`"argmax"` or
 `"coarsest_adequate"`, as in `select_grain`), and the stack’s weights
 are fitted on the inner out-of-fold predictions. Every candidate is then
 refitted on the whole outer training set and predicts the outer test
@@ -63,10 +63,11 @@ the same targets and folds, and not one for a new sample.
 
 The same refits give every candidate an out-of-fold prediction on the
 outer folds, which `scores` holds: the comparison, whose highest level
-was picked out on the folds it is scored on. `inner=None` runs no inner
-search and makes no estimate. `choice`, `models` and `stack` are the
-procedure applied to every target, for prediction: the rule read on the
-outer scores and weights fitted on the outer out-of-fold predictions.
+was picked out on the folds it is scored on. `n_inner=None` runs no
+inner search and makes no estimate. `choice`, `models` and `stack` are
+the procedure applied to every target, for prediction: the rule read on
+the outer scores and weights fitted on the outer out-of-fold
+predictions.
 
 Columns of `targets` that are neither the response nor the identifier
 nor the anchor are ignored unless `static` names them: a predictor is

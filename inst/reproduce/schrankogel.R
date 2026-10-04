@@ -231,6 +231,8 @@ DROP_TAXA <- c("Alchemilla vulgaris agg.", "Taraxacum sp.", "Festuca halleri agg
                "Euphrasia sp.", "Phleum alpinum agg.")
 CV_FOLDS <- 10L
 INNER_FOLDS <- 5L
+# The deposit's hydrological year, which places the yearly bins; the seasons are its own file.
+YEAR_START <- "09-01"
 CV_SEED <- 1L
 REPORTED_STATS <- c("cold_day", "mean", "warm_day")
 METRIC_NAME <- "tss"
@@ -515,7 +517,8 @@ if (!reads_record) {
 }
 
 build <- function(grain, stats) {
-  x <- grain_matrix(readings, logger_ID, date, temp, grain = BINNING[[grain]], stats = stats)
+  x <- grain_matrix(readings, logger_ID, date, temp, grain = BINNING[[grain]], stats = stats,
+                    year_start = YEAR_START)
   assert_equal(paste(grain, "bins"), dim(x)[2L], EXPECTED_BINS[[grain]])
   x
 }
@@ -601,7 +604,8 @@ if ("baseline" %in% stages) {
     # selection unweighted.
     arms <- list(
       elastic_net = list(learner = elasticnet(alpha = 0.5, n_inner = INNER_FOLDS, squares = TRUE,
-                                              threads = threads, seed = CV_SEED),
+                                              s = "lambda.min", threads = threads,
+                                              seed = CV_SEED),
                          response = "presence_absence"),
       stepwise = list(learner = linear(select = "forward", terms = "column", max_terms = 3L,
                                        degree = 2L),
@@ -640,7 +644,7 @@ if ("baseline" %in% stages) {
     series_ladder <- grain_ladder(
       timesift_set(list(series = weekly)), y,
       list(elastic_net = elasticnet(alpha = 0.5, n_inner = INNER_FOLDS, squares = TRUE,
-                                    threads = threads, seed = CV_SEED)),
+                                    s = "lambda.min", threads = threads, seed = CV_SEED)),
       folds = folds, metric = METRIC_NAME)
     write_out(series_ladder, "baseline_series.csv")
     print(summary(series_ladder))
@@ -684,7 +688,7 @@ if ("selection" %in% stages) {
   say("selecting inside each outer training set: ", length(parts), " candidates, ",
       length(unique(folds)), " outer folds, ", INNER_FOLDS, " inner folds, ", epochs, " epochs")
   selection <- select_grain(set, y, cnn(epochs = epochs, batch_size = 32L), folds = folds,
-                            inner = inner_split, metric = SELECTION_METRIC, control = STUDY_CONTROL,
+                            n_inner = inner_split, metric = SELECTION_METRIC, control = STUDY_CONTROL,
                             compare = series_ladder_auc(series_ladder), verbose = TRUE)
   print(selection)
   write_out(selection$selected, "selection.csv")
@@ -907,7 +911,7 @@ if ("ensemble_selection" %in% stages) {
       " rungs, ", nrow(ENSEMBLE_MEMBERS), " members, ", length(unique(folds)), " outer folds, ",
       INNER_FOLDS, " inner folds, ", epochs, " epochs")
   ens_selection <- select_grain(timesift_set(rungs), y, list(ensemble = pinned_ensemble()),
-                                folds = folds, inner = inner_split, metric = SELECTION_METRIC,
+                                folds = folds, n_inner = inner_split, metric = SELECTION_METRIC,
                                 control = STUDY_CONTROL,
                                 compare = series_ladder_auc(series_ladder), verbose = TRUE)
   print(ens_selection)

@@ -39,17 +39,17 @@ toy_case <- function(n_unit = 24L, days = 90L, n_var = 2L) {
 
 run_toy <- function(case, ...) {
   timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-           models = list(toy()), sift = grains("week", "month"), ensemble = FALSE,
+           learners = list(toy()), sift = grains("week", "month"), ensemble = FALSE,
            resampling = cv(v = 3L), control = NULL, verbose = FALSE, ...)
 }
 
 test_that("a run given c() and a run given list() agree", {
   case <- toy_case()
   by_c <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                   models = c(toy(), toy("toy2")), sift = c(grain("week"), grain("month")),
+                   learners = c(toy(), toy("toy2")), sift = c(grain("week"), grain("month")),
                    ensemble = FALSE, resampling = cv(v = 3L), verbose = FALSE)
   by_list <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                      models = list(toy(), toy("toy2")),
+                      learners = list(toy(), toy("toy2")),
                       sift = list(grain("week"), grain("month")),
                       ensemble = FALSE, resampling = cv(v = 3L), verbose = FALSE)
   expect_equal(names(by_c$oof), names(by_list$oof))
@@ -79,10 +79,10 @@ test_that("a metric given as a function scores the run and everything that resco
   case <- toy_case()
   mine <- function(y, p) tss(y, p)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  models = list(toy(), toy("toy2")), sift = grains("week", "month"),
+                  learners = list(toy(), toy("toy2")), sift = grains("week", "month"),
                   resampling = cv(v = 3L), metric = mine, verbose = FALSE)
   by_name <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                      models = list(toy(), toy("toy2")), sift = grains("week", "month"),
+                      learners = list(toy(), toy("toy2")), sift = grains("week", "month"),
                       resampling = cv(v = 3L), metric = "tss", verbose = FALSE)
 
   # The function is what scores, so every number is the registered metric's; only the name differs.
@@ -101,7 +101,7 @@ test_that("a metric given as a function scores the run and everything that resco
                             y, list(toy()), metric = mine),
                "has to be registered")
   expect_error(timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                        models = list(toy()), sift = grains("week"), resampling = cv(v = 3L),
+                        learners = list(toy()), sift = grains("week"), resampling = cv(v = 3L),
                         metric = 3L, verbose = FALSE),
                "name of a registered metric or a function")
 })
@@ -141,7 +141,7 @@ test_that("the scores are one row per candidate, variable and fold", {
 test_that("a learner is handed the whole response matrix however it covers the responses", {
   case <- toy_case()
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  models = list(one = toy(multi = "separate"), all = toy(multi = "joint")),
+                  learners = list(one = toy(multi = "separate"), all = toy(multi = "joint")),
                   sift = grains("week"), ensemble = FALSE, resampling = cv(v = 3L),
                   control = NULL, verbose = FALSE, keep_fits = TRUE)
   separate <- fit$fits[["one / week"]][["1"]]
@@ -165,7 +165,7 @@ test_that("the predictor block is built once for a fit rather than once per resp
     },
     predict = function(model, x) outer(rep(1, dim(x)[1L]), model$rate))
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  models = counting, sift = grains("week"), ensemble = FALSE,
+                  learners = counting, sift = grains("week"), ensemble = FALSE,
                   resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   # Three folds and the refit on all targets, whatever the number of responses. Fitting per
   # response inside the layer instead would build the flattened block once for every one of them,
@@ -178,7 +178,7 @@ test_that("a pair no learner can read is skipped, named, and reported as not app
   case <- toy_case()
   expect_message(
     fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                    models = list(seq = toy(reads = "sequence")),
+                    learners = list(seq = toy(reads = "sequence")),
                     sift = as_sift(list(grain("week"), multigrain(c("month", "season")))),
                     ensemble = FALSE, resampling = cv(v = 3L), control = NULL, verbose = TRUE),
     "multigrain")
@@ -193,12 +193,12 @@ test_that("a representation named through data = is an error rather than a skip"
   case <- toy_case()
   expect_error(
     timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-             models = list(toy(data = native())), sift = grains("week"), ensemble = FALSE,
+             learners = list(toy(data = native())), sift = grains("week"), ensemble = FALSE,
              resampling = cv(v = 3L), control = NULL, verbose = FALSE),
     "one column per reading")
   expect_error(
     timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-             models = list(toy(reads = "sequence", data = multigrain(c("month", "season")))),
+             learners = list(toy(reads = "sequence", data = multigrain(c("month", "season")))),
              sift = grains("week"), ensemble = FALSE, resampling = cv(v = 3L), control = NULL,
              verbose = FALSE),
     "gives one row of features")
@@ -207,7 +207,7 @@ test_that("a representation named through data = is an error rather than a skip"
 test_that("a learner pinned to its own representation runs on that one alone", {
   case <- toy_case()
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  models = list(pinned = toy(data = grain("month")), free = toy()),
+                  learners = list(pinned = toy(data = grain("month")), free = toy()),
                   sift = grains("week"), ensemble = FALSE, resampling = cv(v = 3L),
                   control = NULL, verbose = FALSE)
   expect_equal(sort(names(fit$oof)), c("free / week", "pinned / month"))
@@ -220,7 +220,7 @@ test_that("a learner that does not declare what it reads is refused by name", {
   bare$reads <- NULL
   expect_error(
     timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-             models = list(bare), sift = grains("week"), ensemble = FALSE, control = NULL,
+             learners = list(bare), sift = grains("week"), ensemble = FALSE, control = NULL,
              verbose = FALSE),
     "does not declare `reads`")
 })
@@ -230,7 +230,7 @@ test_that("repeated identifiers without an anchor are refused, naming them", {
   doubled <- rbind(case$targets, case$targets[1:2, ])
   expect_error(
     timesift(doubled, case$series, y = starts_with("sp"), id = plot, time = t,
-             models = list(toy()), sift = grains("week"), ensemble = FALSE, control = NULL,
+             learners = list(toy()), sift = grains("week"), ensemble = FALSE, control = NULL,
              verbose = FALSE),
     "p001")
 })
@@ -240,12 +240,12 @@ test_that("an anchored fit refuses a calendar representation and a default set o
   case$targets$when <- as.POSIXct(rep("2021-12-01", 6L), tz = "UTC")
   expect_error(
     timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-             target_time = when, models = list(toy()), ensemble = FALSE, control = NULL,
+             target_time = when, learners = list(toy()), ensemble = FALSE, control = NULL,
              verbose = FALSE),
     "no default set of spans")
   expect_error(
     timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-             target_time = when, models = list(toy()), sift = grains("week"), ensemble = FALSE,
+             target_time = when, learners = list(toy()), sift = grains("week"), ensemble = FALSE,
              control = NULL, verbose = FALSE),
     "follows the calendar")
 })
@@ -254,13 +254,13 @@ test_that("a lookback without `target_time` is refused, in the sift and pinned a
   case <- toy_case(n_unit = 6L, days = 120L)
   expect_error(
     timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-             models = list(toy()), sift = lookbacks("30 days"), ensemble = FALSE,
+             learners = list(toy()), sift = lookbacks("30 days"), ensemble = FALSE,
              control = NULL, verbose = FALSE),
     "`target_time` has to name the column", fixed = TRUE)
   # The same check sees a representation a learner pinned itself to, which no sift carries.
   expect_error(
     timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-             models = list(toy(data = lookback("30 days"))), sift = grains("week"),
+             learners = list(toy(data = lookback("30 days"))), sift = grains("week"),
              ensemble = FALSE, control = NULL, verbose = FALSE),
     "`target_time` has to name the column", fixed = TRUE)
 })
@@ -269,9 +269,9 @@ test_that("an anchored fit runs across lookback spans", {
   case <- toy_case(n_unit = 8L, days = 150L)
   case$targets$when <- as.POSIXct(rep("2021-12-01", 8L), tz = "UTC")
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  target_time = when, models = list(toy()),
+                  target_time = when, learners = list(toy()),
                   sift = lookbacks("30 days", "60 days"), ensemble = FALSE,
-                  resampling = cv(v = 3L), inner = NULL, control = NULL, verbose = FALSE)
+                  resampling = cv(v = 3L), n_inner = NULL, control = NULL, verbose = FALSE)
   expect_equal(sort(names(fit$oof)), c("toy / 30 days", "toy / 60 days"))
   expect_equal(rownames(fit$y), rownames(case$targets))
 })
@@ -282,13 +282,13 @@ test_that("static is never implicit and never doubles as something else", {
   expect_equal(dim(plain$representations$week)[3L], 1L)
 
   carried <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                      static = elevation, models = list(toy()), sift = grains("week"),
+                      static = elevation, learners = list(toy()), sift = grains("week"),
                       ensemble = FALSE, resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   expect_equal(dimnames(carried$representations$week)[[3L]], c("mean", "elevation"))
 
   expect_error(
     timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-             static = plot, models = list(toy()), sift = grains("week"), ensemble = FALSE,
+             static = plot, learners = list(toy()), sift = grains("week"), ensemble = FALSE,
              control = NULL, verbose = FALSE),
     "already carries")
 })
@@ -296,12 +296,12 @@ test_that("static is never implicit and never doubles as something else", {
 test_that("a targets-only fit is the static block and nothing else", {
   case <- toy_case(n_unit = 20L, days = 30L)
   fit <- timesift(case$targets, y = starts_with("sp"), id = plot, static = elevation,
-                  models = list(toy()), sift = grains("week"), ensemble = FALSE,
+                  learners = list(toy()), sift = grains("week"), ensemble = FALSE,
                   resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   expect_equal(names(fit$representations), "static")
   expect_equal(dim(fit$representations$static), c(20L, 1L, 1L))
   expect_error(
-    timesift(case$targets, y = starts_with("sp"), id = plot, models = list(toy()),
+    timesift(case$targets, y = starts_with("sp"), id = plot, learners = list(toy()),
              ensemble = FALSE, control = NULL, verbose = FALSE),
     "nothing to fit on")
 })
@@ -310,18 +310,18 @@ test_that("the response and the readings are named by selection, not by position
   case <- toy_case(n_unit = 10L, days = 40L)
   case$series$snow <- as.numeric(case$series$temp < 0)
   fit <- timesift(case$targets, case$series, y = all_of(c("sp1", "sp2")), x = c(temp, snow),
-                  id = plot, time = t, models = list(toy()), sift = grains("week"),
+                  id = plot, time = t, learners = list(toy()), sift = grains("week"),
                   ensemble = FALSE, resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   expect_equal(colnames(fit$y), c("sp1", "sp2"))
   expect_equal(dimnames(fit$representations$week)[[3L]], c("temp_mean", "snow_mean"))
 
   bare <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                   models = list(toy()), sift = grains("week"), ensemble = FALSE,
+                   learners = list(toy()), sift = grains("week"), ensemble = FALSE,
                    resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   expect_equal(dimnames(bare$representations$week)[[3L]], c("temp_mean", "snow_mean"))
   expect_error(
     timesift(case$targets, case$series, y = starts_with("nothing"), id = plot, time = t,
-             models = list(toy()), sift = grains("week"), ensemble = FALSE, control = NULL,
+             learners = list(toy()), sift = grains("week"), ensemble = FALSE, control = NULL,
              verbose = FALSE),
     "must name the response")
 })
@@ -330,12 +330,12 @@ test_that("the resampling arrives as a spec, a fold vector or a fold map", {
   case <- toy_case(n_unit = 15L, days = 40L)
   by_vector <- stats::setNames(rep(1:3, length.out = 15L), sort(case$units))
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  models = list(toy()), sift = grains("week"), ensemble = FALSE,
+                  learners = list(toy()), sift = grains("week"), ensemble = FALSE,
                   resampling = by_vector, control = NULL, verbose = FALSE)
   expect_equal(as.integer(fit$folds), unname(by_vector))
 
   grouped <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                      models = list(toy()), sift = grains("week"), ensemble = FALSE,
+                      learners = list(toy()), sift = grains("week"), ensemble = FALSE,
                       resampling = grouped_cv(rep(1:5, each = 3L), v = 5L), control = NULL,
                       verbose = FALSE)
   expect_equal(length(unique(tapply(unclass(grouped$folds), rep(1:5, each = 3L), length))), 1L)
@@ -348,7 +348,7 @@ test_that("a split without names is read against the targets as they were given"
   reversed <- case$targets[rev(seq_len(nrow(case$targets))), , drop = FALSE]
   given <- rep(1:3, length.out = 15L)
   fit <- timesift(reversed, case$series, y = starts_with("sp"), id = plot, time = t,
-                  models = list(toy()), sift = grains("week"), ensemble = FALSE,
+                  learners = list(toy()), sift = grains("week"), ensemble = FALSE,
                   resampling = given, control = NULL, verbose = FALSE)
   expect_equal(as.integer(fit$folds[reversed$plot]), given)
 })
@@ -360,7 +360,7 @@ test_that("the combiner minimises the loss of the head the run was fitted under"
   case <- toy_case(n_unit = 24L, days = 60L)
   run <- function(...) {
     timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-             models = list(a = toy(), b = toy(multi = "separate")), sift = grains("week"),
+             learners = list(a = toy(), b = toy(multi = "separate")), sift = grains("week"),
              resampling = cv(v = 3L), control = NULL, verbose = FALSE, ...)
   }
 
@@ -378,7 +378,7 @@ test_that("the combiner minimises the loss of the head the run was fitted under"
 test_that("an ensemble is fitted on the out-of-fold predictions and predicts through the refits", {
   case <- toy_case(n_unit = 30L, days = 90L)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  models = list(a = toy(), b = toy(multi = "separate")),
+                  learners = list(a = toy(), b = toy(multi = "separate")),
                   sift = grains("week"), ensemble = TRUE, resampling = cv(v = 3L),
                   control = NULL, verbose = FALSE)
   expect_s3_class(fit$stack, "timesift_stack")
@@ -398,7 +398,7 @@ test_that("a single candidate leaves the ensemble unfitted rather than degenerat
   case <- toy_case(n_unit = 12L, days = 40L)
   expect_message(
     fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                    models = list(toy()), sift = grains("week"), ensemble = TRUE,
+                    learners = list(toy()), sift = grains("week"), ensemble = TRUE,
                     resampling = cv(v = 3L), control = NULL, verbose = TRUE),
     "at least two candidates")
   expect_null(fit$stack)
@@ -418,7 +418,7 @@ test_that("a fit predicts units it was never fitted on", {
   fitting <- case$units[1:20]
   fit <- timesift(case$targets[case$targets$plot %in% fitting, , drop = FALSE],
                   case$series[case$series$plot %in% fitting, , drop = FALSE],
-                  y = starts_with("sp"), id = plot, time = t, models = list(a = toy(), b = toy("b")),
+                  y = starts_with("sp"), id = plot, time = t, learners = list(a = toy(), b = toy("b")),
                   sift = grains("week"), resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   fresh <- case$units[21:30]
   new_targets <- case$targets[case$targets$plot %in% fresh, , drop = FALSE]
@@ -436,7 +436,7 @@ test_that("a fit predicts units it was never fitted on", {
 test_that("a binary prediction cuts each response where its held-out predictions put the cut", {
   case <- toy_case(n_unit = 30L, days = 60L)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  models = list(a = toy(), b = toy("b")), sift = grains("week"),
+                  learners = list(a = toy(), b = toy("b")), sift = grains("week"),
                   resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   held <- list(ensemble = ensemble_combine(fit$stack, fit$oof[names(fit$stack$weights)]),
                selected = fit$oof[[fit$choice]], `a / week` = fit$oof[["a / week"]])
@@ -454,13 +454,18 @@ test_that("a binary prediction cuts each response where its held-out predictions
       expect_identical(dimnames(b), dimnames(p))
       expect_identical(b[] == 1L, p >= matrix(cut[colnames(p)], nrow(p), ncol(p), byrow = TRUE))
     }
+    mpa <- decision_threshold(fit, candidate = candidate, rule = "mpa", perc = 0.5)
+    for (v in colnames(fit$y)) {
+      expect_identical(mpa[[v]],
+                       decision_threshold(fit$y[, v], held[[candidate]][, v], "mpa", perc = 0.5))
+    }
   }
 })
 
 test_that("a committee votes through cuts learned on held-out predictions, nested and refitted", {
   case <- toy_case(n_unit = 30L, days = 60L)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  models = list(a = toy(), b = toy("b")), sift = grains("week"),
+                  learners = list(a = toy(), b = toy("b")), sift = grains("week"),
                   resampling = cv(v = 3L), ensemble = ensemble("committee"), control = NULL,
                   verbose = FALSE)
   expect_identical(fit$stack$method, "committee")
@@ -507,7 +512,7 @@ test_that("predicting needs no response column, because a new target has none", 
 test_that("a new target frame has to carry the static predictors the fit was made with", {
   case <- toy_case(n_unit = 20L, days = 40L)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  static = elevation, models = list(toy()), sift = grains("week"),
+                  static = elevation, learners = list(toy()), sift = grains("week"),
                   ensemble = FALSE, resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   expect_equal(dim(predict(fit, case$targets, case$series, candidate = "toy / week")),
                c(20L, ncol(fit$y)))
@@ -520,7 +525,7 @@ test_that("an anchored fit predicts new targets at their own instants", {
   case <- toy_case(n_unit = 10L, days = 150L)
   case$targets$when <- as.POSIXct(rep("2021-12-01", 10L), tz = "UTC")
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  target_time = when, models = list(toy()), sift = lookbacks("30 days"),
+                  target_time = when, learners = list(toy()), sift = lookbacks("30 days"),
                   ensemble = FALSE, resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   later <- case$targets
   later$when <- as.POSIXct(rep("2022-01-05", 10L), tz = "UTC")
@@ -537,7 +542,7 @@ test_that("an anchored fit predicts new targets at their own instants", {
 test_that("a targets-only fit predicts from the static block alone", {
   case <- toy_case(n_unit = 20L, days = 30L)
   fit <- timesift(case$targets, y = starts_with("sp"), id = plot, static = elevation,
-                  models = list(a = toy(), b = toy("b")), resampling = cv(v = 3L),
+                  learners = list(a = toy(), b = toy("b")), resampling = cv(v = 3L),
                   control = NULL, verbose = FALSE)
   p <- predict(fit, case$targets)
   expect_equal(dim(p), c(20L, ncol(fit$y)))
@@ -575,7 +580,7 @@ test_that("a grouped run hands every fit the grouping of the units it is fitted 
     predict = function(model, x) matrix(model, nrow = dim(x)[1L], ncol = length(model),
                                         byrow = TRUE))
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  target_time = when, models = list(recorder), sift = lookbacks("30 days"),
+                  target_time = when, learners = list(recorder), sift = lookbacks("30 days"),
                   ensemble = FALSE, resampling = grouped_cv("plot", v = 4L), control = NULL,
                   verbose = FALSE)
   # Four fold fits and the refit on every target, each handed one group value per unit it was
@@ -589,7 +594,7 @@ test_that("a grouped run hands every fit the grouping of the units it is fitted 
   seen <- list()
   plain <- toy_case(n_unit = 12L, days = 40L)
   timesift(plain$targets, plain$series, y = starts_with("sp"), id = plot, time = t,
-           models = list(recorder), sift = grains("week"), ensemble = FALSE,
+           learners = list(recorder), sift = grains("week"), ensemble = FALSE,
            resampling = cv(v = 3L), control = NULL, verbose = FALSE)
   expect_length(seen, 4L)
   expect_true(all(vapply(seen, function(s) is.null(s$group), logical(1L))))
@@ -601,10 +606,10 @@ test_that("the selected arm is the selection select_grain() makes on the same sp
   case <- toy_case(n_unit = 48L, days = 90L, n_var = 3L)
   folds <- stats::setNames(rep(1:3, length.out = 48L), sort(case$units))
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
-                  models = list(toy = toy()), sift = grains("week", "month"), ensemble = FALSE,
-                  resampling = folds, inner = 3L, seed = 5L, control = NULL, verbose = FALSE)
+                  learners = list(toy = toy()), sift = grains("week", "month"), ensemble = FALSE,
+                  resampling = folds, n_inner = 3L, seed = 5L, control = NULL, verbose = FALSE)
   x <- grain_matrix(case$series, plot, t, temp, grain = c("week", "month"))
-  sel <- select_grain(x, fit$y, list(toy = toy()), folds = fit$folds, inner = 3L, seed = 5L,
+  sel <- select_grain(x, fit$y, list(toy = toy()), folds = fit$folds, n_inner = 3L, seed = 5L,
                       metric = "roc_auc", verbose = FALSE)
   expect_equal(fit$selected$representation, sel$selected$grain)
   expect_equal(fit$selected$inner_score, sel$selected$inner_score)
@@ -618,8 +623,8 @@ test_that("an outer test fold's responses reach neither its choice nor its weigh
   folds <- stats::setNames(rep(1:3, length.out = 48L), sort(case$units))
   run <- function(targets) {
     timesift(targets, case$series, y = starts_with("sp"), id = plot, time = t,
-             models = list(a = toy(), b = toy("b", multi = "separate")),
-             sift = grains("week", "month"), resampling = folds, inner = 3L, control = NULL,
+             learners = list(a = toy(), b = toy("b", multi = "separate")),
+             sift = grains("week", "month"), resampling = folds, n_inner = 3L, control = NULL,
              verbose = FALSE)
   }
   base <- run(case$targets)
@@ -659,8 +664,8 @@ test_that("choosing among candidates that carry no signal is not reported as ski
                 dimnames = list(sim$units, paste0("sp", 1:6)))
     targets <- cbind(data.frame(plot = sim$units, stringsAsFactors = FALSE), as.data.frame(y))
     fit <- timesift(targets, sim$readings, y = starts_with("sp"), id = plot, time = t,
-                    models = models, sift = grains("week"), ensemble = FALSE,
-                    resampling = fold_map(y, v = 5L, seed = r), inner = 4L, control = NULL,
+                    learners = models, sift = grains("week"), ensemble = FALSE,
+                    resampling = fold_map(y, v = 5L, seed = r), n_inner = 4L, control = NULL,
                     verbose = FALSE)
     s <- summary(fit)
     best <- c(best, max(s$mean[s$scored == "outer folds"]))

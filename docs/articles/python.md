@@ -76,20 +76,20 @@ fit
 #>
 #> candidates, scored on the outer folds
 #> candidate                    mean    won  responses
-#> elasticnet / day            0.879      1  separate
-#> elasticnet / week           0.906      1  separate
-#> elasticnet / month          0.910      4  separate
+#> elasticnet / day            0.870      0  separate
+#> elasticnet / week           0.899      3  separate
+#> elasticnet / month          0.911      3  separate
 #>
 #> procedure, chosen and weighted inside each outer training fold
-#> selected                    0.912  se 0.014
-#> ensemble                    0.916  se 0.012
-#> selected elasticnet / month in 4, elasticnet / week in 1 of 5 folds
+#> selected                    0.911  se 0.011
+#> ensemble                    0.907  se 0.012
+#> selected elasticnet / month in 5 of 5 folds
 #>
 #> choice on every target  elasticnet / month
-#> weights on every target  elasticnet / month 0.72   elasticnet / week 0.28
+#> weights on every target  elasticnet / month 0.96   elasticnet / week 0.04
 ```
 
-Every representation named in `sift` was built, and with `models` left
+Every representation named in `sift` was built, and with `learners` left
 at its default of `[ts.elasticnet()]`, a penalised logistic regression
 was fitted on each of them over the same five folds. The report has two
 parts.
@@ -112,69 +112,69 @@ and weighting included.
 pd.DataFrame(fit.estimate)[["arm", "metric", "score", "se", "lower", "upper"]]
 #>          arm                metric      score        se      lower      upper
 #> 0   selected              accuracy   0.902778  0.011719   0.872652   0.932904
-#> 1   selected     average_precision   0.912736  0.023887   0.851332   0.974140
-#> 2   selected                  bias   0.987235  0.046206   0.868460   1.106011
-#> 3   selected                 boyce   0.661197  0.028310   0.588424   0.733970
-#> 4   selected                   csi   0.817593  0.025308   0.752536   0.882649
-#> 5   selected                   ets   0.682243  0.036524   0.588354   0.776131
-#> 6   selected                   far   0.081706  0.027808   0.010224   0.153189
-#> 7   selected                 kappa   0.686667  0.036028   0.594054   0.779279
-#> 8   selected          kappa_youden   0.797754  0.024534   0.734687   0.860820
-#> 9   selected               neg_mae  -0.280351  0.015292  -0.319660  -0.241042
-#> 10  selected         neg_max_error  -0.735800  0.012070  -0.766827  -0.704773
-#> 11  selected               neg_mse  -0.131604  0.008301  -0.152942  -0.110266
-#> 12  selected  neg_poisson_deviance  -0.443547  0.028867  -0.517753  -0.369342
-#> 13  selected              neg_rmse  -0.358039  0.012266  -0.389570  -0.326508
-#> 14  selected                    or  24.000000  0.577350  21.515862  26.484138
-#> 15  selected      ordinal_accuracy   0.816667  0.012172   0.785379   0.847955
-#> 16  selected            ordinal_f1   0.826092  0.010342   0.799507   0.852677
-#> 17  selected     ordinal_precision   0.820331  0.010924   0.792248   0.848413
-#> 18  selected        ordinal_recall   0.832712  0.010828   0.804879   0.860545
-#> 19  selected                  orss   0.986508  0.006571   0.969618   1.003399
-#> 20  selected               pearson   0.707152  0.023807   0.645953   0.768350
-#> 21  selected                   pod   0.889378  0.019559   0.839101   0.939655
-#> 22  selected                  pofd   0.069616  0.025054   0.005214   0.134019
-#> 23  selected             r_squared   0.419123  0.034854   0.329528   0.508718
-#> 24  selected               roc_auc   0.911593  0.014499   0.874321   0.948865
-#> 25  selected                    sr   0.918294  0.027808   0.846811   0.989776
-#> 26  selected                   tss   0.819762  0.023356   0.759723   0.879801
-#> 27  ensemble              accuracy   0.897222  0.009044   0.873974   0.920470
-#> 28  ensemble     average_precision   0.918701  0.018726   0.870564   0.966838
-#> 29  ensemble                  bias   1.044537  0.044212   0.930887   1.158188
-#> 30  ensemble                 boyce   0.687740  0.029985   0.610661   0.764820
-#> 31  ensemble                   csi   0.813479  0.018509   0.765900   0.861057
-#> 32  ensemble                   ets   0.666883  0.028104   0.594640   0.739126
-#> 33  ensemble                   far   0.109749  0.027043   0.040232   0.179266
-#> 34  ensemble                 kappa   0.663810  0.037109   0.568417   0.759202
-#> 35  ensemble          kappa_youden   0.786277  0.019087   0.737211   0.835343
-#> 36  ensemble               neg_mae  -0.282437  0.014369  -0.319374  -0.245499
-#> 37  ensemble         neg_max_error  -0.739320  0.008787  -0.761909  -0.716732
-#> 38  ensemble               neg_mse  -0.131707  0.006787  -0.149153  -0.114261
-#> 39  ensemble  neg_poisson_deviance  -0.444870  0.024573  -0.508036  -0.381704
-#> 40  ensemble              neg_rmse  -0.359284  0.009496  -0.383695  -0.334874
-#> 41  ensemble                    or  21.000000  2.846050  13.098099  28.901901
-#> 42  ensemble      ordinal_accuracy   0.822222  0.014055   0.786094   0.858351
-#> 43  ensemble            ordinal_f1   0.826303  0.015320   0.786922   0.865684
-#> 44  ensemble     ordinal_precision   0.819517  0.014959   0.781065   0.857970
-#> 45  ensemble        ordinal_recall   0.833929  0.016250   0.792157   0.875700
-#> 46  ensemble                  orss   0.983114  0.004731   0.970953   0.995276
-#> 47  ensemble               pearson   0.709169  0.020091   0.657523   0.760815
-#> 48  ensemble                   pod   0.911918  0.012180   0.880608   0.943228
-#> 49  ensemble                  pofd   0.102474  0.025343   0.037327   0.167620
-#> 50  ensemble             r_squared   0.419408  0.025940   0.352727   0.486090
-#> 51  ensemble               roc_auc   0.915733  0.011500   0.886170   0.945296
-#> 52  ensemble                    sr   0.890251  0.027043   0.820734   0.959768
-#> 53  ensemble                   tss   0.809444  0.017458   0.764568   0.854321
+#> 1   selected     average_precision   0.908116  0.023171   0.848552   0.967679
+#> 2   selected                  bias   1.032778  0.038854   0.932901   1.132654
+#> 3   selected                 boyce   0.701781  0.015503   0.661930   0.741633
+#> 4   selected                   csi   0.819987  0.026700   0.751353   0.888621
+#> 5   selected                   ets   0.678483  0.034219   0.590519   0.766447
+#> 6   selected                   far   0.102672  0.026525   0.034488   0.170856
+#> 7   selected                 kappa   0.660423  0.024039   0.598629   0.722217
+#> 8   selected          kappa_youden   0.796165  0.023657   0.735353   0.856978
+#> 9   selected               neg_mae  -0.371196  0.013208  -0.405149  -0.337243
+#> 10  selected         neg_max_error  -0.635774  0.007559  -0.655206  -0.616342
+#> 11  selected               neg_mse  -0.162203  0.006823  -0.179742  -0.144664
+#> 12  selected  neg_poisson_deviance  -0.513075  0.018045  -0.559461  -0.466689
+#> 13  selected              neg_rmse  -0.401536  0.008560  -0.423540  -0.379532
+#> 14  selected                    or  22.750000  1.030776  19.469609  26.030391
+#> 15  selected      ordinal_accuracy   0.808333  0.009379   0.784224   0.832442
+#> 16  selected            ordinal_f1   0.814673  0.010448   0.787816   0.841529
+#> 17  selected     ordinal_precision   0.807500  0.009108   0.784086   0.830914
+#> 18  selected        ordinal_recall   0.822665  0.012320   0.790995   0.854336
+#> 19  selected                  orss   0.986042  0.005010   0.973164   0.998920
+#> 20  selected               pearson   0.675293  0.014535   0.637930   0.712656
+#> 21  selected                   pod   0.910992  0.015011   0.872405   0.949579
+#> 22  selected                  pofd   0.093545  0.019192   0.044211   0.142879
+#> 23  selected             r_squared   0.285434  0.029940   0.208471   0.362397
+#> 24  selected               roc_auc   0.910976  0.011209   0.882161   0.939790
+#> 25  selected                    sr   0.897328  0.026525   0.829144   0.965512
+#> 26  selected                   tss   0.817447  0.019358   0.767686   0.867208
+#> 27  ensemble              accuracy   0.897222  0.012485   0.865130   0.929315
+#> 28  ensemble     average_precision   0.905069  0.021508   0.849781   0.960356
+#> 29  ensemble                  bias   1.013267  0.045904   0.895268   1.131267
+#> 30  ensemble                 boyce   0.692614  0.027483   0.621968   0.763260
+#> 31  ensemble                   csi   0.810000  0.026807   0.741092   0.878908
+#> 32  ensemble                   ets   0.665135  0.036505   0.571295   0.758975
+#> 33  ensemble                   far   0.099101  0.028427   0.026027   0.172174
+#> 34  ensemble                 kappa   0.663810  0.029921   0.586894   0.740725
+#> 35  ensemble          kappa_youden   0.785917  0.025575   0.720174   0.851659
+#> 36  ensemble               neg_mae  -0.370921  0.013551  -0.405754  -0.336088
+#> 37  ensemble         neg_max_error  -0.647332  0.004716  -0.659455  -0.635209
+#> 38  ensemble               neg_mse  -0.163398  0.007436  -0.182512  -0.144283
+#> 39  ensemble  neg_poisson_deviance  -0.516055  0.018174  -0.562774  -0.469336
+#> 40  ensemble              neg_rmse  -0.403008  0.009305  -0.426928  -0.379088
+#> 41  ensemble                    or  23.125000  0.875000  20.340359  25.909641
+#> 42  ensemble      ordinal_accuracy   0.811111  0.015316   0.771741   0.850481
+#> 43  ensemble            ordinal_f1   0.817597  0.016364   0.775531   0.859662
+#> 44  ensemble     ordinal_precision   0.810853  0.015969   0.769804   0.851902
+#> 45  ensemble        ordinal_recall   0.825112  0.017178   0.780955   0.869270
+#> 46  ensemble                  orss   0.983375  0.006059   0.967800   0.998951
+#> 47  ensemble               pearson   0.672901  0.015095   0.634098   0.711704
+#> 48  ensemble                   pod   0.896243  0.019159   0.846994   0.945492
+#> 49  ensemble                  pofd   0.086878  0.020548   0.034058   0.139699
+#> 50  ensemble             r_squared   0.281085  0.030892   0.201674   0.360497
+#> 51  ensemble               roc_auc   0.906884  0.011914   0.876257   0.937510
+#> 52  ensemble                    sr   0.900899  0.028427   0.827826   0.973973
+#> 53  ensemble                   tss   0.809365  0.022716   0.750971   0.867759
 ```
 
 ``` python
 pd.DataFrame(fit.selected)[["fold", "candidate", "inner_score"]]
 #>    fold           candidate  inner_score
-#> 0     1  elasticnet / month     0.882041
-#> 1     2  elasticnet / month     0.897021
-#> 2     3  elasticnet / month     0.887111
-#> 3     4  elasticnet / month     0.902577
-#> 4     5   elasticnet / week     0.888307
+#> 0     1  elasticnet / month     0.883939
+#> 1     2  elasticnet / month     0.899061
+#> 2     3  elasticnet / month     0.897351
+#> 3     4  elasticnet / month     0.908608
+#> 4     5  elasticnet / month     0.896122
 ```
 
 The interval is across the six responses of this dataset, all fitted and
@@ -212,9 +212,9 @@ chose on every target instead.
 ``` python
 p = fit.predict(targets, series)
 p[:3, :4].round(3)
-#> array([[0.588, 0.362, 0.638, 0.16 ],
-#>        [0.841, 0.063, 0.818, 0.062],
-#>        [0.731, 0.153, 0.701, 0.313]])
+#> array([[0.535, 0.429, 0.629, 0.337],
+#>        [0.644, 0.213, 0.772, 0.221],
+#>        [0.588, 0.312, 0.63 , 0.381]])
 ```
 
 `type="binary"` cuts each response into presence and absence. The cut is
@@ -227,12 +227,12 @@ sensitivity plus specificity, `"kappa"` maximises Cohen’s kappa, and
 
 ``` python
 pd.Series(ts.decision_threshold(fit, rule="prevalence"))
-#> sp1    0.511295
-#> sp2    0.498009
-#> sp3    0.543913
-#> sp4    0.448653
-#> sp5    0.494650
-#> sp6    0.465196
+#> sp1    0.520268
+#> sp2    0.502498
+#> sp3    0.523192
+#> sp4    0.485687
+#> sp5    0.513939
+#> sp6    0.507207
 #> dtype: float64
 ```
 
@@ -290,7 +290,7 @@ ts.elasticnet(data=ts.grain("month"))
 #> <timesift learner> elasticnet
 #> reads   : tabular ; one model per response: yes, separate
 #> data    : month
-#> settings: alpha = 0.5, n_inner = 5, squares = True, s = lambda.min, n_lambda = 100, thresh = 1e-08, threads = 1, seed = 1
+#> settings: alpha = 0.5, n_inner = 10, squares = True, s = lambda.1se, n_lambda = 100, tol = 1e-08, threads = 1, seed = 1
 ```
 
 ## What a learner may be handed
@@ -304,7 +304,7 @@ to hold one bin, once the array says how many it has.
 
 ``` python
 ts.timesift(targets, series, y="sp*", id="plot", time="t",
-            models=[ts.elasticnet()], sift=ts.native(), verbose=False)
+            learners=[ts.elasticnet()], sift=ts.native(), verbose=False)
 #> ValueError: no learner can read any of the representations:
 #>   elasticnet() reads a tabular representation; native gives it one column per reading. Use grain(), multigrain() or lookback().
 ```
@@ -356,9 +356,9 @@ fitted by the same compiled core the R package calls rather than by a
 fitter on either side: the penalty path, the standardisation and the
 cross-validated choice of penalty are one implementation, and the two
 languages return the same coefficients for the same design. `s` reads
-that fit at `"lambda.min"`, at `"lambda.1se"`, or at a penalty of your
-own, and `thresh` trades how close the descent settles to the optimum
-against what it costs.
+that fit at `"lambda.1se"`, glmnet’s default, at `"lambda.min"`, or at a
+penalty of your own, and `tol` trades how close the descent settles to
+the optimum against what it costs.
 
 Architecture belongs to the constructor and training belongs to
 `ts.train_control()`, which every neural learner of a run reads. A
@@ -372,7 +372,7 @@ ts.train_control(epochs=200, device="cpu")
 #>   batch_size      64   (default)
 #>   learning_rate   0.001   (default)
 #>   weight_decay    0.0001   (default)
-#>   early_stopping  10   (default)
+#>   early_stopping  inf   (default)
 #>   val_frac        0.0   (default)
 #>   device          cpu
 #>   seed            1   (default)
@@ -434,7 +434,7 @@ weighted_logistic = ts.Learner("weighted_logistic", fit=logistic_fit,
                                predict=logistic_predict, data=ts.grain("month"))
 
 both = ts.timesift(targets, series, y="sp*", id="plot", time="t",
-                   models=[ts.elasticnet(), nearest_neighbour, weighted_logistic],
+                   learners=[ts.elasticnet(), nearest_neighbour, weighted_logistic],
                    sift=ts.grains("week", "month"), resampling=ts.cv(v=5), verbose=False)
 print(ts.summary(both))
 #> timesift  60 targets, 6 responses, 5-fold random CV, roc_auc
@@ -443,17 +443,17 @@ print(ts.summary(both))
 #> candidate                           mean    won  responses
 #> 1nn / week                         0.744      0  joint
 #> 1nn / month                        0.757      0  joint
-#> weighted_logistic / month          0.900      1  separate
-#> elasticnet / month                 0.903      2  separate
-#> elasticnet / week                  0.906      3  separate
+#> elasticnet / week                  0.899      3  separate
+#> weighted_logistic / month          0.900      0  separate
+#> elasticnet / month                 0.912      3  separate
 #>
 #> procedure, chosen and weighted inside each outer training fold
-#> selected                           0.904  se 0.015
-#> ensemble                           0.917  se 0.012
-#> selected elasticnet / month in 3, elasticnet / week in 2 of 5 folds
+#> selected                           0.912  se 0.011
+#> ensemble                           0.901  se 0.009
+#> selected elasticnet / month in 5 of 5 folds
 #>
-#> choice on every target  elasticnet / week
-#> weights on every target  elasticnet / month 0.48   elasticnet / week 0.34   weighted_logistic / month 0.18
+#> choice on every target  elasticnet / month
+#> weights on every target  weighted_logistic / month 0.71   elasticnet / week 0.24   1nn / week 0.05
 ```
 
 Either way a fit is handed every response as the columns of `y` and
@@ -479,9 +479,9 @@ weights are in `fit.fold_weights`.
 
 ``` python
 pd.Series(ts.ensemble_weights(fit))
-#> elasticnet / day      3.833293e-14
-#> elasticnet / week     2.785812e-01
-#> elasticnet / month    7.214188e-01
+#> elasticnet / day      5.967019e-269
+#> elasticnet / week      3.517667e-02
+#> elasticnet / month     9.648233e-01
 #> dtype: float64
 ```
 
@@ -584,9 +584,9 @@ grain_set = ts.grain_matrix(series, "plot", "t", "temp", grain=("day", "week", "
 lad = ts.grain_ladder(grain_set, fit.y, [ts.elasticnet()], folds=fit.folds, verbose=False)
 pd.DataFrame(lad.summary())
 #>       learner  grain     score  n_variable   best
-#> 0  elasticnet    day  0.882663           6  False
-#> 1  elasticnet   week  0.905958           6   True
-#> 2  elasticnet  month  0.902628           6  False
+#> 0  elasticnet    day  0.869715           6  False
+#> 1  elasticnet   week  0.899052           6  False
+#> 2  elasticnet  month  0.912017           6   True
 ```
 
 A claim about one step of that curve rests on the paired contrast. The
@@ -599,14 +599,14 @@ test behind `p_value` has few values to work with.
 pd.Series(ts.paired_contrast(lad, "month|elasticnet", "day|elasticnet"))
 #> a             month|elasticnet
 #> b               day|elasticnet
-#> diff                  0.019965
-#> center                0.019965
-#> lower                -0.011869
-#> upper                 0.051799
+#> diff                  0.042303
+#> center                0.042303
+#> lower                 0.003589
+#> upper                 0.081016
 #> n_variable                   6
 #> n_cell                      30
-#> n_favour                     4
-#> p_value                0.21875
+#> n_favour                     6
+#> p_value                0.03125
 #> p_method                 exact
 #> interval             variables
 #> dtype: object
@@ -620,9 +620,9 @@ the wheel.
 
 ``` python
 pd.DataFrame(ts.grain_contrasts(lad))
-#>       learner  grain reference      diff     lower     upper   p_value
-#> 0  elasticnet    day      week -0.023295 -0.066035  0.019446  0.367568
-#> 1  elasticnet  month      week -0.003330 -0.046071  0.039411  0.977668
+#>       learner grain reference      diff     lower     upper   p_value
+#> 0  elasticnet   day     month -0.042303 -0.088449  0.003844  0.076834
+#> 1  elasticnet  week     month -0.012965 -0.059111  0.033181  0.752021
 ```
 
 ## What was read
@@ -639,10 +639,10 @@ kept = ts.timesift(targets, series, y="sp*", id="plot", time="t",
 profile = ts.occlusion(kept, "elasticnet / month", permutations=5)
 weight = pd.DataFrame(profile["weight"], index=profile["part"], columns=profile["variable"])
 weight.mean(axis=1).head(4)
-#> 2021-09-01T00:00:00Z    0.124983
-#> 2021-10-01T00:00:00Z    0.093020
-#> 2021-11-01T00:00:00Z    0.023396
-#> 2021-12-01T00:00:00Z    0.028906
+#> 2021-09-01T00:00:00Z    0.092622
+#> 2021-10-01T00:00:00Z    0.078312
+#> 2021-11-01T00:00:00Z    0.022786
+#> 2021-12-01T00:00:00Z    0.032392
 #> dtype: float64
 ```
 

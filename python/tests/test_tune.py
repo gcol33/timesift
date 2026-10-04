@@ -40,7 +40,7 @@ def k_learner():
 
 def test_the_setting_that_scores_best_on_the_inner_folds_is_the_one_fitted():
     x, y, _, s = tune_data()
-    tuned = tune(k_learner(), {"k": [1, 2, 3, 4, 5]}, inner=3)
+    tuned = tune(k_learner(), {"k": [1, 2, 3, 4, 5]}, n_inner=3)
     assert tuned.name == "kl"
     fit = fit_learner(tuned, x, y)
     assert isinstance(fit.model, Tuned)
@@ -55,31 +55,31 @@ def test_the_setting_that_scores_best_on_the_inner_folds_is_the_one_fitted():
 
 def test_a_grid_is_every_combination_and_a_setting_given_to_the_fit_overrides_the_carried_one():
     x, y, _, _ = tune_data()
-    fit = fit_learner(tune(k_learner(), {"k": [3, 9], "other": ["a", "b"]}, inner=3), x, y)
+    fit = fit_learner(tune(k_learner(), {"k": [3, 9], "other": ["a", "b"]}, n_inner=3), x, y)
     assert [r["settings"] for r in fit.model.table] == [
         "k = 3, other = a", "k = 9, other = a", "k = 3, other = b", "k = 9, other = b"]
     # Ties go to the first combination in the grid.
     assert fit.model.chosen == {"k": 3, "other": "a"}
-    given = fit_learner(tune(k_learner(), {"k": [3]}, inner=3), x, y, other="given")
+    given = fit_learner(tune(k_learner(), {"k": [3]}, n_inner=3), x, y, other="given")
     assert given.model.model["other"] == "given"
 
 
 def test_the_inner_folds_keep_a_grouping_whole_and_a_metric_of_its_own_is_used():
     x, y, _, _ = tune_data()
     group = [f"g{i // 4:02d}" for i in range(40)]
-    fit = fit_learner(tune(k_learner(), {"k": [1, 2, 3, 4, 5]}, inner=3), x, y, group=group)
+    fit = fit_learner(tune(k_learner(), {"k": [1, 2, 3, 4, 5]}, n_inner=3), x, y, group=group)
     assert fit.model.chosen == {"k": 3}
-    by_tss = fit_learner(tune(k_learner(), {"k": [1, 2, 3, 4, 5]}, metric="tss", inner=3), x, y)
+    by_tss = fit_learner(tune(k_learner(), {"k": [1, 2, 3, 4, 5]}, metric="tss", n_inner=3), x, y)
     assert by_tss.model.chosen == {"k": 3} and by_tss.model.table[2]["score"] == 1.0
     by_function = fit_learner(
-        tune(k_learner(), {"k": [1, 2, 3, 4, 5]}, inner=3,
+        tune(k_learner(), {"k": [1, 2, 3, 4, 5]}, n_inner=3,
              metric=lambda yy, p: -abs(float(np.mean(p)) - 0.2)), x, y)
     assert by_function.model.chosen["k"] in (1, 2, 3, 4, 5)
 
 
 def test_a_shipped_learner_is_tuned_the_same_way():
     x, y, _, _ = tune_data()
-    fit = fit_learner(tune(forest(), {"trees": [5, 15]}, inner=3), x, y)
+    fit = fit_learner(tune(forest(), {"trees": [5, 15]}, n_inner=3), x, y)
     assert fit.model.chosen["trees"] in (5, 15)
     assert len(fit.model.table) == 2
     assert fit.predict(x).shape == y.values.shape
@@ -93,8 +93,8 @@ def test_a_run_records_what_each_tuned_candidate_chose():
     plain = Learner(name="plain", multi=plain.multi, params=plain.params, fit=plain.fit,
                     predict=plain.predict)
     run = timesift(targets, readings, y=["sp1", "sp2"], id="plot", time="time", x="value",
-                   models=[tune(k_learner(), {"k": [1, 2, 3, 4, 5]}, inner=3), plain],
-                   sift=grains("month"), resampling=fold_map(y, v=3, seed=2), inner=None,
+                   learners=[tune(k_learner(), {"k": [1, 2, 3, 4, 5]}, n_inner=3), plain],
+                   sift=grains("month"), resampling=fold_map(y, v=3, seed=2), n_inner=None,
                    ensemble=False, verbose=False)
     by_learner = dict(zip(run.candidates["learner"], run.candidates["settings"]))
     assert by_learner["kl"] == "k = 3" and by_learner["plain"] == ""
@@ -108,7 +108,7 @@ def test_a_grid_says_what_it_cannot_search():
     with pytest.raises(ValueError, match="dict"):
         tune(k_learner(), [1, 2, 3])
     with pytest.raises(ValueError, match="2 or more"):
-        tune(k_learner(), {"k": [1, 2]}, inner=1)
+        tune(k_learner(), {"k": [1, 2]}, n_inner=1)
 
 
 def test_a_learner_with_no_grid_of_its_own_is_searched_over_the_one_registered_for_it():
@@ -120,7 +120,7 @@ def test_a_learner_with_no_grid_of_its_own_is_searched_over_the_one_registered_f
     columns = flatten(x).shape[1]
     assert set(default_grids()) <= set(tunings())
     assert _registered_grid(forest(), x)["mtry"] == list(range(1, min(10, columns) + 1))
-    fit = fit_learner(tune(forest(trees=10), inner=3), x, y)
+    fit = fit_learner(tune(forest(trees=10), n_inner=3), x, y)
     assert len(fit.model.table) == min(10, columns)
 
     assert _registered_grid(boosting(), x) == {"trees": [500, 1000, 2500], "depth": [2, 5, 8],
@@ -129,7 +129,7 @@ def test_a_learner_with_no_grid_of_its_own_is_searched_over_the_one_registered_f
     assert xgb["shrinkage"] == [0.3, 0.4] and xgb["colsample"] == [0.6, 0.8]
     assert _registered_grid(mars(), x)["nprune"] == list(range(2, max(21, 2 * columns + 1) + 1))
     assert _registered_grid(envelope(), x)["quantile"] == [0.0, 0.0125, 0.025, 0.05, 0.1]
-    labels = [r["settings"] for r in fit_learner(tune(envelope(), inner=3), x, y).model.table]
+    labels = [r["settings"] for r in fit_learner(tune(envelope(), n_inner=3), x, y).model.table]
     assert labels == [f"quantile = {q}" for q in ("0", "0.0125", "0.025", "0.05", "0.1")]
     assert _registered_grid(mlp(), x)["hidden"] == [[2], [4], [6], [8]]
     assert _registered_grid(discriminant(), x) == {"degree": [1, 2]}
@@ -144,9 +144,9 @@ def test_a_grid_can_be_registered_for_a_learner_of_ones_own_as_a_dict_or_as_a_fu
     x, y, _, _ = tune_data()
     register_tuning("kl", {"k": [1, 2, 3, 4, 5]}, overwrite=True)
     try:
-        assert fit_learner(tune(k_learner(), inner=3), x, y).model.chosen == {"k": 3}
+        assert fit_learner(tune(k_learner(), n_inner=3), x, y).model.chosen == {"k": 3}
         register_tuning("kl", lambda learner, x: {"k": [2, 3]}, overwrite=True)
-        assert len(fit_learner(tune(k_learner(), inner=3), x, y).model.table) == 2
+        assert len(fit_learner(tune(k_learner(), n_inner=3), x, y).model.table) == 2
         with pytest.raises(ValueError, match="dict of values"):
             register_tuning("kl", [1, 2], overwrite=True)
         with pytest.raises(ValueError, match="already registered"):

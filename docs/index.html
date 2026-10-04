@@ -114,7 +114,7 @@
 <span>  <span class="va">plots</span>, <span class="va">logger</span>,</span>
 <span>  y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp_"</span><span class="op">)</span>,</span>
 <span>  id <span class="op">=</span> <span class="va">plot_id</span>, time <span class="op">=</span> <span class="va">datetime</span>,</span>
-<span>  models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="reference/elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  learners <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="reference/elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  sift <span class="op">=</span> <span class="fu"><a href="reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -130,7 +130,7 @@
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    plots, logger,</span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    y<span class="op">=</span><span class="st">"sp_*"</span>,</span>
 <span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="st">"plot_id"</span>, time<span class="op">=</span><span class="st">"datetime"</span>,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    models<span class="op">=</span>[ts.elasticnet(), ts.forest()],</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    learners <span class="op">=</span> [ts.elasticnet(), ts.forest()],</span>
 <span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    sift<span class="op">=</span>ts.grains(<span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span>),</span>
 <span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>)</span></code></pre></div>
 </div>

@@ -25,7 +25,7 @@
 #' weighted by how many units each holds, is kept, as gbm's `cv.folds` chooses it. The folds are
 #' dealt for each response and stratified on it, as the elastic net's are.
 #'
-#' `preset` says whose defaults the settings left `NULL` take. `"package"` is the fitting
+#' `preset` says whose defaults the settings left `NULL` take. `"default"` is the fitting
 #' package's own, which is what biomod2's default option set fits: under gbm 100 trees of one split,
 #' `shrinkage = 0.1`, `min_leaf = 10` and `subsample = 0.5`; under xgboost 100 trees of depth 6,
 #' `shrinkage = 0.3`, `min_leaf = 1`, `lambda = 1` and every unit and column. `"bigboss"` is
@@ -36,6 +36,8 @@
 #' The case weights are the response head's, [positive_weights()] under presence-absence, and
 #' weigh the gradient and every sum a tree is grown on; `min_leaf` counts units under gbm, as
 #' `n.minobsinnode` does.
+#' Under the shipped presence-absence head those weights are on, so a default `boosting()` is
+#' gbm's specification fitted under them; a head registered without `weights` fits it unweighted.
 #'
 #' @inheritParams elasticnet
 #' @param trees Trees fitted.
@@ -50,7 +52,7 @@
 #'   zero under `"gbm"`.
 #' @param n_inner Folds of the inner cross-validation choosing how many trees are kept, or 0 to
 #'   keep them all.
-#' @param preset Whose defaults the settings left `NULL` take: `"package"` or `"bigboss"`.
+#' @param preset Whose defaults the settings left `NULL` take: `"default"` or `"bigboss"`.
 #' @param seed Seed for the subsamples and the inner folds.
 #' @param threads Fits of one response's inner cross-validation run at once. The model is the same
 #'   on any number.
@@ -66,7 +68,7 @@
 boosting <- function(data = NULL, method = c("gbm", "xgboost"), trees = NULL, depth = NULL,
                      shrinkage = NULL, min_leaf = NULL, subsample = NULL, colsample = NULL,
                      lambda = NULL, gamma = NULL, n_inner = NULL,
-                     preset = c("package", "bigboss"), seed = 1L, threads = 1L) {
+                     preset = c("default", "bigboss"), seed = 1L, threads = 1L) {
   method <- match.arg(method)
   preset <- match.arg(preset)
   settings <- .boost_settings(preset, method, trees, depth, shrinkage, min_leaf,
@@ -119,11 +121,11 @@ boosting <- function(data = NULL, method = c("gbm", "xgboost"), trees = NULL, de
   }
   base <- switch(
     paste(preset, method),
-    "package gbm" = list(trees = 100L, depth = 1L, shrinkage = 0.1, min_leaf = 10,
+    "default gbm" = list(trees = 100L, depth = 1L, shrinkage = 0.1, min_leaf = 10,
                          subsample = 0.5, colsample = 1, lambda = 0, gamma = 0, n_inner = 0L),
     "bigboss gbm" = list(trees = 2500L, depth = 7L, shrinkage = 0.001, min_leaf = 5,
                          subsample = 0.5, colsample = 1, lambda = 0, gamma = 0, n_inner = 3L),
-    "package xgboost" = list(trees = 100L, depth = 6L, shrinkage = 0.3, min_leaf = 1,
+    "default xgboost" = list(trees = 100L, depth = 6L, shrinkage = 0.3, min_leaf = 1,
                              subsample = 1, colsample = 1, lambda = 1, gamma = 0, n_inner = 0L),
     "bigboss xgboost" = list(trees = 4L, depth = 2L, shrinkage = 1, min_leaf = 1, subsample = 1,
                              colsample = 1, lambda = 1, gamma = 0, n_inner = 0L)

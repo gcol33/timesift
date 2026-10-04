@@ -10,9 +10,9 @@ select_grain(
   y,
   learners,
   folds = NULL,
-  inner = 5L,
-  rule = c("argmax", "coarsest_adequate"),
-  threshold = NULL,
+  n_inner = 5L,
+  choose = c("argmax", "coarsest_adequate"),
+  cut_rule = NULL,
   interval = c("variables", "nested_cv"),
   repeats = 1L,
   response = "presence_absence",
@@ -37,17 +37,17 @@ takes. Named alongside the grains they form the candidate set.}
 \item{folds}{The outer fold map, from \code{\link[=fold_map]{fold_map()}} or any named integer vector. Built with the
 defaults of \code{\link[=fold_map]{fold_map()}} when not given.}
 
-\item{inner}{Number of inner folds the selection is made on, or a function of the outer training
+\item{n_inner}{Number of inner folds the selection is made on, or a function of the outer training
 response returning a fold map for those units. A count deals the inner folds by the grouping
 the outer fold map carries, so what \code{\link[=grouped_cv]{grouped_cv()}} kept whole outside stays whole inside.}
 
-\item{rule}{How a candidate is chosen from its inner scores. \code{"argmax"} takes the highest.
+\item{choose}{How a candidate is chosen from its inner scores. \code{"argmax"} takes the highest.
 \code{"coarsest_adequate"} takes the coarsest candidate whose inner score lies within one standard
 error of the highest, the one-standard-error rule of Breiman, Friedman, Olshen and Stone
 (1984) and of Hastie, Tibshirani and Friedman (2009, section 7.10) with coarseness in place of
 model complexity. See Choosing a candidate.}
 
-\item{threshold}{\code{NULL}, or the rule of \code{\link[=decision_threshold]{decision_threshold()}} a presence-absence cut is learned
+\item{cut_rule}{\code{NULL}, or the rule of \code{\link[=decision_threshold]{decision_threshold()}} a presence-absence cut is learned
 by: \code{"youden"}, the cut that maximises TSS, \code{"kappa"} or \code{"prevalence"}. See A cut learned
 inside the training data.}
 
@@ -88,11 +88,11 @@ registered metric with its standard error across variables; \code{contrast}, one
 was searched; and \code{scores}, the per-cell rows of the selected procedure under the selection
 metric, in the layout \code{\link[=grain_ladder]{grain_ladder()}} returns. The held-out prediction of every unit is in
 the \code{predictions} attribute and the scorable-cell mask in \code{cells}. \code{inner} holds every
-candidate's inner score and standard error in every outer fold. With \code{threshold} set, the
+candidate's inner score and standard error in every outer fold. With \code{cut_rule} set, the
 estimate carries the score, its interval and the interval's name in \code{interval}, one row per
 metric and interval. With \code{interval = "nested_cv"} it also carries \code{nested_cv}, the same rows
 with the estimator's own quantities beside them, and \code{final}, the procedure fitted on every
-unit, whose risk that interval is for. With \code{threshold} set, the
+unit, whose risk that interval is for. With \code{cut_rule} set, the
 estimate carries one further row, \code{tss_inner_cut}, the procedure's TSS at the learned cuts;
 \code{thresholds} holds the cut of every outer fold and variable; and \code{cut_scores} the per-cell
 rows it is averaged from, in the layout of \code{scores}. Both are \code{NULL} otherwise.
@@ -125,10 +125,10 @@ The cost is the ladder's, multiplied by the number of inner folds: \code{v_outer
 Inside each outer fold every candidate carries an inner score, the mean over variables of its
 per-variable mean over the inner folds, and a standard error, the standard deviation over the
 inner folds of the fold's own score (the mean over the variables scored in that fold) divided by
-the square root of the number of inner folds. \code{rule = "argmax"} takes the highest inner score,
+the square root of the number of inner folds. \code{choose = "argmax"} takes the highest inner score,
 and on an exact tie the candidate declared first.
 
-\code{rule = "coarsest_adequate"} first finds that highest score and its standard error, calls every
+\code{choose = "coarsest_adequate"} first finds that highest score and its standard error, calls every
 candidate scoring at least the highest minus one standard error adequate, and takes the coarsest
 adequate one. Coarseness is read off the representation as the package holds it: fewer bins is
 coarser, and between two candidates with the same number of bins, fewer channels is coarser.
@@ -191,7 +191,7 @@ network.
 \section{A cut learned inside the training data}{
 
 TSS read at the cut that maximises it on the scored units is biased upward, most where presences
-are few (\code{\link[=tss_inflation]{tss_inflation()}}). With \code{threshold} set, each outer fold learns one cut per variable
+are few (\code{\link[=tss_inflation]{tss_inflation()}}). With \code{cut_rule} set, each outer fold learns one cut per variable
 on the inner out-of-fold predictions of the candidate it selected, which the inner search has
 already made for every outer training unit, by \code{\link[=decision_threshold]{decision_threshold()}} under the rule named. The
 cut is then frozen and the outer test fold's predictions are read at it by \code{\link[=tss]{tss()}}. No unit of
@@ -213,7 +213,7 @@ d <- data.frame(
 y <- matrix(rbinom(120, 1, plogis(c(warmth, -warmth))), nrow = 60,
             dimnames = list(units, c("sp1", "sp2")))
 x <- grain_matrix(d, plot, t, temp, grain = c("week", "month"))
-sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), inner = 3,
+sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), n_inner = 3,
                     verbose = FALSE)
 sel
 sel$estimate

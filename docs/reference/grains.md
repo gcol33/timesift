@@ -8,7 +8,7 @@ one vector.
 ## Usage
 
 ``` r
-grains(..., stats = "mean", year_start = "09-01")
+grains(..., stats = "mean", year_start = "01-01")
 
 lookbacks(..., lag = "0 days", bins = 1L, stats = "mean")
 
@@ -31,8 +31,7 @@ as_sift(x)
 
 - year_start:
 
-  `"MM-DD"` boundary of the hydrological year, used by `"season"` and
-  `"year"`.
+  `"MM-DD"` boundary of the year, used by `"season"` and `"year"`.
 
 - lag:
 

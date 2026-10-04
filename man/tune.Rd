@@ -4,7 +4,7 @@
 \alias{tune}
 \title{Tune a learner's settings on the training units}
 \usage{
-tune(learner, grid = NULL, metric = NULL, inner = 5L, seed = 1L)
+tune(learner, grid = NULL, metric = NULL, n_inner = 5L, seed = 1L)
 }
 \arguments{
 \item{learner}{A \code{\link[=learner]{learner()}}, or the name of a registered one.}
@@ -15,7 +15,7 @@ registered for the learner.}
 \item{metric}{The registered metric, or a function of \verb{(y, p)}, a setting is scored by. Left
 unset it is the response head's own.}
 
-\item{inner}{Number of inner folds.}
+\item{n_inner}{Number of inner folds.}
 
 \item{seed}{Random seed of the inner folds.}
 }
@@ -51,7 +51,7 @@ and \code{shrinkage} of a gbm-style \code{\link[=boosting]{boosting()}}, \code{s
 decay is a training setting here, which \code{\link[=train_control]{train_control()}} holds and a grid does not reach.
 }
 \examples{
-tuned <- tune(forest(), list(mtry = c(2, 4), min_node = c(1, 5)), inner = 3L)
+tuned <- tune(forest(), list(mtry = c(2, 4), min_node = c(1, 5)), n_inner = 3L)
 tuned
 
 }

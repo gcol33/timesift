@@ -7,11 +7,11 @@
 elasticnet(
   data = NULL,
   alpha = 0.5,
-  n_inner = 5L,
+  n_inner = 10L,
   squares = TRUE,
-  s = "lambda.min",
+  s = "lambda.1se",
   n_lambda = 100L,
-  thresh = 1e-08,
+  tol = 1e-08,
   threads = 1L,
   seed = 1L
 )
@@ -22,17 +22,20 @@ representation of the run.}
 
 \item{alpha}{Elastic-net mixing, \code{1} lasso and \code{0} ridge.}
 
-\item{n_inner}{Folds of the inner cross-validation that chooses the penalty.}
+\item{n_inner}{Folds of the inner cross-validation that chooses the penalty, ten as in
+\code{cv.glmnet()}.}
 
 \item{squares}{Add the square of every column, giving the same quadratic capacity a
 second-order polynomial term would.}
 
 \item{s}{Which penalty of the inner path to predict at: \code{"lambda.min"}, \code{"lambda.1se"}, or a
-penalty of its own, which is interpolated between the two points of the path around it.}
+penalty of its own, which is interpolated between the two points of the path around it.
+\code{"lambda.1se"}, the largest penalty within one standard error of the least held-out
+deviance, is glmnet's default.}
 
 \item{n_lambda}{Points of the penalty path.}
 
-\item{thresh}{Where the coordinate descent stops, read off the largest coefficient move of a
+\item{tol}{Where the coordinate descent stops, read off the largest coefficient move of a
 pass. The default leaves the fit as close to the optimum as glmnet's own default does; a
 looser one is faster and a tighter one costs time roughly in proportion.}
 

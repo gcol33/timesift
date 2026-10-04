@@ -246,7 +246,7 @@ oracle_lookback_matrix <- function(data, id, time, value, at, span, lag = "0 day
 }
 
 oracle_grain_matrix <- function(data, id, time, value, grain = "day", stats = "mean",
-                                 year_start = "09-01") {
+                                 year_start = "01-01") {
   unit <- as.character(data[[id]])
   when <- data[[time]]
   reading <- as.numeric(data[[value]])

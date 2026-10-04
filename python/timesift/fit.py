@@ -174,8 +174,8 @@ class Timesift:
 
 
 def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time=None,
-             static=None, coords=None, models=None, sift=None, ensemble=True, resampling=None, inner=5,
-             rule: str = "argmax", response: str = "presence_absence", metric=None,
+             static=None, coords=None, learners=None, sift=None, ensemble=True, resampling=None, n_inner=5,
+             choose: str = "argmax", response: str = "presence_absence", metric=None,
              control=None, keep_fits: bool = False, seed: int = 1,
              verbose: bool = True, refit: bool = True) -> Timesift:
     """Compare every learner across every representation, and estimate choosing among them.
@@ -187,8 +187,8 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
     holding each target's coordinates; they place a target and are not predictors, and a learner
     that places a spatial field by them, :func:`~timesift.hierarchical`, reads them off the array.
 
-    Within each outer fold of ``resampling`` the training targets are split again into ``inner``
-    folds. Every candidate is cross-validated on that inner split, ``rule`` picks one on its inner
+    Within each outer fold of ``resampling`` the training targets are split again into ``n_inner``
+    folds. Every candidate is cross-validated on that inner split, ``choose`` picks one on its inner
     score (``"argmax"`` or ``"coarsest_adequate"``, as in ``select_grain``), and the stack's
     weights are fitted on the inner out-of-fold predictions. Every candidate is then refitted on
     the whole outer training set and predicts the outer test fold, and the selected candidate's
@@ -200,7 +200,7 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
 
     The same refits give every candidate an out-of-fold prediction on the outer folds, which
     ``scores`` holds: the comparison, whose highest level was picked out on the folds it is scored
-    on. ``inner=None`` runs no inner search and makes no estimate. ``choice``, ``models`` and
+    on. ``n_inner=None`` runs no inner search and makes no estimate. ``choice``, ``models`` and
     ``stack`` are the procedure applied to every target, for prediction: the rule read on the
     outer scores and weights fitted on the outer out-of-fold predictions.
 
@@ -216,8 +216,8 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
     refitted on all targets at the end, which is what ``predict`` reads; a repeated resampling asks
     it of its first run alone.
     """
-    if rule not in RULES:
-        raise ValueError(f"rule must be one of {RULES}, got {rule!r}")
+    if choose not in RULES:
+        raise ValueError(f"choose must be one of {RULES}, got {choose!r}")
     drawn = as_resampling(resampling)
     if drawn.repeats > 1:
         runs = []
@@ -226,9 +226,9 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
                 print(f"repeat {r + 1} of {drawn.repeats}")
             runs.append(timesift(targets, series, y=y, x=x, id=id, time=time,
                                  target_time=target_time, static=static, coords=coords,
-                                 models=models, sift=sift, ensemble=ensemble,
+                                 learners=learners, sift=sift, ensemble=ensemble,
                                  resampling=replace(drawn, seed=drawn.seed + r, repeats=1),
-                                 inner=inner, rule=rule, response=response, metric=metric,
+                                 n_inner=n_inner, choose=choose, response=response, metric=metric,
                                  control=control, keep_fits=keep_fits and r == 0, seed=seed,
                                  verbose=verbose and r == 0, refit=r == 0))
         return _combine_repeats(runs, run_ensemble(ensemble, response))
@@ -247,7 +247,7 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
     ensemble = run_ensemble(ensemble, response)
 
     members = _members(sift, series, spec)
-    learners = _as_learners(models)
+    learners = _as_learners(learners)
     _check_anchored(members, learners, spec)
     pairs = _pair(members, learners)
 
@@ -282,7 +282,7 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
     fitted_pairs = [pair for pair in pairs if not pair["reason"]]
     names = [pair["candidate"] for pair in fitted_pairs]
     n_cand = len(fitted_pairs)
-    nested = inner is not None
+    nested = n_inner is not None
     stacking = ensemble is not None and n_cand >= 2
     # The candidate set as the selection engine reads it: `grain` names the array and `learner`
     # the candidate, and the order the candidates were declared in is both the fitting order and
@@ -291,8 +291,8 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
                   for pair in fitted_pairs]
     ctx = selection_context(timesift_set(dict(representations)), y_mat,
                             {pair["candidate"]: pair["learner"] for pair in fitted_pairs},
-                            candidates, rule,
-                            _inner_splitter(inner, folds.group) if nested else None, response,
+                            candidates, choose,
+                            _inner_splitter(n_inner, folds.group) if nested else None, response,
                             metric if metric is not None else head["metric"], control,
                             folds.group)
 
@@ -324,7 +324,9 @@ def timesift(targets, series=None, *, y, x=None, id=None, time=None, target_time
                 weights, combined = _fold_stack(search["lad"], candidates,
                                                 y_mat.take_units(train), ensemble, refit)
                 p_ensemble[test] = combined
-                fold_weights.append(dict(fold=int(k), **weights))
+                # A candidate the fold's stack left out, below ``min_score`` there, carries no
+                # weight in it, so every fold's row names every candidate.
+                fold_weights.append({"fold": int(k), **dict.fromkeys(names, 0.0), **weights})
         if verbose:
             picked = f" selected {names[won]}" if nested else ""
             print(f"fold {int(k)} of {len(levels)}{picked}")
@@ -622,21 +624,21 @@ def _candidate_table(pairs, representations, fitted) -> dict:
     return {k: np.asarray(v) for k, v in columns.items()}
 
 
-def _as_learners(models) -> list:
+def _as_learners(learners) -> list:
     """A learner, the name of a registered one, or a list of either.
 
     One learner is not a list of learners and reads in Python as a sequence of nothing, so it is
     wrapped here rather than left to iterate into its own fields. ``learner_dict`` takes the same
-    three forms, and R's `models` takes a learner, a set of them or a list.
+    three forms, and R's `learners` takes a learner, a set of them or a list.
     """
-    if models is None:
-        models = _default_models()
-    if not isinstance(models, (list, tuple)):
-        models = [models]
-    return [get_learner(m) for m in models]
+    if learners is None:
+        learners = _default_learners()
+    if not isinstance(learners, (list, tuple)):
+        learners = [learners]
+    return [get_learner(m) for m in learners]
 
 
-def _default_models() -> list:
+def _default_learners() -> list:
     from .learners import elasticnet
     return [elasticnet()]
 

@@ -12,11 +12,11 @@ for new targets in
 ## Usage
 
 ``` r
-native(stats = "mean", year_start = "09-01")
+native(stats = "mean", year_start = "01-01")
 
-grain(grain, stats = "mean", year_start = "09-01")
+grain(grain, stats = "mean", year_start = "01-01")
 
-multigrain(grains = NULL, stats = "mean", year_start = "09-01")
+multigrain(grains = NULL, stats = "mean", year_start = "01-01")
 
 lookback(span, lag = "0 days", bins = 1L, stats = "mean")
 ```
@@ -32,8 +32,7 @@ lookback(span, lag = "0 days", bins = 1L, stats = "mean")
 
 - year_start:
 
-  `"MM-DD"` boundary of the hydrological year, used by `"season"` and
-  `"year"`.
+  `"MM-DD"` boundary of the year, used by `"season"` and `"year"`.
 
 - grain:
 

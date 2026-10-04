@@ -16,8 +16,8 @@
 #'   the `POSIXct` start of each reading's bin, which is how a calendar the package does not
 #'   carry, such as astronomical seasons, is binned.
 #' @param stats Statistics to compute per bin, one channel each, in the order given. See Details.
-#' @param year_start `"MM-DD"` boundary of the hydrological year, used by `"season"` and
-#'   `"year"`. Defaults to `"09-01"`.
+#' @param year_start `"MM-DD"` boundary of the year, used by `"season"` and `"year"`. Defaults
+#'   to the calendar year, `"01-01"`; a hydrological year starting in September is `"09-01"`.
 #' @param partial What to do with a bin the record does not cover for its whole calendar span,
 #'   which is what a record beginning or ending away from a bin boundary produces. `"keep"`, the
 #'   default, returns it alongside the full bins; `"drop"` removes it. See Partial bins.
@@ -137,7 +137,7 @@ grain_matrix <- function(data,
                           value,
                           grain = "day",
                           stats = "mean",
-                          year_start = "09-01",
+                          year_start = "01-01",
                           partial = c("keep", "drop")) {
   id_col <- .resolve_column(substitute(id), data, parent.frame())
   time_col <- .resolve_column(substitute(time), data, parent.frame())

@@ -12,7 +12,7 @@ whole record skips is a column of zeros.
 ## Usage
 
 ``` r
-coverage(data, id, time, grain = "day", year_start = "09-01")
+coverage(data, id, time, grain = "day", year_start = "01-01")
 ```
 
 ## Arguments
@@ -43,8 +43,9 @@ coverage(data, id, time, grain = "day", year_start = "09-01")
 
 - year_start:
 
-  `"MM-DD"` boundary of the hydrological year, used by `"season"` and
-  `"year"`. Defaults to `"09-01"`.
+  `"MM-DD"` boundary of the year, used by `"season"` and `"year"`.
+  Defaults to the calendar year, `"01-01"`; a hydrological year starting
+  in September is `"09-01"`.
 
 ## Value
 

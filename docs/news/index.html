@@ -80,12 +80,33 @@
 <code>maxnet()</code> is <code><a href="../reference/maxent.html">maxent()</a></code>, named after the model rather than the package whose formulation it follows. Its arguments, defaults and numbers are unchanged; it registers and reports as <code>maxent</code>.</li>
 <li>
 <code>boosting(newton = TRUE)</code> is <code>boosting(method = "xgboost")</code>. The flag switched the whole algorithm, the tree growth, the split criterion, what <code>depth</code> and <code>min_leaf</code> count and the default set, where its name described the leaf step alone, which gbm’s trees take as well. <code>method = "gbm"</code>, Friedman’s gradient boosting machine, is the default as before.</li>
+<li>
+<code>year_start</code> defaults to <code>"01-01"</code>, the calendar year, in <code><a href="../reference/grain_matrix.html">grain_matrix()</a></code>, <code><a href="../reference/native.html">grain()</a></code>, <code><a href="../reference/native.html">multigrain()</a></code>, <code><a href="../reference/grains.html">grains()</a></code> and <code><a href="../reference/coverage.html">coverage()</a></code>, where it was the Schrankogel deposit’s hydrological year, <code>"09-01"</code>. A season or year bin now starts on 1 January unless a boundary is given; <code>inst/reproduce/schrankogel.R</code> passes <code>"09-01"</code>.</li>
+<li>
+<code><a href="../reference/timesift.html">timesift()</a></code> takes <code>learners</code> for <code>models</code>, <code>n_inner</code> for <code>inner</code> and <code>choose</code> for <code>rule</code>; <code><a href="../reference/select_grain.html">select_grain()</a></code> takes <code>n_inner</code>, <code>choose</code>, and <code>cut_rule</code> for <code>threshold</code>, and its result carries <code>choose</code> and <code>cut_rule</code> where it carried <code>rule</code> and <code>threshold</code>; <code><a href="../reference/tune.html">tune()</a></code> takes <code>n_inner</code>. A fit’s fitted models are still <code>fit$models</code>.</li>
+<li>
+<code><a href="../reference/elasticnet.html">elasticnet()</a></code> defaults to <code>cv.glmnet()</code>’s ten inner folds and <code>s = "lambda.1se"</code>, where it took five folds and <code>"lambda.min"</code>. The reproduction driver and the selection benchmark pass their own settings, so their numbers are unchanged.</li>
+<li>
+<code><a href="../reference/mars.html">mars()</a></code> and <code><a href="../reference/discriminant.html">discriminant()</a></code> take <code>max_terms</code> for <code>nk</code> and <code>min_gain</code> for <code>thresh</code>; <code><a href="../reference/elasticnet.html">elasticnet()</a></code> and <code><a href="../reference/maxent.html">maxent()</a></code> take <code>tol</code> for <code>thresh</code>. A convergence tolerance and the least gain a forward step is kept for were sharing one name.</li>
+<li>
+<code>preset = "package"</code> is <code>preset = "default"</code> on <code><a href="../reference/tree.html">tree()</a></code>, <code><a href="../reference/forest.html">forest()</a></code> and <code><a href="../reference/boosting.html">boosting()</a></code>.</li>
+<li>
+<code><a href="../reference/kappa_score.html">kappa_score()</a></code> cuts at <code>"prevalence"</code> by default, the rule the registered <code>kappa</code> metric reads, where it cut at <code>"youden"</code>.</li>
+<li>
+<code>train_control(early_stopping)</code> defaults to <code>Inf</code>, which never stops. It is read only where <code>val_frac</code> holds a validation set back, and at <code>val_frac = 0</code> it was never read.</li>
+<li>
+<code><a href="../reference/kappa_score.html">decision_threshold()</a></code> on a fit takes <code>perc</code> for the <code>"mpa"</code> rule in both languages; in Python <code>candidate</code> and <code>perc</code> are keyword-only, so the R call <code>decision_threshold(fit, "ensemble")</code> errors there instead of reading <code>"ensemble"</code> as predictions.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h3>
+<ul><li>A nested run whose ensemble sets <code>min_score</code> no longer fails with “numbers of columns of arguments do not match” when an outer fold’s stack leaves a candidate out. <code>fold_weights</code> has a column per candidate in every fold, 0 where that fold left it out; in Python every row carries every candidate, where a fold’s row named only the candidates it kept.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="other-changes-development-version">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-development-version"></a></h3>
-<ul><li>In Python a representation, a learner and a training control print as they do in R, where they printed as their dataclass fields and a learner’s functions.</li>
-<li>The site’s Python side has a Get started article, the R walkthrough section by section and run against the package, and a reference laid out under the sections of the R reference with an index page, so the two language menus carry the same pages.</li>
-<li>The <code>reproducing-schrankogel</code> vignette is gone. <code>inst/reproduce/README.md</code> is where the reproduction is documented: how to run each stage, what it costs, and the comparison with the paper, which the vignette carried an older copy of.</li>
+<ul><li><p>Every learner whose defaults follow a reference package says that under the shipped presence-absence head it is fitted under <code><a href="../reference/positive_weights.html">positive_weights()</a></code>, so a default <code><a href="../reference/tree.html">tree()</a></code> is rpart’s specification under those case weights. <code><a href="../reference/hierarchical.html">hierarchical()</a></code> says that at <code>spatial = "none"</code> and <code>random = FALSE</code> it is a penalised logistic model.</p></li>
+<li><p>In Python a representation, a learner and a training control print as they do in R, where they printed as their dataclass fields and a learner’s functions.</p></li>
+<li><p>The site’s Python side has a Get started article, the R walkthrough section by section and run against the package, and a reference laid out under the sections of the R reference with an index page, so the two language menus carry the same pages.</p></li>
+<li><p>The <code>reproducing-schrankogel</code> vignette is gone. <code>inst/reproduce/README.md</code> is where the reproduction is documented: how to run each stage, what it costs, and the comparison with the paper, which the vignette carried an older copy of.</p></li>
 </ul></div>
 </div>
     <div class="section level2">

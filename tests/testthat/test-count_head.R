@@ -91,8 +91,8 @@ test_that("a run under the count head is scored by the Poisson deviance and stac
   targets <- data.frame(plot = d$units, count = d$count, stringsAsFactors = FALSE)
   run <- suppressWarnings(timesift(
     targets, d$readings, y = count, id = plot, time = t, x = temp, response = "count",
-    models = list(en = elasticnet(squares = FALSE), rf = forest(trees = 30L)),
-    sift = grains("week"), resampling = cv(v = 4L), inner = NULL,
+    learners = list(en = elasticnet(squares = FALSE), rf = forest(trees = 30L)),
+    sift = grains("week"), resampling = cv(v = 4L), n_inner = NULL,
     ensemble = ensemble("stack"), verbose = FALSE))
   expect_identical(run$metric, "neg_poisson_deviance")
   expect_true(all(is.finite(run$scores$score[run$scores$scorable])))

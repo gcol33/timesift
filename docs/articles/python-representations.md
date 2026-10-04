@@ -9,7 +9,7 @@ reference](https://gillescolling.com/timesift/articles/python-reference.md)
 ## `native()`
 
 ``` python
-native(stats='mean', year_start='09-01')
+native(stats='mean', year_start='01-01')
 ```
 
 The record unreduced: one bin per reading.
@@ -17,7 +17,7 @@ The record unreduced: one bin per reading.
 ## `grain()`
 
 ``` python
-grain(g, stats='mean', year_start='09-01')
+grain(g, stats='mean', year_start='01-01')
 ```
 
 One calendar grain, named, or supplied as a function of the reading
@@ -27,7 +27,7 @@ instants returning each reading’s bin start, which is reported as
 ## `multigrain()`
 
 ``` python
-multigrain(grains=None, stats='mean', year_start='09-01')
+multigrain(grains=None, stats='mean', year_start='01-01')
 ```
 
 Several grains flattened and bound side by side into one block of
@@ -49,7 +49,7 @@ target’s own instant.
 ## `grains()`
 
 ``` python
-grains(*g, stats='mean', year_start='09-01')
+grains(*g, stats='mean', year_start='01-01')
 ```
 
 A sift over calendar grains, named or read off the record with `"auto"`.
@@ -114,7 +114,7 @@ The sift with `"auto"` replaced by the grains the record supports.
 ## `auto_grains()`
 
 ``` python
-auto_grains(series, spec: TimesiftSpec, stats=('mean',), year_start='09-01')
+auto_grains(series, spec: TimesiftSpec, stats=('mean',), year_start='01-01')
 ```
 
 The named grains that give the record at least two bins, from the finest

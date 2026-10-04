@@ -111,13 +111,13 @@ def test_the_boosting_core_refuses_what_it_cannot_fit():
 
 
 def test_a_preset_fills_the_settings_left_open_as_gbm_xgboost_and_biomod2_have_them():
-    p = _boost_settings("package", "gbm", *[None] * 9)
+    p = _boost_settings("default", "gbm", *[None] * 9)
     assert (p["trees"], p["depth"], p["shrinkage"], p["min_leaf"], p["subsample"],
             p["n_inner"]) == (100, 1, 0.1, 10, 0.5, 0)
     b = _boost_settings("bigboss", "gbm", *[None] * 9)
     assert (b["trees"], b["depth"], b["shrinkage"], b["min_leaf"], b["n_inner"]) == (
         2500, 7, 0.001, 5, 3)
-    xg = _boost_settings("package", "xgboost", *[None] * 9)
+    xg = _boost_settings("default", "xgboost", *[None] * 9)
     assert (xg["trees"], xg["depth"], xg["shrinkage"], xg["lambda_"], xg["subsample"]) == (
         100, 6, 0.3, 1, 1)
     xb = _boost_settings("bigboss", "xgboost", *[None] * 9)

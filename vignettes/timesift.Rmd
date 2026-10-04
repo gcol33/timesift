@@ -65,7 +65,7 @@ fit <- timesift(
 fit
 ```
 
-Every representation named in `sift` was built, and `models` defaulting to `list(elasticnet())`,
+Every representation named in `sift` was built, and `learners` defaulting to `elasticnet()`,
 a penalised logistic regression was fitted on each of them over the same five folds. The report has
 two parts.
 
@@ -158,7 +158,7 @@ how many it has.
 
 ```{r compatibility, error = TRUE}
 timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
-         models = elasticnet(), sift = native())
+         learners = elasticnet(), sift = native())
 ```
 
 Inside a set such a pair is skipped and listed as `not applicable` by `summary()`; named through a
@@ -197,8 +197,8 @@ strength across responses is what makes the rarer ones learnable at these sample
 core the Python package calls rather than by a fitter on either side: the penalty path, the
 standardisation and the cross-validated choice of penalty are one implementation, and the two
 languages return the same coefficients for the same design. `s` reads that fit at
-`"lambda.min"`, at `"lambda.1se"`, or at a penalty of your own, and `thresh` trades how close the
-descent settles to the optimum against what it costs.
+`"lambda.1se"`, glmnet's default, at `"lambda.min"`, or at a penalty of your own, and `tol` trades
+how close the descent settles to the optimum against what it costs.
 
 Architecture belongs to the constructor and training belongs to `train_control()`, which every
 neural learner of a run reads. A learner given a control of its own overrides the run's on the
@@ -243,7 +243,7 @@ weighted_glm <- learner(
 )
 
 both <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
-                 models = c(elasticnet(), nearest_neighbour, weighted_glm),
+                 learners = c(elasticnet(), nearest_neighbour, weighted_glm),
                  sift = grains("week", "month"), resampling = cv(v = 5), verbose = FALSE)
 summary(both)
 ```

@@ -42,6 +42,9 @@ case weights, so a rare response weighs here what it weighs in every other learn
 The defaults are biomod2's \code{GLM}: every column enters as \code{x + I(x^2)}, and the terms are
 searched in both directions by AIC as \code{MASS::stepAIC()} searches them, with no bound on how many
 are kept.
+Under the shipped presence-absence head those weights are on, so a default \code{linear()} is
+biomod2's \code{GLM} specification fitted under them; a head registered without \code{weights} fits it
+unweighted.
 
 \code{terms} says what one term is. Under \code{"power"} each power of a column, \code{x}, \code{x^2} and so on, is
 a term of its own, which is how biomod2 writes a quadratic formula and how \code{stepAIC()} walks it.

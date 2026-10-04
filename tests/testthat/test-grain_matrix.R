@@ -96,7 +96,7 @@ test_that("a bin the record does not fill is reported and can be dropped", {
   # and year of the calendar and neither the first nor the last week of it.
   aligned <- hourly_series(units = "a", from = "2021-09-01 00:00:00", hours = 26304)
   for (w in c("native", "halfday", "day", "month", "season", "year")) {
-    x <- grain_matrix(aligned, plot, t, temp, grain = w)
+    x <- grain_matrix(aligned, plot, t, temp, grain = w, year_start = "09-01")
     expect_false(any(attr(x, "bin_partial")), info = w)
   }
   week <- grain_matrix(aligned, plot, t, temp, grain = "week")
@@ -135,8 +135,9 @@ test_that("a caller-supplied calendar owns its own bin lengths", {
 
   # The same record on the named grain counts three calendar months from the anniversary, so it
   # is a different rule and a different number of bins, not a different implementation of one.
-  expect_equal(dim(grain_matrix(d, plot, t, temp, grain = "season"))[2], 3L)
-  expect_equal(format(attr(grain_matrix(d, plot, t, temp, grain = "season"), "bin_start"),
+  named <- grain_matrix(d, plot, t, temp, grain = "season", year_start = "09-01")
+  expect_equal(dim(named)[2], 3L)
+  expect_equal(format(attr(named, "bin_start"),
                       "%Y-%m-%d", tz = "UTC"),
                c("2021-09-01", "2021-12-01", "2022-03-01"))
 })

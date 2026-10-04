@@ -290,7 +290,7 @@ def ordinal_metric(y, p, metric: str) -> float:
     return value if np.isfinite(value) else float("nan")
 
 
-def decision_threshold(y, p=None, rule: str = "youden", candidate: str = "ensemble",
+def decision_threshold(y, p=None, rule: str = "youden", *, candidate: str = "ensemble",
                        perc: float = 0.9):
     """The probability cut a rule selects. Presence is predicted at ``p >= threshold``.
 
@@ -305,6 +305,8 @@ def decision_threshold(y, p=None, rule: str = "youden", candidate: str = "ensemb
         raise ValueError(f"rule must be one of {THRESHOLD_RULES}, got {rule!r}")
     from .fit import Timesift
     if isinstance(y, Timesift):
+        if isinstance(p, str):
+            raise TypeError(f"a fit's candidate is named as candidate={p!r}, not by position")
         if p is not None:
             raise TypeError("a fit carries its own held-out predictions; `p` is not given with one")
         observed = np.asarray(y.y.values, dtype=np.float64)
@@ -312,7 +314,7 @@ def decision_threshold(y, p=None, rule: str = "youden", candidate: str = "ensemb
             raise ValueError("a cut is learned on a presence-absence response, and this fit was "
                              f'made under the "{y.response}" head.')
         held = np.asarray(y._held_out(candidate), dtype=np.float64)
-        return {v: decision_threshold(observed[:, j], held[:, j], rule)
+        return {v: decision_threshold(observed[:, j], held[:, j], rule, perc=perc)
                 for j, v in enumerate(y.y.variables)}
     if p is None:
         raise TypeError("`p` is the predictions for the units of `y`")
@@ -352,8 +354,11 @@ def cohen_kappa(a, b) -> float:
     return float("nan") if pe >= 1 else float((po - pe) / (1 - pe))
 
 
-def kappa_score(y, p, rule: str = "youden") -> float:
-    """Cohen's kappa of a model's decisions against the observed response."""
+def kappa_score(y, p, rule: str = "prevalence") -> float:
+    """Cohen's kappa of a model's decisions against the observed response, cut by ``rule``.
+
+    The default cuts at the observed presence rate, the rule the registered ``kappa`` metric reads.
+    """
     thr = decision_threshold(y, p, rule)
     if not np.isfinite(thr):
         return float("nan")

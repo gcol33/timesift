@@ -40,8 +40,8 @@ mean_reader <- function() {
 projection_fit <- function(case) {
   suppressWarnings(timesift(
     case$targets, case$series, y = c("sp1", "sp2"), id = cell, time = t, x = temp,
-    models = list(rd = mean_reader()), sift = grains("month"), resampling = cv(v = 3L),
-    inner = NULL, ensemble = FALSE, verbose = FALSE))
+    learners = list(rd = mean_reader()), sift = grains("month"), resampling = cv(v = 3L),
+    n_inner = NULL, ensemble = FALSE, verbose = FALSE))
 }
 
 test_that("a projection is the fit applied to one target per cell", {
@@ -78,8 +78,8 @@ test_that("binary and spread maps follow predict", {
 
   two <- suppressWarnings(timesift(
     case$targets, case$series, y = c("sp1", "sp2"), id = cell, time = t, x = temp,
-    models = list(a = mean_reader(), b = mean_reader()), sift = grains("month"),
-    resampling = cv(v = 3L), inner = NULL, ensemble = ensemble("mean"), verbose = FALSE))
+    learners = list(a = mean_reader(), b = mean_reader()), sift = grains("month"),
+    resampling = cv(v = 3L), n_inner = NULL, ensemble = ensemble("mean"), verbose = FALSE))
   spread <- project(two, series = case$raster, type = "spread")
   expect_true(all(c("sp1.mean", "sp1.sd", "sp2.upper") %in% names(spread)))
   ensemble_map <- project(two, series = case$raster)
@@ -89,8 +89,8 @@ test_that("binary and spread maps follow predict", {
 test_that("static predictors are read from the layers of a raster", {
   case <- projection_case()
   fit <- suppressWarnings(timesift(
-    case$targets, y = c("sp1", "sp2"), id = cell, static = elev, models = elasticnet(),
-    ensemble = FALSE, inner = NULL, resampling = cv(v = 3L), verbose = FALSE))
+    case$targets, y = c("sp1", "sp2"), id = cell, static = elev, learners = elasticnet(),
+    ensemble = FALSE, n_inner = NULL, resampling = cv(v = 3L), verbose = FALSE))
   map <- project(fit, static = case$static, candidate = "elasticnet / static")
   want <- stats::predict(fit, case$targets, candidate = "elasticnet / static")
   expect_equal(unname(terra::values(map)[, "sp1"]), unname(want[as.character(1:case$n), "sp1"]))
@@ -104,8 +104,8 @@ test_that("a projection says what it was not given", {
   expect_error(project(fit, series = case$raster, chunk = 0), "1 or more")
   expect_error(project(1), "expected a timesift")
   static_fit <- suppressWarnings(timesift(
-    case$targets, y = c("sp1", "sp2"), id = cell, static = elev, models = elasticnet(),
-    ensemble = FALSE, inner = NULL, resampling = cv(v = 3L), verbose = FALSE))
+    case$targets, y = c("sp1", "sp2"), id = cell, static = elev, learners = elasticnet(),
+    ensemble = FALSE, n_inner = NULL, resampling = cv(v = 3L), verbose = FALSE))
   expect_error(project(static_fit), "SpatRaster with layers named")
   other <- case$static
   names(other) <- "other"

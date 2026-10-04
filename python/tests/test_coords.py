@@ -119,8 +119,8 @@ def test_a_run_hands_its_learners_the_coordinates_of_the_targets_in_each_split()
 
     y = Response(np.asarray(tg["sp"], dtype=float)[:, None], tuple(plots), ("sp",))
     timesift(tg, readings, y="sp", id="plot", time="when", x="temp", coords=("lon", "lat"),
-             models=[Learner(name="seer", fit=fit, predict=predict, multi="joint")],
-             sift=grains("month"), resampling=fold_map(y, v=4, seed=2), inner=None,
+             learners=[Learner(name="seer", fit=fit, predict=predict, multi="joint")],
+             sift=grains("month"), resampling=fold_map(y, v=4, seed=2), n_inner=None,
              ensemble=False, verbose=False)
     assert seen
     for coords, units in seen:

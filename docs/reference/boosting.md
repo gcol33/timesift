@@ -25,7 +25,7 @@ boosting(
   lambda = NULL,
   gamma = NULL,
   n_inner = NULL,
-  preset = c("package", "bigboss"),
+  preset = c("default", "bigboss"),
   seed = 1L,
   threads = 1L
 )
@@ -80,7 +80,7 @@ boosting(
 
 - preset:
 
-  Whose defaults the settings left `NULL` take: `"package"` or
+  Whose defaults the settings left `NULL` take: `"default"` or
   `"bigboss"`.
 
 - seed:
@@ -121,7 +121,7 @@ least held-out deviance, summed over the folds and weighted by how many
 units each holds, is kept, as gbm's `cv.folds` chooses it. The folds are
 dealt for each response and stratified on it, as the elastic net's are.
 
-`preset` says whose defaults the settings left `NULL` take. `"package"`
+`preset` says whose defaults the settings left `NULL` take. `"default"`
 is the fitting package's own, which is what biomod2's default option set
 fits: under gbm 100 trees of one split, `shrinkage = 0.1`,
 `min_leaf = 10` and `subsample = 0.5`; under xgboost 100 trees of depth
@@ -135,6 +135,9 @@ The case weights are the response head's,
 [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
 under presence-absence, and weigh the gradient and every sum a tree is
 grown on; `min_leaf` counts units under gbm, as `n.minobsinnode` does.
+Under the shipped presence-absence head those weights are on, so a
+default `boosting()` is gbm's specification fitted under them; a head
+registered without `weights` fits it unweighted.
 
 ## Examples
 

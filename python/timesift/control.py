@@ -8,6 +8,7 @@ the control it is fitted under, so overriding one is the same call in either lan
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, fields, replace
 
 __all__ = ["CONTROL_SETTINGS", "TrainControl", "as_control", "train_control"]
@@ -21,7 +22,7 @@ class TrainControl:
     batch_size: int = 64
     learning_rate: float = 1e-3
     weight_decay: float = 1e-4
-    early_stopping: int = 10
+    early_stopping: float = math.inf
     val_frac: float = 0.0
     device: str = "auto"
     seed: int = 1
@@ -38,7 +39,8 @@ class TrainControl:
         if self.weight_decay < 0:
             raise ValueError(f"`weight_decay` cannot be negative, got {self.weight_decay}")
         if self.early_stopping < 1:
-            raise ValueError(f"`early_stopping` must be at least 1, got {self.early_stopping}")
+            raise ValueError(f"`early_stopping` must be at least 1, or math.inf for never, "
+                             f"got {self.early_stopping}")
         if not 0 <= self.val_frac < 1:
             raise ValueError(f"`val_frac` must be in [0, 1), got {self.val_frac}")
         if not 0 <= self.swa_start < 1:
@@ -88,10 +90,11 @@ def train_control(**settings) -> TrainControl:
     ``batch_size`` is the most targets an optimiser step reads: the fitting targets are cut into as
     few batches of at most that many as they divide into, of as equal a length as they can be.
     ``val_frac`` is held back from every fit alike by a plain random permutation, the fit on all
-    targets a run ends with included, and ``early_stopping`` is read only on that set. At the
-    default of 0 nothing is held back: every fitting target is trained on, the whole budget runs,
-    and the fit keeps the last epoch, where the cosine schedule has annealed the learning rate to
-    zero.
+    targets a run ends with included, and ``early_stopping`` is read only on that set: an epoch
+    count of patience, or ``math.inf``, the default, to train the whole budget and restore the
+    epoch with the lowest validation loss. At the ``val_frac`` default of 0 nothing is held back:
+    every fitting target is trained on, the whole budget runs, and the fit keeps the last epoch,
+    where the cosine schedule has annealed the learning rate to zero.
 
     ``device`` is ``"auto"`` for the graphics processor where there is one, NVIDIA's or Apple's,
     or the name of a device to train on. A fitted encoder carries the setting rather than the

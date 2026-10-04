@@ -36,8 +36,8 @@ representations.
 
 ## Details
 
-`models` and `sift` take either form. A length-one string is the name of
-a registered learner.
+`learners` and `sift` take either form. A length-one string is the name
+of a registered learner.
 
 ## Examples
 

@@ -182,8 +182,8 @@ hier_run <- function(spatial, ...) {
   }))
   list(targets = targets, series = series,
        fit = timesift(targets, series, y = tidyselect::starts_with("s"), id = plot, time = t, ...,
-                      models = hierarchical(spatial = spatial), sift = grains("month"),
-                      resampling = cv(v = 3L), inner = NULL, ensemble = FALSE, verbose = FALSE))
+                      learners = hierarchical(spatial = spatial), sift = grains("month"),
+                      resampling = cv(v = 3L), n_inner = NULL, ensemble = FALSE, verbose = FALSE))
 }
 
 test_that("a field needs the coordinates, and a fit without one does not", {
@@ -222,15 +222,15 @@ test_that("an intercept for each unit needs the unit, and a held-out unit is pre
                v = stats::rnorm(3001L))
   }))
   fit <- timesift(targets, series, y = s1, id = plot, time = t, target_time = t0,
-                  models = hierarchical(random = TRUE), sift = lookbacks("30 days"),
-                  resampling = grouped_cv("plot", v = 2L), inner = NULL, ensemble = FALSE,
+                  learners = hierarchical(random = TRUE), sift = lookbacks("30 days"),
+                  resampling = grouped_cv("plot", v = 2L), n_inner = NULL, ensemble = FALSE,
                   verbose = FALSE)
   p <- stats::predict(fit, targets, series, candidate = "selected")
   expect_equal(dim(p), c(n, 1L))
   expect_true(all(p > 0 & p < 1))
   none <- timesift(targets, series, y = s1, id = plot, time = t, target_time = t0,
-                   models = hierarchical(), sift = lookbacks("30 days"),
-                   resampling = grouped_cv("plot", v = 2L), inner = NULL, ensemble = FALSE,
+                   learners = hierarchical(), sift = lookbacks("30 days"),
+                   resampling = grouped_cv("plot", v = 2L), n_inner = NULL, ensemble = FALSE,
                    verbose = FALSE)
   expect_false(isTRUE(all.equal(p, stats::predict(none, targets, series, candidate = "selected"))))
 })

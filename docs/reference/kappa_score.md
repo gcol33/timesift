@@ -9,7 +9,7 @@ part company.
 ## Usage
 
 ``` r
-kappa_score(y, p, rule = c("youden", "kappa", "prevalence", "mpa"))
+kappa_score(y, p, rule = c("prevalence", "youden", "kappa", "mpa"))
 
 decision_threshold(y, ...)
 
@@ -27,6 +27,7 @@ decision_threshold(
   y,
   candidate = "ensemble",
   rule = c("youden", "kappa", "prevalence", "mpa"),
+  perc = 0.9,
   ...
 )
 
@@ -50,6 +51,9 @@ model_agreement(y, p_a, p_b, rule = c("youden", "kappa", "prevalence", "mpa"))
 - rule:
 
   Threshold rule: `"youden"`, `"kappa"`, `"prevalence"` or `"mpa"`.
+  `kappa_score()` cuts at `"prevalence"` by default, the rule the
+  registered `kappa` metric reads, and the other functions at
+  `"youden"`.
 
 - ...:
 

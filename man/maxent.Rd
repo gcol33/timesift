@@ -15,7 +15,7 @@ maxent(
   clamp = TRUE,
   n_inner = 5L,
   s = c("lambda.min", "lambda.1se"),
-  thresh = 1e-08,
+  tol = 1e-08,
   max_design = 2,
   threads = 1L,
   seed = 1L
@@ -46,7 +46,7 @@ formulation predicts a probability, which is its \code{"logistic"}.}
 
 \item{s}{Where the absence formulation reads its path: \code{"lambda.min"} or \code{"lambda.1se"}.}
 
-\item{thresh}{Where the coordinate descent stops, as the elastic net's \code{thresh}.}
+\item{tol}{Where the coordinate descent stops, as the elastic net's \code{tol}.}
 
 \item{max_design}{Gigabytes the expanded design may take.}
 

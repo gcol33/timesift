@@ -148,7 +148,7 @@ test_that("the nested cross-validation interval covers the procedure's risk at t
   rows <- lapply(seq_len(replicates), function(r) {
     s <- ncv_design(150L, r)
     sel <- select_grain(s$x, s$y, ncv_learner(), folds = fold_map(s$y, v = 5L, seed = r),
-                        inner = 3L, metric = "roc_auc", interval = "nested_cv", repeats = 1L,
+                        n_inner = 3L, metric = "roc_auc", interval = "nested_cv", repeats = 1L,
                         seed = r, verbose = FALSE)
     # The truth: the procedure fitted on every unit of the sample, scored on units it never saw.
     p <- stats::predict(sel$final$fit, deployment$x[[sel$final$grain]])

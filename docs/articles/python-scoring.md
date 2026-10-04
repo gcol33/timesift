@@ -46,10 +46,14 @@ are ranked above absences where presences are rare.
 ## `kappa_score()`
 
 ``` python
-kappa_score(y, p, rule: str = 'youden')
+kappa_score(y, p, rule: str = 'prevalence')
 ```
 
-Cohen’s kappa of a model’s decisions against the observed response.
+Cohen’s kappa of a model’s decisions against the observed response, cut
+by `rule`.
+
+The default cuts at the observed presence rate, the rule the registered
+`kappa` metric reads.
 
 ## `table_metric()`
 
@@ -138,6 +142,7 @@ decision_threshold(
     y,
     p=None,
     rule: str = 'youden',
+    *,
     candidate: str = 'ensemble',
     perc: float = 0.9,
 )

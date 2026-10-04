@@ -9,7 +9,7 @@ train_control(
   batch_size = 64L,
   learning_rate = 0.001,
   weight_decay = 1e-04,
-  early_stopping = 10L,
+  early_stopping = Inf,
   val_frac = 0,
   device = "auto",
   seed = 1L,
@@ -29,8 +29,8 @@ batch is a remainder of one.}
 \item{weight_decay}{AdamW weight decay.}
 
 \item{early_stopping}{Epochs without an inner-validation improvement before training stops.
-Read only where \code{val_frac} holds a validation set back. \code{Inf} trains the whole budget and
-still restores the epoch with the lowest validation loss.}
+Read only where \code{val_frac} holds a validation set back. \code{Inf}, the default, never stops: the
+whole budget is trained and the epoch with the lowest validation loss is restored.}
 
 \item{val_frac}{Share of the fitting targets held back as an inner validation set, used for
 early stopping and for nothing else. It is never scored as a result. The set is drawn from

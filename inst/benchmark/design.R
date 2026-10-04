@@ -36,6 +36,7 @@ BENCH <- list(
   grains      = c("halfday", "day", "week", "month", "season", "year"),
   elasticnet_squares = TRUE,
   elasticnet_n_inner  = 5L,
+  elasticnet_s        = "lambda.min",
   cnn_epochs   = 40L,
   n_deploy     = 3000L,
   deploy_chunk = 750L,
@@ -145,7 +146,8 @@ bench_ncv_repeats <- function(repeats) {
 bench_learner <- function(block) {
   switch(bench_block(block),
          elasticnet = timesift::elasticnet(squares = BENCH$elasticnet_squares,
-                                           n_inner = BENCH$elasticnet_n_inner),
+                                           n_inner = BENCH$elasticnet_n_inner,
+                                           s = BENCH$elasticnet_s),
          cnn = timesift::cnn(epochs = BENCH$cnn_epochs, device = BENCH$device),
          stop("unknown block: ", block))
 }

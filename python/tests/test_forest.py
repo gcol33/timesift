@@ -108,11 +108,11 @@ def test_the_forest_core_refuses_what_it_cannot_grow_on():
 
 
 def test_a_preset_fills_the_settings_left_open_as_randomforest_and_biomod2_have_them():
-    assert _forest_settings("package", "binomial", 471, None, None, None) == dict(
+    assert _forest_settings("default", "binomial", 471, None, None, None) == dict(
         trees=500, mtry=21, min_node=1)
-    assert _forest_settings("package", "gaussian", 471, None, None, None) == dict(
+    assert _forest_settings("default", "gaussian", 471, None, None, None) == dict(
         trees=500, mtry=157, min_node=5)
-    assert _forest_settings("package", "gaussian", 2, None, None, None)["mtry"] == 1
+    assert _forest_settings("default", "gaussian", 2, None, None, None)["mtry"] == 1
     assert _forest_settings("bigboss", "binomial", 471, None, None, None) == dict(
         trees=500, mtry=2, min_node=5)
     assert _forest_settings("bigboss", "binomial", 1, 100, None, 3) == dict(

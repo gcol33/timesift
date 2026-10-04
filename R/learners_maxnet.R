@@ -56,7 +56,7 @@
 #' @param clamp Hold each column and each feature inside the range it was fitted on.
 #' @param n_inner Folds of the absence formulation's inner cross-validation.
 #' @param s Where the absence formulation reads its path: `"lambda.min"` or `"lambda.1se"`.
-#' @param thresh Where the coordinate descent stops, as the elastic net's `thresh`.
+#' @param tol Where the coordinate descent stops, as the elastic net's `tol`.
 #' @param max_design Gigabytes the expanded design may take.
 #' @param threads How many fits of the absence formulation's inner cross-validation run at once.
 #'   What comes back does not depend on it.
@@ -72,7 +72,7 @@
 maxent <- function(data = NULL, classes = NULL, regmult = 1,
                    formulation = c("background", "absence"), type = NULL, knots = 50L,
                    add_samples = TRUE, clamp = TRUE, n_inner = 5L,
-                   s = c("lambda.min", "lambda.1se"), thresh = 1e-8, max_design = 2,
+                   s = c("lambda.min", "lambda.1se"), tol = 1e-8, max_design = 2,
                    threads = 1L, seed = 1L) {
   formulation <- match.arg(formulation)
   s <- match.arg(s)
@@ -87,10 +87,10 @@ maxent <- function(data = NULL, classes = NULL, regmult = 1,
     data = data, reads = "tabular", multi = "separate",
     params = list(classes = classes, regmult = regmult, formulation = formulation, type = type,
                   knots = as.integer(knots), add_samples = isTRUE(add_samples),
-                  clamp = isTRUE(clamp), n_inner = as.integer(n_inner), s = s, thresh = thresh,
+                  clamp = isTRUE(clamp), n_inner = as.integer(n_inner), s = s, tol = tol,
                   max_design = max_design, threads = as.integer(threads), seed = as.integer(seed)),
     fit = function(x, y, classes, regmult, formulation, type, knots, add_samples, clamp, n_inner,
-                   s, thresh, max_design, threads, seed, head, weights, group = NULL, ...) {
+                   s, tol, max_design, threads, seed, head, weights, group = NULL, ...) {
       if (!identical(.head_family(head), "binomial")) {
         stop("maxnet fits a presence-absence response, under a head whose loss is the binary ",
              "cross-entropy; this head's loss is ", .describe(head$loss), ".", call. = FALSE)
@@ -114,7 +114,7 @@ maxent <- function(data = NULL, classes = NULL, regmult = 1,
           n_fold <- length(labels)
         }
         .maxnet_fit(m, yj, weights[, j], classes = classes, knots = knots, regmult = regmult,
-                    formulation = formulation, add_samples = add_samples, thresh = thresh,
+                    formulation = formulation, add_samples = add_samples, thresh = tol,
                     one_se = identical(s, "lambda.1se"), fold = fold, n_fold = n_fold,
                     threads = threads, max_design = max_design)
       })

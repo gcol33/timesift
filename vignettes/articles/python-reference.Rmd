@@ -121,7 +121,7 @@ The arms that ship, how they are trained, and the interface a learner of your ow
 : biomod2's surface range envelope, one per variable, over every bin-by-channel column: for each column the `quantile` and `1 - quantile` quantiles of its readings over the units present, and a unit predicted present where every column lies between its two, the ends included. With the same quantile it draws the envelope `bm_SRE()` draws; the quantile is R's default, type 7.
 
 [`mars()`](python-learners.html#mars)
-: One MARS model per variable over every bin-by-channel column, fitted as the earth package fits it and as biomod2 fits `MARS`. The forward pass starts from the intercept and at each step multiplies a term already in the model by a pair of hinges on one column, `max(0, x - t)` and `max(0, t - x)`, taking the parent, the column and the knot `t` that most reduce the residual sum of squares of a least-squares fit to the response; a knot at a column's least value enters the column linearly. `degree` bounds how many hinges a term multiplies. The pass stops at `nk` terms, when a step raises the R-squared by less than `thresh`, or when no term reduces the residuals.
+: One MARS model per variable over every bin-by-channel column, fitted as the earth package fits it and as biomod2 fits `MARS`. The forward pass starts from the intercept and at each step multiplies a term already in the model by a pair of hinges on one column, `max(0, x - t)` and `max(0, t - x)`, taking the parent, the column and the knot `t` that most reduce the residual sum of squares of a least-squares fit to the response; a knot at a column's least value enters the column linearly. `degree` bounds how many hinges a term multiplies. The pass stops at `max_terms` terms, when a step raises the R-squared by less than `min_gain`, or when no term reduces the residuals.
 
 [`discriminant()`](python-learners.html#discriminant)
 : One flexible discriminant per variable over every bin-by-channel column, fitted as mda's `fda(method = mars)` fits it and as biomod2 fits `FDA`. Optimal scoring gives presence and absence one score each and regresses the scored response on a MARS basis of the columns; the fitted score is the one canonical variate, and the prediction is the posterior probability of presence under two normal classes around the class centroids on it, the classes' shares among the fitting units as priors.
@@ -256,7 +256,7 @@ The metrics, the paired contrast between two arms on matched cells, every grain 
 : The area under the precision-recall curve, as the step sum over the distinct predictions.
 
 [`kappa_score()`](python-scoring.html#kappa_score)
-: Cohen's kappa of a model's decisions against the observed response.
+: Cohen's kappa of a model's decisions against the observed response, cut by `rule`.
 
 [`table_metric()`](python-scoring.html#table_metric)
 : A metric of the two-by-two table of decisions against observations.

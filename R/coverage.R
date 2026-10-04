@@ -26,7 +26,7 @@
 #' coverage(d[!lost, ], plot, t, grain = "week")
 #'
 #' @export
-coverage <- function(data, id, time, grain = "day", year_start = "09-01") {
+coverage <- function(data, id, time, grain = "day", year_start = "01-01") {
   id_col <- .resolve_column(substitute(id), data, parent.frame())
   time_col <- .resolve_column(substitute(time), data, parent.frame())
   grain <- .check_grain(grain)

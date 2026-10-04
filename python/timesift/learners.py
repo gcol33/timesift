@@ -729,8 +729,8 @@ def _design(x: TimesiftMatrix, squares: bool) -> np.ndarray:
     return np.hstack([m, m ** 2]) if squares else m
 
 
-def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, s="lambda.min", n_lambda=100,
-               thresh=1e-8, threads=1, seed=1) -> Learner:
+def elasticnet(data=None, alpha=0.5, n_inner=10, squares=True, s="lambda.1se", n_lambda=100,
+               tol=1e-8, threads=1, seed=1) -> Learner:
     """One penalised regression per variable, over every bin-by-channel column and, by default,
     their squares, with the penalty chosen by an inner cross-validation on the fitting units.
 
@@ -747,7 +747,10 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, s="lambda.min", n_
     weighted mean and weighted standard deviation, a hundred penalties down from the smallest
     that leaves every coefficient at zero, and the held-out deviance read fold by fold. ``s`` is
     where the fit is read: ``"lambda.min"``, ``"lambda.1se"``, or a penalty of its own, which is
-    interpolated between the two points of the path around it.
+    interpolated between the two points of the path around it. The defaults are cv.glmnet's: ten
+    inner folds, read at ``"lambda.1se"``, the largest penalty within one standard error of the
+    least held-out deviance. ``tol`` is where the coordinate descent stops, read off the largest
+    coefficient move of a pass.
 
     The inner folds are dealt for each response and stratified on it, so a rare outcome is spread
     over them as evenly as its count allows. A presence-absence response whose inner training
@@ -770,10 +773,10 @@ def elasticnet(data=None, alpha=0.5, n_inner=5, squares=True, s="lambda.min", n_
     return Learner(name="elasticnet", fit=_elasticnet_fit, predict=_elasticnet_predict,
                    data=data, reads="tabular", multi="separate",
                    params=dict(alpha=alpha, n_inner=n_inner, squares=squares, s=s,
-                               n_lambda=n_lambda, thresh=thresh, threads=threads, seed=seed))
+                               n_lambda=n_lambda, tol=tol, threads=threads, seed=seed))
 
 
-def _elasticnet_fit(x, y, alpha, n_inner, squares, s, n_lambda, thresh, threads, seed, head,
+def _elasticnet_fit(x, y, alpha, n_inner, squares, s, n_lambda, tol, threads, seed, head,
                     variables, group=None, **_):
     from .penalised import penalised_cv
     family = _family(head)
@@ -787,7 +790,7 @@ def _elasticnet_fit(x, y, alpha, n_inner, squares, s, n_lambda, thresh, threads,
         if family == "binomial" and not _inner_fittable(yj, fold):
             return float(yj.mean())
         return penalised_cv(design, yj, w, family, alpha, fold, int(fold.max()) + 1,
-                            n_lambda=n_lambda, thresh=thresh, threads=threads)
+                            n_lambda=n_lambda, thresh=tol, threads=threads)
 
     models = _fit_columns(m, y, make, _variable_seeds(seed, variables), _head_weights(head, y))
     return dict(models=models, squares=squares, s=s, n_col=m.shape[1], family=family,
@@ -807,7 +810,7 @@ def _elasticnet_predict(model, x):
                             lambda f, m: penalised_predict(f, m, model["s"]))
 
 
-def forest(data=None, trees=None, mtry=None, min_node=None, balance=False, preset="package",
+def forest(data=None, trees=None, mtry=None, min_node=None, balance=False, preset="default",
            seed=1, threads=1) -> Learner:
     """One random forest per variable, over every bin-by-channel column: a probability forest
     under a presence-absence head and a regression forest under a head with a squared-error loss
@@ -826,7 +829,7 @@ def forest(data=None, trees=None, mtry=None, min_node=None, balance=False, prese
     ``balance=True`` is the down-sampled forest biomod2 fits as ``RFd``: each tree draws as many
     units from each class as the smaller class holds.
 
-    ``preset`` says whose defaults the settings left ``None`` take. ``"package"`` is
+    ``preset`` says whose defaults the settings left ``None`` take. ``"default"`` is
     randomForest's own, which is what biomod2's default option set fits: 500 trees, ``mtry`` the
     square root of the column count under presence-absence and a third of it under a squared-error
     loss, and ``min_node`` 1 and 5 under the two. ``"bigboss"`` is biomod2's tuned option set: 500
@@ -836,9 +839,12 @@ def forest(data=None, trees=None, mtry=None, min_node=None, balance=False, prese
     The case weights are the response head's, :func:`~timesift.response.positive_weights` under
     presence-absence, and weight the bootstrap draw: a unit is drawn in proportion to its weight,
     and within its class under ``balance``.
+    Under the shipped presence-absence head those weights are on, so a default ``forest()`` is
+    randomForest's specification fitted under them; a head registered without ``weights`` fits it
+    unweighted.
     """
-    if preset not in ("package", "bigboss"):
-        raise ValueError(f'`preset` is "package" or "bigboss", got {preset!r}.')
+    if preset not in ("default", "bigboss"):
+        raise ValueError(f'`preset` is "default" or "bigboss", got {preset!r}.')
     return Learner(name="forest", fit=_rf_fit, predict=_rf_predict, data=data, reads="tabular",
                    multi="separate",
                    params=dict(trees=trees, mtry=mtry, min_node=min_node, balance=bool(balance),
@@ -884,7 +890,7 @@ def _rf_predict(model, x):
 
 def boosting(data=None, method="gbm", trees=None, depth=None, shrinkage=None, min_leaf=None,
              subsample=None, colsample=None, lambda_=None, gamma=None, n_inner=None,
-             preset="package", seed=1, threads=1) -> Learner:
+             preset="default", seed=1, threads=1) -> Learner:
     """One boosted model per variable, over every bin-by-channel column: a logistic model under a
     presence-absence head, a squared-error one under a head with a squared-error loss and a Poisson
     one with a log link under a count head. The score
@@ -909,7 +915,7 @@ def boosting(data=None, method="gbm", trees=None, depth=None, shrinkage=None, mi
     and weighted by how many units each holds, is kept, as gbm's ``cv.folds`` chooses it. The folds
     are dealt for each response and stratified on it, as the elastic net's are.
 
-    ``preset`` says whose defaults the settings left ``None`` take. ``"package"`` is the fitting
+    ``preset`` says whose defaults the settings left ``None`` take. ``"default"`` is the fitting
     package's own, which is what biomod2's default option set fits: under gbm 100 trees of one
     split, ``shrinkage=0.1``, ``min_leaf=10`` and ``subsample=0.5``; under xgboost 100 trees of
     depth 6, ``shrinkage=0.3``, ``min_leaf=1``, ``lambda_=1`` and every unit and column.
@@ -921,11 +927,14 @@ def boosting(data=None, method="gbm", trees=None, depth=None, shrinkage=None, mi
     response head's, :func:`~timesift.response.positive_weights` under presence-absence, and weigh
     the gradient and every sum a tree is grown on; ``min_leaf`` counts units under gbm, as
     ``n.minobsinnode`` does.
+    Under the shipped presence-absence head those weights are on, so a default ``boosting()`` is
+    gbm's specification fitted under them; a head registered without ``weights`` fits it
+    unweighted.
     """
     if method not in ("gbm", "xgboost"):
         raise ValueError(f'`method` is "gbm" or "xgboost", got {method!r}.')
-    if preset not in ("package", "bigboss"):
-        raise ValueError(f'`preset` is "package" or "bigboss", got {preset!r}.')
+    if preset not in ("default", "bigboss"):
+        raise ValueError(f'`preset` is "default" or "bigboss", got {preset!r}.')
     settings = _boost_settings(preset, method, trees, depth, shrinkage, min_leaf, subsample,
                                colsample, lambda_, gamma, n_inner)
     return Learner(name="boosting", fit=_boost_fit, predict=_boost_predict, data=data,
@@ -935,11 +944,11 @@ def boosting(data=None, method="gbm", trees=None, depth=None, shrinkage=None, mi
 
 
 _BOOST_PRESETS = {
-    ("package", "gbm"): dict(trees=100, depth=1, shrinkage=0.1, min_leaf=10, subsample=0.5,
+    ("default", "gbm"): dict(trees=100, depth=1, shrinkage=0.1, min_leaf=10, subsample=0.5,
                              colsample=1, lambda_=0, gamma=0, n_inner=0),
     ("bigboss", "gbm"): dict(trees=2500, depth=7, shrinkage=0.001, min_leaf=5, subsample=0.5,
                              colsample=1, lambda_=0, gamma=0, n_inner=3),
-    ("package", "xgboost"): dict(trees=100, depth=6, shrinkage=0.3, min_leaf=1, subsample=1,
+    ("default", "xgboost"): dict(trees=100, depth=6, shrinkage=0.3, min_leaf=1, subsample=1,
                             colsample=1, lambda_=1, gamma=0, n_inner=0),
     ("bigboss", "xgboost"): dict(trees=4, depth=2, shrinkage=1, min_leaf=1, subsample=1, colsample=1,
                             lambda_=1, gamma=0, n_inner=0),
@@ -993,7 +1002,7 @@ def _boost_predict(model, x):
 
 
 def maxent(data=None, classes=None, regmult=1.0, formulation="background", type=None, knots=50,
-           add_samples=True, clamp=True, n_inner=5, s="lambda.min", thresh=1e-8, max_design=2.0,
+           add_samples=True, clamp=True, n_inner=5, s="lambda.min", tol=1e-8, max_design=2.0,
            threads=1, seed=1) -> Learner:
     """One maximum-entropy model per variable, over every bin-by-channel column, in the formulation
     of the maxnet package (Phillips et al. 2017) and biomod2's `MAXNET`: maxnet's feature classes,
@@ -1049,7 +1058,7 @@ def maxent(data=None, classes=None, regmult=1.0, formulation="background", type=
                    params=dict(classes=classes, regmult=float(regmult), formulation=formulation,
                                type=_maxnet_type(formulation, type), knots=int(knots),
                                add_samples=bool(add_samples), clamp=bool(clamp),
-                               n_inner=int(n_inner), s=s, thresh=float(thresh),
+                               n_inner=int(n_inner), s=s, tol=float(tol),
                                max_design=float(max_design), threads=int(threads),
                                seed=int(seed)))
 
@@ -1067,7 +1076,7 @@ def _maxnet_type(formulation, type) -> str:
 
 
 def _maxnet_fit(x, y, classes, regmult, formulation, type, knots, add_samples, clamp, n_inner, s,
-                thresh, max_design, threads, seed, head, variables, group=None, **_):
+                tol, max_design, threads, seed, head, variables, group=None, **_):
     from ._maxnet import maxnet_fit
     if _family(head) != "binomial":
         raise ValueError("maxnet fits a presence-absence response, under a head whose loss is the "
@@ -1084,7 +1093,7 @@ def _maxnet_fit(x, y, classes, regmult, formulation, type, knots, add_samples, c
                 return float(yj.mean())
             n_fold = int(fold.max()) + 1
         return maxnet_fit(design, yj, w, classes=classes, knots=knots, regmult=regmult,
-                          formulation=formulation, add_samples=add_samples, thresh=thresh,
+                          formulation=formulation, add_samples=add_samples, thresh=tol,
                           one_se=s == "lambda.1se", fold=fold, n_fold=n_fold, threads=threads,
                           max_design=max_design)
 
@@ -1102,7 +1111,7 @@ def _maxnet_predict(model, x):
 
 
 def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prune="se_sum",
-         n_inner=None, preset="package", shrink=1.0, seed=1) -> Learner:
+         n_inner=None, preset="default", shrink=1.0, seed=1) -> Learner:
     """One classification or regression tree per variable, over every bin-by-channel column,
     grown under rpart's rules: the Gini index under a presence-absence head, the sum of squares
     under a head with a squared-error loss and the Poisson deviance under a count head, a split
@@ -1120,7 +1129,7 @@ def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prun
     standard error of the least cross-validated error; ``"min"`` the first row reaching the least
     error; and ``"none"`` keeps the tree as grown.
 
-    ``preset`` says whose defaults the settings left ``None`` take. ``"package"`` is rpart's own,
+    ``preset`` says whose defaults the settings left ``None`` take. ``"default"`` is rpart's own,
     which is what biomod2's default option set fits: ``min_split=20``,
     ``min_leaf=round(min_split / 3)`` (or ``min_split=3 * min_leaf`` where only ``min_leaf`` is
     given), ``cp=0.01``, ``max_depth=30`` and ten inner folds. ``"bigboss"`` is biomod2's tuned
@@ -1130,6 +1139,9 @@ def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prun
     The case weights are the response head's, :func:`~timesift.response.positive_weights` under
     presence-absence. They weigh every class count, sum of squares and event count the tree is
     grown on; ``min_split`` and ``min_leaf`` count observations, as rpart's do.
+    Under the shipped presence-absence head those weights are on, so a default ``tree()`` is
+    rpart's specification fitted under them; a head registered without ``weights`` fits it
+    unweighted.
 
     Under a count head a leaf predicts a rate, and the rate is shrunk towards the rate of the
     units the tree is grown on, as rpart's ``method = "poisson"`` shrinks it: the posterior mean
@@ -1154,13 +1166,13 @@ def _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner) -> dict:
     open follows a given ``min_leaf``, as ``rpart.control()`` has them."""
     if preset == "bigboss":
         base = dict(min_split=5, min_leaf=5, cp=0.001, max_depth=10, n_inner=5)
-    elif preset == "package":
+    elif preset == "default":
         split = min_split if min_split is not None else (
             20 if min_leaf is None else 3 * int(min_leaf))
         base = dict(min_split=split, min_leaf=round(split / 3), cp=0.01, max_depth=30,
                     n_inner=10)
     else:
-        raise ValueError(f'`preset` is "package" or "bigboss", got {preset!r}.')
+        raise ValueError(f'`preset` is "default" or "bigboss", got {preset!r}.')
     given = dict(min_split=min_split, min_leaf=min_leaf, cp=cp, max_depth=max_depth,
                  n_inner=n_inner)
     out = {k: base[k] if v is None else v for k, v in given.items()}
@@ -1206,6 +1218,9 @@ def linear(data=None, select="both", terms="power", max_terms=math.inf, degree=2
     The defaults are biomod2's ``GLM``: every column enters as ``x + I(x^2)``, and the terms are
     searched in both directions by AIC as ``MASS::stepAIC()`` searches them, with no bound on how
     many are kept.
+    Under the shipped presence-absence head those weights are on, so a default ``linear()`` is
+    biomod2's ``GLM`` specification fitted under them; a head registered without ``weights`` fits it
+    unweighted.
 
     ``terms`` says what one term is. Under ``"power"`` each power of a column is a term of its own,
     which is how biomod2 writes a quadratic formula and how ``stepAIC()`` walks it. Under
@@ -1308,7 +1323,7 @@ def _whole(v, name, least):
         raise ValueError(f"`{name}` is one whole number of {least} or more, got {v!r}.")
 
 
-def mars(data=None, degree=1, penalty=None, nk=None, thresh=0.001, minspan=0, endspan=0,
+def mars(data=None, degree=1, penalty=None, max_terms=None, min_gain=0.001, minspan=0, endspan=0,
          fast_k=20, fast_beta=1.0, prune=True, nprune=None, threads=1) -> Learner:
     """One MARS model per variable over every bin-by-channel column, fitted as the earth package
     fits it and as biomod2 fits ``MARS``. The forward pass starts from the intercept and at each
@@ -1316,8 +1331,8 @@ def mars(data=None, degree=1, penalty=None, nk=None, thresh=0.001, minspan=0, en
     ``max(0, x - t)`` and ``max(0, t - x)``, taking the parent, the column and the knot ``t`` that
     most reduce the residual sum of squares of a least-squares fit to the response; a knot at a
     column's least value enters the column linearly. ``degree`` bounds how many hinges a term
-    multiplies. The pass stops at ``nk`` terms, when a step raises the R-squared by less than
-    ``thresh``, or when no term reduces the residuals.
+    multiplies. The pass stops at ``max_terms`` terms, when a step raises the R-squared by less
+    than ``min_gain``, or when no term reduces the residuals.
 
     The pruning pass removes terms one at a time, each time the one whose loss raises the residuals
     least, and keeps the subset of least generalised cross-validation, which charges ``penalty``
@@ -1328,18 +1343,20 @@ def mars(data=None, degree=1, penalty=None, nk=None, thresh=0.001, minspan=0, en
     squared-error head they are refitted by least squares.
 
     The defaults are earth's, which biomod2 uses under its default and ``"bigboss"`` option sets
-    alike: degree one, ``penalty`` 2 (3 above degree one), ``thresh=0.001``,
-    ``nk = min(200, max(20, 2 p)) + 1`` for ``p`` columns, Friedman's spans between knots
+    alike: degree one, ``penalty`` 2 (3 above degree one), ``min_gain=0.001``,
+    ``max_terms = min(200, max(20, 2 p)) + 1`` for ``p`` columns, Friedman's spans between knots
     (``minspan=0``, ``endspan=0``) and Fast MARS over the ``fast_k=20`` best parents.
-    ``prune=False`` keeps every forward term; ``nprune`` caps the terms kept. The case weights are the head's and
-    weigh both passes and the refit. The passes run on the core the R package calls, so the two
+    ``prune=False`` keeps every forward term; ``nprune`` caps the terms kept. The case weights are
+    the head's and weigh both passes and the refit; under the shipped presence-absence head they
+    are on, so a default ``mars()`` is earth's specification fitted under them, and a head
+    registered without ``weights`` fits it unweighted. The passes run on the core the R package calls, so the two
     keep the same terms and return the same coefficients; ``threads`` searches that many columns
     at once and does not change what comes back. A variable holding one value is predicted its
     mean.
     """
     _whole(degree, "degree", 1)
-    if nk is not None:
-        _whole(nk, "nk", 1)
+    if max_terms is not None:
+        _whole(max_terms, "max_terms", 1)
     if nprune is not None:
         _whole(nprune, "nprune", 1)
     _whole(endspan, "endspan", 0)
@@ -1349,8 +1366,8 @@ def mars(data=None, degree=1, penalty=None, nk=None, thresh=0.001, minspan=0, en
     if penalty is not None and (isinstance(penalty, bool) or np.isnan(penalty)
                                 or (penalty < 0 and penalty != -1)):
         raise ValueError(f"`penalty` is one number of zero or more, or -1, got {penalty!r}.")
-    if isinstance(thresh, bool) or not 0.0 <= thresh < 1.0:
-        raise ValueError(f"`thresh` is one number in [0, 1), got {thresh!r}.")
+    if isinstance(min_gain, bool) or not 0.0 <= min_gain < 1.0:
+        raise ValueError(f"`min_gain` is one number in [0, 1), got {min_gain!r}.")
     if isinstance(fast_beta, bool) or not fast_beta >= 0.0:
         raise ValueError(f"`fast_beta` is one number of zero or more, got {fast_beta!r}.")
     if not isinstance(prune, (bool, np.bool_)):
@@ -1358,22 +1375,23 @@ def mars(data=None, degree=1, penalty=None, nk=None, thresh=0.001, minspan=0, en
     return Learner(name="mars", fit=_mars_fit, predict=_mars_predict, data=data, reads="tabular",
                    multi="separate",
                    params=dict(degree=int(degree), penalty=penalty,
-                               nk=None if nk is None else int(nk), thresh=float(thresh),
+                               max_terms=None if max_terms is None else int(max_terms),
+                               min_gain=float(min_gain),
                                minspan=int(minspan), endspan=int(endspan), fast_k=int(fast_k),
                                fast_beta=float(fast_beta), prune=bool(prune),
                                nprune=None if nprune is None else int(nprune),
                                threads=int(threads)))
 
 
-def _mars_fit(x, y, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_beta, prune,
-              nprune, threads, head, variables, **_):
+def _mars_fit(x, y, degree, penalty, max_terms, min_gain, minspan, endspan, fast_k, fast_beta,
+              prune, nprune, threads, head, variables, **_):
     from ._mars import mars_fit
     family = _family(head)
     m = flatten(x)
 
     def make(design, yj, seed_j, w):
-        return mars_fit(design, yj, w, family, degree=degree, penalty=penalty, nk=nk,
-                        thresh=thresh, minspan=minspan, endspan=endspan, fast_k=fast_k,
+        return mars_fit(design, yj, w, family, degree=degree, penalty=penalty, nk=max_terms,
+                        thresh=min_gain, minspan=minspan, endspan=endspan, fast_k=fast_k,
                         fast_beta=fast_beta, prune=prune, nprune=nprune, threads=threads)
 
     models = _fit_columns(m, y, make, [0] * y.shape[1], _head_weights(head, y))
@@ -1409,7 +1427,9 @@ def additive(data=None, k=10, gamma=1.0, max_knots=2000, threads=1) -> Learner:
     functions as it holds values, a column of two enters linearly and a column of one is left out;
     a column whose linear part the columns before it span keeps only its penalised part.
 
-    The head's case weights enter the likelihood as mgcv's prior weights. The model holds at most
+    The head's case weights enter the likelihood as mgcv's prior weights; under the shipped
+    presence-absence head they are on, so a default ``additive()`` is mgcv's specification fitted
+    under them, and a head registered without ``weights`` fits it unweighted. The model holds at most
     as many coefficients as there are units, one for the intercept and ``k - 1`` per column. The
     fit runs on the core the R package calls, so the two languages fit the same model; ``threads``
     works that many columns and variables at once and does not change what comes back. A variable
@@ -1455,7 +1475,7 @@ def _additive_predict(model, x):
     return out
 
 
-def discriminant(data=None, degree=1, penalty=None, nk=None, thresh=0.001, prune=True,
+def discriminant(data=None, degree=1, penalty=None, max_terms=None, min_gain=0.001, prune=True,
                  calibrate=True, threads=1) -> Learner:
     """One flexible discriminant per variable over every bin-by-channel column, fitted as mda's
     ``fda(method = mars)`` fits it and as biomod2 fits ``FDA``. Optimal scoring gives presence and
@@ -1466,16 +1486,18 @@ def discriminant(data=None, degree=1, penalty=None, nk=None, thresh=0.001, prune
 
     The basis is mda's own MARS, not earth's that ``mars`` reproduces: each forward step adds a column
     linearly or a pair of hinges on it, and the pass stops when a step lowers the residuals by less
-    than ``thresh`` of them, when they fall to ``thresh`` of the null model's, when the generalised
-    cross-validation passes ten times the null model's, or at ``nk`` terms. The pruning drops the
-    term of least t statistic, one at a time, and keeps the subset of least generalised
-    cross-validation, which counts each term beyond the intercept as ``1 + penalty / 2`` degrees
-    of freedom. The defaults are mda's, which biomod2 passes
-    unchanged: degree one, ``penalty`` 2 (3 above degree one), ``thresh=0.001`` and
-    ``nk = max(21, 2 p + 1)`` for ``p`` columns.
+    than ``min_gain`` of them, when they fall to ``min_gain`` of the null model's, when the
+    generalised cross-validation passes ten times the null model's, or at ``max_terms`` terms. The
+    pruning drops the term of least t statistic, one at a time, and keeps the subset of least
+    generalised cross-validation, which counts each term beyond the intercept as
+    ``1 + penalty / 2`` degrees of freedom. The defaults are mda's, which biomod2 passes unchanged:
+    degree one, ``penalty`` 2 (3 above degree one), ``min_gain=0.001`` and
+    ``max_terms = max(21, 2 p + 1)`` for ``p`` columns.
 
     The head's case weights set the classes' scores and the variate, and not the basis, whose
-    forward pass mda runs unweighted. ``calibrate=True`` recalibrates the posterior by a probit
+    forward pass mda runs unweighted; under the shipped presence-absence head they are on, so a
+    default ``discriminant()`` is mda's specification fitted under them, and a head registered
+    without ``weights`` fits it unweighted. ``calibrate=True`` recalibrates the posterior by a probit
     regression of the response on it under the case weights, on the fitting units, as biomod2
     always does for ``FDA``; ``False`` predicts the posterior. The passes run on the core the R
     package calls, so the two keep the same terms and predict the same probabilities; ``threads``
@@ -1485,25 +1507,26 @@ def discriminant(data=None, degree=1, penalty=None, nk=None, thresh=0.001, prune
     cross-entropy.
     """
     _whole(degree, "degree", 1)
-    if nk is not None:
-        _whole(nk, "nk", 3)
+    if max_terms is not None:
+        _whole(max_terms, "max_terms", 3)
     _whole(threads, "threads", 1)
     if penalty is not None and (isinstance(penalty, bool) or np.isnan(penalty) or penalty < 0):
         raise ValueError(f"`penalty` is one number of zero or more, got {penalty!r}.")
-    if isinstance(thresh, bool) or not 0.0 <= thresh < 1.0:
-        raise ValueError(f"`thresh` is one number in [0, 1), got {thresh!r}.")
+    if isinstance(min_gain, bool) or not 0.0 <= min_gain < 1.0:
+        raise ValueError(f"`min_gain` is one number in [0, 1), got {min_gain!r}.")
     for name, flag in (("prune", prune), ("calibrate", calibrate)):
         if not isinstance(flag, (bool, np.bool_)):
             raise ValueError(f"`{name}` is True or False, got {flag!r}.")
     return Learner(name="discriminant", fit=_discriminant_fit, predict=_discriminant_predict,
                    data=data, reads="tabular", multi="separate",
                    params=dict(degree=int(degree), penalty=penalty,
-                               nk=None if nk is None else int(nk), thresh=float(thresh),
+                               max_terms=None if max_terms is None else int(max_terms),
+                               min_gain=float(min_gain),
                                prune=bool(prune), calibrate=bool(calibrate),
                                threads=int(threads)))
 
 
-def _discriminant_fit(x, y, degree, penalty, nk, thresh, prune, calibrate, threads, head,
+def _discriminant_fit(x, y, degree, penalty, max_terms, min_gain, prune, calibrate, threads, head,
                       variables, **_):
     from ._fda import fda_fit
     if _family(head) != "binomial":
@@ -1513,7 +1536,7 @@ def _discriminant_fit(x, y, degree, penalty, nk, thresh, prune, calibrate, threa
     m = flatten(x)
 
     def make(design, yj, seed_j, w):
-        return fda_fit(design, yj, w, degree=degree, penalty=penalty, nk=nk, thresh=thresh,
+        return fda_fit(design, yj, w, degree=degree, penalty=penalty, nk=max_terms, thresh=min_gain,
                        prune=prune, calibrate=calibrate, threads=threads)
 
     models = _fit_columns(m, y, make, [0] * y.shape[1], _head_weights(head, y))
@@ -1557,7 +1580,9 @@ def hierarchical(data=None, spatial="none", random=False, cov="exponential", nei
     and the hyperparameters are integrated over on a grid of ``nodes`` points per hyperparameter,
     centred on the mode of their posterior and weighted by it (Rue, Martino and Chopin 2009). With
     an intercept alone its standard deviation is set at the mode of its posterior; with neither
-    the fit is the posterior mode of the coefficients. A prediction at new units interpolates the
+    the fit is the posterior mode of the coefficients, so at ``spatial="none"`` and
+    ``random=False`` the learner is a penalised logistic model, every coefficient shrunk towards
+    zero by its prior. A prediction at new units interpolates the
     field to their coordinates, so the targets it is given carry the same coordinate columns. The
     head's case weights enter the likelihood in every configuration. A response holding one value
     is predicted its mean. The learner fits a presence-absence head.

@@ -35,6 +35,9 @@ table_metric(
 - rule:
 
   Threshold rule: `"youden"`, `"kappa"`, `"prevalence"` or `"mpa"`.
+  [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+  cuts at `"prevalence"` by default, the rule the registered `kappa`
+  metric reads, and the other functions at `"youden"`.
 
 - threshold:
 

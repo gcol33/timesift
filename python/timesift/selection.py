@@ -44,8 +44,8 @@ class Selection:
     inner: list[dict]
     metric: str
     response: str
-    rule: str = "argmax"
-    threshold: str | None = None
+    choose: str = "argmax"
+    cut_rule: str | None = None
     thresholds: list[dict] | None = None
     cut_scores: Ladder | None = None
     interval: str = "variables"
@@ -58,7 +58,7 @@ class Selection:
             arm = f"{row['grain']}|{row['learner']}"
             picked[arm] = picked.get(arm, 0) + 1
         lines = [f"<timesift selection> {len(self.candidates)} candidates over "
-                 f"{len(self.selected)} outer folds by {self.rule}",
+                 f"{len(self.selected)} outer folds by {self.choose}",
                  "selected: " + ", ".join(f"{a} x{n}" for a, n in picked.items())]
         for row in self.estimate:
             mark = " <- selected on" if row["metric"] == self.metric else ""
@@ -69,8 +69,8 @@ class Selection:
         return "\n".join(lines)
 
 
-def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
-                 threshold: str | None = None, interval: str = "variables", repeats: int = 1,
+def select_grain(x, y, learners, folds=None, n_inner=5, choose: str = "argmax",
+                 cut_rule: str | None = None, interval: str = "variables", repeats: int = 1,
                  response: str = "presence_absence", metric=None,
                  compare: Ladder | None = None, control=None, seed: int = 1,
                  verbose: bool = True) -> Selection:
@@ -94,7 +94,7 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
 
     Inside each outer fold every candidate carries an inner score, the mean over variables of its
     per-variable mean over the inner folds, and a standard error, the standard deviation over the
-    inner folds of the fold's own score divided by the square root of their number. ``rule``
+    inner folds of the fold's own score divided by the square root of their number. ``choose``
     chooses among them. ``"argmax"`` takes the highest score, and on an exact tie the candidate
     declared first. ``"coarsest_adequate"`` is the one-standard-error rule (Breiman, Friedman,
     Olshen and Stone 1984; Hastie, Tibshirani and Friedman 2009, section 7.10) with coarseness in
@@ -102,7 +102,7 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
     adequate, and the one with the fewest bins wins, then the fewest channels, then the higher
     score, then the one declared first. A standard error that cannot be computed is taken as zero.
 
-    ``threshold`` names a rule of ``decision_threshold`` (``"youden"``, the cut that maximises
+    ``cut_rule`` names a rule of ``decision_threshold`` (``"youden"``, the cut that maximises
     TSS, ``"kappa"`` or ``"prevalence"``). With it set, each outer fold learns one cut per variable
     on the inner out-of-fold predictions of the candidate it selected, which cover the outer
     training units and nothing else, freezes it, and reads the outer test fold's predictions at it
@@ -124,10 +124,10 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
     standard error, and the paper's is kept beside it as ``se_bates``. One repetition costs one
     fit of the procedure per unordered pair and per unordered triple of outer folds.
     """
-    if rule not in RULES:
-        raise ValueError(f"rule must be one of {RULES}, got {rule!r}")
-    if threshold is not None and threshold not in THRESHOLD_RULES:
-        raise ValueError(f"threshold must be None or one of {THRESHOLD_RULES}, got {threshold!r}")
+    if choose not in RULES:
+        raise ValueError(f"choose must be one of {RULES}, got {choose!r}")
+    if cut_rule is not None and cut_rule not in THRESHOLD_RULES:
+        raise ValueError(f"cut_rule must be None or one of {THRESHOLD_RULES}, got {cut_rule!r}")
     check_interval(interval)
     grains = timesift_set(x)
     units = grains.units
@@ -146,7 +146,7 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
                         "function of (y, p).")
     metric = metric or spec["metric"]
     score = METRICS.get(metric)
-    split = _inner_splitter(inner, folds.group)
+    split = _inner_splitter(n_inner, folds.group)
     _check_compare(compare, metric, interval)
     # The candidate set keeps the order its grains and its learners were declared in, so which
     # candidate an exact tie on the inner score falls to does not depend on how the names sort.
@@ -155,7 +155,7 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
     if len(candidates) < 2:
         raise ValueError("selection needs at least two candidates; "
                          "got one grain and one learner")
-    ctx = selection_context(grains, y, learners, candidates, rule, split, response, metric,
+    ctx = selection_context(grains, y, learners, candidates, choose, split, response, metric,
                             control, folds.group)
 
     levels = np.unique(f)
@@ -175,10 +175,10 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
 
         # The cut is learned on the selected candidate's inner out-of-fold predictions, which
         # cover the outer training units and nothing else.
-        if threshold is not None:
+        if cut_rule is not None:
             oof = lad.predictions[f"{won['grain']}|{won['learner']}"]
             for j, v in enumerate(y.variables):
-                cuts[(int(k), v)] = decision_threshold(y_train.values[:, j], oof[:, j], threshold)
+                cuts[(int(k), v)] = decision_threshold(y_train.values[:, j], oof[:, j], cut_rule)
 
         chosen.append(dict(fold=int(k), grain=won["grain"], learner=won["learner"],
                            inner_score=won["score"], inner_best=best["score"],
@@ -215,8 +215,8 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
         nested = _nested_cv_estimate(ncv, SELECTED_ARM, response)
         estimate = estimate + [{k: row[k] for k in estimate[0]} for row in nested]
     thresholds = cut_scores = None
-    if threshold is not None:
-        thresholds = [dict(fold=k, variable=v, threshold=c, rule=threshold)
+    if cut_rule is not None:
+        thresholds = [dict(fold=k, variable=v, threshold=c, rule=cut_rule)
                       for (k, v), c in cuts.items()]
         cut_scores = ladder_from_rows(
             score_arm(SELECTED, SELECTED, y, p, f, levels, cells, tss, at=cuts),
@@ -227,7 +227,7 @@ def select_grain(x, y, learners, folds=None, inner=5, rule: str = "argmax",
     return Selection(selected=chosen, estimate=estimate,
                      contrast=_selection_contrast(scores, compare, interval),
                      candidates=candidates, scores=scores, inner=inner_rows,
-                     metric=metric, response=response, rule=rule, threshold=threshold,
+                     metric=metric, response=response, choose=choose, cut_rule=cut_rule,
                      thresholds=thresholds, cut_scores=cut_scores, interval=interval,
                      nested_cv=nested, final=final)
 
@@ -361,7 +361,7 @@ def _inner_splitter(inner, group=None):
     if callable(inner):
         return lambda y_train, seed, train: inner(y_train)
     if not isinstance(inner, (int, np.integer)) or isinstance(inner, bool) or int(inner) < 2:
-        raise ValueError("`inner` is a number of folds of at least 2, or a function of the "
+        raise ValueError("`n_inner` is a number of folds of at least 2, or a function of the "
                          f"training response, got {inner!r}")
 
     def split(y_train, seed, train):

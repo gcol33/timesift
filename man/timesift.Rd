@@ -14,12 +14,12 @@ timesift(
   target_time = NULL,
   static = NULL,
   coords = NULL,
-  models = NULL,
+  learners = NULL,
   sift = NULL,
   ensemble = TRUE,
   resampling = cv(),
-  inner = 5L,
-  rule = c("argmax", "coarsest_adequate"),
+  n_inner = 5L,
+  choose = c("argmax", "coarsest_adequate"),
   response = "presence_absence",
   metric = NULL,
   control = train_control(),
@@ -54,7 +54,7 @@ expression. None by default.}
 expression, for a learner that places a unit in space, such as \code{\link[=hierarchical]{hierarchical()}}. They travel
 with every representation and are not predictors. None by default.}
 
-\item{models}{A learner, a set of them from \code{\link[=c]{c()}}, or a list. Defaults to \code{\link[=elasticnet]{elasticnet()}}.}
+\item{learners}{A learner, a set of them from \code{\link[=c]{c()}}, or a list. Defaults to \code{\link[=elasticnet]{elasticnet()}}.}
 
 \item{sift}{The representations a learner without a \verb{data =} of its own is run across.
 A \code{\link[=grains]{grains()}} or \code{\link[=lookbacks]{lookbacks()}} set, a set from \code{\link[=c]{c()}}, a bare vector of grain names, a single
@@ -69,12 +69,12 @@ all the repeats' held-out predictions, \code{oof} is a target's mean prediction 
 and the stack is fitted on the repeats' out-of-fold predictions together. The models, the
 per-fold fits and \code{folds} are the first repeat's.}
 
-\item{inner}{Number of inner folds the choice and the stack's weights are made on inside each
+\item{n_inner}{Number of inner folds the choice and the stack's weights are made on inside each
 outer training set, a function of the outer training response returning a fold map for those
 targets, or \code{NULL} to compare the candidates on the outer folds without an estimate. A count
 deals the inner folds by the grouping the outer split carries, as \code{\link[=select_grain]{select_grain()}} does.}
 
-\item{rule}{How a candidate is chosen from its inner scores, \code{"argmax"} or
+\item{choose}{How a candidate is chosen from its inner scores, \code{"argmax"} or
 \code{"coarsest_adequate"}, as in \code{\link[=select_grain]{select_grain()}}.}
 
 \item{response}{Name of the registered response head.}
@@ -102,18 +102,19 @@ A \code{timesift} object, a list carrying:
 stack (\code{arm = "ensemble"}), one row per metric, with the standard error and the 95\% interval
 across response variables. An interval across the variables of this dataset, not one for a
 new sample: every variable is fitted and scored on the same targets and folds, so the error
-they share is not in it. \code{NULL} with \code{inner = NULL}.
+they share is not in it. \code{NULL} with \code{n_inner = NULL}.
 \item \code{selected}: one row per outer fold, the candidate it chose, the inner score it chose on, the
 highest inner score and that score's standard error; \code{inner}: every candidate's inner score
 in every outer fold; \code{fold_weights}: the stack's weights in every outer fold, one row per
-fold. All \code{NULL} with \code{inner = NULL}.
+fold and a column per candidate, 0 where that fold's stack left the candidate out. All
+\code{NULL} with \code{n_inner = NULL}.
 \item \code{predictions}: the held-out prediction of every target under the selected candidate and under
 the stack.
 \item \code{candidates}, \code{scores} and \code{oof}: every candidate, its per-cell scores on the outer folds and
 its outer out-of-fold predictions.
 \item \code{choice}, \code{models}, \code{stack} and \code{weights}: the procedure applied to every target, which is
 what \code{\link[=predict]{predict()}} uses. Every candidate is refitted on all of them; \code{choice} is the candidate
-the rule takes on the outer scores, with the outer folds as the split it chooses on, and
+\code{choose} takes on the outer scores, with the outer folds as the split it chooses on, and
 \code{stack} holds weights fitted on the outer out-of-fold predictions.
 \item \code{representations}, \code{fits}, \code{folds}, \code{cells}, \code{y}, and the \code{metric}, \code{response}, \code{spec} and
 \code{call} it was asked for.
@@ -122,12 +123,12 @@ the rule takes on the outer scores, with the outer folds as the split it chooses
 \description{
 One call from two tables to a scored comparison and a held-out estimate of choosing among it.
 \code{targets} is one row per thing to predict and \code{series} is the long, time-stamped record belonging
-to those rows. Every representation in \code{sift} is built and every learner in \code{models} is paired
+to those rows. Every representation in \code{sift} is built and every learner in \code{learners} is paired
 with the ones it can read; each pair is a candidate.
 }
 \details{
-Within each outer fold of \code{resampling} the training targets are split again into \code{inner} folds.
-Every candidate is cross-validated on that inner split, the rule picks one on its inner score,
+Within each outer fold of \code{resampling} the training targets are split again into \code{n_inner} folds.
+Every candidate is cross-validated on that inner split, \code{choose} picks one on its inner score,
 and the stack's weights are fitted on the inner out-of-fold predictions. Every candidate is then
 refitted on the whole outer training set and predicts the outer test fold, and the selected
 candidate's prediction and the prediction combined under that fold's weights are kept. Nothing
@@ -139,7 +140,7 @@ The same refits give every candidate an out-of-fold prediction on the outer fold
 holds those. They say where predictive skill saturates as the record is read more coarsely, which
 is the measurement the package exists for, but the highest of them is a number the held-out
 targets helped choose: read the candidates for the shape of the comparison and \code{estimate} for
-the level. With \code{inner = NULL} no inner search is run, the candidates are compared on the outer
+the level. With \code{n_inner = NULL} no inner search is run, the candidates are compared on the outer
 folds alone and no estimate is made.
 
 The cost is \code{v_outer * (v_inner + 1) * candidates} fits for the evaluation and one refit per

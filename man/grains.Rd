@@ -6,7 +6,7 @@
 \alias{as_sift}
 \title{Several representations to run the same learners across}
 \usage{
-grains(..., stats = "mean", year_start = "09-01")
+grains(..., stats = "mean", year_start = "01-01")
 
 lookbacks(..., lag = "0 days", bins = 1L, stats = "mean")
 
@@ -19,7 +19,7 @@ arguments or as one vector.}
 \item{stats}{Statistics computed per bin, one channel each, in the order given. See
 \code{\link[=grain_matrix]{grain_matrix()}} for the seven and for what separates an extreme reading from an extreme day.}
 
-\item{year_start}{\code{"MM-DD"} boundary of the hydrological year, used by \code{"season"} and \code{"year"}.}
+\item{year_start}{\code{"MM-DD"} boundary of the year, used by \code{"season"} and \code{"year"}.}
 
 \item{lag}{The gap between a target's instant and the end of its lookback.}
 

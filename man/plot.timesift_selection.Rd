@@ -35,7 +35,7 @@ d <- data.frame(
 y <- matrix(rbinom(120, 1, plogis(c(warmth, -warmth))), nrow = 60,
             dimnames = list(units, c("sp1", "sp2")))
 x <- grain_matrix(d, plot, t, temp, grain = c("week", "month"))
-sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), inner = 3,
+sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), n_inner = 3,
                     verbose = FALSE)
 plot(sel)
 

@@ -8,8 +8,8 @@ discriminant(
   data = NULL,
   degree = 1L,
   penalty = NULL,
-  nk = NULL,
-  thresh = 0.001,
+  max_terms = NULL,
+  min_gain = 0.001,
   prune = TRUE,
   calibrate = TRUE,
   threads = 1L
@@ -24,10 +24,10 @@ representation of the run.}
 \item{penalty}{The generalised cross-validation's charge per term beyond its own degree of
 freedom, taken at half. \code{NULL} is mda's, 2 at degree one and 3 above.}
 
-\item{nk}{The most terms the forward pass reaches, the intercept included. \code{NULL} is
+\item{max_terms}{The most terms the forward pass reaches, the intercept included. \code{NULL} is
 \verb{max(21, 2 p + 1)} for \code{p} columns; an even number is taken one lower.}
 
-\item{thresh}{The least share of the residuals a forward step is kept for.}
+\item{min_gain}{The least share of the residuals a forward step is kept for.}
 
 \item{prune}{Whether the pruning pass runs. Without it every term of the forward pass is kept.}
 
@@ -50,18 +50,19 @@ classes' shares among the fitting units as priors.
 The basis is mda's own MARS, which biomod2 reaches through \code{fda()} and which differs from earth's
 that \code{\link[=mars]{mars()}} reproduces. Each forward step adds a column linearly or a pair of hinges on it,
 \code{max(0, x - t)} and \code{max(0, t - x)}, choosing by Friedman's running updates, and the pass stops
-when a step lowers the residuals by less than \code{thresh} of them, when they fall to \code{thresh} of
-the null model's, when the generalised cross-validation passes ten times the null model's, or at
-\code{nk} terms. The pruning pass drops
-the term of least t statistic, one at a time, and keeps the subset of least generalised
-cross-validation, which counts each term beyond the intercept as \code{1 + penalty / 2} degrees of
-freedom. The defaults are mda's, which biomod2
-passes unchanged under its default option set and under \code{"bigboss"}: degree one,
-\code{penalty = 2}, \code{thresh = 0.001} and \verb{nk = max(21, 2 p + 1)} for \code{p} columns.
+when a step lowers the residuals by less than \code{min_gain} of them, when they fall to \code{min_gain}
+of the null model's, when the generalised cross-validation passes ten times the null model's,
+or at \code{max_terms} terms. The pruning pass drops the term of least t statistic, one at a time,
+and keeps the subset of least generalised cross-validation, which counts each term beyond the
+intercept as \code{1 + penalty / 2} degrees of freedom. The defaults are mda's, which biomod2 passes
+unchanged under its default option set and under \code{"bigboss"}: degree one, \code{penalty = 2},
+\code{min_gain = 0.001} and \verb{max_terms = max(21, 2 p + 1)} for \code{p} columns.
 
 The case weights are the response head's, \code{\link[=positive_weights]{positive_weights()}} under presence-absence. They set
 the classes' scores and the variate, as \code{fda()} reads them, and not the basis: mda's forward
 pass sets them to one.
+Under the shipped presence-absence head those weights are on, so a default \code{discriminant()} is
+mda's specification fitted under them; a head registered without \code{weights} fits it unweighted.
 
 biomod2 always recalibrates an \code{FDA} posterior by a probit regression of the response on it,
 under the case weights, and predicts through that regression. \code{calibrate = TRUE} does the same,
@@ -69,9 +70,10 @@ on the units the discriminant was fitted on; \code{FALSE} predicts the posterior
 rounds the posterior to three decimals before recalibrating it, which is not reproduced.
 
 The forward pass, the pruning, the scoring and the recalibration live in the core the Python
-package calls, pinned against mda and R's \code{glm()} in the fixtures, so the two languages keep the same terms and predict the same
-probabilities. A response holding one value is predicted its mean, and so is one whose scored
-response the basis does not reach; both are named in \code{unfitted}. The learner needs a
+package calls, pinned against mda and R's \code{glm()} in the fixtures, so the two languages keep the
+same terms and predict the same probabilities. A response holding one value is predicted its
+mean, and so is one whose scored response the basis does not reach; both are named in
+\code{unfitted}. The learner needs a
 presence-absence response, and a head whose loss is not the binary cross-entropy is refused.
 }
 \examples{

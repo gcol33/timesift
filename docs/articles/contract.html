@@ -321,13 +321,13 @@ drifting block of 168 or 730 hours.</p>
 </tbody>
 </table>
 <p><code>year_start</code> is a <code>"MM-DD"</code> string, default
-<code>"09-01"</code>. It sets the boundary of the hydrological year and
-therefore also the phase of the seasonal bins. A seasonal bin is three
-calendar months counted from that anniversary, so a record of three
-hydrological years beginning on it holds twelve of them and no partial
-one. Cutting seasons anywhere else, at the equinoxes and solstices for
-instance, is a different calendar and is passed as a function; see
-Custom bins.</p>
+<code>"01-01"</code>. It sets the boundary of the year, a hydrological
+one where it is not the first of January, and therefore also the phase
+of the seasonal bins. A seasonal bin is three calendar months counted
+from that anniversary, so a record of three hydrological years beginning
+on it holds twelve of them and no partial one. Cutting seasons anywhere
+else, at the equinoxes and solstices for instance, is a different
+calendar and is passed as a function; see Custom bins.</p>
 <p>Bins are contiguous and cover the record with no gap and no overlap,
 and both halves of that are asserted:</p>
 <ul>
@@ -1917,7 +1917,7 @@ values, taken in tree order, over the number of trees.</li>
 <div class="section level3">
 <h3 id="the-settings">The settings<a class="anchor" aria-label="anchor" href="#the-settings"></a>
 </h3>
-<p><code>preset = "package"</code> is randomForest’s own defaults, which
+<p><code>preset = "default"</code> is randomForest’s own defaults, which
 is what biomod2’s default option set fits: 500 trees, <code>mtry</code>
 the square root of the column count rounded down under a binomial family
 and a third of it under a Gaussian or a Poisson one, never below one,
@@ -2078,13 +2078,13 @@ observation keeps its trees up to the first of least error.</p>
 <div class="section level3">
 <h3 id="the-settings-1">The settings<a class="anchor" aria-label="anchor" href="#the-settings-1"></a>
 </h3>
-<p>Under <code>method = "gbm"</code>, <code>preset = "package"</code> is
+<p>Under <code>method = "gbm"</code>, <code>preset = "default"</code> is
 gbm’s defaults as biomod2 passes them: 100 trees of one split,
 <code>shrinkage = 0.1</code>, <code>min_leaf = 10</code>,
 <code>subsample = 0.5</code>, no inner folds. <code>"bigboss"</code> is
 2500 trees of seven splits, <code>shrinkage = 0.001</code>,
 <code>min_leaf = 5</code>, <code>subsample = 0.5</code> and three inner
-folds. Under <code>method = "xgboost"</code>, <code>"package"</code> is
+folds. Under <code>method = "xgboost"</code>, <code>"default"</code> is
 xgboost’s: 100 trees of depth 6, <code>shrinkage = 0.3</code>,
 <code>min_leaf = 1</code>, <code>lambda = 1</code>,
 <code>gamma = 0</code>, every observation and column;

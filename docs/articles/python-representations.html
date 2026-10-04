@@ -116,14 +116,14 @@ compared across.</p>
 <h2 id="native">
 <code>native()</code><a class="anchor" aria-label="anchor" href="#native"></a>
 </h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>native(stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'09-01'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>native(stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
 <p>The record unreduced: one bin per reading.</p>
 </div>
 <div class="section level2">
 <h2 id="grain">
 <code>grain()</code><a class="anchor" aria-label="anchor" href="#grain"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>grain(g, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'09-01'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>grain(g, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
 <p>One calendar grain, named, or supplied as a function of the reading
 instants returning each reading’s bin start, which is reported as
 <code>custom</code>.</p>
@@ -132,7 +132,7 @@ instants returning each reading’s bin start, which is reported as
 <h2 id="multigrain">
 <code>multigrain()</code><a class="anchor" aria-label="anchor" href="#multigrain"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>multigrain(grains<span class="op">=</span><span class="va">None</span>, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'09-01'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>multigrain(grains<span class="op">=</span><span class="va">None</span>, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
 <p>Several grains flattened and bound side by side into one block of
 features.</p>
 <p>Left at <code>None</code> the grains are the ones the record
@@ -151,7 +151,7 @@ target’s own instant.</p>
 <h2 id="grains">
 <code>grains()</code><a class="anchor" aria-label="anchor" href="#grains"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>grains(<span class="op">*</span>g, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'09-01'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>grains(<span class="op">*</span>g, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
 <p>A sift over calendar grains, named or read off the record with
 <code>"auto"</code>.</p>
 </div>
@@ -224,7 +224,7 @@ supports.</p>
 <h2 id="auto_grains">
 <code>auto_grains()</code><a class="anchor" aria-label="anchor" href="#auto_grains"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>auto_grains(series, spec: TimesiftSpec, stats<span class="op">=</span>(<span class="st">'mean'</span>,), year_start<span class="op">=</span><span class="st">'09-01'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>auto_grains(series, spec: TimesiftSpec, stats<span class="op">=</span>(<span class="st">'mean'</span>,), year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
 <p>The named grains that give the record at least two bins, from the
 finest to the coarsest.</p>
 <p>The count comes from the calendar in the core rather than from

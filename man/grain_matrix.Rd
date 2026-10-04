@@ -11,7 +11,7 @@ grain_matrix(
   value,
   grain = "day",
   stats = "mean",
-  year_start = "09-01",
+  year_start = "01-01",
   partial = c("keep", "drop")
 )
 }
@@ -33,8 +33,8 @@ carry, such as astronomical seasons, is binned.}
 
 \item{stats}{Statistics to compute per bin, one channel each, in the order given. See Details.}
 
-\item{year_start}{\code{"MM-DD"} boundary of the hydrological year, used by \code{"season"} and
-\code{"year"}. Defaults to \code{"09-01"}.}
+\item{year_start}{\code{"MM-DD"} boundary of the year, used by \code{"season"} and \code{"year"}. Defaults
+to the calendar year, \code{"01-01"}; a hydrological year starting in September is \code{"09-01"}.}
 
 \item{partial}{What to do with a bin the record does not cover for its whole calendar span,
 which is what a record beginning or ending away from a bin boundary produces. \code{"keep"}, the

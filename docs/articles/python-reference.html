@@ -349,8 +349,9 @@ parent, the column and the knot <code>t</code> that most reduce the
 residual sum of squares of a least-squares fit to the response; a knot
 at a column’s least value enters the column linearly.
 <code>degree</code> bounds how many hinges a term multiplies. The pass
-stops at <code>nk</code> terms, when a step raises the R-squared by less
-than <code>thresh</code>, or when no term reduces the residuals.
+stops at <code>max_terms</code> terms, when a step raises the R-squared
+by less than <code>min_gain</code>, or when no term reduces the
+residuals.
 </dd>
 <dt><a href="python-learners.html#discriminant"><code>discriminant()</code></a></dt>
 <dd>
@@ -591,7 +592,8 @@ distinct predictions.
 </dd>
 <dt><a href="python-scoring.html#kappa_score"><code>kappa_score()</code></a></dt>
 <dd>
-Cohen’s kappa of a model’s decisions against the observed response.
+Cohen’s kappa of a model’s decisions against the observed response, cut
+by <code>rule</code>.
 </dd>
 <dt><a href="python-scoring.html#table_metric"><code>table_metric()</code></a></dt>
 <dd>

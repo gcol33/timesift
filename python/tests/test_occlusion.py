@@ -256,9 +256,9 @@ def test_the_ensemble_is_held_back_by_channel_through_the_members_it_combines():
     targets = {"plot": list(y.units), "sp0": y.values[:, 0].tolist(),
                "sp1": y.values[:, 1].tolist()}
     run = timesift(targets, readings, y=["sp0", "sp1"], id="plot", time="time", x="value",
-                   models=[warm_reader("a"), warm_reader("b", 2.0)],
+                   learners=[warm_reader("a"), warm_reader("b", 2.0)],
                    sift=grains("month", stats=["cold_day", "mean", "warm_day"]),
-                   resampling=fold_map(y, v=3, seed=2), inner=None,
+                   resampling=fold_map(y, v=3, seed=2), n_inner=None,
                    ensemble=ensemble("mean"), keep_fits=True, verbose=False)
     out = occlusion(run, "ensemble", over="channel", permutations=3, seed=4)
     assert set(out["part"]) == {"cold_day", "mean", "warm_day"}
@@ -269,9 +269,9 @@ def test_the_ensemble_is_held_back_by_channel_through_the_members_it_combines():
     with pytest.raises(ValueError, match="different bins"):
         occlusion(run, "ensemble", over="bin")
     alone = timesift(targets, readings, y=["sp0", "sp1"], id="plot", time="time", x="value",
-                     models=[warm_reader("a")],
+                     learners=[warm_reader("a")],
                      sift=grains("month", stats=["cold_day", "mean", "warm_day"]),
-                     resampling=fold_map(y, v=3, seed=2), inner=None, ensemble=False,
+                     resampling=fold_map(y, v=3, seed=2), n_inner=None, ensemble=False,
                      keep_fits=True, verbose=False)
     with pytest.raises(ValueError, match="no ensemble"):
         occlusion(alone, "ensemble", over="channel")

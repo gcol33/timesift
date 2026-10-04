@@ -64,7 +64,7 @@ bench_replicate <- function(cell, replicate, candidates, learner, pkg_dir) {
   dep <- tick("deployment", .bench_deployment(cell, stamp, candidates))
   folds <- fold_map(sim$y, v = BENCH$outer, seed = replicate)
 
-  sel <- tick("select", select_grain(set, sim$y, learner, folds = folds, inner = cell$inner,
+  sel <- tick("select", select_grain(set, sim$y, learner, folds = folds, n_inner = cell$inner,
                                      metric = BENCH$metric, interval = "nested_cv",
                                      repeats = BENCH$ncv_repeats, verbose = FALSE))
   bench_assert_candidates(sel, stamp)

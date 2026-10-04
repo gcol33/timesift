@@ -54,7 +54,7 @@ def test_the_stack_still_runs_where_the_record_is_one_bin_per_year():
     _, y, readings = fixture(n_unit=24, days=400, seed=83)
     for w in ("season", "year"):
         x = grain_matrix(readings, "id", "time", "value", grain=w)
-        assert x.values.shape[1] <= 5
+        assert x.values.shape[1] <= 6
         for build in (lambda: cnn(epochs=2),
                       lambda: rescnn(epochs=2, channels=(16, 32))):
             assert fit_learner(build(), x, y).predict(x).shape == (24, 2)

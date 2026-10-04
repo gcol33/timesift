@@ -31,19 +31,19 @@
 #'   registered for the learner.
 #' @param metric The registered metric, or a function of `(y, p)`, a setting is scored by. Left
 #'   unset it is the response head's own.
-#' @param inner Number of inner folds.
+#' @param n_inner Number of inner folds.
 #' @param seed Random seed of the inner folds.
 #'
 #' @return A [learner()] reporting under the name of the one it wraps.
 #'
 #' @examples
-#' tuned <- tune(forest(), list(mtry = c(2, 4), min_node = c(1, 5)), inner = 3L)
+#' tuned <- tune(forest(), list(mtry = c(2, 4), min_node = c(1, 5)), n_inner = 3L)
 #' tuned
 #'
 #' @export
-tune <- function(learner, grid = NULL, metric = NULL, inner = 5L, seed = 1L) {
+tune <- function(learner, grid = NULL, metric = NULL, n_inner = 5L, seed = 1L) {
   base <- .as_learner(learner)
-  .check_count(inner, "inner", 2L)
+  .check_count(n_inner, "n_inner", 2L)
   if (is.null(grid) && !.tuning_reg$has(base$name)) {
     stop("no grid is registered for the ", base$name, " learner. Give `grid`, or register one ",
          "with register_tuning(). Registered: ", .listing(tunings()), ".", call. = FALSE)
@@ -54,11 +54,11 @@ tune <- function(learner, grid = NULL, metric = NULL, inner = 5L, seed = 1L) {
   if (!is.null(metric)) {
     .as_metric(metric)
   }
-  inner <- as.integer(inner)
+  n_inner <- as.integer(n_inner)
   fit <- function(x, y, head, group = NULL, control = NULL, ...) {
     given <- list(...)
     points <- .tune_points(base, grid %||% .registered_grid(base, x))
-    search <- .tune_search(base, points, x, y, head, control, group, given, metric, inner, seed)
+    search <- .tune_search(base, points, x, y, head, control, group, given, metric, n_inner, seed)
     best <- points[[search$best]]
     kept <- given[setdiff(names(given), names(best))]
     model <- .call_fit(base, x, y, head, control, group, c(kept, best))

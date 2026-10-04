@@ -90,9 +90,9 @@ def test_mars_refuses_settings_it_has_no_pass_for():
     with pytest.raises(ValueError, match="-1"):
         mars(penalty=-2)
     with pytest.raises(ValueError, match=r"\[0, 1\)"):
-        mars(thresh=1.0)
+        mars(min_gain=1.0)
     with pytest.raises(ValueError, match="whole number"):
-        mars(nk=0)
+        mars(max_terms=0)
     x = np.array([1.0, 3, 2, 5, 4, 6]).reshape(-1, 1)
     with pytest.raises(Exception, match="zero or more"):
         mars_fit(x, np.array([0.0, 1, 0, 1, 0, 1]), np.array([1.0, 1, -1, 1, 1, 1]), "gaussian")

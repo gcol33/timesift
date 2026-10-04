@@ -14,7 +14,7 @@ train_control(
   batch_size = 64L,
   learning_rate = 0.001,
   weight_decay = 1e-04,
-  early_stopping = 10L,
+  early_stopping = Inf,
   val_frac = 0,
   device = "auto",
   seed = 1L,
@@ -46,9 +46,9 @@ train_control(
 - early_stopping:
 
   Epochs without an inner-validation improvement before training stops.
-  Read only where `val_frac` holds a validation set back. `Inf` trains
-  the whole budget and still restores the epoch with the lowest
-  validation loss.
+  Read only where `val_frac` holds a validation set back. `Inf`, the
+  default, never stops: the whole budget is trained and the epoch with
+  the lowest validation loss is restored.
 
 - val_frac:
 

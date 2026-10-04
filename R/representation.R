@@ -13,7 +13,7 @@
 #'   [grains()] describes.
 #' @param stats Statistics computed per bin, one channel each, in the order given. See
 #'   [grain_matrix()] for the seven and for what separates an extreme reading from an extreme day.
-#' @param year_start `"MM-DD"` boundary of the hydrological year, used by `"season"` and `"year"`.
+#' @param year_start `"MM-DD"` boundary of the year, used by `"season"` and `"year"`.
 #' @param span The lookback's length, as a duration such as `"30 days"` or a number of seconds.
 #'   See [lookback_matrix()] for how a duration is read.
 #' @param lag The gap between a target's instant and the end of its lookback.
@@ -40,13 +40,13 @@
 #' lookback("30 days", bins = 3L)
 #'
 #' @export
-native <- function(stats = "mean", year_start = "09-01") {
+native <- function(stats = "mean", year_start = "01-01") {
   grain("native", stats = stats, year_start = year_start)
 }
 
 #' @rdname native
 #' @export
-grain <- function(grain, stats = "mean", year_start = "09-01") {
+grain <- function(grain, stats = "mean", year_start = "01-01") {
   g <- .check_grain(grain)
   if (!is.function(g) && length(g) != 1L) {
     stop("`grain()` takes one grain; name several with `grains()` or `multigrain()`.",
@@ -60,7 +60,7 @@ grain <- function(grain, stats = "mean", year_start = "09-01") {
 
 #' @rdname native
 #' @export
-multigrain <- function(grains = NULL, stats = "mean", year_start = "09-01") {
+multigrain <- function(grains = NULL, stats = "mean", year_start = "01-01") {
   if (is.null(grains)) {
     .check_stats(stats, "day")
   } else {
@@ -157,7 +157,7 @@ print.timesift_representation <- function(x, ...) {
 #' lookbacks("30 days", "90 days", bins = 3L)
 #'
 #' @export
-grains <- function(..., stats = "mean", year_start = "09-01") {
+grains <- function(..., stats = "mean", year_start = "01-01") {
   named <- unlist(list(...), use.names = FALSE)
   if (!length(named)) {
     stop("`grains()` needs at least one grain name, or \"auto\".", call. = FALSE)

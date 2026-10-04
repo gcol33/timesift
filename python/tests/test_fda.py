@@ -90,11 +90,11 @@ def test_discriminant_refuses_settings_and_responses_it_has_no_fit_for():
     with pytest.raises(ValueError, match="whole number"):
         discriminant(degree=0)
     with pytest.raises(ValueError, match="whole number"):
-        discriminant(nk=2)
+        discriminant(max_terms=2)
     with pytest.raises(ValueError, match="zero or more"):
         discriminant(penalty=-1)
     with pytest.raises(ValueError, match=r"\[0, 1\)"):
-        discriminant(thresh=1.0)
+        discriminant(min_gain=1.0)
     with pytest.raises(ValueError, match="True or False"):
         discriminant(calibrate="yes")
     x = np.array([1.0, 3, 2, 5, 4, 6]).reshape(-1, 1)

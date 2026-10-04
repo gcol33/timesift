@@ -127,12 +127,12 @@ prediction that follows from it.</p>
 <span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>    target_time<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>    static<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>    coords<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>    models<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>    learners<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>    sift<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>    ensemble<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>    resampling<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>    inner<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>    rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'argmax'</span>,</span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>    choose: <span class="bu">str</span> <span class="op">=</span> <span class="st">'argmax'</span>,</span>
 <span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>    response: <span class="bu">str</span> <span class="op">=</span> <span class="st">'presence_absence'</span>,</span>
 <span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>    metric<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>    control<span class="op">=</span><span class="va">None</span>,</span>
@@ -154,8 +154,8 @@ coordinates; they place a target and are not predictors, and a learner
 that places a spatial field by them, <code>timesift.hierarchical</code>,
 reads them off the array.</p>
 <p>Within each outer fold of <code>resampling</code> the training
-targets are split again into <code>inner</code> folds. Every candidate
-is cross-validated on that inner split, <code>rule</code> picks one on
+targets are split again into <code>n_inner</code> folds. Every candidate
+is cross-validated on that inner split, <code>choose</code> picks one on
 its inner score (<code>"argmax"</code> or
 <code>"coarsest_adequate"</code>, as in <code>select_grain</code>), and
 the stack’s weights are fitted on the inner out-of-fold predictions.
@@ -170,7 +170,7 @@ one for a new sample.</p>
 <p>The same refits give every candidate an out-of-fold prediction on the
 outer folds, which <code>scores</code> holds: the comparison, whose
 highest level was picked out on the folds it is scored on.
-<code>inner=None</code> runs no inner search and makes no estimate.
+<code>n_inner=None</code> runs no inner search and makes no estimate.
 <code>choice</code>, <code>models</code> and <code>stack</code> are the
 procedure applied to every target, for prediction: the rule read on the
 outer scores and weights fitted on the outer out-of-fold

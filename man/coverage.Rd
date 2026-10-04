@@ -4,7 +4,7 @@
 \alias{coverage}
 \title{Which units reach which bins}
 \usage{
-coverage(data, id, time, grain = "day", year_start = "09-01")
+coverage(data, id, time, grain = "day", year_start = "01-01")
 }
 \arguments{
 \item{data}{A data frame of readings in long form, one row per reading.}
@@ -20,8 +20,8 @@ grain, a \code{\link[=timesift_set]{timesift_set()}}. A function is called on th
 the \code{POSIXct} start of each reading's bin, which is how a calendar the package does not
 carry, such as astronomical seasons, is binned.}
 
-\item{year_start}{\code{"MM-DD"} boundary of the hydrological year, used by \code{"season"} and
-\code{"year"}. Defaults to \code{"09-01"}.}
+\item{year_start}{\code{"MM-DD"} boundary of the year, used by \code{"season"} and \code{"year"}. Defaults
+to the calendar year, \code{"01-01"}; a hydrological year starting in September is \code{"09-01"}.}
 }
 \value{
 An integer matrix of reading counts, one row per unit and one column per bin, of class

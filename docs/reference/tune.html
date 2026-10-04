@@ -89,7 +89,7 @@ by the same device.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tune</span><span class="op">(</span><span class="va">learner</span>, grid <span class="op">=</span> <span class="cn">NULL</span>, metric <span class="op">=</span> <span class="cn">NULL</span>, inner <span class="op">=</span> <span class="fl">5L</span>, seed <span class="op">=</span> <span class="fl">1L</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tune</span><span class="op">(</span><span class="va">learner</span>, grid <span class="op">=</span> <span class="cn">NULL</span>, metric <span class="op">=</span> <span class="cn">NULL</span>, n_inner <span class="op">=</span> <span class="fl">5L</span>, seed <span class="op">=</span> <span class="fl">1L</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -110,7 +110,7 @@ registered for the learner.</p></dd>
 unset it is the response head's own.</p></dd>
 
 
-<dt id="arg-inner">inner<a class="anchor" aria-label="anchor" href="#arg-inner"></a></dt>
+<dt id="arg-n-inner">n_inner<a class="anchor" aria-label="anchor" href="#arg-n-inner"></a></dt>
 <dd><p>Number of inner folds.</p></dd>
 
 
@@ -145,7 +145,7 @@ decay is a training setting here, which <code><a href="train_control.html">train
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="va">tuned</span> <span class="op">&lt;-</span> <span class="fu">tune</span><span class="op">(</span><span class="fu"><a href="forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mtry <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">4</span><span class="op">)</span>, min_node <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>, inner <span class="op">=</span> <span class="fl">3L</span><span class="op">)</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="va">tuned</span> <span class="op">&lt;-</span> <span class="fu">tune</span><span class="op">(</span><span class="fu"><a href="forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mtry <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">4</span><span class="op">)</span>, min_node <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>, n_inner <span class="op">=</span> <span class="fl">3L</span><span class="op">)</span></span>
 <span><span class="va">tuned</span></span>
 <span></span></code></pre></div>
     </div>

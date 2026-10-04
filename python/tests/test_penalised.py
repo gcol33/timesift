@@ -295,7 +295,7 @@ def test_the_penalised_learner_fits_over_the_core_and_carries_no_fitter_of_its_o
 
 def test_the_penalised_learner_reads_the_penalty_its_s_names():
     x, y = planted()
-    at_min = fit_learner(elasticnet(), x, y).predict(x)
+    at_min = fit_learner(elasticnet(s="lambda.min"), x, y).predict(x)
     at_1se = fit_learner(elasticnet(s="lambda.1se"), x, y).predict(x)
     assert not np.allclose(at_min, at_1se)
     # The larger penalty shrinks harder, so its predictions sit closer to the prevalence.

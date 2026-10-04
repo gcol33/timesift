@@ -10,18 +10,19 @@
 #' The basis is mda's own MARS, which biomod2 reaches through `fda()` and which differs from earth's
 #' that [mars()] reproduces. Each forward step adds a column linearly or a pair of hinges on it,
 #' `max(0, x - t)` and `max(0, t - x)`, choosing by Friedman's running updates, and the pass stops
-#' when a step lowers the residuals by less than `thresh` of them, when they fall to `thresh` of
-#' the null model's, when the generalised cross-validation passes ten times the null model's, or at
-#' `nk` terms. The pruning pass drops
-#' the term of least t statistic, one at a time, and keeps the subset of least generalised
-#' cross-validation, which counts each term beyond the intercept as `1 + penalty / 2` degrees of
-#' freedom. The defaults are mda's, which biomod2
-#' passes unchanged under its default option set and under `"bigboss"`: degree one,
-#' `penalty = 2`, `thresh = 0.001` and `nk = max(21, 2 p + 1)` for `p` columns.
+#' when a step lowers the residuals by less than `min_gain` of them, when they fall to `min_gain`
+#' of the null model's, when the generalised cross-validation passes ten times the null model's,
+#' or at `max_terms` terms. The pruning pass drops the term of least t statistic, one at a time,
+#' and keeps the subset of least generalised cross-validation, which counts each term beyond the
+#' intercept as `1 + penalty / 2` degrees of freedom. The defaults are mda's, which biomod2 passes
+#' unchanged under its default option set and under `"bigboss"`: degree one, `penalty = 2`,
+#' `min_gain = 0.001` and `max_terms = max(21, 2 p + 1)` for `p` columns.
 #'
 #' The case weights are the response head's, [positive_weights()] under presence-absence. They set
 #' the classes' scores and the variate, as `fda()` reads them, and not the basis: mda's forward
 #' pass sets them to one.
+#' Under the shipped presence-absence head those weights are on, so a default `discriminant()` is
+#' mda's specification fitted under them; a head registered without `weights` fits it unweighted.
 #'
 #' biomod2 always recalibrates an `FDA` posterior by a probit regression of the response on it,
 #' under the case weights, and predicts through that regression. `calibrate = TRUE` does the same,
@@ -29,18 +30,19 @@
 #' rounds the posterior to three decimals before recalibrating it, which is not reproduced.
 #'
 #' The forward pass, the pruning, the scoring and the recalibration live in the core the Python
-#' package calls, pinned against mda and R's `glm()` in the fixtures, so the two languages keep the same terms and predict the same
-#' probabilities. A response holding one value is predicted its mean, and so is one whose scored
-#' response the basis does not reach; both are named in `unfitted`. The learner needs a
+#' package calls, pinned against mda and R's `glm()` in the fixtures, so the two languages keep the
+#' same terms and predict the same probabilities. A response holding one value is predicted its
+#' mean, and so is one whose scored response the basis does not reach; both are named in
+#' `unfitted`. The learner needs a
 #' presence-absence response, and a head whose loss is not the binary cross-entropy is refused.
 #'
 #' @inheritParams elasticnet
 #' @param degree The most hinges a term of the basis multiplies.
 #' @param penalty The generalised cross-validation's charge per term beyond its own degree of
 #'   freedom, taken at half. `NULL` is mda's, 2 at degree one and 3 above.
-#' @param nk The most terms the forward pass reaches, the intercept included. `NULL` is
+#' @param max_terms The most terms the forward pass reaches, the intercept included. `NULL` is
 #'   `max(21, 2 p + 1)` for `p` columns; an even number is taken one lower.
-#' @param thresh The least share of the residuals a forward step is kept for.
+#' @param min_gain The least share of the residuals a forward step is kept for.
 #' @param prune Whether the pruning pass runs. Without it every term of the forward pass is kept.
 #' @param calibrate Whether the posterior is recalibrated by a probit regression, as biomod2 does.
 #' @param threads Columns searched at once. The model is the same on any number.
@@ -52,18 +54,18 @@
 #' discriminant(data = grain("season"), calibrate = FALSE)
 #'
 #' @export
-discriminant <- function(data = NULL, degree = 1L, penalty = NULL, nk = NULL, thresh = 0.001,
-                         prune = TRUE, calibrate = TRUE, threads = 1L) {
+discriminant <- function(data = NULL, degree = 1L, penalty = NULL, max_terms = NULL,
+                         min_gain = 0.001, prune = TRUE, calibrate = TRUE, threads = 1L) {
   .check_count(degree, "degree", 1)
-  if (!is.null(nk)) .check_count(nk, "nk", 3)
+  if (!is.null(max_terms)) .check_count(max_terms, "max_terms", 3)
   .check_count(threads, "threads", 1)
   if (!is.null(penalty) && (!is.numeric(penalty) || length(penalty) != 1L || is.na(penalty) ||
                             penalty < 0)) {
     stop("`penalty` is one number of zero or more, got ", .describe(penalty), ".", call. = FALSE)
   }
-  if (!is.numeric(thresh) || length(thresh) != 1L || is.na(thresh) || thresh < 0 ||
-      thresh >= 1) {
-    stop("`thresh` is one number in [0, 1), got ", .describe(thresh), ".", call. = FALSE)
+  if (!is.numeric(min_gain) || length(min_gain) != 1L || is.na(min_gain) || min_gain < 0 ||
+      min_gain >= 1) {
+    stop("`min_gain` is one number in [0, 1), got ", .describe(min_gain), ".", call. = FALSE)
   }
   if (!is.logical(prune) || length(prune) != 1L || is.na(prune)) {
     stop("`prune` is TRUE or FALSE.", call. = FALSE)
@@ -74,10 +76,11 @@ discriminant <- function(data = NULL, degree = 1L, penalty = NULL, nk = NULL, th
   learner(
     name = "discriminant",
     data = data, reads = "tabular", multi = "separate",
-    params = list(degree = as.integer(degree), penalty = penalty, nk = nk, thresh = thresh,
-                  prune = prune, calibrate = calibrate, threads = as.integer(threads)),
-    fit = function(x, y, degree, penalty, nk, thresh, prune, calibrate, threads, head, weights,
-                   ...) {
+    params = list(degree = as.integer(degree), penalty = penalty, max_terms = max_terms,
+                  min_gain = min_gain, prune = prune, calibrate = calibrate,
+                  threads = as.integer(threads)),
+    fit = function(x, y, degree, penalty, max_terms, min_gain, prune, calibrate, threads, head,
+                   weights, ...) {
       if (!identical(.head_family(head), "binomial")) {
         stop("a discriminant separates presences from absences, under a head whose loss is the ",
              "binary cross-entropy; this head's loss is ", .describe(head$loss), ".",
@@ -89,8 +92,8 @@ discriminant <- function(data = NULL, degree = 1L, penalty = NULL, nk = NULL, th
         if (length(unique(yj)) < 2L) {
           return(mean(yj))
         }
-        .fda_fit(m, yj, weights[, j], degree = degree, penalty = penalty, nk = nk,
-                 thresh = thresh, prune = prune, calibrate = calibrate, threads = threads)
+        .fda_fit(m, yj, weights[, j], degree = degree, penalty = penalty, nk = max_terms,
+                 thresh = min_gain, prune = prune, calibrate = calibrate, threads = threads)
       })
       unfitted <- vapply(models, function(f) is.numeric(f) || !f$discriminates, logical(1L))
       stopped <- vapply(models, function(f) is.list(f) && !f$converged, logical(1L))

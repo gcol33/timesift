@@ -62,22 +62,24 @@ fit
 #> 
 #> candidates, scored on the outer folds
 #> candidate                    mean    won  responses
-#> elasticnet / day            0.870      0  separate
-#> elasticnet / week           0.891      2  separate
-#> elasticnet / month          0.903      4  separate
+#> elasticnet / day            0.866      1  separate
+#> elasticnet / week           0.897      3  separate
+#> elasticnet / month          0.907      2  separate
 #> 
 #> procedure, chosen and weighted inside each outer training fold
-#> selected                    0.903  se 0.018
-#> ensemble                    0.906  se 0.016
-#> selected elasticnet / month in 5 of 5 folds
+#> selected                    0.908  se 0.022
+#> ensemble                    0.907  se 0.016
+#> selected elasticnet / month in 4, elasticnet / week in 1 of 5 folds
 #> 
 #> choice on every target  elasticnet / month
-#> weights on every target  elasticnet / month 0.68   elasticnet / week 0.30   elasticnet / day 0.02
+#> weights on every target  elasticnet / month 1.00
 ```
 
-Every representation named in `sift` was built, and `models` defaulting
-to `list(elasticnet())`, a penalised logistic regression was fitted on
-each of them over the same five folds. The report has two parts.
+Every representation named in `sift` was built, and `learners`
+defaulting to
+[`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md),
+a penalised logistic regression was fitted on each of them over the same
+five folds. The report has two parts.
 
 The candidates are the comparison. Each is scored on the five outer
 folds, on the same cells, so their means can be read against each other
@@ -97,67 +99,67 @@ and weighting included.
 
 fit$estimate[c("arm", "metric", "score", "se", "lower", "upper")]
 #>         arm               metric      score          se       lower      upper
-#> 1  selected             accuracy  0.8750000 0.009378857  0.85089088  0.8991091
-#> 2  selected    average_precision  0.9107680 0.012782597  0.87790930  0.9436267
-#> 3  selected                 bias  1.0608069 0.063369831  0.89790954  1.2237042
-#> 4  selected                boyce  0.5831371 0.034972189  0.49323818  0.6730359
-#> 5  selected                  csi  0.7721429 0.018589735  0.72435642  0.8199293
-#> 6  selected                  ets  0.6116214 0.028640968  0.53799748  0.6852454
-#> 7  selected                  far  0.1264683 0.022321808  0.06908822  0.1838483
-#> 8  selected                kappa  0.6142196 0.027961977  0.54234103  0.6860981
-#> 9  selected         kappa_youden  0.7439128 0.021912758  0.68758424  0.8002413
-#> 10 selected              neg_mae -0.2715152 0.023577789 -0.33212387 -0.2109066
-#> 11 selected        neg_max_error -0.7345475 0.014256765 -0.77119566 -0.6978993
-#> 12 selected              neg_mse -0.1338696 0.010710719 -0.16140236 -0.1063368
-#> 13 selected neg_poisson_deviance -0.4176026 0.022150567 -0.47454241 -0.3606627
-#> 14 selected             neg_rmse -0.3596157 0.014615085 -0.39718499 -0.3220464
-#> 15 selected                   or 24.0000000 0.577350269 21.51586229 26.4841377
-#> 16 selected     ordinal_accuracy  0.8055556 0.020030840  0.75406464  0.8570465
-#> 17 selected           ordinal_f1  0.8138427 0.019885672  0.76272493  0.8649604
-#> 18 selected    ordinal_precision  0.8171429 0.019897146  0.76599561  0.8682901
-#> 19 selected       ordinal_recall  0.8110119 0.020116978  0.75929957  0.8627242
-#> 20 selected                 orss  0.9865082 0.006570675  0.96961770  1.0033986
-#> 21 selected              pearson  0.7045518 0.029907404  0.62767236  0.7814312
-#> 22 selected                  pod  0.8886905 0.030541705  0.81018052  0.9672004
-#> 23 selected                 pofd  0.1292063 0.020990916  0.07524748  0.1831652
-#> 24 selected            r_squared  0.4317790 0.046822319  0.31141842  0.5521396
-#> 25 selected              roc_auc  0.9028340 0.018192706  0.85606816  0.9495998
-#> 26 selected                   sr  0.8735317 0.022321808  0.81615171  0.9309118
-#> 27 selected                  tss  0.7594841 0.028655394  0.68582309  0.8331452
-#> 28 ensemble             accuracy  0.8722222 0.009296223  0.84832552  0.8961189
-#> 29 ensemble    average_precision  0.9130114 0.012886860  0.87988467  0.9461381
-#> 30 ensemble                 bias  1.1074735 0.054437350  0.96753788  1.2474092
-#> 31 ensemble                boyce  0.6056176 0.034449809  0.51706154  0.6941736
-#> 32 ensemble                  csi  0.7773280 0.013547515  0.74250305  0.8121530
-#> 33 ensemble                  ets  0.6102246 0.025560413  0.54451947  0.6759297
-#> 34 ensemble                  far  0.1412831 0.023311641  0.08135859  0.2012075
-#> 35 ensemble                kappa  0.6027910 0.033505416  0.51666259  0.6889194
-#> 36 ensemble         kappa_youden  0.7421500 0.020134502  0.69039258  0.7939073
-#> 37 ensemble              neg_mae -0.2734525 0.022721579 -0.33186019 -0.2150448
-#> 38 ensemble        neg_max_error -0.7345809 0.015123610 -0.77345741 -0.6957045
-#> 39 ensemble              neg_mse -0.1337877 0.010763976 -0.16145733 -0.1061180
-#> 40 ensemble neg_poisson_deviance -0.4156521 0.022939963 -0.47462114 -0.3566830
-#> 41 ensemble             neg_rmse -0.3594603 0.014568970 -0.39691105 -0.3220096
-#> 42 ensemble                   or 24.0000000 0.577350269 21.51586229 26.4841377
-#> 43 ensemble     ordinal_accuracy  0.8083333 0.017612075  0.76306005  0.8536066
-#> 44 ensemble           ordinal_f1  0.8152329 0.019053557  0.76625414  0.8642116
-#> 45 ensemble    ordinal_precision  0.8176984 0.019657004  0.76716847  0.8682284
-#> 46 ensemble       ordinal_recall  0.8132540 0.018695997  0.76519438  0.8613136
-#> 47 ensemble                 orss  0.9865082 0.006570675  0.96961770  1.0033986
-#> 48 ensemble              pearson  0.7056779 0.029416036  0.63006155  0.7812942
-#> 49 ensemble                  pod  0.9086905 0.022048335  0.85201343  0.9653675
-#> 50 ensemble                 pofd  0.1482540 0.028898110  0.07396901  0.2225389
-#> 51 ensemble            r_squared  0.4320409 0.047136780  0.31087192  0.5532098
-#> 52 ensemble              roc_auc  0.9057540 0.016491834  0.86336036  0.9481476
-#> 53 ensemble                   sr  0.8587169 0.023311641  0.79879245  0.9186414
-#> 54 ensemble                  tss  0.7604365 0.024839273  0.69658512  0.8242879
+#> 1  selected             accuracy  0.8777778 0.015908690  0.83688319  0.9186724
+#> 2  selected    average_precision  0.9134774 0.018894456  0.86490764  0.9620471
+#> 3  selected                 bias  1.0727116 0.056937161  0.92635001  1.2190733
+#> 4  selected                boyce  0.6824181 0.055424952  0.53994375  0.8248925
+#> 5  selected                  csi  0.7860714 0.024178549  0.72391849  0.8482244
+#> 6  selected                  ets  0.6348278 0.041399419  0.52840719  0.7412484
+#> 7  selected                  far  0.1187302 0.028711737  0.04492429  0.1925360
+#> 8  selected                kappa  0.6367593 0.034685563  0.54759718  0.7259213
+#> 9  selected         kappa_youden  0.7543294 0.032708510  0.67024955  0.8384093
+#> 10 selected              neg_mae -0.3557994 0.019010008 -0.40466614 -0.3069326
+#> 11 selected        neg_max_error -0.6121056 0.011515318 -0.64170664 -0.5825045
+#> 12 selected              neg_mse -0.1542971 0.013224621 -0.18829204 -0.1203021
+#> 13 selected neg_poisson_deviance -0.4858941 0.024935228 -0.54999210 -0.4217960
+#> 14 selected             neg_rmse -0.3900576 0.015724765 -0.43047939 -0.3496358
+#> 15 selected                   or 23.5000000 0.500000000 17.14689763 29.8531024
+#> 16 selected     ordinal_accuracy  0.8138889 0.017435950  0.76906835  0.8587094
+#> 17 selected           ordinal_f1  0.8197278 0.017391577  0.77502138  0.8644343
+#> 18 selected    ordinal_precision  0.8219907 0.016217367  0.78030267  0.8636788
+#> 19 selected       ordinal_recall  0.8180159 0.018711488  0.76991646  0.8661153
+#> 20 selected                 orss  0.9890723 0.006914267  0.97129857  1.0068459
+#> 21 selected              pearson  0.7009506 0.032456953  0.61751740  0.7843839
+#> 22 selected                  pod  0.8964683 0.025170501  0.83176542  0.9611711
+#> 23 selected                 pofd  0.1257143 0.039611921  0.02388860  0.2275400
+#> 24 selected            r_squared  0.3437177 0.059344801  0.19116699  0.4962683
+#> 25 selected              roc_auc  0.9084160 0.021620212  0.85283948  0.9639925
+#> 26 selected                   sr  0.8812698 0.028711737  0.80746397  0.9550757
+#> 27 selected                  tss  0.7707540 0.035825510  0.67866156  0.8628464
+#> 28 ensemble             accuracy  0.8750000 0.011180340  0.84626002  0.9037400
+#> 29 ensemble    average_precision  0.9143980 0.013535606  0.87960363  0.9491924
+#> 30 ensemble                 bias  1.0679497 0.048673935  0.94282940  1.1930701
+#> 31 ensemble                boyce  0.6897743 0.037156752  0.59425981  0.7852888
+#> 32 ensemble                  csi  0.7776058 0.018333372  0.73047839  0.8247333
+#> 33 ensemble                  ets  0.6189548 0.030714246  0.54000128  0.6979082
+#> 34 ensemble                  far  0.1224339 0.023392168  0.06230238  0.1825653
+#> 35 ensemble                kappa  0.6253307 0.016040524  0.58409721  0.6665642
+#> 36 ensemble         kappa_youden  0.7477055 0.024184193  0.68553807  0.8098730
+#> 37 ensemble              neg_mae -0.3530131 0.018303754 -0.40006442 -0.3059618
+#> 38 ensemble        neg_max_error -0.6163724 0.011503915 -0.64594412 -0.5868006
+#> 39 ensemble              neg_mse -0.1521954 0.011427574 -0.18157095 -0.1228199
+#> 40 ensemble neg_poisson_deviance -0.4823667 0.022655663 -0.54060494 -0.4241285
+#> 41 ensemble             neg_rmse -0.3879671 0.013953420 -0.42383548 -0.3520987
+#> 42 ensemble                   or 23.5000000 0.500000000 17.14689763 29.8531024
+#> 43 ensemble     ordinal_accuracy  0.8138889 0.017435950  0.76906835  0.8587094
+#> 44 ensemble           ordinal_f1  0.8197278 0.017391577  0.77502138  0.8644343
+#> 45 ensemble    ordinal_precision  0.8219907 0.016217367  0.78030267  0.8636788
+#> 46 ensemble       ordinal_recall  0.8180159 0.018711488  0.76991646  0.8661153
+#> 47 ensemble                 orss  0.9890723 0.006914267  0.97129857  1.0068459
+#> 48 ensemble              pearson  0.7050684 0.027212866  0.63511551  0.7750213
+#> 49 ensemble                  pod  0.8917063 0.022858665  0.83294628  0.9504664
+#> 50 ensemble                 pofd  0.1257143 0.033072963  0.04069753  0.2107310
+#> 51 ensemble            r_squared  0.3522563 0.051730730  0.21927827  0.4852344
+#> 52 ensemble              roc_auc  0.9074901 0.016384905  0.86537134  0.9496088
+#> 53 ensemble                   sr  0.8775661 0.023392168  0.81743466  0.9376976
+#> 54 ensemble                  tss  0.7659921 0.027637201  0.69494838  0.8370358
 fit$selected[c("fold", "candidate", "inner_score")]
 #>   fold          candidate inner_score
-#> 1    1 elasticnet / month   0.8968360
-#> 2    2 elasticnet / month   0.8962751
-#> 3    3 elasticnet / month   0.9056376
-#> 4    4 elasticnet / month   0.8959669
-#> 5    5 elasticnet / month   0.9099788
+#> 1    1 elasticnet / month   0.9035741
+#> 2    2 elasticnet / month   0.8993175
+#> 3    3  elasticnet / week   0.9297381
+#> 4    4 elasticnet / month   0.9089008
+#> 5    5 elasticnet / month   0.9144762
 ```
 
 The interval is across the six responses of this dataset, all fitted and
@@ -199,9 +201,9 @@ chose on every target instead.
 p <- predict(fit, targets, series)
 round(p[1:3, 1:4], 3)
 #>        sp1   sp2   sp3   sp4
-#> p001 0.181 0.884 0.304 0.879
-#> p002 0.566 0.576 0.584 0.694
-#> p003 0.040 0.924 0.185 0.949
+#> p001 0.290 0.803 0.396 0.741
+#> p002 0.583 0.534 0.576 0.548
+#> p003 0.170 0.841 0.334 0.774
 ```
 
 `type = "binary"` cuts each response into presence and absence. The cut
@@ -218,7 +220,7 @@ as were observed.
 
 decision_threshold(fit, rule = "prevalence")
 #>       sp1       sp2       sp3       sp4       sp5       sp6 
-#> 0.5643002 0.4907909 0.5252335 0.5131875 0.6334832 0.5234282
+#> 0.5454921 0.5204788 0.5309027 0.5044327 0.5217123 0.5156719
 predict(fit, targets, series, type = "binary", rule = "prevalence")[1:3, 1:4]
 #>      sp1 sp2 sp3 sp4
 #> p001   0   1   0   1
@@ -279,7 +281,7 @@ elasticnet(data = grain("month"))
 #> <timesift learner> elasticnet 
 #> reads   : tabular ; one model per response: yes, separate 
 #> data    : month 
-#> settings: alpha = 0.5, n_inner = 5, squares = TRUE, s = lambda.min, n_lambda = 100, thresh = 1e-08, threads = 1, seed = 1
+#> settings: alpha = 0.5, n_inner = 10, squares = TRUE, s = lambda.1se, n_lambda = 100, tol = 1e-08, threads = 1, seed = 1
 ```
 
 ## What a learner may be handed
@@ -296,7 +298,7 @@ array says how many it has.
 ``` r
 
 timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
-         models = elasticnet(), sift = native())
+         learners = elasticnet(), sift = native())
 #> Error:
 #> ! no learner can read any representation in the sift:
 #>   `elasticnet()` reads a tabular representation; `native()` gives it one column per reading. Use `grain()`, `multigrain()` or `lookback()`.
@@ -365,9 +367,9 @@ compiled core the Python package calls rather than by a fitter on either
 side: the penalty path, the standardisation and the cross-validated
 choice of penalty are one implementation, and the two languages return
 the same coefficients for the same design. `s` reads that fit at
-`"lambda.min"`, at `"lambda.1se"`, or at a penalty of your own, and
-`thresh` trades how close the descent settles to the optimum against
-what it costs.
+`"lambda.1se"`, glmnet’s default, at `"lambda.min"`, or at a penalty of
+your own, and `tol` trades how close the descent settles to the optimum
+against what it costs.
 
 Architecture belongs to the constructor and training belongs to
 [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md),
@@ -383,7 +385,7 @@ train_control(epochs = 200L, device = "cpu")
 #>   batch_size      64   (default)
 #>   learning_rate   0.001   (default)
 #>   weight_decay    1e-04   (default)
-#>   early_stopping  10   (default)
+#>   early_stopping  Inf   (default)
 #>   val_frac        0   (default)
 #>   device          cpu
 #>   seed            1   (default)
@@ -435,7 +437,7 @@ weighted_glm <- learner(
 )
 
 both <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
-                 models = c(elasticnet(), nearest_neighbour, weighted_glm),
+                 learners = c(elasticnet(), nearest_neighbour, weighted_glm),
                  sift = grains("week", "month"), resampling = cv(v = 5), verbose = FALSE)
 summary(both)
 #> timesift  60 targets, 6 responses, 5-fold random CV, roc_auc
@@ -444,17 +446,17 @@ summary(both)
 #> candidate                      mean    won  responses
 #> 1nn / week                    0.720      0  separate
 #> 1nn / month                   0.772      0  separate
-#> elasticnet / week             0.895      2  separate
-#> weighted_glm / month          0.904      2  separate
-#> elasticnet / month            0.907      2  separate
+#> elasticnet / week             0.897      2  separate
+#> weighted_glm / month          0.904      3  separate
+#> elasticnet / month            0.907      1  separate
 #> 
 #> procedure, chosen and weighted inside each outer training fold
-#> selected                      0.907  se 0.019
-#> ensemble                      0.910  se 0.016
-#> selected elasticnet / month in 5 of 5 folds
+#> selected                      0.908  se 0.022
+#> ensemble                      0.896  se 0.016
+#> selected elasticnet / month in 4, elasticnet / week in 1 of 5 folds
 #> 
 #> choice on every target  elasticnet / month
-#> weights on every target  elasticnet / week 0.35   elasticnet / month 0.34   weighted_glm / month 0.28   1nn / month 0.03
+#> weights on every target  weighted_glm / month 0.66   elasticnet / month 0.30   1nn / month 0.04
 ```
 
 ## The combination
@@ -475,7 +477,7 @@ weights are in `fit$fold_weights`.
 
 ensemble_weights(fit)
 #>   elasticnet / day  elasticnet / week elasticnet / month 
-#>         0.01546323         0.30141036         0.68312641
+#>      3.375410e-139       2.476064e-23       1.000000e+00
 ```
 
 The weights say how much of the combination each candidate carries, and
@@ -584,8 +586,8 @@ set <- grain_matrix(series, plot, t, temp, grain = c("day", "week", "month"))
 lad <- grain_ladder(set, fit$y, elasticnet(), folds = fit$folds, verbose = FALSE)
 summary(lad)
 #>      learner grain     score n_variable  best
-#> 1 elasticnet   day 0.8713503          6 FALSE
-#> 2 elasticnet  week 0.8950320          6 FALSE
+#> 1 elasticnet   day 0.8663062          6 FALSE
+#> 2 elasticnet  week 0.8970888          6 FALSE
 #> 3 elasticnet month 0.9074901          6  TRUE
 ```
 
@@ -599,9 +601,9 @@ test behind `p_value` has few values to work with.
 
 paired_contrast(lad, "month|elasticnet", "day|elasticnet")
 #>                  a              b       diff     center       lower      upper
-#> 1 month|elasticnet day|elasticnet 0.03613977 0.03613977 0.006698533 0.06558101
+#> 1 month|elasticnet day|elasticnet 0.04118386 0.04118386 -0.01256729 0.09493501
 #>   n_variable n_cell n_favour p_value p_method  interval
-#> 1          6     30        6 0.03125    exact variables
+#> 1          6     30        5 0.09375    exact variables
 ```
 
 Where the whole curve is the question rather than one step of it,
@@ -612,9 +614,9 @@ against the best one, correcting for the comparisons made and no others.
 ``` r
 
 grain_contrasts(lad)
-#>      learner grain reference        diff       lower       upper   p_value
-#> 1 elasticnet   day     month -0.03613977 -0.08170934 0.009429801 0.1380470
-#> 2 elasticnet  week     month -0.01245811 -0.05802768 0.033111459 0.7631558
+#>      learner grain reference        diff       lower       upper    p_value
+#> 1 elasticnet   day     month -0.04118386 -0.08790089 0.005533166 0.09132994
+#> 2 elasticnet  week     month -0.01040123 -0.05711826 0.036315794 0.83437774
 ```
 
 ## What was read
@@ -632,10 +634,10 @@ kept <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
 weight <- occlusion(kept, "elasticnet / month", permutations = 5)
 head(aggregate(weight ~ part, weight, mean), 4)
 #>                   part     weight
-#> 1 2021-09-01T00:00:00Z 0.09523258
-#> 2 2021-10-01T00:00:00Z 0.11486486
-#> 3 2021-11-01T00:00:00Z 0.07128131
-#> 4 2021-12-01T00:00:00Z 0.05093959
+#> 1 2021-09-01T00:00:00Z 0.05928263
+#> 2 2021-10-01T00:00:00Z 0.09155445
+#> 3 2021-11-01T00:00:00Z 0.04998280
+#> 4 2021-12-01T00:00:00Z 0.01739462
 ```
 
 Holding a channel back instead asks what each statistic of a grain

@@ -25,7 +25,7 @@ maxent(
   clamp = TRUE,
   n_inner = 5L,
   s = c("lambda.min", "lambda.1se"),
-  thresh = 1e-08,
+  tol = 1e-08,
   max_design = 2,
   threads = 1L,
   seed = 1L
@@ -81,9 +81,9 @@ maxent(
   Where the absence formulation reads its path: `"lambda.min"` or
   `"lambda.1se"`.
 
-- thresh:
+- tol:
 
-  Where the coordinate descent stops, as the elastic net's `thresh`.
+  Where the coordinate descent stops, as the elastic net's `tol`.
 
 - max_design:
 

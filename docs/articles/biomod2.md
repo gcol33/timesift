@@ -59,7 +59,7 @@ also accepts directly. biomod2’s tuned `ANN` (`size = 5`, `decay = 0.1`,
 
 biomod2 ships two option sets: its defaults and a tuned set called
 `"bigboss"`. Where the two differ, the learners offer both, as
-`preset = "package"` (the defaults of the fitting package, which
+`preset = "default"` (the defaults of the fitting package, which
 biomod2’s default set uses) and `preset = "bigboss"`. For example,
 `tree(preset = "bigboss")` sets `min_split = 5`, `min_leaf = 5`,
 `cp = 0.001`, `max_depth = 10` and five inner folds. A setting given
@@ -126,7 +126,7 @@ is suited to a coarse grain.
 fit <- timesift(
   targets, sim$readings,
   y = starts_with("v"), id = unit, time = time,
-  models = models,
+  learners = models,
   sift = grains("week", "month", "season"),
   ensemble = ensemble("weighted", decay = 1.6, min_score = 0.5),
   resampling = cv(v = 5),
@@ -136,10 +136,10 @@ fit$candidates[c("candidate", "grain", "bins", "status")][1:6, ]
 #>      candidate  grain bins status
 #> 1   CTA / week   week   53 fitted
 #> 2  CTA / month  month   12 fitted
-#> 3 CTA / season season    4 fitted
+#> 3 CTA / season season    5 fitted
 #> 4    RF / week   week   53 fitted
 #> 5   RF / month  month   12 fitted
-#> 6  RF / season season    4 fitted
+#> 6  RF / season season    5 fitted
 ```
 
 The run fitted 29 candidates: nine learners at three grains each and the
@@ -154,30 +154,30 @@ fit
 #> 
 #> candidates, scored on the outer folds
 #> candidate                  mean    won  responses
+#> SRE / season              0.532      0  separate
 #> CTA / month               0.540      0  separate
-#> SRE / season              0.540      0  separate
-#> CTA / season              0.542      0  separate
-#> XGBOOST / season          0.560      0  separate
 #> XGBOOST / month           0.569      0  separate
-#> RF / season               0.577      0  separate
-#> RFd / season              0.578      0  separate
-#> GBM / season              0.583      0  separate
+#> XGBOOST / season          0.597      0  separate
 #> RF / month                0.600      0  separate
+#> CTA / season              0.602      0  separate
 #> GBM / month               0.613      0  separate
 #> RFd / month               0.613      0  separate
-#> GLM / season              0.615      0  separate
-#> FDA / season              0.617      0  separate
-#> MAXNET / season           0.626      0  separate
-#> MARS / season             0.634      0  separate
+#> RF / season               0.616      0  separate
+#> RFd / season              0.621      0  separate
+#> GBM / season              0.624      0  separate
+#> MARS / season             0.636      0  separate
 #> CTA / week                0.636      0  separate
-#> GAM / season              0.639      0  separate
+#> FDA / season              0.639      0  separate
 #> FDA / month               0.641      0  separate
+#> GAM / season              0.645      0  separate
 #> GLM / week                0.655      0  separate
 #> MARS / month              0.666      0  separate
 #> RFd / week                0.670      0  separate
+#> MAXNET / season           0.678      0  separate
 #> GLM / month               0.681      0  separate
 #> XGBOOST / week            0.683      0  separate
 #> RF / week                 0.683      0  separate
+#> GLM / season              0.687      0  separate
 #> MAXNET / month            0.696      0  separate
 #> FDA / week                0.700      1  separate
 #> GBM / week                0.701      0  separate
@@ -186,11 +186,11 @@ fit
 #> 
 #> procedure, chosen and weighted inside each outer training fold
 #> selected                  0.780  se 0.012
-#> ensemble                  0.759  se 0.014
+#> ensemble                  0.755  se 0.014
 #> selected MAXNET / week in 5 of 5 folds
 #> 
 #> choice on every target  MAXNET / week
-#> weights on every target  MAXNET / week 0.38   MARS / week 0.23   GBM / week 0.15   FDA / week 0.09   MAXNET / month 0.06   RF / week 0.04   XGBOOST / week 0.02   GLM / month 0.01   RFd / week 0.01   MARS / month 0.01
+#> weights on every target  MAXNET / week 0.38   MARS / week 0.23   GBM / week 0.15   FDA / week 0.09   MAXNET / month 0.06   GLM / season 0.04   RF / week 0.02   XGBOOST / week 0.01   GLM / month 0.01   MAXNET / season 0.01
 ```
 
 The report gives the AUC of each candidate, the number of responses on
@@ -235,7 +235,7 @@ ens <- BIOMOD_EnsembleModeling(mod, models.chosen = "all",
 ``` r
 
 fit <- timesift(targets, series, y = starts_with("sp"), id = plot_id, time = datetime,
-                models = list(CTA = tree(), RF = forest(), GBM = boosting(),
+                learners = list(CTA = tree(), RF = forest(), GBM = boosting(),
                               XGBOOST = boosting(method = "xgboost"), MAXNET = maxent(),
                               GLM = linear(),
                               MARS = mars(), FDA = discriminant()),
@@ -250,8 +250,8 @@ The Python interface takes the same constructors and arguments:
 import timesift as ts
 
 fit = ts.timesift(targets, series, y="sp_*", id="plot_id", time="datetime",
-                  models=[ts.tree(), ts.forest(), ts.boosting(method="xgboost"), ts.maxent(),
-                          ts.mars(), ts.discriminant()],
+                  learners=[ts.tree(), ts.forest(), ts.boosting(method="xgboost"), ts.maxent(),
+                            ts.mars(), ts.discriminant()],
                   sift=ts.grains("week", "month", "season"),
                   ensemble=ts.ensemble("weighted", min_score=0.5),
                   resampling=ts.cv(v=5))
@@ -291,7 +291,7 @@ weights in this run:
 round(sort(fit$weights, decreasing = TRUE)[1:6], 3)
 #>  MAXNET / week    MARS / week     GBM / week     FDA / week MAXNET / month 
 #>          0.375          0.234          0.146          0.092          0.057 
-#>      RF / week 
+#>   GLM / season 
 #>          0.036
 ```
 
@@ -304,7 +304,7 @@ predictions, then averages these votes. A smaller run at one grain:
 fit_ca <- timesift(
   targets, sim$readings,
   y = starts_with("v"), id = unit, time = time,
-  models = models[c("RF", "GBM", "MAXNET", "MARS", "FDA")],
+  learners = models[c("RF", "GBM", "MAXNET", "MARS", "FDA")],
   sift = grains("week"),
   ensemble = ensemble("committee", rule = "kappa"),
   resampling = cv(v = 5),
@@ -330,9 +330,9 @@ dimnames(sp)[[3]]
 #> [1] "mean"  "sd"    "cv"    "lower" "upper"
 round(sp[1:3, 1, ], 3)
 #>             mean    sd    cv lower upper
-#> d001u00001 0.245 0.140 0.571 0.107 0.382
-#> d001u00002 0.215 0.219 1.015 0.000 0.431
-#> d001u00003 0.211 0.090 0.429 0.122 0.299
+#> d001u00001 0.250 0.135 0.541 0.117 0.382
+#> d001u00002 0.220 0.216 0.984 0.007 0.432
+#> d001u00003 0.215 0.085 0.395 0.132 0.299
 ```
 
 With one target per map cell, the coefficient of variation gives an
@@ -450,7 +450,7 @@ listed in the candidate table.
 ``` r
 
 timesift(targets, series, y = starts_with("sp"), id = plot, time = t, x = temp,
-         models = list(RF = tune(forest(), list(mtry = c(2, 5, 10), min_node = c(1, 5)))))
+         learners = list(RF = tune(forest(), list(mtry = c(2, 5, 10), min_node = c(1, 5)))))
 ```
 
 ## Variable importance

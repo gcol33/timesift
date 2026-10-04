@@ -104,7 +104,7 @@ and libtorch and are not required to be.
 
 ```r
 fit <- timesift(targets, series, y = starts_with("sp_"), id = plot_id, time = datetime,
-                models = c(elasticnet(), forest(), cnn()),
+                learners = c(elasticnet(), forest(), cnn()),
                 sift = grains("day", "week", "month"),
                 resampling = cv(v = 5))
 summary(fit)
@@ -154,8 +154,8 @@ in the paper is `c("cold_day", "mean", "warm_day")` at the weekly grain.
 `native`, `halfday`, `day`, `week`, `month`, `season`, `year`. `native` is the record as recorded,
 one bin per reading. The four coarse grains follow the calendar rather than a fixed count of hours,
 so a bin is a real month or a real week rather than a drifting block of 730 or 168 hours.
-`year_start` sets the hydrological-year boundary (default `"09-01"`, the convention in the source
-dataset).
+`year_start` sets the year boundary (default `"01-01"`; the source dataset's hydrological year is
+`"09-01"`, which the reproduction driver passes).
 
 A calendar the package does not carry is passed as a function of the reading instants returning
 each reading's bin start. That is how the deposit's astronomical seasons, cut at the equinoxes and

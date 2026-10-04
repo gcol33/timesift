@@ -26,10 +26,10 @@
 #' Inside each outer fold every candidate carries an inner score, the mean over variables of its
 #' per-variable mean over the inner folds, and a standard error, the standard deviation over the
 #' inner folds of the fold's own score (the mean over the variables scored in that fold) divided by
-#' the square root of the number of inner folds. `rule = "argmax"` takes the highest inner score,
+#' the square root of the number of inner folds. `choose = "argmax"` takes the highest inner score,
 #' and on an exact tie the candidate declared first.
 #'
-#' `rule = "coarsest_adequate"` first finds that highest score and its standard error, calls every
+#' `choose = "coarsest_adequate"` first finds that highest score and its standard error, calls every
 #' candidate scoring at least the highest minus one standard error adequate, and takes the coarsest
 #' adequate one. Coarseness is read off the representation as the package holds it: fewer bins is
 #' coarser, and between two candidates with the same number of bins, fewer channels is coarser.
@@ -93,7 +93,7 @@
 #'
 #' @section A cut learned inside the training data:
 #' TSS read at the cut that maximises it on the scored units is biased upward, most where presences
-#' are few ([tss_inflation()]). With `threshold` set, each outer fold learns one cut per variable
+#' are few ([tss_inflation()]). With `cut_rule` set, each outer fold learns one cut per variable
 #' on the inner out-of-fold predictions of the candidate it selected, which the inner search has
 #' already made for every outer training unit, by [decision_threshold()] under the rule named. The
 #' cut is then frozen and the outer test fold's predictions are read at it by [tss()]. No unit of
@@ -109,15 +109,15 @@
 #'   takes. Named alongside the grains they form the candidate set.
 #' @param folds The outer fold map, from [fold_map()] or any named integer vector. Built with the
 #'   defaults of [fold_map()] when not given.
-#' @param inner Number of inner folds the selection is made on, or a function of the outer training
+#' @param n_inner Number of inner folds the selection is made on, or a function of the outer training
 #'   response returning a fold map for those units. A count deals the inner folds by the grouping
 #'   the outer fold map carries, so what [grouped_cv()] kept whole outside stays whole inside.
-#' @param rule How a candidate is chosen from its inner scores. `"argmax"` takes the highest.
+#' @param choose How a candidate is chosen from its inner scores. `"argmax"` takes the highest.
 #'   `"coarsest_adequate"` takes the coarsest candidate whose inner score lies within one standard
 #'   error of the highest, the one-standard-error rule of Breiman, Friedman, Olshen and Stone
 #'   (1984) and of Hastie, Tibshirani and Friedman (2009, section 7.10) with coarseness in place of
 #'   model complexity. See Choosing a candidate.
-#' @param threshold `NULL`, or the rule of [decision_threshold()] a presence-absence cut is learned
+#' @param cut_rule `NULL`, or the rule of [decision_threshold()] a presence-absence cut is learned
 #'   by: `"youden"`, the cut that maximises TSS, `"kappa"` or `"prevalence"`. See A cut learned
 #'   inside the training data.
 #' @param interval Which interval to report beside the across-variable one, which is always
@@ -145,11 +145,11 @@
 #'   was searched; and `scores`, the per-cell rows of the selected procedure under the selection
 #'   metric, in the layout [grain_ladder()] returns. The held-out prediction of every unit is in
 #'   the `predictions` attribute and the scorable-cell mask in `cells`. `inner` holds every
-#'   candidate's inner score and standard error in every outer fold. With `threshold` set, the
+#'   candidate's inner score and standard error in every outer fold. With `cut_rule` set, the
 #'   estimate carries the score, its interval and the interval's name in `interval`, one row per
 #'   metric and interval. With `interval = "nested_cv"` it also carries `nested_cv`, the same rows
 #'   with the estimator's own quantities beside them, and `final`, the procedure fitted on every
-#'   unit, whose risk that interval is for. With `threshold` set, the
+#'   unit, whose risk that interval is for. With `cut_rule` set, the
 #'   estimate carries one further row, `tss_inner_cut`, the procedure's TSS at the learned cuts;
 #'   `thresholds` holds the cut of every outer fold and variable; and `cut_scores` the per-cell
 #'   rows it is averaged from, in the layout of `scores`. Both are `NULL` otherwise.
@@ -169,21 +169,21 @@
 #' y <- matrix(rbinom(120, 1, plogis(c(warmth, -warmth))), nrow = 60,
 #'             dimnames = list(units, c("sp1", "sp2")))
 #' x <- grain_matrix(d, plot, t, temp, grain = c("week", "month"))
-#' sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), inner = 3,
+#' sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), n_inner = 3,
 #'                     verbose = FALSE)
 #' sel
 #' sel$estimate
 #'
 #' @export
-select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
-                         rule = c("argmax", "coarsest_adequate"), threshold = NULL,
+select_grain <- function(x, y, learners, folds = NULL, n_inner = 5L,
+                         choose = c("argmax", "coarsest_adequate"), cut_rule = NULL,
                          interval = c("variables", "nested_cv"), repeats = 1L,
                          response = "presence_absence", metric = NULL, compare = NULL,
                          control = train_control(), seed = 1L, verbose = TRUE) {
-  rule <- match.arg(rule)
+  choose <- match.arg(choose)
   interval <- .check_interval(interval[1L])
-  if (!is.null(threshold)) {
-    threshold <- match.arg(threshold, .threshold_rules)
+  if (!is.null(cut_rule)) {
+    cut_rule <- match.arg(cut_rule, .threshold_rules)
   }
   set <- .as_set(x)
   units <- dimnames(set[[1L]])[[1L]]
@@ -205,14 +205,14 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
   score <- .metrics_reg$get(metric)
   learners <- .learner_list(learners)
   group <- .fold_group(folds, units)
-  inner_split <- .inner_splitter(inner, group)
+  inner_split <- .inner_splitter(n_inner, group)
   .check_compare(compare, metric, interval)
   candidates <- expand.grid(grain = names(set), learner = names(learners),
                             KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
   if (nrow(candidates) < 2L) {
     stop("selection needs at least two candidates; got one grain and one learner.", call. = FALSE)
   }
-  ctx <- .selection_context(set, y, learners, candidates, .cross_pairs(set, learners), rule,
+  ctx <- .selection_context(set, y, learners, candidates, .cross_pairs(set, learners), choose,
                             inner_split, response, metric, control, group)
 
   levels <- sort(unique(f))
@@ -237,10 +237,10 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
 
     # The cut is learned on the selected candidate's inner out-of-fold predictions, which cover
     # the outer training units and nothing else.
-    if (!is.null(threshold)) {
+    if (!is.null(cut_rule)) {
       oof <- attr(lad, "predictions")[[.candidate_label(grid$grain[won], grid$learner[won])]]
       cuts[i, ] <- vapply(colnames(y), function(v) {
-        decision_threshold(y_train[, v], oof[rownames(y_train), v], threshold)
+        decision_threshold(y_train[, v], oof[rownames(y_train), v], cut_rule)
       }, numeric(1L))
     }
 
@@ -283,10 +283,10 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     estimate <- rbind(estimate, nested[names(estimate)])
   }
   thresholds <- cut_scores <- NULL
-  if (!is.null(threshold)) {
+  if (!is.null(cut_rule)) {
     thresholds <- data.frame(fold = rep(levels, times = ncol(y)),
                              variable = rep(colnames(y), each = length(levels)),
-                             threshold = as.vector(cuts), rule = threshold,
+                             threshold = as.vector(cuts), rule = cut_rule,
                              stringsAsFactors = FALSE)
     cut_scores <- .as_grain_rows(.score_arm(.selected_label, "selected", y, p, f, levels, cells,
                                             tss, at = cuts))
@@ -309,7 +309,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
     final = final
   )
   structure(out, class = "timesift_selection", metric = metric, response = response,
-            rule = rule, threshold = threshold, interval = interval,
+            choose = choose, cut_rule = cut_rule, interval = interval,
             folds = stats::setNames(f, units), cells = cells,
             predictions = stats::setNames(list(p), .selected_arm))
 }
@@ -322,7 +322,7 @@ select_grain <- function(x, y, learners, folds = NULL, inner = 5L,
 #' @export
 print.timesift_selection <- function(x, ...) {
   cat("<timesift selection>", .plural(nrow(x$selected), "outer fold"), "over",
-      .plural(nrow(x$candidates), "candidate"), "by", attr(x, "rule") %||% "argmax", "\n")
+      .plural(nrow(x$candidates), "candidate"), "by", attr(x, "choose") %||% "argmax", "\n")
   est <- x$estimate[x$estimate$metric == attr(x, "metric"), , drop = FALSE]
   cat(sprintf("%s: %.3f for the procedure, selection included\n", attr(x, "metric"),
               est$score[1L]))
@@ -333,7 +333,7 @@ print.timesift_selection <- function(x, ...) {
   cut <- x$estimate[x$estimate$metric == .inner_cut_metric, , drop = FALSE]
   if (nrow(cut)) {
     cat(sprintf("tss at the %s cut learned on the inner folds: %.3f (se %.3f)\n",
-                attr(x, "threshold"), cut$score, cut$se))
+                attr(x, "cut_rule"), cut$score, cut$se))
   }
   print(summary(x))
   invisible(x)
@@ -384,7 +384,7 @@ summary.timesift_selection <- function(object, ...) {
 #' y <- matrix(rbinom(120, 1, plogis(c(warmth, -warmth))), nrow = 60,
 #'             dimnames = list(units, c("sp1", "sp2")))
 #' x <- grain_matrix(d, plot, t, temp, grain = c("week", "month"))
-#' sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), inner = 3,
+#' sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), n_inner = 3,
 #'                     verbose = FALSE)
 #' plot(sel)
 #'
@@ -633,7 +633,7 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
   }
   if (!is.numeric(inner) || length(inner) != 1L || is.na(inner) || inner < 2L ||
         inner != trunc(inner)) {
-    stop("`inner` is a number of folds of at least 2, or a function of the training response, got ",
+    stop("`n_inner` is a number of folds of at least 2, or a function of the training response, got ",
          paste(deparse(inner), collapse = ""), ".", call. = FALSE)
   }
   inner <- as.integer(inner)

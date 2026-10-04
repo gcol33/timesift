@@ -154,7 +154,7 @@ def test_the_corrected_centres_naive_standard_error_is_the_jackknife_of_the_comb
 def test_the_selection_reports_both_intervals_and_the_fit_the_nested_one_is_for():
     x, y = design(200, 7)
     folds = fold_map(y, v=5, seed=2)
-    sel = select_grain(x, y, centroid(), folds=folds, inner=3, metric="roc_auc",
+    sel = select_grain(x, y, centroid(), folds=folds, n_inner=3, metric="roc_auc",
                        interval="nested_cv", repeats=2, seed=1, verbose=False)
     kinds = {r["interval"] for r in sel.estimate}
     assert kinds == {"variables", "nested_cv"}
@@ -172,7 +172,7 @@ def test_the_selection_reports_both_intervals_and_the_fit_the_nested_one_is_for(
     assert sel.final["grain"] == "good"
     assert sel.final["fit"].predict(x["good"]).shape == y.values.shape
     with pytest.raises(ValueError, match="`interval` is one of"):
-        select_grain(x, y, centroid(), folds=folds, inner=3, interval="bootstrap", verbose=False)
+        select_grain(x, y, centroid(), folds=folds, n_inner=3, interval="bootstrap", verbose=False)
 
 
 def test_a_paired_nested_interval_needs_a_ladder_that_was_cross_validated_for_it():

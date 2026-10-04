@@ -237,7 +237,7 @@ tuned <code>DNN</code> (<code>hidden = c(100, 100)</code>,
 <code>mlp(hidden = c(100, 100), activation = "selu", epochs = 150, batch_size = 100)</code>.</p>
 <p>biomod2 ships two option sets: its defaults and a tuned set called
 <code>"bigboss"</code>. Where the two differ, the learners offer both,
-as <code>preset = "package"</code> (the defaults of the fitting package,
+as <code>preset = "default"</code> (the defaults of the fitting package,
 which biomod2’s default set uses) and <code>preset = "bigboss"</code>.
 For example, <code>tree(preset = "bigboss")</code> sets
 <code>min_split = 5</code>, <code>min_leaf = 5</code>,
@@ -293,7 +293,7 @@ the bands, and the envelope is suited to a coarse grain.</p>
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span></span>
 <span>  <span class="va">targets</span>, <span class="va">sim</span><span class="op">$</span><span class="va">readings</span>,</span>
 <span>  y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"v"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">unit</span>, time <span class="op">=</span> <span class="va">time</span>,</span>
-<span>  models <span class="op">=</span> <span class="va">models</span>,</span>
+<span>  learners <span class="op">=</span> <span class="va">models</span>,</span>
 <span>  sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"week"</span>, <span class="st">"month"</span>, <span class="st">"season"</span><span class="op">)</span>,</span>
 <span>  ensemble <span class="op">=</span> <span class="fu"><a href="../reference/ensemble.html">ensemble</a></span><span class="op">(</span><span class="st">"weighted"</span>, decay <span class="op">=</span> <span class="fl">1.6</span>, min_score <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>,</span>
 <span>  resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span>
@@ -303,10 +303,10 @@ the bands, and the envelope is suited to a coarse grain.</p>
 <span><span class="co">#&gt;      candidate  grain bins status</span></span>
 <span><span class="co">#&gt; 1   CTA / week   week   53 fitted</span></span>
 <span><span class="co">#&gt; 2  CTA / month  month   12 fitted</span></span>
-<span><span class="co">#&gt; 3 CTA / season season    4 fitted</span></span>
+<span><span class="co">#&gt; 3 CTA / season season    5 fitted</span></span>
 <span><span class="co">#&gt; 4    RF / week   week   53 fitted</span></span>
 <span><span class="co">#&gt; 5   RF / month  month   12 fitted</span></span>
-<span><span class="co">#&gt; 6  RF / season season    4 fitted</span></span></code></pre></div>
+<span><span class="co">#&gt; 6  RF / season season    5 fitted</span></span></code></pre></div>
 <p>The run fitted 29 candidates: nine learners at three grains each and
 the two fixed learners at one. All of them were cross-validated on the
 same five outer folds and scored on the same cells, so their mean scores
@@ -317,30 +317,30 @@ are directly comparable.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; candidates, scored on the outer folds</span></span>
 <span><span class="co">#&gt; candidate                  mean    won  responses</span></span>
+<span><span class="co">#&gt; SRE / season              0.532      0  separate</span></span>
 <span><span class="co">#&gt; CTA / month               0.540      0  separate</span></span>
-<span><span class="co">#&gt; SRE / season              0.540      0  separate</span></span>
-<span><span class="co">#&gt; CTA / season              0.542      0  separate</span></span>
-<span><span class="co">#&gt; XGBOOST / season          0.560      0  separate</span></span>
 <span><span class="co">#&gt; XGBOOST / month           0.569      0  separate</span></span>
-<span><span class="co">#&gt; RF / season               0.577      0  separate</span></span>
-<span><span class="co">#&gt; RFd / season              0.578      0  separate</span></span>
-<span><span class="co">#&gt; GBM / season              0.583      0  separate</span></span>
+<span><span class="co">#&gt; XGBOOST / season          0.597      0  separate</span></span>
 <span><span class="co">#&gt; RF / month                0.600      0  separate</span></span>
+<span><span class="co">#&gt; CTA / season              0.602      0  separate</span></span>
 <span><span class="co">#&gt; GBM / month               0.613      0  separate</span></span>
 <span><span class="co">#&gt; RFd / month               0.613      0  separate</span></span>
-<span><span class="co">#&gt; GLM / season              0.615      0  separate</span></span>
-<span><span class="co">#&gt; FDA / season              0.617      0  separate</span></span>
-<span><span class="co">#&gt; MAXNET / season           0.626      0  separate</span></span>
-<span><span class="co">#&gt; MARS / season             0.634      0  separate</span></span>
+<span><span class="co">#&gt; RF / season               0.616      0  separate</span></span>
+<span><span class="co">#&gt; RFd / season              0.621      0  separate</span></span>
+<span><span class="co">#&gt; GBM / season              0.624      0  separate</span></span>
+<span><span class="co">#&gt; MARS / season             0.636      0  separate</span></span>
 <span><span class="co">#&gt; CTA / week                0.636      0  separate</span></span>
-<span><span class="co">#&gt; GAM / season              0.639      0  separate</span></span>
+<span><span class="co">#&gt; FDA / season              0.639      0  separate</span></span>
 <span><span class="co">#&gt; FDA / month               0.641      0  separate</span></span>
+<span><span class="co">#&gt; GAM / season              0.645      0  separate</span></span>
 <span><span class="co">#&gt; GLM / week                0.655      0  separate</span></span>
 <span><span class="co">#&gt; MARS / month              0.666      0  separate</span></span>
 <span><span class="co">#&gt; RFd / week                0.670      0  separate</span></span>
+<span><span class="co">#&gt; MAXNET / season           0.678      0  separate</span></span>
 <span><span class="co">#&gt; GLM / month               0.681      0  separate</span></span>
 <span><span class="co">#&gt; XGBOOST / week            0.683      0  separate</span></span>
 <span><span class="co">#&gt; RF / week                 0.683      0  separate</span></span>
+<span><span class="co">#&gt; GLM / season              0.687      0  separate</span></span>
 <span><span class="co">#&gt; MAXNET / month            0.696      0  separate</span></span>
 <span><span class="co">#&gt; FDA / week                0.700      1  separate</span></span>
 <span><span class="co">#&gt; GBM / week                0.701      0  separate</span></span>
@@ -349,11 +349,11 @@ are directly comparable.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; procedure, chosen and weighted inside each outer training fold</span></span>
 <span><span class="co">#&gt; selected                  0.780  se 0.012</span></span>
-<span><span class="co">#&gt; ensemble                  0.759  se 0.014</span></span>
+<span><span class="co">#&gt; ensemble                  0.755  se 0.014</span></span>
 <span><span class="co">#&gt; selected MAXNET / week in 5 of 5 folds</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; choice on every target  MAXNET / week</span></span>
-<span><span class="co">#&gt; weights on every target  MAXNET / week 0.38   MARS / week 0.23   GBM / week 0.15   FDA / week 0.09   MAXNET / month 0.06   RF / week 0.04   XGBOOST / week 0.02   GLM / month 0.01   RFd / week 0.01   MARS / month 0.01</span></span></code></pre></div>
+<span><span class="co">#&gt; weights on every target  MAXNET / week 0.38   MARS / week 0.23   GBM / week 0.15   FDA / week 0.09   MAXNET / month 0.06   GLM / season 0.04   RF / week 0.02   XGBOOST / week 0.01   GLM / month 0.01   MAXNET / season 0.01</span></span></code></pre></div>
 <p>The report gives the AUC of each candidate, the number of responses
 on which it scored highest, and the held-out scores of the selection
 procedure and of the weighted ensemble. The four highest mean AUCs
@@ -401,15 +401,19 @@ ranking of algorithms.</p>
   </clipPath>
 </defs>
 <g clip-path='url(#cpMC4wMHw0NjguMDB8MC4wMHwzMjQuMDA=)'>
-<line x1='68.88' y1='204.64' x2='68.88' y2='79.76' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='204.64' x2='60.48' y2='204.64' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='163.01' x2='60.48' y2='163.01' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='121.38' x2='60.48' y2='121.38' style='stroke-width: 0.75;' />
-<line x1='68.88' y1='79.76' x2='60.48' y2='79.76' style='stroke-width: 0.75;' />
-<text transform='translate(48.72,204.64) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.4</text>
-<text transform='translate(48.72,163.01) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.6</text>
-<text transform='translate(48.72,121.38) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.8</text>
-<text transform='translate(48.72,79.76) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>1.0</text>
+<line x1='68.88' y1='233.76' x2='68.88' y2='80.01' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='233.76' x2='60.48' y2='233.76' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='211.80' x2='60.48' y2='211.80' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='189.83' x2='60.48' y2='189.83' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='167.87' x2='60.48' y2='167.87' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='145.90' x2='60.48' y2='145.90' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='123.94' x2='60.48' y2='123.94' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='101.98' x2='60.48' y2='101.98' style='stroke-width: 0.75;' />
+<line x1='68.88' y1='80.01' x2='60.48' y2='80.01' style='stroke-width: 0.75;' />
+<text transform='translate(48.72,233.76) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.3</text>
+<text transform='translate(48.72,189.83) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.5</text>
+<text transform='translate(48.72,145.90) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.7</text>
+<text transform='translate(48.72,101.98) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0.9</text>
 <polygon points='68.88,238.32 432.72,238.32 432.72,68.88 68.88,68.88 ' style='stroke-width: 0.75;' />
 <text x='250.80' y='302.16' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>representation</text>
 <text transform='translate(15.12,153.60) rotate(-90)' text-anchor='middle' style='font-size: 1.4em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>roc_auc</text>
@@ -427,147 +431,151 @@ ranking of algorithms.</p>
   </clipPath>
 </defs>
 <g clip-path='url(#cpNjguODh8NDMyLjcyfDY4Ljg4fDIzOC4zMg==)'>
-<line x1='68.88' y1='204.64' x2='432.72' y2='204.64' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='163.01' x2='432.72' y2='163.01' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='121.38' x2='432.72' y2='121.38' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='79.76' x2='432.72' y2='79.76' style='stroke-width: 0.75; stroke: #E5E5E5;' />
-<line x1='68.88' y1='129.99' x2='432.72' y2='129.99' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
-<line x1='82.36' y1='189.93' x2='82.36' y2='121.04' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='80.20,189.93 82.36,189.93 84.52,189.93 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='84.52,121.04 82.36,121.04 80.20,121.04 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<line x1='250.80' y1='195.47' x2='250.80' y2='155.37' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='248.64,195.47 250.80,195.47 252.96,195.47 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='252.96,155.37 250.80,155.37 248.64,155.37 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<line x1='419.24' y1='189.03' x2='419.24' y2='160.98' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='417.08,189.03 419.24,189.03 421.40,189.03 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='421.40,160.98 419.24,160.98 417.08,160.98 ' style='stroke-width: 0.75; stroke: #E16A86;' />
-<polyline points='82.36,155.48 250.80,175.42 419.24,175.00 ' style='stroke-width: 1.50; stroke: #E16A86;' />
-<circle cx='82.36' cy='155.48' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
-<circle cx='250.80' cy='175.42' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
-<circle cx='419.24' cy='175.00' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
-<circle cx='82.36' cy='155.48' r='6.93' style='stroke-width: 1.50; stroke: #E16A86;' />
-<line x1='82.36' y1='170.07' x2='82.36' y2='121.20' style='stroke-width: 0.75; stroke: #D17B44;' />
-<polyline points='80.20,170.07 82.36,170.07 84.52,170.07 ' style='stroke-width: 0.75; stroke: #D17B44;' />
-<polyline points='84.52,121.20 82.36,121.20 80.20,121.20 ' style='stroke-width: 0.75; stroke: #D17B44;' />
-<line x1='250.80' y1='183.97' x2='250.80' y2='142.20' style='stroke-width: 0.75; stroke: #D17B44;' />
-<polyline points='248.64,183.97 250.80,183.97 252.96,183.97 ' style='stroke-width: 0.75; stroke: #D17B44;' />
-<polyline points='252.96,142.20 250.80,142.20 248.64,142.20 ' style='stroke-width: 0.75; stroke: #D17B44;' />
-<line x1='419.24' y1='201.86' x2='419.24' y2='133.61' style='stroke-width: 0.75; stroke: #D17B44;' />
-<polyline points='417.08,201.86 419.24,201.86 421.40,201.86 ' style='stroke-width: 0.75; stroke: #D17B44;' />
-<polyline points='421.40,133.61 419.24,133.61 417.08,133.61 ' style='stroke-width: 0.75; stroke: #D17B44;' />
-<polyline points='82.36,145.64 250.80,163.08 419.24,167.73 ' style='stroke-width: 1.50; stroke: #D17B44;' />
-<circle cx='82.36' cy='145.64' r='3.15' style='stroke-width: 0.75; stroke: #D17B44; fill: #D17B44;' />
-<circle cx='250.80' cy='163.08' r='3.15' style='stroke-width: 0.75; stroke: #D17B44; fill: #D17B44;' />
-<circle cx='419.24' cy='167.73' r='3.15' style='stroke-width: 0.75; stroke: #D17B44; fill: #D17B44;' />
-<circle cx='82.36' cy='145.64' r='6.93' style='stroke-width: 1.50; stroke: #D17B44;' />
-<line x1='82.36' y1='164.47' x2='82.36' y2='132.24' style='stroke-width: 0.75; stroke: #B28D00;' />
-<polyline points='80.20,164.47 82.36,164.47 84.52,164.47 ' style='stroke-width: 0.75; stroke: #B28D00;' />
-<polyline points='84.52,132.24 82.36,132.24 80.20,132.24 ' style='stroke-width: 0.75; stroke: #B28D00;' />
-<line x1='250.80' y1='177.06' x2='250.80' y2='143.63' style='stroke-width: 0.75; stroke: #B28D00;' />
-<polyline points='248.64,177.06 250.80,177.06 252.96,177.06 ' style='stroke-width: 0.75; stroke: #B28D00;' />
-<polyline points='252.96,143.63 250.80,143.63 248.64,143.63 ' style='stroke-width: 0.75; stroke: #B28D00;' />
-<line x1='419.24' y1='207.30' x2='419.24' y2='127.72' style='stroke-width: 0.75; stroke: #B28D00;' />
-<polyline points='417.08,207.30 419.24,207.30 421.40,207.30 ' style='stroke-width: 0.75; stroke: #B28D00;' />
-<polyline points='421.40,127.72 419.24,127.72 417.08,127.72 ' style='stroke-width: 0.75; stroke: #B28D00;' />
-<polyline points='82.36,148.35 250.80,160.34 419.24,167.51 ' style='stroke-width: 1.50; stroke: #B28D00;' />
-<circle cx='82.36' cy='148.35' r='3.15' style='stroke-width: 0.75; stroke: #B28D00; fill: #B28D00;' />
-<circle cx='250.80' cy='160.34' r='3.15' style='stroke-width: 0.75; stroke: #B28D00; fill: #B28D00;' />
-<circle cx='419.24' cy='167.51' r='3.15' style='stroke-width: 0.75; stroke: #B28D00; fill: #B28D00;' />
-<circle cx='82.36' cy='148.35' r='6.93' style='stroke-width: 1.50; stroke: #B28D00;' />
-<line x1='82.36' y1='166.09' x2='82.36' y2='117.88' style='stroke-width: 0.75; stroke: #829C00;' />
-<polyline points='80.20,166.09 82.36,166.09 84.52,166.09 ' style='stroke-width: 0.75; stroke: #829C00;' />
-<polyline points='84.52,117.88 82.36,117.88 80.20,117.88 ' style='stroke-width: 0.75; stroke: #829C00;' />
-<line x1='250.80' y1='181.30' x2='250.80' y2='139.51' style='stroke-width: 0.75; stroke: #829C00;' />
-<polyline points='248.64,181.30 250.80,181.30 252.96,181.30 ' style='stroke-width: 0.75; stroke: #829C00;' />
-<polyline points='252.96,139.51 250.80,139.51 248.64,139.51 ' style='stroke-width: 0.75; stroke: #829C00;' />
-<line x1='419.24' y1='187.80' x2='419.24' y2='145.27' style='stroke-width: 0.75; stroke: #829C00;' />
-<polyline points='417.08,187.80 419.24,187.80 421.40,187.80 ' style='stroke-width: 0.75; stroke: #829C00;' />
-<polyline points='421.40,145.27 419.24,145.27 417.08,145.27 ' style='stroke-width: 0.75; stroke: #829C00;' />
-<polyline points='82.36,141.98 250.80,160.41 419.24,166.54 ' style='stroke-width: 1.50; stroke: #829C00;' />
-<circle cx='82.36' cy='141.98' r='3.15' style='stroke-width: 0.75; stroke: #829C00; fill: #829C00;' />
-<circle cx='250.80' cy='160.41' r='3.15' style='stroke-width: 0.75; stroke: #829C00; fill: #829C00;' />
-<circle cx='419.24' cy='166.54' r='3.15' style='stroke-width: 0.75; stroke: #829C00; fill: #829C00;' />
-<circle cx='82.36' cy='141.98' r='6.93' style='stroke-width: 1.50; stroke: #829C00;' />
-<line x1='82.36' y1='179.85' x2='82.36' y2='111.65' style='stroke-width: 0.75; stroke: #20A73C;' />
-<polyline points='80.20,179.85 82.36,179.85 84.52,179.85 ' style='stroke-width: 0.75; stroke: #20A73C;' />
-<polyline points='84.52,111.65 82.36,111.65 80.20,111.65 ' style='stroke-width: 0.75; stroke: #20A73C;' />
-<line x1='250.80' y1='203.25' x2='250.80' y2='135.48' style='stroke-width: 0.75; stroke: #20A73C;' />
-<polyline points='248.64,203.25 250.80,203.25 252.96,203.25 ' style='stroke-width: 0.75; stroke: #20A73C;' />
-<polyline points='252.96,135.48 250.80,135.48 248.64,135.48 ' style='stroke-width: 0.75; stroke: #20A73C;' />
-<line x1='419.24' y1='227.09' x2='419.24' y2='115.38' style='stroke-width: 0.75; stroke: #20A73C;' />
-<polyline points='417.08,227.09 419.24,227.09 421.40,227.09 ' style='stroke-width: 0.75; stroke: #20A73C;' />
-<polyline points='421.40,115.38 419.24,115.38 417.08,115.38 ' style='stroke-width: 0.75; stroke: #20A73C;' />
-<polyline points='82.36,145.75 250.80,169.36 419.24,171.23 ' style='stroke-width: 1.50; stroke: #20A73C;' />
-<circle cx='82.36' cy='145.75' r='3.15' style='stroke-width: 0.75; stroke: #20A73C; fill: #20A73C;' />
-<circle cx='250.80' cy='169.36' r='3.15' style='stroke-width: 0.75; stroke: #20A73C; fill: #20A73C;' />
-<circle cx='419.24' cy='171.23' r='3.15' style='stroke-width: 0.75; stroke: #20A73C; fill: #20A73C;' />
-<circle cx='82.36' cy='145.75' r='6.93' style='stroke-width: 1.50; stroke: #20A73C;' />
-<line x1='82.36' y1='136.28' x2='82.36' y2='114.63' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='80.20,136.28 82.36,136.28 84.52,136.28 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='84.52,114.63 82.36,114.63 80.20,114.63 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<line x1='250.80' y1='173.89' x2='250.80' y2='112.13' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='248.64,173.89 250.80,173.89 252.96,173.89 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='252.96,112.13 250.80,112.13 248.64,112.13 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<line x1='419.24' y1='221.80' x2='419.24' y2='93.41' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='417.08,221.80 419.24,221.80 421.40,221.80 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='421.40,93.41 419.24,93.41 417.08,93.41 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
-<polyline points='82.36,125.46 250.80,143.01 419.24,157.61 ' style='stroke-width: 1.50; stroke: #00AD7F;' />
-<circle cx='82.36' cy='125.46' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
-<circle cx='250.80' cy='143.01' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
-<circle cx='419.24' cy='157.61' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
-<circle cx='82.36' cy='125.46' r='6.93' style='stroke-width: 1.50; stroke: #00AD7F;' />
-<line x1='82.36' y1='182.54' x2='82.36' y2='120.69' style='stroke-width: 0.75; stroke: #00ABB2;' />
-<polyline points='80.20,182.54 82.36,182.54 84.52,182.54 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
-<polyline points='84.52,120.69 82.36,120.69 80.20,120.69 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
-<line x1='250.80' y1='163.85' x2='250.80' y2='128.65' style='stroke-width: 0.75; stroke: #00ABB2;' />
-<polyline points='248.64,163.85 250.80,163.85 252.96,163.85 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
-<polyline points='252.96,128.65 250.80,128.65 248.64,128.65 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
-<line x1='419.24' y1='212.03' x2='419.24' y2='107.54' style='stroke-width: 0.75; stroke: #00ABB2;' />
-<polyline points='417.08,212.03 419.24,212.03 421.40,212.03 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
-<polyline points='421.40,107.54 419.24,107.54 417.08,107.54 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
-<polyline points='82.36,151.61 250.80,146.25 419.24,159.79 ' style='stroke-width: 1.50; stroke: #00ABB2;' />
-<circle cx='82.36' cy='151.61' r='3.15' style='stroke-width: 0.75; stroke: #00ABB2; fill: #00ABB2;' />
-<circle cx='250.80' cy='146.25' r='3.15' style='stroke-width: 0.75; stroke: #00ABB2; fill: #00ABB2;' />
-<circle cx='419.24' cy='159.79' r='3.15' style='stroke-width: 0.75; stroke: #00ABB2; fill: #00ABB2;' />
-<circle cx='250.80' cy='146.25' r='6.93' style='stroke-width: 1.50; stroke: #00ABB2;' />
-<line x1='419.24' y1='209.33' x2='419.24' y2='100.55' style='stroke-width: 0.75; stroke: #00A0D6;' />
-<polyline points='417.08,209.33 419.24,209.33 421.40,209.33 ' style='stroke-width: 0.75; stroke: #00A0D6;' />
-<polyline points='421.40,100.55 419.24,100.55 417.08,100.55 ' style='stroke-width: 0.75; stroke: #00A0D6;' />
-<circle cx='419.24' cy='154.94' r='3.15' style='stroke-width: 0.75; stroke: #00A0D6; fill: #00A0D6;' />
-<circle cx='419.24' cy='154.94' r='6.93' style='stroke-width: 1.50; stroke: #00A0D6;' />
-<line x1='82.36' y1='148.18' x2='82.36' y2='126.46' style='stroke-width: 0.75; stroke: #7B8AE6;' />
-<polyline points='80.20,148.18 82.36,148.18 84.52,148.18 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
-<polyline points='84.52,126.46 82.36,126.46 80.20,126.46 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
-<line x1='250.80' y1='200.61' x2='250.80' y2='97.91' style='stroke-width: 0.75; stroke: #7B8AE6;' />
-<polyline points='248.64,200.61 250.80,200.61 252.96,200.61 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
-<polyline points='252.96,97.91 250.80,97.91 248.64,97.91 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
-<line x1='419.24' y1='212.55' x2='419.24' y2='99.20' style='stroke-width: 0.75; stroke: #7B8AE6;' />
-<polyline points='417.08,212.55 419.24,212.55 421.40,212.55 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
-<polyline points='421.40,99.20 419.24,99.20 417.08,99.20 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
-<polyline points='82.36,137.32 250.80,149.26 419.24,155.88 ' style='stroke-width: 1.50; stroke: #7B8AE6;' />
-<circle cx='82.36' cy='137.32' r='3.15' style='stroke-width: 0.75; stroke: #7B8AE6; fill: #7B8AE6;' />
-<circle cx='250.80' cy='149.26' r='3.15' style='stroke-width: 0.75; stroke: #7B8AE6; fill: #7B8AE6;' />
-<circle cx='419.24' cy='155.88' r='3.15' style='stroke-width: 0.75; stroke: #7B8AE6; fill: #7B8AE6;' />
-<circle cx='82.36' cy='137.32' r='6.93' style='stroke-width: 1.50; stroke: #7B8AE6;' />
-<line x1='82.36' y1='209.28' x2='82.36' y2='75.16' style='stroke-width: 0.75; stroke: #C071DC;' />
-<polyline points='80.20,209.28 82.36,209.28 84.52,209.28 ' style='stroke-width: 0.75; stroke: #C071DC;' />
+<line x1='68.88' y1='233.76' x2='432.72' y2='233.76' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='211.80' x2='432.72' y2='211.80' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='189.83' x2='432.72' y2='189.83' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='167.87' x2='432.72' y2='167.87' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='145.90' x2='432.72' y2='145.90' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='123.94' x2='432.72' y2='123.94' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='101.98' x2='432.72' y2='101.98' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='80.01' x2='432.72' y2='80.01' style='stroke-width: 0.75; stroke: #E5E5E5;' />
+<line x1='68.88' y1='133.78' x2='432.72' y2='133.78' style='stroke-width: 1.50; stroke: #666666; stroke-dasharray: 8.00,8.00;' />
+<line x1='82.36' y1='196.27' x2='82.36' y2='123.58' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='80.20,196.27 82.36,196.27 84.52,196.27 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='84.52,123.58 82.36,123.58 80.20,123.58 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<line x1='250.80' y1='202.12' x2='250.80' y2='159.80' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='248.64,202.12 250.80,202.12 252.96,202.12 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='252.96,159.80 250.80,159.80 248.64,159.80 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<line x1='419.24' y1='179.27' x2='419.24' y2='155.79' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='417.08,179.27 419.24,179.27 421.40,179.27 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='421.40,155.79 419.24,155.79 417.08,155.79 ' style='stroke-width: 0.75; stroke: #E16A86;' />
+<polyline points='82.36,159.93 250.80,180.96 419.24,167.53 ' style='stroke-width: 1.50; stroke: #E16A86;' />
+<circle cx='82.36' cy='159.93' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
+<circle cx='250.80' cy='180.96' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
+<circle cx='419.24' cy='167.53' r='3.15' style='stroke-width: 0.75; stroke: #E16A86; fill: #E16A86;' />
+<circle cx='82.36' cy='159.93' r='6.93' style='stroke-width: 1.50; stroke: #E16A86;' />
+<line x1='82.36' y1='175.32' x2='82.36' y2='123.75' style='stroke-width: 0.75; stroke: #D17B44;' />
+<polyline points='80.20,175.32 82.36,175.32 84.52,175.32 ' style='stroke-width: 0.75; stroke: #D17B44;' />
+<polyline points='84.52,123.75 82.36,123.75 80.20,123.75 ' style='stroke-width: 0.75; stroke: #D17B44;' />
+<line x1='250.80' y1='189.99' x2='250.80' y2='145.91' style='stroke-width: 0.75; stroke: #D17B44;' />
+<polyline points='248.64,189.99 250.80,189.99 252.96,189.99 ' style='stroke-width: 0.75; stroke: #D17B44;' />
+<polyline points='252.96,145.91 250.80,145.91 248.64,145.91 ' style='stroke-width: 0.75; stroke: #D17B44;' />
+<line x1='419.24' y1='206.24' x2='419.24' y2='122.39' style='stroke-width: 0.75; stroke: #D17B44;' />
+<polyline points='417.08,206.24 419.24,206.24 421.40,206.24 ' style='stroke-width: 0.75; stroke: #D17B44;' />
+<polyline points='421.40,122.39 419.24,122.39 417.08,122.39 ' style='stroke-width: 0.75; stroke: #D17B44;' />
+<polyline points='82.36,149.53 250.80,167.95 419.24,164.31 ' style='stroke-width: 1.50; stroke: #D17B44;' />
+<circle cx='82.36' cy='149.53' r='3.15' style='stroke-width: 0.75; stroke: #D17B44; fill: #D17B44;' />
+<circle cx='250.80' cy='167.95' r='3.15' style='stroke-width: 0.75; stroke: #D17B44; fill: #D17B44;' />
+<circle cx='419.24' cy='164.31' r='3.15' style='stroke-width: 0.75; stroke: #D17B44; fill: #D17B44;' />
+<circle cx='82.36' cy='149.53' r='6.93' style='stroke-width: 1.50; stroke: #D17B44;' />
+<line x1='82.36' y1='169.41' x2='82.36' y2='135.39' style='stroke-width: 0.75; stroke: #B28D00;' />
+<polyline points='80.20,169.41 82.36,169.41 84.52,169.41 ' style='stroke-width: 0.75; stroke: #B28D00;' />
+<polyline points='84.52,135.39 82.36,135.39 80.20,135.39 ' style='stroke-width: 0.75; stroke: #B28D00;' />
+<line x1='250.80' y1='182.69' x2='250.80' y2='147.42' style='stroke-width: 0.75; stroke: #B28D00;' />
+<polyline points='248.64,182.69 250.80,182.69 252.96,182.69 ' style='stroke-width: 0.75; stroke: #B28D00;' />
+<polyline points='252.96,147.42 250.80,147.42 248.64,147.42 ' style='stroke-width: 0.75; stroke: #B28D00;' />
+<line x1='419.24' y1='207.36' x2='419.24' y2='119.01' style='stroke-width: 0.75; stroke: #B28D00;' />
+<polyline points='417.08,207.36 419.24,207.36 421.40,207.36 ' style='stroke-width: 0.75; stroke: #B28D00;' />
+<polyline points='421.40,119.01 419.24,119.01 417.08,119.01 ' style='stroke-width: 0.75; stroke: #B28D00;' />
+<polyline points='82.36,152.40 250.80,165.06 419.24,163.19 ' style='stroke-width: 1.50; stroke: #B28D00;' />
+<circle cx='82.36' cy='152.40' r='3.15' style='stroke-width: 0.75; stroke: #B28D00; fill: #B28D00;' />
+<circle cx='250.80' cy='165.06' r='3.15' style='stroke-width: 0.75; stroke: #B28D00; fill: #B28D00;' />
+<circle cx='419.24' cy='163.19' r='3.15' style='stroke-width: 0.75; stroke: #B28D00; fill: #B28D00;' />
+<circle cx='82.36' cy='152.40' r='6.93' style='stroke-width: 1.50; stroke: #B28D00;' />
+<line x1='82.36' y1='171.12' x2='82.36' y2='120.24' style='stroke-width: 0.75; stroke: #829C00;' />
+<polyline points='80.20,171.12 82.36,171.12 84.52,171.12 ' style='stroke-width: 0.75; stroke: #829C00;' />
+<polyline points='84.52,120.24 82.36,120.24 80.20,120.24 ' style='stroke-width: 0.75; stroke: #829C00;' />
+<line x1='250.80' y1='187.17' x2='250.80' y2='143.07' style='stroke-width: 0.75; stroke: #829C00;' />
+<polyline points='248.64,187.17 250.80,187.17 252.96,187.17 ' style='stroke-width: 0.75; stroke: #829C00;' />
+<polyline points='252.96,143.07 250.80,143.07 248.64,143.07 ' style='stroke-width: 0.75; stroke: #829C00;' />
+<line x1='419.24' y1='196.93' x2='419.24' y2='128.48' style='stroke-width: 0.75; stroke: #829C00;' />
+<polyline points='417.08,196.93 419.24,196.93 421.40,196.93 ' style='stroke-width: 0.75; stroke: #829C00;' />
+<polyline points='421.40,128.48 419.24,128.48 417.08,128.48 ' style='stroke-width: 0.75; stroke: #829C00;' />
+<polyline points='82.36,145.68 250.80,165.12 419.24,162.70 ' style='stroke-width: 1.50; stroke: #829C00;' />
+<circle cx='82.36' cy='145.68' r='3.15' style='stroke-width: 0.75; stroke: #829C00; fill: #829C00;' />
+<circle cx='250.80' cy='165.12' r='3.15' style='stroke-width: 0.75; stroke: #829C00; fill: #829C00;' />
+<circle cx='419.24' cy='162.70' r='3.15' style='stroke-width: 0.75; stroke: #829C00; fill: #829C00;' />
+<circle cx='82.36' cy='145.68' r='6.93' style='stroke-width: 1.50; stroke: #829C00;' />
+<line x1='82.36' y1='185.64' x2='82.36' y2='113.67' style='stroke-width: 0.75; stroke: #20A73C;' />
+<polyline points='80.20,185.64 82.36,185.64 84.52,185.64 ' style='stroke-width: 0.75; stroke: #20A73C;' />
+<polyline points='84.52,113.67 82.36,113.67 80.20,113.67 ' style='stroke-width: 0.75; stroke: #20A73C;' />
+<line x1='250.80' y1='210.33' x2='250.80' y2='138.81' style='stroke-width: 0.75; stroke: #20A73C;' />
+<polyline points='248.64,210.33 250.80,210.33 252.96,210.33 ' style='stroke-width: 0.75; stroke: #20A73C;' />
+<polyline points='252.96,138.81 250.80,138.81 248.64,138.81 ' style='stroke-width: 0.75; stroke: #20A73C;' />
+<line x1='419.24' y1='218.24' x2='419.24' y2='118.81' style='stroke-width: 0.75; stroke: #20A73C;' />
+<polyline points='417.08,218.24 419.24,218.24 421.40,218.24 ' style='stroke-width: 0.75; stroke: #20A73C;' />
+<polyline points='421.40,118.81 419.24,118.81 417.08,118.81 ' style='stroke-width: 0.75; stroke: #20A73C;' />
+<polyline points='82.36,149.65 250.80,174.57 419.24,168.53 ' style='stroke-width: 1.50; stroke: #20A73C;' />
+<circle cx='82.36' cy='149.65' r='3.15' style='stroke-width: 0.75; stroke: #20A73C; fill: #20A73C;' />
+<circle cx='250.80' cy='174.57' r='3.15' style='stroke-width: 0.75; stroke: #20A73C; fill: #20A73C;' />
+<circle cx='419.24' cy='168.53' r='3.15' style='stroke-width: 0.75; stroke: #20A73C; fill: #20A73C;' />
+<circle cx='82.36' cy='149.65' r='6.93' style='stroke-width: 1.50; stroke: #20A73C;' />
+<line x1='82.36' y1='139.66' x2='82.36' y2='116.82' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='80.20,139.66 82.36,139.66 84.52,139.66 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='84.52,116.82 82.36,116.82 80.20,116.82 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<line x1='250.80' y1='179.35' x2='250.80' y2='114.17' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='248.64,179.35 250.80,179.35 252.96,179.35 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='252.96,114.17 250.80,114.17 248.64,114.17 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<line x1='419.24' y1='208.03' x2='419.24' y2='93.50' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='417.08,208.03 419.24,208.03 421.40,208.03 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='421.40,93.50 419.24,93.50 417.08,93.50 ' style='stroke-width: 0.75; stroke: #00AD7F;' />
+<polyline points='82.36,128.24 250.80,146.76 419.24,150.77 ' style='stroke-width: 1.50; stroke: #00AD7F;' />
+<circle cx='82.36' cy='128.24' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
+<circle cx='250.80' cy='146.76' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
+<circle cx='419.24' cy='150.77' r='3.15' style='stroke-width: 0.75; stroke: #00AD7F; fill: #00AD7F;' />
+<circle cx='82.36' cy='128.24' r='6.93' style='stroke-width: 1.50; stroke: #00AD7F;' />
+<line x1='82.36' y1='188.47' x2='82.36' y2='123.21' style='stroke-width: 0.75; stroke: #00ABB2;' />
+<polyline points='80.20,188.47 82.36,188.47 84.52,188.47 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
+<polyline points='84.52,123.21 82.36,123.21 80.20,123.21 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
+<line x1='250.80' y1='168.76' x2='250.80' y2='131.60' style='stroke-width: 0.75; stroke: #00ABB2;' />
+<polyline points='248.64,168.76 250.80,168.76 252.96,168.76 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
+<polyline points='252.96,131.60 250.80,131.60 248.64,131.60 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
+<line x1='419.24' y1='204.49' x2='419.24' y2='92.88' style='stroke-width: 0.75; stroke: #00ABB2;' />
+<polyline points='417.08,204.49 419.24,204.49 421.40,204.49 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
+<polyline points='421.40,92.88 419.24,92.88 417.08,92.88 ' style='stroke-width: 0.75; stroke: #00ABB2;' />
+<polyline points='82.36,155.84 250.80,150.18 419.24,148.68 ' style='stroke-width: 1.50; stroke: #00ABB2;' />
+<circle cx='82.36' cy='155.84' r='3.15' style='stroke-width: 0.75; stroke: #00ABB2; fill: #00ABB2;' />
+<circle cx='250.80' cy='150.18' r='3.15' style='stroke-width: 0.75; stroke: #00ABB2; fill: #00ABB2;' />
+<circle cx='419.24' cy='148.68' r='3.15' style='stroke-width: 0.75; stroke: #00ABB2; fill: #00ABB2;' />
+<circle cx='419.24' cy='148.68' r='6.93' style='stroke-width: 1.50; stroke: #00ABB2;' />
+<line x1='419.24' y1='209.42' x2='419.24' y2='106.42' style='stroke-width: 0.75; stroke: #00A0D6;' />
+<polyline points='417.08,209.42 419.24,209.42 421.40,209.42 ' style='stroke-width: 0.75; stroke: #00A0D6;' />
+<polyline points='421.40,106.42 419.24,106.42 417.08,106.42 ' style='stroke-width: 0.75; stroke: #00A0D6;' />
+<circle cx='419.24' cy='157.92' r='3.15' style='stroke-width: 0.75; stroke: #00A0D6; fill: #00A0D6;' />
+<circle cx='419.24' cy='157.92' r='6.93' style='stroke-width: 1.50; stroke: #00A0D6;' />
+<line x1='82.36' y1='152.21' x2='82.36' y2='129.30' style='stroke-width: 0.75; stroke: #7B8AE6;' />
+<polyline points='80.20,152.21 82.36,152.21 84.52,152.21 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
+<polyline points='84.52,129.30 82.36,129.30 80.20,129.30 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
+<line x1='250.80' y1='207.55' x2='250.80' y2='99.17' style='stroke-width: 0.75; stroke: #7B8AE6;' />
+<polyline points='248.64,207.55 250.80,207.55 252.96,207.55 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
+<polyline points='252.96,99.17 250.80,99.17 248.64,99.17 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
+<line x1='419.24' y1='223.89' x2='419.24' y2='96.13' style='stroke-width: 0.75; stroke: #7B8AE6;' />
+<polyline points='417.08,223.89 419.24,223.89 421.40,223.89 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
+<polyline points='421.40,96.13 419.24,96.13 417.08,96.13 ' style='stroke-width: 0.75; stroke: #7B8AE6;' />
+<polyline points='82.36,140.75 250.80,153.36 419.24,160.01 ' style='stroke-width: 1.50; stroke: #7B8AE6;' />
+<circle cx='82.36' cy='140.75' r='3.15' style='stroke-width: 0.75; stroke: #7B8AE6; fill: #7B8AE6;' />
+<circle cx='250.80' cy='153.36' r='3.15' style='stroke-width: 0.75; stroke: #7B8AE6; fill: #7B8AE6;' />
+<circle cx='419.24' cy='160.01' r='3.15' style='stroke-width: 0.75; stroke: #7B8AE6; fill: #7B8AE6;' />
+<circle cx='82.36' cy='140.75' r='6.93' style='stroke-width: 1.50; stroke: #7B8AE6;' />
+<line x1='82.36' y1='216.69' x2='82.36' y2='75.16' style='stroke-width: 0.75; stroke: #C071DC;' />
+<polyline points='80.20,216.69 82.36,216.69 84.52,216.69 ' style='stroke-width: 0.75; stroke: #C071DC;' />
 <polyline points='84.52,75.16 82.36,75.16 80.20,75.16 ' style='stroke-width: 0.75; stroke: #C071DC;' />
-<line x1='250.80' y1='192.38' x2='250.80' y2='116.47' style='stroke-width: 0.75; stroke: #C071DC;' />
-<polyline points='248.64,192.38 250.80,192.38 252.96,192.38 ' style='stroke-width: 0.75; stroke: #C071DC;' />
-<polyline points='252.96,116.47 250.80,116.47 248.64,116.47 ' style='stroke-width: 0.75; stroke: #C071DC;' />
-<line x1='419.24' y1='232.04' x2='419.24' y2='86.90' style='stroke-width: 0.75; stroke: #C071DC;' />
+<line x1='250.80' y1='198.86' x2='250.80' y2='118.76' style='stroke-width: 0.75; stroke: #C071DC;' />
+<polyline points='248.64,198.86 250.80,198.86 252.96,198.86 ' style='stroke-width: 0.75; stroke: #C071DC;' />
+<polyline points='252.96,118.76 250.80,118.76 248.64,118.76 ' style='stroke-width: 0.75; stroke: #C071DC;' />
+<line x1='419.24' y1='232.04' x2='419.24' y2='86.48' style='stroke-width: 0.75; stroke: #C071DC;' />
 <polyline points='417.08,232.04 419.24,232.04 421.40,232.04 ' style='stroke-width: 0.75; stroke: #C071DC;' />
-<polyline points='421.40,86.90 419.24,86.90 417.08,86.90 ' style='stroke-width: 0.75; stroke: #C071DC;' />
-<polyline points='82.36,142.22 250.80,154.43 419.24,159.47 ' style='stroke-width: 1.50; stroke: #C071DC;' />
-<circle cx='82.36' cy='142.22' r='3.15' style='stroke-width: 0.75; stroke: #C071DC; fill: #C071DC;' />
-<circle cx='250.80' cy='154.43' r='3.15' style='stroke-width: 0.75; stroke: #C071DC; fill: #C071DC;' />
-<circle cx='419.24' cy='159.47' r='3.15' style='stroke-width: 0.75; stroke: #C071DC; fill: #C071DC;' />
-<circle cx='82.36' cy='142.22' r='6.93' style='stroke-width: 1.50; stroke: #C071DC;' />
-<line x1='419.24' y1='184.06' x2='419.24' y2='166.76' style='stroke-width: 0.75; stroke: #DE63B9;' />
-<polyline points='417.08,184.06 419.24,184.06 421.40,184.06 ' style='stroke-width: 0.75; stroke: #DE63B9;' />
-<polyline points='421.40,166.76 419.24,166.76 417.08,166.76 ' style='stroke-width: 0.75; stroke: #DE63B9;' />
-<circle cx='419.24' cy='175.41' r='3.15' style='stroke-width: 0.75; stroke: #DE63B9; fill: #DE63B9;' />
-<circle cx='419.24' cy='175.41' r='6.93' style='stroke-width: 1.50; stroke: #DE63B9;' />
+<polyline points='421.40,86.48 419.24,86.48 417.08,86.48 ' style='stroke-width: 0.75; stroke: #C071DC;' />
+<polyline points='82.36,145.92 250.80,158.81 419.24,159.26 ' style='stroke-width: 1.50; stroke: #C071DC;' />
+<circle cx='82.36' cy='145.92' r='3.15' style='stroke-width: 0.75; stroke: #C071DC; fill: #C071DC;' />
+<circle cx='250.80' cy='158.81' r='3.15' style='stroke-width: 0.75; stroke: #C071DC; fill: #C071DC;' />
+<circle cx='419.24' cy='159.26' r='3.15' style='stroke-width: 0.75; stroke: #C071DC; fill: #C071DC;' />
+<circle cx='82.36' cy='145.92' r='6.93' style='stroke-width: 1.50; stroke: #C071DC;' />
+<line x1='419.24' y1='187.22' x2='419.24' y2='178.43' style='stroke-width: 0.75; stroke: #DE63B9;' />
+<polyline points='417.08,187.22 419.24,187.22 421.40,187.22 ' style='stroke-width: 0.75; stroke: #DE63B9;' />
+<polyline points='421.40,178.43 419.24,178.43 417.08,178.43 ' style='stroke-width: 0.75; stroke: #DE63B9;' />
+<circle cx='419.24' cy='182.82' r='3.15' style='stroke-width: 0.75; stroke: #DE63B9; fill: #DE63B9;' />
+<circle cx='419.24' cy='182.82' r='6.93' style='stroke-width: 1.50; stroke: #DE63B9;' />
 <line x1='81.48' y1='36.72' x2='106.68' y2='36.72' style='stroke-width: 1.50; stroke: #E16A86;' />
 <line x1='81.48' y1='53.52' x2='106.68' y2='53.52' style='stroke-width: 1.50; stroke: #D17B44;' />
 <line x1='81.48' y1='70.32' x2='106.68' y2='70.32' style='stroke-width: 1.50; stroke: #B28D00;' />
@@ -618,7 +626,7 @@ evaluated.</p>
 <span>                               metric.eval <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"TSS"</span>, <span class="st">"ROC"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot_id</span>, time <span class="op">=</span> <span class="va">datetime</span>,</span>
-<span>                models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>CTA <span class="op">=</span> <span class="fu"><a href="../reference/tree.html">tree</a></span><span class="op">(</span><span class="op">)</span>, RF <span class="op">=</span> <span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>, GBM <span class="op">=</span> <span class="fu"><a href="../reference/boosting.html">boosting</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>                learners <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>CTA <span class="op">=</span> <span class="fu"><a href="../reference/tree.html">tree</a></span><span class="op">(</span><span class="op">)</span>, RF <span class="op">=</span> <span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>, GBM <span class="op">=</span> <span class="fu"><a href="../reference/boosting.html">boosting</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                              XGBOOST <span class="op">=</span> <span class="fu"><a href="../reference/boosting.html">boosting</a></span><span class="op">(</span>method <span class="op">=</span> <span class="st">"xgboost"</span><span class="op">)</span>, MAXNET <span class="op">=</span> <span class="fu"><a href="../reference/maxent.html">maxent</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                              GLM <span class="op">=</span> <span class="fu"><a href="../reference/linear.html">linear</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                              MARS <span class="op">=</span> <span class="fu"><a href="../reference/mars.html">mars</a></span><span class="op">(</span><span class="op">)</span>, FDA <span class="op">=</span> <span class="fu"><a href="../reference/discriminant.html">discriminant</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -629,8 +637,8 @@ evaluated.</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a></span>
 <span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp_*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot_id"</span>, time<span class="op">=</span><span class="st">"datetime"</span>,</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>                  models<span class="op">=</span>[ts.tree(), ts.forest(), ts.boosting(method<span class="op">=</span><span class="st">"xgboost"</span>), ts.maxent(),</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>                          ts.mars(), ts.discriminant()],</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>                  learners<span class="op">=</span>[ts.tree(), ts.forest(), ts.boosting(method<span class="op">=</span><span class="st">"xgboost"</span>), ts.maxent(),</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>                            ts.mars(), ts.discriminant()],</span>
 <span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>                  sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>, <span class="st">"season"</span>),</span>
 <span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>                  ensemble<span class="op">=</span>ts.ensemble(<span class="st">"weighted"</span>, min_score<span class="op">=</span><span class="fl">0.5</span>),</span>
 <span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>                  resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">5</span>))</span></code></pre></div>
@@ -707,7 +715,7 @@ biomod2. The six largest weights in this run:</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">weights</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt;  MAXNET / week    MARS / week     GBM / week     FDA / week MAXNET / month </span></span>
 <span><span class="co">#&gt;          0.375          0.234          0.146          0.092          0.057 </span></span>
-<span><span class="co">#&gt;      RF / week </span></span>
+<span><span class="co">#&gt;   GLM / season </span></span>
 <span><span class="co">#&gt;          0.036</span></span></code></pre></div>
 <p>Committee averaging converts each member’s predictions to presence or
 absence at a threshold learned from that member’s out-of-fold
@@ -716,7 +724,7 @@ predictions, then averages these votes. A smaller run at one grain:</p>
 <code class="sourceCode R"><span><span class="va">fit_ca</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span></span>
 <span>  <span class="va">targets</span>, <span class="va">sim</span><span class="op">$</span><span class="va">readings</span>,</span>
 <span>  y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"v"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">unit</span>, time <span class="op">=</span> <span class="va">time</span>,</span>
-<span>  models <span class="op">=</span> <span class="va">models</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"RF"</span>, <span class="st">"GBM"</span>, <span class="st">"MAXNET"</span>, <span class="st">"MARS"</span>, <span class="st">"FDA"</span><span class="op">)</span><span class="op">]</span>,</span>
+<span>  learners <span class="op">=</span> <span class="va">models</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"RF"</span>, <span class="st">"GBM"</span>, <span class="st">"MAXNET"</span>, <span class="st">"MARS"</span>, <span class="st">"FDA"</span><span class="op">)</span><span class="op">]</span>,</span>
 <span>  sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"week"</span><span class="op">)</span>,</span>
 <span>  ensemble <span class="op">=</span> <span class="fu"><a href="../reference/ensemble.html">ensemble</a></span><span class="op">(</span><span class="st">"committee"</span>, rule <span class="op">=</span> <span class="st">"kappa"</span><span class="op">)</span>,</span>
 <span>  resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span>
@@ -738,9 +746,9 @@ the coefficient of variation and an interval:</p>
 <span><span class="co">#&gt; [1] "mean"  "sd"    "cv"    "lower" "upper"</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">sp</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, <span class="fl">1</span>, <span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt;             mean    sd    cv lower upper</span></span>
-<span><span class="co">#&gt; d001u00001 0.245 0.140 0.571 0.107 0.382</span></span>
-<span><span class="co">#&gt; d001u00002 0.215 0.219 1.015 0.000 0.431</span></span>
-<span><span class="co">#&gt; d001u00003 0.211 0.090 0.429 0.122 0.299</span></span></code></pre></div>
+<span><span class="co">#&gt; d001u00001 0.250 0.135 0.541 0.117 0.382</span></span>
+<span><span class="co">#&gt; d001u00002 0.220 0.216 0.984 0.007 0.432</span></span>
+<span><span class="co">#&gt; d001u00003 0.215 0.085 0.395 0.132 0.299</span></span></code></pre></div>
 <p>With one target per map cell, the coefficient of variation gives an
 uncertainty map like the one <code>EMcv</code> produces.</p>
 </div>
@@ -879,7 +887,7 @@ only, so the settings are never chosen on the units that score the tuned
 candidate. The chosen settings are listed in the candidate table.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>, x <span class="op">=</span> <span class="va">temp</span>,</span>
-<span>         models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>RF <span class="op">=</span> <span class="fu"><a href="../reference/tune.html">tune</a></span><span class="op">(</span><span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mtry <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span>, min_node <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span>         learners <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>RF <span class="op">=</span> <span class="fu"><a href="../reference/tune.html">tune</a></span><span class="op">(</span><span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mtry <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span>, min_node <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="variable-importance">Variable importance<a class="anchor" aria-label="anchor" href="#variable-importance"></a>

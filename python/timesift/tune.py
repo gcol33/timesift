@@ -24,7 +24,7 @@ class Tuned:
     table: list
 
 
-def tune(learner, grid: dict | None = None, metric=None, inner: int = 5, seed: int = 1) -> Learner:
+def tune(learner, grid: dict | None = None, metric=None, n_inner: int = 5, seed: int = 1) -> Learner:
     """A learner that searches ``grid`` on the units it is fitted on and fits the best setting.
 
     The search is a cross-validation inside those units, so in a run the outer folds never see it:
@@ -48,8 +48,8 @@ def tune(learner, grid: dict | None = None, metric=None, inner: int = 5, seed: i
     the ``settings`` column of a run's candidate table.
     """
     base = get_learner(learner)
-    if not isinstance(inner, (int, np.integer)) or isinstance(inner, bool) or inner < 2:
-        raise ValueError(f"`inner` is a number of folds of 2 or more, got {inner!r}")
+    if not isinstance(n_inner, (int, np.integer)) or isinstance(n_inner, bool) or n_inner < 2:
+        raise ValueError(f"`n_inner` is a number of folds of 2 or more, got {n_inner!r}")
     if grid is None and not TUNINGS.has(base.name):
         raise ValueError(f"no grid is registered for the {base.name} learner. Give `grid`, or "
                          f"register one with register_tuning(). Registered: "
@@ -62,7 +62,7 @@ def tune(learner, grid: dict | None = None, metric=None, inner: int = 5, seed: i
     def fit(x, y, head=None, control=None, group=None, variables=None, **given):
         points = _points(base, grid if grid is not None else _registered_grid(base, x))
         search = _search(base, points, x, y, head, control, group, variables, given, metric,
-                         int(inner), seed)
+                         int(n_inner), seed)
         best = points[search["best"]]
         kept = {k: v for k, v in given.items() if k not in best}
         model = _call_fit(base, x, y, head, control, variables, group, {**kept, **best})

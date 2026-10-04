@@ -172,11 +172,12 @@ locations rather than their square.</p>
 the hyperparameters are integrated over on a grid of <code>nodes</code> points per hyperparameter, centred
 on the mode of their posterior and weighted by it (Rue, Martino and Chopin 2009). With an
 intercept alone its standard deviation is set at the mode of its posterior; with neither the
-fit is the posterior mode of the coefficients. A prediction at new units interpolates the field
-to their coordinates, so <code><a href="predict.timesift.html">predict.timesift()</a></code> is given targets that carry the same coordinate
-columns. The head's case weights enter the likelihood in every configuration. A response holding
-one value is predicted its mean and named in <code>unfitted</code>. The learner fits a presence-absence
-head.</p>
+fit is the posterior mode of the coefficients, so at <code>spatial = "none"</code> and <code>random = FALSE</code>
+the learner is a penalised logistic model, every coefficient shrunk towards zero by its prior. A
+prediction at new units interpolates the field to their coordinates, so <code><a href="predict.timesift.html">predict.timesift()</a></code> is
+given targets that carry the same coordinate columns. The head's case weights enter the
+likelihood in every configuration. A response holding one value is predicted its mean and named
+in <code>unfitted</code>. The learner fits a presence-absence head.</p>
 <p>With <code>random = TRUE</code> each unit, as named by <code>id</code> in <code><a href="timesift.html">timesift()</a></code>, gets an intercept, which
 absorbs what its several targets share beyond the record: it is identified where a unit carries
 more than one target, as an anchored fit's units do. A prediction adds a unit's intercept where

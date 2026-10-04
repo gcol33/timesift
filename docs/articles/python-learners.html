@@ -119,11 +119,11 @@ of your own goes through.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>elasticnet(</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>    alpha<span class="op">=</span><span class="fl">0.5</span>,</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="dv">10</span>,</span>
 <span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>    squares<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>    s<span class="op">=</span><span class="st">'lambda.min'</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>    s<span class="op">=</span><span class="st">'lambda.1se'</span>,</span>
 <span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>    n_lambda<span class="op">=</span><span class="dv">100</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>    thresh<span class="op">=</span><span class="fl">1e-08</span>,</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>    tol<span class="op">=</span><span class="fl">1e-08</span>,</span>
 <span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>)</span></code></pre></div>
@@ -146,7 +146,10 @@ that leaves every coefficient at zero, and the held-out deviance read
 fold by fold. <code>s</code> is where the fit is read:
 <code>"lambda.min"</code>, <code>"lambda.1se"</code>, or a penalty of
 its own, which is interpolated between the two points of the path around
-it.</p>
+it. The defaults are cv.glmnet’s: ten inner folds, read at
+<code>"lambda.1se"</code>, the largest penalty within one standard error
+of the least held-out deviance. <code>tol</code> is where the coordinate
+descent stops, read off the largest coefficient move of a pass.</p>
 <p>The inner folds are dealt for each response and stratified on it, so
 a rare outcome is spread over them as evenly as its count allows. A
 presence-absence response whose inner training sets cannot each hold two
@@ -181,7 +184,10 @@ so are the case weights.</p>
 <p>The defaults are biomod2’s <code>GLM</code>: every column enters as
 <code>x + I(x^2)</code>, and the terms are searched in both directions
 by AIC as <code><a href="https://rdrr.io/pkg/MASS/man/stepAIC.html" class="external-link">MASS::stepAIC()</a></code> searches them, with no bound on
-how many are kept.</p>
+how many are kept. Under the shipped presence-absence head those weights
+are on, so a default <code><a href="../reference/linear.html">linear()</a></code> is biomod2’s <code>GLM</code>
+specification fitted under them; a head registered without
+<code>weights</code> fits it unweighted.</p>
 <p><code>terms</code> says what one term is. Under <code>"power"</code>
 each power of a column is a term of its own, which is how biomod2 writes
 a quadratic formula and how <code>stepAIC()</code> walks it. Under
@@ -219,7 +225,7 @@ back.</p>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    mtry<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    min_node<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    balance<span class="op">=</span><span class="va">False</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'package'</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'default'</span>,</span>
 <span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>)</span></code></pre></div>
@@ -244,7 +250,7 @@ any number of threads.</p>
 <code>RFd</code>: each tree draws as many units from each class as the
 smaller class holds.</p>
 <p><code>preset</code> says whose defaults the settings left
-<code>None</code> take. <code>"package"</code> is randomForest’s own,
+<code>None</code> take. <code>"default"</code> is randomForest’s own,
 which is what biomod2’s default option set fits: 500 trees,
 <code>mtry</code> the square root of the column count under
 presence-absence and a third of it under a squared-error loss, and
@@ -255,7 +261,10 @@ biomod2’s tuned option set: 500 trees, <code>mtry=2</code> and
 <p>The case weights are the response head’s,
 <code>timesift.response.positive_weights</code> under presence-absence,
 and weight the bootstrap draw: a unit is drawn in proportion to its
-weight, and within its class under <code>balance</code>.</p>
+weight, and within its class under <code>balance</code>. Under the
+shipped presence-absence head those weights are on, so a default
+<code><a href="../reference/forest.html">forest()</a></code> is randomForest’s specification fitted under them;
+a head registered without <code>weights</code> fits it unweighted.</p>
 </div>
 <div class="section level2">
 <h2 id="tree">
@@ -269,7 +278,7 @@ weight, and within its class under <code>balance</code>.</p>
 <span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    max_depth<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    prune<span class="op">=</span><span class="st">'se_sum'</span>,</span>
 <span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'package'</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'default'</span>,</span>
 <span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>    shrink<span class="op">=</span><span class="fl">1.0</span>,</span>
 <span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>)</span></code></pre></div>
@@ -294,7 +303,7 @@ within one standard error of the least cross-validated error;
 <code>"min"</code> the first row reaching the least error; and
 <code>"none"</code> keeps the tree as grown.</p>
 <p><code>preset</code> says whose defaults the settings left
-<code>None</code> take. <code>"package"</code> is rpart’s own, which is
+<code>None</code> take. <code>"default"</code> is rpart’s own, which is
 what biomod2’s default option set fits: <code>min_split=20</code>,
 <code>min_leaf=round(min_split / 3)</code> (or
 <code>min_split=3 * min_leaf</code> where only <code>min_leaf</code> is
@@ -307,7 +316,10 @@ setting given explicitly beats either.</p>
 <code>timesift.response.positive_weights</code> under presence-absence.
 They weigh every class count, sum of squares and event count the tree is
 grown on; <code>min_split</code> and <code>min_leaf</code> count
-observations, as rpart’s do.</p>
+observations, as rpart’s do. Under the shipped presence-absence head
+those weights are on, so a default <code><a href="../reference/tree.html">tree()</a></code> is rpart’s
+specification fitted under them; a head registered without
+<code>weights</code> fits it unweighted.</p>
 <p>Under a count head a leaf predicts a rate, and the rate is shrunk
 towards the rate of the units the tree is grown on, as rpart’s
 <code>method = "poisson"</code> shrinks it: the posterior mean of a
@@ -333,7 +345,7 @@ shrunk ones.</p>
 <span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>    lambda_<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>    gamma<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'package'</span>,</span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'default'</span>,</span>
 <span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a>)</span></code></pre></div>
@@ -370,7 +382,7 @@ by how many units each holds, is kept, as gbm’s <code>cv.folds</code>
 chooses it. The folds are dealt for each response and stratified on it,
 as the elastic net’s are.</p>
 <p><code>preset</code> says whose defaults the settings left
-<code>None</code> take. <code>"package"</code> is the fitting package’s
+<code>None</code> take. <code>"default"</code> is the fitting package’s
 own, which is what biomod2’s default option set fits: under gbm 100
 trees of one split, <code>shrinkage=0.1</code>, <code>min_leaf=10</code>
 and <code>subsample=0.5</code>; under xgboost 100 trees of depth 6,
@@ -386,7 +398,10 @@ Python’s keyword. The case weights are the response head’s,
 <code>timesift.response.positive_weights</code> under presence-absence,
 and weigh the gradient and every sum a tree is grown on;
 <code>min_leaf</code> counts units under gbm, as
-<code>n.minobsinnode</code> does.</p>
+<code>n.minobsinnode</code> does. Under the shipped presence-absence
+head those weights are on, so a default <code><a href="../reference/boosting.html">boosting()</a></code> is gbm’s
+specification fitted under them; a head registered without
+<code>weights</code> fits it unweighted.</p>
 </div>
 <div class="section level2">
 <h2 id="maxent">
@@ -403,7 +418,7 @@ and weigh the gradient and every sum a tree is grown on;
 <span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>    clamp<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="dv">5</span>,</span>
 <span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>    s<span class="op">=</span><span class="st">'lambda.min'</span>,</span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>    thresh<span class="op">=</span><span class="fl">1e-08</span>,</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>    tol<span class="op">=</span><span class="fl">1e-08</span>,</span>
 <span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>    max_design<span class="op">=</span><span class="fl">2.0</span>,</span>
 <span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
@@ -490,8 +505,8 @@ the binary cross-entropy.</p>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>    degree<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>    penalty<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>    nk<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>    thresh<span class="op">=</span><span class="fl">0.001</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>    max_terms<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>    min_gain<span class="op">=</span><span class="fl">0.001</span>,</span>
 <span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>    minspan<span class="op">=</span><span class="dv">0</span>,</span>
 <span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>    endspan<span class="op">=</span><span class="dv">0</span>,</span>
 <span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>    fast_k<span class="op">=</span><span class="dv">20</span>,</span>
@@ -509,8 +524,9 @@ parent, the column and the knot <code>t</code> that most reduce the
 residual sum of squares of a least-squares fit to the response; a knot
 at a column’s least value enters the column linearly.
 <code>degree</code> bounds how many hinges a term multiplies. The pass
-stops at <code>nk</code> terms, when a step raises the R-squared by less
-than <code>thresh</code>, or when no term reduces the residuals.</p>
+stops at <code>max_terms</code> terms, when a step raises the R-squared
+by less than <code>min_gain</code>, or when no term reduces the
+residuals.</p>
 <p>The pruning pass removes terms one at a time, each time the one whose
 loss raises the residuals least, and keeps the subset of least
 generalised cross-validation, which charges <code>penalty</code> per
@@ -523,14 +539,18 @@ prediction is its mean count; under a squared-error head they are
 refitted by least squares.</p>
 <p>The defaults are earth’s, which biomod2 uses under its default and
 <code>"bigboss"</code> option sets alike: degree one,
-<code>penalty</code> 2 (3 above degree one), <code>thresh=0.001</code>,
-<code>nk = min(200, max(20, 2 p)) + 1</code> for <code>p</code> columns,
-Friedman’s spans between knots (<code>minspan=0</code>,
+<code>penalty</code> 2 (3 above degree one),
+<code>min_gain=0.001</code>,
+<code>max_terms = min(200, max(20, 2 p)) + 1</code> for <code>p</code>
+columns, Friedman’s spans between knots (<code>minspan=0</code>,
 <code>endspan=0</code>) and Fast MARS over the <code>fast_k=20</code>
 best parents. <code>prune=False</code> keeps every forward term;
 <code>nprune</code> caps the terms kept. The case weights are the head’s
-and weigh both passes and the refit. The passes run on the core the R
-package calls, so the two keep the same terms and return the same
+and weigh both passes and the refit; under the shipped presence-absence
+head they are on, so a default <code><a href="../reference/mars.html">mars()</a></code> is earth’s
+specification fitted under them, and a head registered without
+<code>weights</code> fits it unweighted. The passes run on the core the
+R package calls, so the two keep the same terms and return the same
 coefficients; <code>threads</code> searches that many columns at once
 and does not change what comes back. A variable holding one value is
 predicted its mean.</p>
@@ -543,8 +563,8 @@ predicted its mean.</p>
 <span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>    degree<span class="op">=</span><span class="dv">1</span>,</span>
 <span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>    penalty<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>    nk<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>    thresh<span class="op">=</span><span class="fl">0.001</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>    max_terms<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>    min_gain<span class="op">=</span><span class="fl">0.001</span>,</span>
 <span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>    prune<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>    calibrate<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
@@ -560,17 +580,21 @@ fitting units as priors.</p>
 <p>The basis is mda’s own MARS, not earth’s that <code>mars</code>
 reproduces: each forward step adds a column linearly or a pair of hinges
 on it, and the pass stops when a step lowers the residuals by less than
-<code>thresh</code> of them, when they fall to <code>thresh</code> of
-the null model’s, when the generalised cross-validation passes ten times
-the null model’s, or at <code>nk</code> terms. The pruning drops the
-term of least t statistic, one at a time, and keeps the subset of least
-generalised cross-validation, which counts each term beyond the
+<code>min_gain</code> of them, when they fall to <code>min_gain</code>
+of the null model’s, when the generalised cross-validation passes ten
+times the null model’s, or at <code>max_terms</code> terms. The pruning
+drops the term of least t statistic, one at a time, and keeps the subset
+of least generalised cross-validation, which counts each term beyond the
 intercept as <code>1 + penalty / 2</code> degrees of freedom. The
 defaults are mda’s, which biomod2 passes unchanged: degree one,
-<code>penalty</code> 2 (3 above degree one), <code>thresh=0.001</code>
-and <code>nk = max(21, 2 p + 1)</code> for <code>p</code> columns.</p>
+<code>penalty</code> 2 (3 above degree one), <code>min_gain=0.001</code>
+and <code>max_terms = max(21, 2 p + 1)</code> for <code>p</code>
+columns.</p>
 <p>The head’s case weights set the classes’ scores and the variate, and
-not the basis, whose forward pass mda runs unweighted.
+not the basis, whose forward pass mda runs unweighted; under the shipped
+presence-absence head they are on, so a default
+<code><a href="../reference/discriminant.html">discriminant()</a></code> is mda’s specification fitted under them,
+and a head registered without <code>weights</code> fits it unweighted.
 <code>calibrate=True</code> recalibrates the posterior by a probit
 regression of the response on it under the case weights, on the fitting
 units, as biomod2 always does for <code>FDA</code>; <code>False</code>
@@ -613,10 +637,13 @@ on that many of them, drawn as mgcv draws them. A column of fewer than
 values, a column of two enters linearly and a column of one is left out;
 a column whose linear part the columns before it span keeps only its
 penalised part.</p>
-<p>The head’s case weights enter the likelihood as mgcv’s prior weights.
-The model holds at most as many coefficients as there are units, one for
-the intercept and <code>k - 1</code> per column. The fit runs on the
-core the R package calls, so the two languages fit the same model;
+<p>The head’s case weights enter the likelihood as mgcv’s prior weights;
+under the shipped presence-absence head they are on, so a default
+<code><a href="../reference/additive.html">additive()</a></code> is mgcv’s specification fitted under them, and a
+head registered without <code>weights</code> fits it unweighted. The
+model holds at most as many coefficients as there are units, one for the
+intercept and <code>k - 1</code> per column. The fit runs on the core
+the R package calls, so the two languages fit the same model;
 <code>threads</code> works that many columns and variables at once and
 does not change what comes back. A variable holding one value is
 predicted its mean and named in <code>unfitted</code>, and one whose
@@ -673,11 +700,13 @@ grid of <code>nodes</code> points per hyperparameter, centred on the
 mode of their posterior and weighted by it (Rue, Martino and Chopin
 2009). With an intercept alone its standard deviation is set at the mode
 of its posterior; with neither the fit is the posterior mode of the
-coefficients. A prediction at new units interpolates the field to their
-coordinates, so the targets it is given carry the same coordinate
-columns. The head’s case weights enter the likelihood in every
-configuration. A response holding one value is predicted its mean. The
-learner fits a presence-absence head.</p>
+coefficients, so at <code>spatial="none"</code> and
+<code>random=False</code> the learner is a penalised logistic model,
+every coefficient shrunk towards zero by its prior. A prediction at new
+units interpolates the field to their coordinates, so the targets it is
+given carry the same coordinate columns. The head’s case weights enter
+the likelihood in every configuration. A response holding one value is
+predicted its mean. The learner fits a presence-absence head.</p>
 <p>With <code>random=True</code> each unit, as named by <code>id</code>
 in <code>timesift.timesift</code>, gets an intercept, which absorbs what
 its several targets share beyond the record: it is identified where a
@@ -742,10 +771,13 @@ the fitting targets are cut into as few batches of at most that many as
 they divide into, of as equal a length as they can be.
 <code>val_frac</code> is held back from every fit alike by a plain
 random permutation, the fit on all targets a run ends with included, and
-<code>early_stopping</code> is read only on that set. At the default of
-0 nothing is held back: every fitting target is trained on, the whole
-budget runs, and the fit keeps the last epoch, where the cosine schedule
-has annealed the learning rate to zero.</p>
+<code>early_stopping</code> is read only on that set: an epoch count of
+patience, or <code>math.inf</code>, the default, to train the whole
+budget and restore the epoch with the lowest validation loss. At the
+<code>val_frac</code> default of 0 nothing is held back: every fitting
+target is trained on, the whole budget runs, and the fit keeps the last
+epoch, where the cosine schedule has annealed the learning rate to
+zero.</p>
 <p><code>device</code> is <code>"auto"</code> for the graphics processor
 where there is one, NVIDIA’s or Apple’s, or the name of a device to
 train on. A fitted encoder carries the setting rather than the device it
@@ -779,7 +811,7 @@ resolved to, so a fit made on one machine predicts on another.</p>
 <li>
 <code>weight_decay</code> - float</li>
 <li>
-<code>early_stopping</code> - int</li>
+<code>early_stopping</code> - float</li>
 <li>
 <code>val_frac</code> - float</li>
 <li>
@@ -885,7 +917,7 @@ registered one.</p>
 <h2 id="tune">
 <code>tune()</code><a class="anchor" aria-label="anchor" href="#tune"></a>
 </h2>
-<div class="sourceCode" id="cb24"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>tune(learner, grid: <span class="bu">dict</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>, metric<span class="op">=</span><span class="va">None</span>, inner: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>, seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>tune(learner, grid: <span class="bu">dict</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>, metric<span class="op">=</span><span class="va">None</span>, n_inner: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>, seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>)</span></code></pre></div>
 <p>A learner that searches <code>grid</code> on the units it is fitted
 on and fits the best setting.</p>
 <p>The search is a cross-validation inside those units, so in a run the

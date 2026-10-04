@@ -19,7 +19,7 @@
 #' from each class as the smaller class holds, so a rare response's presences are half of every
 #' tree's draw.
 #'
-#' `preset` says whose defaults the settings left `NULL` take. `"package"` is randomForest's own,
+#' `preset` says whose defaults the settings left `NULL` take. `"default"` is randomForest's own,
 #' which is what biomod2's default option set fits: 500 trees, `mtry` the square root of the column
 #' count under presence-absence and a third of it under a squared-error loss, and `min_node` 1 and
 #' 5 under the two. `"bigboss"` is biomod2's tuned option set: 500 trees, `mtry = 2` and
@@ -29,13 +29,16 @@
 #' The case weights are the response head's, [positive_weights()] under presence-absence, and
 #' weight the bootstrap draw: a unit is drawn in proportion to its weight, and within its class
 #' under `balance`.
+#' Under the shipped presence-absence head those weights are on, so a default `forest()` is
+#' randomForest's specification fitted under them; a head registered without `weights` fits it
+#' unweighted.
 #'
 #' @inheritParams elasticnet
 #' @param trees Trees in the forest.
 #' @param mtry Columns drawn for each node, the best of which it is split on.
 #' @param min_node Units each side of a split keeps.
 #' @param balance Whether each tree draws as many units from each class as the smaller holds.
-#' @param preset Whose defaults the settings left `NULL` take: `"package"` or `"bigboss"`.
+#' @param preset Whose defaults the settings left `NULL` take: `"default"` or `"bigboss"`.
 #' @param seed Seed for the bootstrap draws and the column draws.
 #' @param threads Trees grown at once. The forest is the same on any number.
 #'
@@ -47,7 +50,7 @@
 #'
 #' @export
 forest <- function(data = NULL, trees = NULL, mtry = NULL, min_node = NULL, balance = FALSE,
-                   preset = c("package", "bigboss"), seed = 1L, threads = 1L) {
+                   preset = c("default", "bigboss"), seed = 1L, threads = 1L) {
   preset <- match.arg(preset)
   learner(
     name = "forest",

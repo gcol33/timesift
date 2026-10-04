@@ -29,7 +29,7 @@ k_learner <- function() {
 
 test_that("the setting that scores best on the inner folds is the one fitted", {
   d <- tune_data()
-  tuned <- tune(k_learner(), list(k = 1:5), inner = 3L)
+  tuned <- tune(k_learner(), list(k = 1:5), n_inner = 3L)
   expect_s3_class(tuned, "timesift_learner")
   expect_identical(tuned$name, "kl")
   fit <- fit_learner(tuned, d$x, d$y)
@@ -47,34 +47,34 @@ test_that("the setting that scores best on the inner folds is the one fitted", {
 
 test_that("a grid is every combination, and a setting given to the fit overrides the carried one", {
   d <- tune_data()
-  tuned <- tune(k_learner(), list(k = c(3, 9), other = c("a", "b")), inner = 3L)
+  tuned <- tune(k_learner(), list(k = c(3, 9), other = c("a", "b")), n_inner = 3L)
   fit <- fit_learner(tuned, d$x, d$y)
   expect_equal(fit$model$table$settings,
                c("k = 3, other = a", "k = 9, other = a", "k = 3, other = b", "k = 9, other = b"))
   expect_equal(fit$model$chosen$k, 3)
   # Ties go to the first combination in the grid.
   expect_identical(fit$model$chosen$other, "a")
-  given <- fit_learner(tune(k_learner(), list(k = 3), inner = 3L), d$x, d$y, other = "given")
+  given <- fit_learner(tune(k_learner(), list(k = 3), n_inner = 3L), d$x, d$y, other = "given")
   expect_identical(given$model$model$other, "given")
 })
 
 test_that("the inner folds keep a grouping whole, and a metric of its own is used", {
   d <- tune_data()
   group <- rep(sprintf("g%02d", 1:10), each = 4L)
-  fit <- fit_learner(tune(k_learner(), list(k = 1:5), inner = 3L), d$x, d$y, group = group)
+  fit <- fit_learner(tune(k_learner(), list(k = 1:5), n_inner = 3L), d$x, d$y, group = group)
   expect_equal(fit$model$chosen$k, 3L)
-  by_tss <- fit_learner(tune(k_learner(), list(k = 1:5), metric = "tss", inner = 3L), d$x, d$y)
+  by_tss <- fit_learner(tune(k_learner(), list(k = 1:5), metric = "tss", n_inner = 3L), d$x, d$y)
   expect_equal(by_tss$model$chosen$k, 3L)
   expect_equal(by_tss$model$table$score[3L], 1)
   by_function <- fit_learner(
-    tune(k_learner(), list(k = 1:5), metric = function(y, p) -abs(mean(p) - 0.2), inner = 3L),
+    tune(k_learner(), list(k = 1:5), metric = function(y, p) -abs(mean(p) - 0.2), n_inner = 3L),
     d$x, d$y)
   expect_true(by_function$model$chosen$k %in% 1:5)
 })
 
 test_that("a shipped learner is tuned the same way", {
   d <- tune_data()
-  fit <- fit_learner(tune(forest(), list(trees = c(5, 15)), inner = 3L), d$x, d$y)
+  fit <- fit_learner(tune(forest(), list(trees = c(5, 15)), n_inner = 3L), d$x, d$y)
   expect_true(fit$model$chosen$trees %in% c(5, 15))
   expect_equal(nrow(fit$model$table), 2L)
   expect_equal(dim(stats::predict(fit, d$x)), dim(d$y))
@@ -85,8 +85,8 @@ test_that("a run records what each tuned candidate chose", {
   targets <- data.frame(plot = d$units, d$y, stringsAsFactors = FALSE)
   run <- suppressWarnings(timesift(
     targets, d$readings, y = c("sp1", "sp2"), id = plot, time = t, x = temp,
-    models = list(tuned = tune(k_learner(), list(k = 1:5), inner = 3L), plain = k_learner()),
-    sift = grains("month"), resampling = cv(v = 3L), inner = NULL, ensemble = FALSE,
+    learners = list(tuned = tune(k_learner(), list(k = 1:5), n_inner = 3L), plain = k_learner()),
+    sift = grains("month"), resampling = cv(v = 3L), n_inner = NULL, ensemble = FALSE,
     verbose = FALSE))
   expect_true("settings" %in% names(run$candidates))
   expect_identical(run$candidates$settings[run$candidates$learner == "tuned"], "k = 3")
@@ -98,7 +98,7 @@ test_that("a grid says what it cannot search", {
   expect_error(tune(k_learner(), list(k = integer())), "no value for k")
   expect_error(tune(k_learner(), 1:3), "named list")
   expect_error(tune(k_learner(), list()), "named list")
-  expect_error(tune(k_learner(), list(k = 1:2), inner = 1L), "2 or more")
+  expect_error(tune(k_learner(), list(k = 1:2), n_inner = 1L), "2 or more")
   expect_error(tune("nope", list(k = 1)), "nope")
 })
 
@@ -110,7 +110,7 @@ test_that("a learner with no grid of its own is searched over the one registered
 
   forest_grid <- timesift:::.registered_grid(forest(), d$x)
   expect_equal(forest_grid$mtry, seq_len(min(10L, columns)))
-  fit <- fit_learner(tune(forest(trees = 10L), inner = 3L), d$x, d$y)
+  fit <- fit_learner(tune(forest(trees = 10L), n_inner = 3L), d$x, d$y)
   expect_equal(nrow(fit$model$table), min(10L, columns))
 
   gbm <- timesift:::.registered_grid(boosting(), d$x)
@@ -123,7 +123,7 @@ test_that("a learner with no grid of its own is searched over the one registered
                2:max(21L, 2L * columns + 1L))
   expect_equal(timesift:::.registered_grid(envelope(), d$x)$quantile,
                c(0, 0.0125, 0.025, 0.05, 0.1))
-  expect_equal(fit_learner(tune(envelope(), inner = 3L), d$x, d$y)$model$table$settings,
+  expect_equal(fit_learner(tune(envelope(), n_inner = 3L), d$x, d$y)$model$table$settings,
                sprintf("quantile = %s", c("0", "0.0125", "0.025", "0.05", "0.1")))
   expect_equal(timesift:::.registered_grid(mlp(), d$x)$hidden, list(2L, 4L, 6L, 8L))
 
@@ -135,9 +135,9 @@ test_that("a grid can be registered for a learner of one's own, as a list or as 
   register_tuning("kl", list(k = 1:5), overwrite = TRUE)
   on.exit(.tuning_reg$remove("kl"), add = TRUE)
   expect_true("kl" %in% tunings())
-  expect_equal(fit_learner(tune(k_learner(), inner = 3L), d$x, d$y)$model$chosen$k, 3L)
+  expect_equal(fit_learner(tune(k_learner(), n_inner = 3L), d$x, d$y)$model$chosen$k, 3L)
   register_tuning("kl", function(learner, x) list(k = c(2L, 3L)), overwrite = TRUE)
-  fit <- fit_learner(tune(k_learner(), inner = 3L), d$x, d$y)
+  fit <- fit_learner(tune(k_learner(), n_inner = 3L), d$x, d$y)
   expect_equal(nrow(fit$model$table), 2L)
   expect_error(register_tuning("kl", 1:3, overwrite = TRUE), "named list")
   expect_error(register_tuning("kl", list(k = 1)), "already registered")

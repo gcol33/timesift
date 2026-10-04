@@ -168,9 +168,9 @@ select_grain(
     y,
     learners,
     folds=None,
-    inner=5,
-    rule: str = 'argmax',
-    threshold: str | None = None,
+    n_inner=5,
+    choose: str = 'argmax',
+    cut_rule: str | None = None,
     interval: str = 'variables',
     repeats: int = 1,
     response: str = 'presence_absence',
@@ -208,7 +208,7 @@ its own overrides it on the ones it names.
 Inside each outer fold every candidate carries an inner score, the mean
 over variables of its per-variable mean over the inner folds, and a
 standard error, the standard deviation over the inner folds of the
-fold’s own score divided by the square root of their number. `rule`
+fold’s own score divided by the square root of their number. `choose`
 chooses among them. `"argmax"` takes the highest score, and on an exact
 tie the candidate declared first. `"coarsest_adequate"` is the
 one-standard-error rule (Breiman, Friedman, Olshen and Stone 1984;
@@ -218,7 +218,7 @@ its standard error is adequate, and the one with the fewest bins wins,
 then the fewest channels, then the higher score, then the one declared
 first. A standard error that cannot be computed is taken as zero.
 
-`threshold` names a rule of `decision_threshold` (`"youden"`, the cut
+`cut_rule` names a rule of `decision_threshold` (`"youden"`, the cut
 that maximises TSS, `"kappa"` or `"prevalence"`). With it set, each
 outer fold learns one cut per variable on the inner out-of-fold
 predictions of the candidate it selected, which cover the outer training
@@ -259,8 +259,8 @@ Selection(
     inner,
     metric,
     response,
-    rule,
-    threshold,
+    choose,
+    cut_rule,
     thresholds,
     cut_scores,
     interval,
@@ -282,8 +282,8 @@ Attributes:
 - `inner` - list\[dict\]
 - `metric` - str
 - `response` - str
-- `rule` - str
-- `threshold` - str \| None
+- `choose` - str
+- `cut_rule` - str \| None
 - `thresholds` - list\[dict\] \| None
 - `cut_scores` - Ladder \| None
 - `interval` - str

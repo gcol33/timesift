@@ -8,7 +8,7 @@ prediction target, from the same one call the R package offers, and it answers t
 import timesift as ts
 
 fit = ts.timesift(plots, logger, y="sp_*", id="plot_id", time="datetime",
-                  models=[ts.elasticnet(), ts.forest()],
+                  learners = [ts.elasticnet(), ts.forest()],
                   sift=ts.grains("day", "week", "month"),
                   resampling=ts.cv(v=5))
 print(ts.summary(fit))

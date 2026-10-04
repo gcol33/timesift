@@ -10,7 +10,7 @@ forest(
   mtry = NULL,
   min_node = NULL,
   balance = FALSE,
-  preset = c("package", "bigboss"),
+  preset = c("default", "bigboss"),
   seed = 1L,
   threads = 1L
 )
@@ -27,7 +27,7 @@ representation of the run.}
 
 \item{balance}{Whether each tree draws as many units from each class as the smaller holds.}
 
-\item{preset}{Whose defaults the settings left \code{NULL} take: \code{"package"} or \code{"bigboss"}.}
+\item{preset}{Whose defaults the settings left \code{NULL} take: \code{"default"} or \code{"bigboss"}.}
 
 \item{seed}{Seed for the bootstrap draws and the column draws.}
 
@@ -57,7 +57,7 @@ languages grow the same forest on any number of threads.
 from each class as the smaller class holds, so a rare response's presences are half of every
 tree's draw.
 
-\code{preset} says whose defaults the settings left \code{NULL} take. \code{"package"} is randomForest's own,
+\code{preset} says whose defaults the settings left \code{NULL} take. \code{"default"} is randomForest's own,
 which is what biomod2's default option set fits: 500 trees, \code{mtry} the square root of the column
 count under presence-absence and a third of it under a squared-error loss, and \code{min_node} 1 and
 5 under the two. \code{"bigboss"} is biomod2's tuned option set: 500 trees, \code{mtry = 2} and
@@ -67,6 +67,9 @@ the column count.
 The case weights are the response head's, \code{\link[=positive_weights]{positive_weights()}} under presence-absence, and
 weight the bootstrap draw: a unit is drawn in proportion to its weight, and within its class
 under \code{balance}.
+Under the shipped presence-absence head those weights are on, so a default \code{forest()} is
+randomForest's specification fitted under them; a head registered without \code{weights} fits it
+unweighted.
 }
 \examples{
 forest(trees = 200L)

@@ -27,16 +27,85 @@
   described the leaf step alone, which gbm’s trees take as well.
   `method = "gbm"`, Friedman’s gradient boosting machine, is the default
   as before.
+- `year_start` defaults to `"01-01"`, the calendar year, in
+  [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md),
+  [`grain()`](https://gillescolling.com/timesift/reference/native.md),
+  [`multigrain()`](https://gillescolling.com/timesift/reference/native.md),
+  [`grains()`](https://gillescolling.com/timesift/reference/grains.md)
+  and
+  [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md),
+  where it was the Schrankogel deposit’s hydrological year, `"09-01"`. A
+  season or year bin now starts on 1 January unless a boundary is given;
+  `inst/reproduce/schrankogel.R` passes `"09-01"`.
+- [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+  takes `learners` for `models`, `n_inner` for `inner` and `choose` for
+  `rule`;
+  [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md)
+  takes `n_inner`, `choose`, and `cut_rule` for `threshold`, and its
+  result carries `choose` and `cut_rule` where it carried `rule` and
+  `threshold`;
+  [`tune()`](https://gillescolling.com/timesift/reference/tune.md) takes
+  `n_inner`. A fit’s fitted models are still `fit$models`.
+- [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+  defaults to `cv.glmnet()`’s ten inner folds and `s = "lambda.1se"`,
+  where it took five folds and `"lambda.min"`. The reproduction driver
+  and the selection benchmark pass their own settings, so their numbers
+  are unchanged.
+- [`mars()`](https://gillescolling.com/timesift/reference/mars.md) and
+  [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
+  take `max_terms` for `nk` and `min_gain` for `thresh`;
+  [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+  and
+  [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md)
+  take `tol` for `thresh`. A convergence tolerance and the least gain a
+  forward step is kept for were sharing one name.
+- `preset = "package"` is `preset = "default"` on
+  [`tree()`](https://gillescolling.com/timesift/reference/tree.md),
+  [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
+  and
+  [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md).
+- [`kappa_score()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+  cuts at `"prevalence"` by default, the rule the registered `kappa`
+  metric reads, where it cut at `"youden"`.
+- `train_control(early_stopping)` defaults to `Inf`, which never stops.
+  It is read only where `val_frac` holds a validation set back, and at
+  `val_frac = 0` it was never read.
+- [`decision_threshold()`](https://gillescolling.com/timesift/reference/kappa_score.md)
+  on a fit takes `perc` for the `"mpa"` rule in both languages; in
+  Python `candidate` and `perc` are keyword-only, so the R call
+  `decision_threshold(fit, "ensemble")` errors there instead of reading
+  `"ensemble"` as predictions.
+
+### Bug fixes
+
+- A nested run whose ensemble sets `min_score` no longer fails with
+  “numbers of columns of arguments do not match” when an outer fold’s
+  stack leaves a candidate out. `fold_weights` has a column per
+  candidate in every fold, 0 where that fold left it out; in Python
+  every row carries every candidate, where a fold’s row named only the
+  candidates it kept.
 
 ### Other changes
+
+- Every learner whose defaults follow a reference package says that
+  under the shipped presence-absence head it is fitted under
+  [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md),
+  so a default
+  [`tree()`](https://gillescolling.com/timesift/reference/tree.md) is
+  rpart’s specification under those case weights.
+  [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
+  says that at `spatial = "none"` and `random = FALSE` it is a penalised
+  logistic model.
 
 - In Python a representation, a learner and a training control print as
   they do in R, where they printed as their dataclass fields and a
   learner’s functions.
+
 - The site’s Python side has a Get started article, the R walkthrough
   section by section and run against the package, and a reference laid
   out under the sections of the R reference with an index page, so the
   two language menus carry the same pages.
+
 - The `reproducing-schrankogel` vignette is gone.
   `inst/reproduce/README.md` is where the reproduction is documented:
   how to run each stage, what it costs, and the comparison with the

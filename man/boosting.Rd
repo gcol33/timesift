@@ -16,7 +16,7 @@ boosting(
   lambda = NULL,
   gamma = NULL,
   n_inner = NULL,
-  preset = c("package", "bigboss"),
+  preset = c("default", "bigboss"),
   seed = 1L,
   threads = 1L
 )
@@ -46,7 +46,7 @@ zero under \code{"gbm"}.}
 \item{n_inner}{Folds of the inner cross-validation choosing how many trees are kept, or 0 to
 keep them all.}
 
-\item{preset}{Whose defaults the settings left \code{NULL} take: \code{"package"} or \code{"bigboss"}.}
+\item{preset}{Whose defaults the settings left \code{NULL} take: \code{"default"} or \code{"bigboss"}.}
 
 \item{seed}{Seed for the subsamples and the inner folds.}
 
@@ -83,7 +83,7 @@ fold's complement, and the number of trees of least held-out deviance, summed ov
 weighted by how many units each holds, is kept, as gbm's \code{cv.folds} chooses it. The folds are
 dealt for each response and stratified on it, as the elastic net's are.
 
-\code{preset} says whose defaults the settings left \code{NULL} take. \code{"package"} is the fitting
+\code{preset} says whose defaults the settings left \code{NULL} take. \code{"default"} is the fitting
 package's own, which is what biomod2's default option set fits: under gbm 100 trees of one split,
 \code{shrinkage = 0.1}, \code{min_leaf = 10} and \code{subsample = 0.5}; under xgboost 100 trees of depth 6,
 \code{shrinkage = 0.3}, \code{min_leaf = 1}, \code{lambda = 1} and every unit and column. \code{"bigboss"} is
@@ -94,6 +94,8 @@ biomod2's tuned option set: under gbm 2500 trees of seven splits, \code{shrinkag
 The case weights are the response head's, \code{\link[=positive_weights]{positive_weights()}} under presence-absence, and
 weigh the gradient and every sum a tree is grown on; \code{min_leaf} counts units under gbm, as
 \code{n.minobsinnode} does.
+Under the shipped presence-absence head those weights are on, so a default \code{boosting()} is
+gbm's specification fitted under them; a head registered without \code{weights} fits it unweighted.
 }
 \examples{
 boosting()

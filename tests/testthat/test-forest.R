@@ -134,11 +134,11 @@ test_that("the forest core refuses what it cannot grow on", {
 })
 
 test_that("a preset fills the settings left open, as randomForest and biomod2 have them", {
-  expect_identical(.forest_settings("package", "binomial", 471L, NULL, NULL, NULL),
+  expect_identical(.forest_settings("default", "binomial", 471L, NULL, NULL, NULL),
                    list(trees = 500L, mtry = 21L, min_node = 1L))
-  expect_identical(.forest_settings("package", "gaussian", 471L, NULL, NULL, NULL),
+  expect_identical(.forest_settings("default", "gaussian", 471L, NULL, NULL, NULL),
                    list(trees = 500L, mtry = 157L, min_node = 5L))
-  expect_identical(.forest_settings("package", "gaussian", 2L, NULL, NULL, NULL)$mtry, 1L)
+  expect_identical(.forest_settings("default", "gaussian", 2L, NULL, NULL, NULL)$mtry, 1L)
   expect_identical(.forest_settings("bigboss", "binomial", 471L, NULL, NULL, NULL),
                    list(trees = 500L, mtry = 2L, min_node = 5L))
   expect_identical(.forest_settings("bigboss", "binomial", 1L, 100L, NULL, 3L),

@@ -83,7 +83,7 @@ fold_map <- function(y, v = 10L, seed = 1L, strata = 5L, by = NULL, group = NULL
 #' holds as many units as another to within one and a map of `v` blocks has `v` folds. Nothing is
 #' drawn, so both languages return the same map. `env_cv()` centres and scales every column first,
 #' which a coordinate system does not need. Under the nested selection the inner folds keep blocks
-#' whole as well, so `inner` is at most `v - 1`.
+#' whole as well, so `n_inner` is at most `v - 1`.
 #'
 #' `resampling` also accepts a fold vector or a [fold_map()] result directly, which is how a split
 #' the package has no constructor for -- a spatial block, a season held out whole -- reaches the

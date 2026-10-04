@@ -52,7 +52,7 @@ ordered as they arrived, and each part is cut again until there are \code{v} of 
 holds as many units as another to within one and a map of \code{v} blocks has \code{v} folds. Nothing is
 drawn, so both languages return the same map. \code{env_cv()} centres and scales every column first,
 which a coordinate system does not need. Under the nested selection the inner folds keep blocks
-whole as well, so \code{inner} is at most \code{v - 1}.
+whole as well, so \code{n_inner} is at most \code{v - 1}.
 
 \code{resampling} also accepts a fold vector or a \code{\link[=fold_map]{fold_map()}} result directly, which is how a split
 the package has no constructor for -- a spatial block, a season held out whole -- reaches the

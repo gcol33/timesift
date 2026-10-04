@@ -293,8 +293,8 @@ def run(spatial, coords=True, random=False, n=60, seed=2):
     y = Response(np.column_stack([tg["s1"], tg["s2"]]).astype(float), tuple(plots), ("s1", "s2"))
     fit = timesift(tg, series, y=("s1", "s2"), id="plot", time="when", x="v",
                    coords=("lon", "lat") if coords else None,
-                   models=[hierarchical(spatial=spatial, random=random)], sift=grains("month"),
-                   resampling=fold_map(y, v=3, seed=2), inner=None, ensemble=False, verbose=False)
+                   learners=[hierarchical(spatial=spatial, random=random)], sift=grains("month"),
+                   resampling=fold_map(y, v=3, seed=2), n_inner=None, ensemble=False, verbose=False)
     return tg, series, fit
 
 

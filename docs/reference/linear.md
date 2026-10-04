@@ -59,7 +59,10 @@ A
 The defaults are biomod2's `GLM`: every column enters as `x + I(x^2)`,
 and the terms are searched in both directions by AIC as
 [`MASS::stepAIC()`](https://rdrr.io/pkg/MASS/man/stepAIC.html) searches
-them, with no bound on how many are kept.
+them, with no bound on how many are kept. Under the shipped
+presence-absence head those weights are on, so a default `linear()` is
+biomod2's `GLM` specification fitted under them; a head registered
+without `weights` fits it unweighted.
 
 `terms` says what one term is. Under `"power"` each power of a column,
 `x`, `x^2` and so on, is a term of its own, which is how biomod2 writes

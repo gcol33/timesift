@@ -14,8 +14,42 @@
   algorithm, the tree growth, the split criterion, what `depth` and `min_leaf` count and the
   default set, where its name described the leaf step alone, which gbm's trees take as well.
   `method = "gbm"`, Friedman's gradient boosting machine, is the default as before.
+* `year_start` defaults to `"01-01"`, the calendar year, in `grain_matrix()`, `grain()`,
+  `multigrain()`, `grains()` and `coverage()`, where it was the Schrankogel deposit's hydrological
+  year, `"09-01"`. A season or year bin now starts on 1 January unless a boundary is given;
+  `inst/reproduce/schrankogel.R` passes `"09-01"`.
+* `timesift()` takes `learners` for `models`, `n_inner` for `inner` and `choose` for `rule`;
+  `select_grain()` takes `n_inner`, `choose`, and `cut_rule` for `threshold`, and its result
+  carries `choose` and `cut_rule` where it carried `rule` and `threshold`; `tune()` takes
+  `n_inner`. A fit's fitted models are still `fit$models`.
+* `elasticnet()` defaults to `cv.glmnet()`'s ten inner folds and `s = "lambda.1se"`, where it took
+  five folds and `"lambda.min"`. The reproduction driver and the selection benchmark pass their
+  own settings, so their numbers are unchanged.
+* `mars()` and `discriminant()` take `max_terms` for `nk` and `min_gain` for `thresh`;
+  `elasticnet()` and `maxent()` take `tol` for `thresh`. A convergence tolerance and the least
+  gain a forward step is kept for were sharing one name.
+* `preset = "package"` is `preset = "default"` on `tree()`, `forest()` and `boosting()`.
+* `kappa_score()` cuts at `"prevalence"` by default, the rule the registered `kappa` metric
+  reads, where it cut at `"youden"`.
+* `train_control(early_stopping)` defaults to `Inf`, which never stops. It is read only where
+  `val_frac` holds a validation set back, and at `val_frac = 0` it was never read.
+* `decision_threshold()` on a fit takes `perc` for the `"mpa"` rule in both languages; in Python
+  `candidate` and `perc` are keyword-only, so the R call `decision_threshold(fit, "ensemble")`
+  errors there instead of reading `"ensemble"` as predictions.
+
+## Bug fixes
+
+* A nested run whose ensemble sets `min_score` no longer fails with "numbers of columns of
+  arguments do not match" when an outer fold's stack leaves a candidate out. `fold_weights` has a
+  column per candidate in every fold, 0 where that fold left it out; in Python every row carries
+  every candidate, where a fold's row named only the candidates it kept.
 
 ## Other changes
+
+* Every learner whose defaults follow a reference package says that under the shipped
+  presence-absence head it is fitted under `positive_weights()`, so a default `tree()` is rpart's
+  specification under those case weights. `hierarchical()` says that at `spatial = "none"` and
+  `random = FALSE` it is a penalised logistic model.
 
 * In Python a representation, a learner and a training control print as they do in R, where they
   printed as their dataclass fields and a learner's functions.

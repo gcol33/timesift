@@ -8,7 +8,7 @@
 \alias{model_agreement}
 \title{Cohen's kappa, and where two models disagree}
 \usage{
-kappa_score(y, p, rule = c("youden", "kappa", "prevalence", "mpa"))
+kappa_score(y, p, rule = c("prevalence", "youden", "kappa", "mpa"))
 
 decision_threshold(y, ...)
 
@@ -24,6 +24,7 @@ decision_threshold(y, ...)
   y,
   candidate = "ensemble",
   rule = c("youden", "kappa", "prevalence", "mpa"),
+  perc = 0.9,
   ...
 )
 
@@ -35,7 +36,9 @@ model_agreement(y, p_a, p_b, rule = c("youden", "kappa", "prevalence", "mpa"))
 
 \item{p}{Predicted scores for the same units, in the same order. Higher means presence.}
 
-\item{rule}{Threshold rule: \code{"youden"}, \code{"kappa"}, \code{"prevalence"} or \code{"mpa"}.}
+\item{rule}{Threshold rule: \code{"youden"}, \code{"kappa"}, \code{"prevalence"} or \code{"mpa"}. \code{kappa_score()}
+cuts at \code{"prevalence"} by default, the rule the registered \code{kappa} metric reads, and the other
+functions at \code{"youden"}.}
 
 \item{...}{Ignored.}
 

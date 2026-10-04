@@ -22,7 +22,7 @@ tree(
   max_depth = NULL,
   prune = c("se_sum", "one_se", "min", "none"),
   n_inner = NULL,
-  preset = c("package", "bigboss"),
+  preset = c("default", "bigboss"),
   shrink = 1,
   seed = 1L
 )
@@ -62,7 +62,7 @@ tree(
 
 - preset:
 
-  Whose defaults the settings left `NULL` take: `"package"` or
+  Whose defaults the settings left `NULL` take: `"default"` or
   `"bigboss"`.
 
 - shrink:
@@ -92,7 +92,7 @@ several tie, which is how biomod2 prunes its classification tree;
 least cross-validated error; `"min"` the first row reaching the least
 error; and `"none"` keeps the tree as grown.
 
-`preset` says whose defaults the settings left `NULL` take. `"package"`
+`preset` says whose defaults the settings left `NULL` take. `"default"`
 is rpart's own, which is what biomod2's default option set fits:
 `min_split = 20`, `min_leaf = round(min_split / 3)` (or
 `min_split = 3 * min_leaf` where only `min_leaf` is given), `cp = 0.01`,
@@ -105,7 +105,10 @@ The case weights are the response head's,
 [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
 under presence-absence. They weigh every class count, sum of squares and
 event count the tree is grown on; `min_split` and `min_leaf` count
-observations, as rpart's do.
+observations, as rpart's do. Under the shipped presence-absence head
+those weights are on, so a default `tree()` is rpart's specification
+fitted under them; a head registered without `weights` fits it
+unweighted.
 
 Under a count head a leaf predicts a rate, and the rate is shrunk
 towards the rate of the units the tree is grown on, as rpart's

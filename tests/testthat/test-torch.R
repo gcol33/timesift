@@ -38,7 +38,7 @@ test_that("the stack still runs where the record is one bin per year", {
   y <- sim_response(sim, n_var = 2L, seed = 84L)
   for (w in c("season", "year")) {
     x <- grain_matrix(sim$readings, plot, t, temp, grain = w)
-    expect_lte(dim(x)[2L], 5L)
+    expect_lte(dim(x)[2L], 6L)
     for (l in list(cnn(epochs = 2L), rescnn(epochs = 2L, channels = c(16L, 32L)))) {
       p <- stats::predict(fit_learner(l, x, y), x)
       expect_equal(dim(p), c(24L, 2L), info = paste(l$name, w))

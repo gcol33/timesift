@@ -14,11 +14,11 @@ The arms that ship, how they are trained, and the interface a learner of your ow
 elasticnet(
     data=None,
     alpha=0.5,
-    n_inner=5,
+    n_inner=10,
     squares=True,
-    s='lambda.min',
+    s='lambda.1se',
     n_lambda=100,
-    thresh=1e-08,
+    tol=1e-08,
     threads=1,
     seed=1,
 )
@@ -40,7 +40,10 @@ measured against: weights normalised to sum to one, columns centred and scaled b
 weighted mean and weighted standard deviation, a hundred penalties down from the smallest
 that leaves every coefficient at zero, and the held-out deviance read fold by fold. `s` is
 where the fit is read: `"lambda.min"`, `"lambda.1se"`, or a penalty of its own, which is
-interpolated between the two points of the path around it.
+interpolated between the two points of the path around it. The defaults are cv.glmnet's: ten
+inner folds, read at `"lambda.1se"`, the largest penalty within one standard error of the
+least held-out deviance. `tol` is where the coordinate descent stops, read off the largest
+coefficient move of a pass.
 
 The inner folds are dealt for each response and stratified on it, so a rare outcome is spread
 over them as evenly as its count allows. A presence-absence response whose inner training
@@ -74,6 +77,9 @@ one, and so are the case weights.
 The defaults are biomod2's `GLM`: every column enters as `x + I(x^2)`, and the terms are
 searched in both directions by AIC as `MASS::stepAIC()` searches them, with no bound on how
 many are kept.
+Under the shipped presence-absence head those weights are on, so a default `linear()` is
+biomod2's `GLM` specification fitted under them; a head registered without `weights` fits it
+unweighted.
 
 `terms` says what one term is. Under `"power"` each power of a column is a term of its own,
 which is how biomod2 writes a quadratic formula and how `stepAIC()` walks it. Under
@@ -105,7 +111,7 @@ forest(
     mtry=None,
     min_node=None,
     balance=False,
-    preset='package',
+    preset='default',
     seed=1,
     threads=1,
 )
@@ -128,7 +134,7 @@ the two languages grow the same forest on any number of threads.
 `balance=True` is the down-sampled forest biomod2 fits as `RFd`: each tree draws as many
 units from each class as the smaller class holds.
 
-`preset` says whose defaults the settings left `None` take. `"package"` is
+`preset` says whose defaults the settings left `None` take. `"default"` is
 randomForest's own, which is what biomod2's default option set fits: 500 trees, `mtry` the
 square root of the column count under presence-absence and a third of it under a squared-error
 loss, and `min_node` 1 and 5 under the two. `"bigboss"` is biomod2's tuned option set: 500
@@ -138,6 +144,9 @@ above the column count is the column count.
 The case weights are the response head's, `timesift.response.positive_weights` under
 presence-absence, and weight the bootstrap draw: a unit is drawn in proportion to its weight,
 and within its class under `balance`.
+Under the shipped presence-absence head those weights are on, so a default `forest()` is
+randomForest's specification fitted under them; a head registered without `weights` fits it
+unweighted.
 
 ## `tree()` {#tree}
 
@@ -150,7 +159,7 @@ tree(
     max_depth=None,
     prune='se_sum',
     n_inner=None,
-    preset='package',
+    preset='default',
     shrink=1.0,
     seed=1,
 )
@@ -173,7 +182,7 @@ how biomod2 prunes its classification tree; `"one_se"` takes the smallest tree w
 standard error of the least cross-validated error; `"min"` the first row reaching the least
 error; and `"none"` keeps the tree as grown.
 
-`preset` says whose defaults the settings left `None` take. `"package"` is rpart's own,
+`preset` says whose defaults the settings left `None` take. `"default"` is rpart's own,
 which is what biomod2's default option set fits: `min_split=20`,
 `min_leaf=round(min_split / 3)` (or `min_split=3 * min_leaf` where only `min_leaf` is
 given), `cp=0.01`, `max_depth=30` and ten inner folds. `"bigboss"` is biomod2's tuned
@@ -183,6 +192,9 @@ folds. A setting given explicitly beats either.
 The case weights are the response head's, `timesift.response.positive_weights` under
 presence-absence. They weigh every class count, sum of squares and event count the tree is
 grown on; `min_split` and `min_leaf` count observations, as rpart's do.
+Under the shipped presence-absence head those weights are on, so a default `tree()` is
+rpart's specification fitted under them; a head registered without `weights` fits it
+unweighted.
 
 Under a count head a leaf predicts a rate, and the rate is shrunk towards the rate of the
 units the tree is grown on, as rpart's `method = "poisson"` shrinks it: the posterior mean
@@ -205,7 +217,7 @@ boosting(
     lambda_=None,
     gamma=None,
     n_inner=None,
-    preset='package',
+    preset='default',
     seed=1,
     threads=1,
 )
@@ -235,7 +247,7 @@ fold's complement, and the number of trees of least held-out deviance, summed ov
 and weighted by how many units each holds, is kept, as gbm's `cv.folds` chooses it. The folds
 are dealt for each response and stratified on it, as the elastic net's are.
 
-`preset` says whose defaults the settings left `None` take. `"package"` is the fitting
+`preset` says whose defaults the settings left `None` take. `"default"` is the fitting
 package's own, which is what biomod2's default option set fits: under gbm 100 trees of one
 split, `shrinkage=0.1`, `min_leaf=10` and `subsample=0.5`; under xgboost 100 trees of
 depth 6, `shrinkage=0.3`, `min_leaf=1`, `lambda_=1` and every unit and column.
@@ -247,6 +259,9 @@ four trees of depth 2 at `shrinkage=1`. A setting given explicitly beats either.
 response head's, `timesift.response.positive_weights` under presence-absence, and weigh
 the gradient and every sum a tree is grown on; `min_leaf` counts units under gbm, as
 `n.minobsinnode` does.
+Under the shipped presence-absence head those weights are on, so a default `boosting()` is
+gbm's specification fitted under them; a head registered without `weights` fits it
+unweighted.
 
 ## `maxent()` {#maxent}
 
@@ -262,7 +277,7 @@ maxent(
     clamp=True,
     n_inner=5,
     s='lambda.min',
-    thresh=1e-08,
+    tol=1e-08,
     max_design=2.0,
     threads=1,
     seed=1,
@@ -338,8 +353,8 @@ mars(
     data=None,
     degree=1,
     penalty=None,
-    nk=None,
-    thresh=0.001,
+    max_terms=None,
+    min_gain=0.001,
     minspan=0,
     endspan=0,
     fast_k=20,
@@ -356,8 +371,8 @@ step multiplies a term already in the model by a pair of hinges on one column,
 `max(0, x - t)` and `max(0, t - x)`, taking the parent, the column and the knot `t` that
 most reduce the residual sum of squares of a least-squares fit to the response; a knot at a
 column's least value enters the column linearly. `degree` bounds how many hinges a term
-multiplies. The pass stops at `nk` terms, when a step raises the R-squared by less than
-`thresh`, or when no term reduces the residuals.
+multiplies. The pass stops at `max_terms` terms, when a step raises the R-squared by less
+than `min_gain`, or when no term reduces the residuals.
 
 The pruning pass removes terms one at a time, each time the one whose loss raises the residuals
 least, and keeps the subset of least generalised cross-validation, which charges `penalty`
@@ -368,11 +383,13 @@ under a count head they are refitted as a Poisson model with a log link, as eart
 squared-error head they are refitted by least squares.
 
 The defaults are earth's, which biomod2 uses under its default and `"bigboss"` option sets
-alike: degree one, `penalty` 2 (3 above degree one), `thresh=0.001`,
-`nk = min(200, max(20, 2 p)) + 1` for `p` columns, Friedman's spans between knots
+alike: degree one, `penalty` 2 (3 above degree one), `min_gain=0.001`,
+`max_terms = min(200, max(20, 2 p)) + 1` for `p` columns, Friedman's spans between knots
 (`minspan=0`, `endspan=0`) and Fast MARS over the `fast_k=20` best parents.
-`prune=False` keeps every forward term; `nprune` caps the terms kept. The case weights are the head's and
-weigh both passes and the refit. The passes run on the core the R package calls, so the two
+`prune=False` keeps every forward term; `nprune` caps the terms kept. The case weights are
+the head's and weigh both passes and the refit; under the shipped presence-absence head they
+are on, so a default `mars()` is earth's specification fitted under them, and a head
+registered without `weights` fits it unweighted. The passes run on the core the R package calls, so the two
 keep the same terms and return the same coefficients; `threads` searches that many columns
 at once and does not change what comes back. A variable holding one value is predicted its
 mean.
@@ -384,8 +401,8 @@ discriminant(
     data=None,
     degree=1,
     penalty=None,
-    nk=None,
-    thresh=0.001,
+    max_terms=None,
+    min_gain=0.001,
     prune=True,
     calibrate=True,
     threads=1,
@@ -401,16 +418,18 @@ the fitting units as priors.
 
 The basis is mda's own MARS, not earth's that `mars` reproduces: each forward step adds a column
 linearly or a pair of hinges on it, and the pass stops when a step lowers the residuals by less
-than `thresh` of them, when they fall to `thresh` of the null model's, when the generalised
-cross-validation passes ten times the null model's, or at `nk` terms. The pruning drops the
-term of least t statistic, one at a time, and keeps the subset of least generalised
-cross-validation, which counts each term beyond the intercept as `1 + penalty / 2` degrees
-of freedom. The defaults are mda's, which biomod2 passes
-unchanged: degree one, `penalty` 2 (3 above degree one), `thresh=0.001` and
-`nk = max(21, 2 p + 1)` for `p` columns.
+than `min_gain` of them, when they fall to `min_gain` of the null model's, when the
+generalised cross-validation passes ten times the null model's, or at `max_terms` terms. The
+pruning drops the term of least t statistic, one at a time, and keeps the subset of least
+generalised cross-validation, which counts each term beyond the intercept as
+`1 + penalty / 2` degrees of freedom. The defaults are mda's, which biomod2 passes unchanged:
+degree one, `penalty` 2 (3 above degree one), `min_gain=0.001` and
+`max_terms = max(21, 2 p + 1)` for `p` columns.
 
 The head's case weights set the classes' scores and the variate, and not the basis, whose
-forward pass mda runs unweighted. `calibrate=True` recalibrates the posterior by a probit
+forward pass mda runs unweighted; under the shipped presence-absence head they are on, so a
+default `discriminant()` is mda's specification fitted under them, and a head registered
+without `weights` fits it unweighted. `calibrate=True` recalibrates the posterior by a probit
 regression of the response on it under the case weights, on the fitting units, as biomod2
 always does for `FDA`; `False` predicts the posterior. The passes run on the core the R
 package calls, so the two keep the same terms and predict the same probabilities; `threads`
@@ -446,7 +465,9 @@ drawn as mgcv draws them. A column of fewer than `k` distinct values takes as ma
 functions as it holds values, a column of two enters linearly and a column of one is left out;
 a column whose linear part the columns before it span keeps only its penalised part.
 
-The head's case weights enter the likelihood as mgcv's prior weights. The model holds at most
+The head's case weights enter the likelihood as mgcv's prior weights; under the shipped
+presence-absence head they are on, so a default `additive()` is mgcv's specification fitted
+under them, and a head registered without `weights` fits it unweighted. The model holds at most
 as many coefficients as there are units, one for the intercept and `k - 1` per column. The
 fit runs on the core the R package calls, so the two languages fit the same model; `threads`
 works that many columns and variables at once and does not change what comes back. A variable
@@ -495,7 +516,9 @@ Inference is Laplace's method over the coefficients, the intercepts and the fiel
 and the hyperparameters are integrated over on a grid of `nodes` points per hyperparameter,
 centred on the mode of their posterior and weighted by it (Rue, Martino and Chopin 2009). With
 an intercept alone its standard deviation is set at the mode of its posterior; with neither
-the fit is the posterior mode of the coefficients. A prediction at new units interpolates the
+the fit is the posterior mode of the coefficients, so at `spatial="none"` and
+`random=False` the learner is a penalised logistic model, every coefficient shrunk towards
+zero by its prior. A prediction at new units interpolates the
 field to their coordinates, so the targets it is given carry the same coordinate columns. The
 head's case weights enter the likelihood in every configuration. A response holding one value
 is predicted its mean. The learner fits a presence-absence head.
@@ -560,10 +583,11 @@ out of it. What a rare response weighs is the response head's, not a training se
 `batch_size` is the most targets an optimiser step reads: the fitting targets are cut into as
 few batches of at most that many as they divide into, of as equal a length as they can be.
 `val_frac` is held back from every fit alike by a plain random permutation, the fit on all
-targets a run ends with included, and `early_stopping` is read only on that set. At the
-default of 0 nothing is held back: every fitting target is trained on, the whole budget runs,
-and the fit keeps the last epoch, where the cosine schedule has annealed the learning rate to
-zero.
+targets a run ends with included, and `early_stopping` is read only on that set: an epoch
+count of patience, or `math.inf`, the default, to train the whole budget and restore the
+epoch with the lowest validation loss. At the `val_frac` default of 0 nothing is held back:
+every fitting target is trained on, the whole budget runs, and the fit keeps the last epoch,
+where the cosine schedule has annealed the learning rate to zero.
 
 `device` is `"auto"` for the graphics processor where there is one, NVIDIA's or Apple's,
 or the name of a device to train on. A fitted encoder carries the setting rather than the
@@ -594,7 +618,7 @@ Attributes:
 - `batch_size` - int
 - `learning_rate` - float
 - `weight_decay` - float
-- `early_stopping` - int
+- `early_stopping` - float
 - `val_frac` - float
 - `device` - str
 - `seed` - int
@@ -686,7 +710,7 @@ The learners registered under this session.
 ## `tune()` {#tune}
 
 ```python
-tune(learner, grid: dict | None = None, metric=None, inner: int = 5, seed: int = 1)
+tune(learner, grid: dict | None = None, metric=None, n_inner: int = 5, seed: int = 1)
 ```
 
 A learner that searches `grid` on the units it is fitted on and fits the best setting.

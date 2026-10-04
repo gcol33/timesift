@@ -52,7 +52,7 @@ directly. biomod2's tuned `ANN` (`size = 5`, `decay = 0.1`, `maxit = 200`) corre
 "selu", epochs = 150, batch_size = 100)`.
 
 biomod2 ships two option sets: its defaults and a tuned set called `"bigboss"`. Where the two
-differ, the learners offer both, as `preset = "package"` (the defaults of the fitting package, which
+differ, the learners offer both, as `preset = "default"` (the defaults of the fitting package, which
 biomod2's default set uses) and `preset = "bigboss"`. For example, `tree(preset = "bigboss")` sets
 `min_split = 5`, `min_leaf = 5`, `cp = 0.001`, `max_depth = 10` and five inner folds. A setting
 given explicitly overrides either preset. `mars()`, `discriminant()` and `additive()` have a single
@@ -101,7 +101,7 @@ inside all the bands, and the envelope is suited to a coarse grain.
 fit <- timesift(
   targets, sim$readings,
   y = starts_with("v"), id = unit, time = time,
-  models = models,
+  learners = models,
   sift = grains("week", "month", "season"),
   ensemble = ensemble("weighted", decay = 1.6, min_score = 0.5),
   resampling = cv(v = 5),
@@ -151,7 +151,7 @@ ens <- BIOMOD_EnsembleModeling(mod, models.chosen = "all",
 
 ```{r timesift-side, eval = FALSE}
 fit <- timesift(targets, series, y = starts_with("sp"), id = plot_id, time = datetime,
-                models = list(CTA = tree(), RF = forest(), GBM = boosting(),
+                learners = list(CTA = tree(), RF = forest(), GBM = boosting(),
                               XGBOOST = boosting(method = "xgboost"), MAXNET = maxent(),
                               GLM = linear(),
                               MARS = mars(), FDA = discriminant()),
@@ -166,8 +166,8 @@ The Python interface takes the same constructors and arguments:
 import timesift as ts
 
 fit = ts.timesift(targets, series, y="sp_*", id="plot_id", time="datetime",
-                  models=[ts.tree(), ts.forest(), ts.boosting(method="xgboost"), ts.maxent(),
-                          ts.mars(), ts.discriminant()],
+                  learners=[ts.tree(), ts.forest(), ts.boosting(method="xgboost"), ts.maxent(),
+                            ts.mars(), ts.discriminant()],
                   sift=ts.grains("week", "month", "season"),
                   ensemble=ts.ensemble("weighted", min_score=0.5),
                   resampling=ts.cv(v=5))
@@ -209,7 +209,7 @@ from that member's out-of-fold predictions, then averages these votes. A smaller
 fit_ca <- timesift(
   targets, sim$readings,
   y = starts_with("v"), id = unit, time = time,
-  models = models[c("RF", "GBM", "MAXNET", "MARS", "FDA")],
+  learners = models[c("RF", "GBM", "MAXNET", "MARS", "FDA")],
   sift = grains("week"),
   ensemble = ensemble("committee", rule = "kappa"),
   resampling = cv(v = 5),
@@ -308,7 +308,7 @@ table.
 
 ```{r tune, eval = FALSE}
 timesift(targets, series, y = starts_with("sp"), id = plot, time = t, x = temp,
-         models = list(RF = tune(forest(), list(mtry = c(2, 5, 10), min_node = c(1, 5)))))
+         learners = list(RF = tune(forest(), list(mtry = c(2, 5, 10), min_node = c(1, 5)))))
 ```
 
 ## Variable importance

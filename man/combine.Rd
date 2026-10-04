@@ -28,7 +28,7 @@ A \code{timesift_models} for learners and a \code{timesift_sift} for representat
 cannot do: \code{c(base, cnn())} where \code{base} is already a set.
 }
 \details{
-\code{models} and \code{sift} take either form. A length-one string is the name of a registered learner.
+\code{learners} and \code{sift} take either form. A length-one string is the name of a registered learner.
 }
 \examples{
 base <- c(elasticnet(), forest())

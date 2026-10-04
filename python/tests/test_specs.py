@@ -146,7 +146,8 @@ def test_a_sift_reads_grain_names_representations_or_a_single_one():
 
 
 def test_auto_names_the_grains_the_record_gives_more_than_one_bin():
-    assert auto_grains(series(), spec()) == ("native", "halfday", "day", "week", "month")
+    assert auto_grains(series(), spec()) == ("native", "halfday", "day", "week", "month",
+                                                 "season")
     assert auto_grains(series(days=3), spec()) == ("native", "halfday", "day")
 
 
@@ -163,7 +164,8 @@ def test_auto_counts_the_bins_on_the_clock_the_column_carries():
 
 
 def test_auto_leaves_out_the_grains_a_day_level_statistic_is_undefined_at():
-    assert auto_grains(series(), spec(), stats=("cold_day",)) == ("day", "week", "month")
+    assert auto_grains(series(), spec(), stats=("cold_day",)) == ("day", "week", "month",
+                                                                  "season")
 
 
 def test_a_set_of_grains_hands_every_member_its_statistics_and_its_year_start():

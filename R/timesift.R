@@ -2,11 +2,11 @@
 #'
 #' One call from two tables to a scored comparison and a held-out estimate of choosing among it.
 #' `targets` is one row per thing to predict and `series` is the long, time-stamped record belonging
-#' to those rows. Every representation in `sift` is built and every learner in `models` is paired
+#' to those rows. Every representation in `sift` is built and every learner in `learners` is paired
 #' with the ones it can read; each pair is a candidate.
 #'
-#' Within each outer fold of `resampling` the training targets are split again into `inner` folds.
-#' Every candidate is cross-validated on that inner split, the rule picks one on its inner score,
+#' Within each outer fold of `resampling` the training targets are split again into `n_inner` folds.
+#' Every candidate is cross-validated on that inner split, `choose` picks one on its inner score,
 #' and the stack's weights are fitted on the inner out-of-fold predictions. Every candidate is then
 #' refitted on the whole outer training set and predicts the outer test fold, and the selected
 #' candidate's prediction and the prediction combined under that fold's weights are kept. Nothing
@@ -18,7 +18,7 @@
 #' holds those. They say where predictive skill saturates as the record is read more coarsely, which
 #' is the measurement the package exists for, but the highest of them is a number the held-out
 #' targets helped choose: read the candidates for the shape of the comparison and `estimate` for
-#' the level. With `inner = NULL` no inner search is run, the candidates are compared on the outer
+#' the level. With `n_inner = NULL` no inner search is run, the candidates are compared on the outer
 #' folds alone and no estimate is made.
 #'
 #' The cost is `v_outer * (v_inner + 1) * candidates` fits for the evaluation and one refit per
@@ -39,7 +39,7 @@
 #' @param coords The two columns of `targets` holding each target's coordinates, as a tidyselect
 #'   expression, for a learner that places a unit in space, such as [hierarchical()]. They travel
 #'   with every representation and are not predictors. None by default.
-#' @param models A learner, a set of them from [c()], or a list. Defaults to [elasticnet()].
+#' @param learners A learner, a set of them from [c()], or a list. Defaults to [elasticnet()].
 #' @param sift The representations a learner without a `data =` of its own is run across.
 #'   A [grains()] or [lookbacks()] set, a set from [c()], a bare vector of grain names, a single
 #'   representation, or a list of them. Defaults to `grains("auto")`.
@@ -50,11 +50,11 @@
 #'   all the repeats' held-out predictions, `oof` is a target's mean prediction over the repeats,
 #'   and the stack is fitted on the repeats' out-of-fold predictions together. The models, the
 #'   per-fold fits and `folds` are the first repeat's.
-#' @param inner Number of inner folds the choice and the stack's weights are made on inside each
+#' @param n_inner Number of inner folds the choice and the stack's weights are made on inside each
 #'   outer training set, a function of the outer training response returning a fold map for those
 #'   targets, or `NULL` to compare the candidates on the outer folds without an estimate. A count
 #'   deals the inner folds by the grouping the outer split carries, as [select_grain()] does.
-#' @param rule How a candidate is chosen from its inner scores, `"argmax"` or
+#' @param choose How a candidate is chosen from its inner scores, `"argmax"` or
 #'   `"coarsest_adequate"`, as in [select_grain()].
 #' @param response Name of the registered response head.
 #' @param metric Name of a registered metric, or a function of `(y, p)`, or `NULL` for the
@@ -94,18 +94,19 @@
 #'     stack (`arm = "ensemble"`), one row per metric, with the standard error and the 95% interval
 #'     across response variables. An interval across the variables of this dataset, not one for a
 #'     new sample: every variable is fitted and scored on the same targets and folds, so the error
-#'     they share is not in it. `NULL` with `inner = NULL`.
+#'     they share is not in it. `NULL` with `n_inner = NULL`.
 #'   * `selected`: one row per outer fold, the candidate it chose, the inner score it chose on, the
 #'     highest inner score and that score's standard error; `inner`: every candidate's inner score
 #'     in every outer fold; `fold_weights`: the stack's weights in every outer fold, one row per
-#'     fold. All `NULL` with `inner = NULL`.
+#'     fold and a column per candidate, 0 where that fold's stack left the candidate out. All
+#'     `NULL` with `n_inner = NULL`.
 #'   * `predictions`: the held-out prediction of every target under the selected candidate and under
 #'     the stack.
 #'   * `candidates`, `scores` and `oof`: every candidate, its per-cell scores on the outer folds and
 #'     its outer out-of-fold predictions.
 #'   * `choice`, `models`, `stack` and `weights`: the procedure applied to every target, which is
 #'     what [predict()] uses. Every candidate is refitted on all of them; `choice` is the candidate
-#'     the rule takes on the outer scores, with the outer folds as the split it chooses on, and
+#'     `choose` takes on the outer scores, with the outer folds as the split it chooses on, and
 #'     `stack` holds weights fitted on the outer out-of-fold predictions.
 #'   * `representations`, `fits`, `folds`, `cells`, `y`, and the `metric`, `response`, `spec` and
 #'     `call` it was asked for.
@@ -133,13 +134,13 @@
 #' @export
 timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL,
                      target_time = NULL, static = NULL, coords = NULL,
-                     models = NULL, sift = NULL, ensemble = TRUE,
-                     resampling = cv(), inner = 5L, rule = c("argmax", "coarsest_adequate"),
+                     learners = NULL, sift = NULL, ensemble = TRUE,
+                     resampling = cv(), n_inner = 5L, choose = c("argmax", "coarsest_adequate"),
                      response = "presence_absence", metric = NULL,
                      control = train_control(), keep_fits = FALSE, seed = 1L, verbose = TRUE,
                      .refit = TRUE) {
   call <- match.call()
-  rule <- match.arg(rule)
+  choose <- match.arg(choose)
   env <- parent.frame()
   if (inherits(resampling, "timesift_resampling") && resampling$repeats > 1L) {
     return(.timesift_repeated(call, env, resampling, ensemble, response, verbose))
@@ -210,7 +211,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
     ensemble <- .run_ensemble(ensemble, response)
   }
 
-  learners <- .learner_list(models %||% list(elasticnet()))
+  learners <- .learner_list(learners %||% list(elasticnet()))
   for (ln in names(learners)) .learner_contract(learners[[ln]], ln)
   .refuse_pinned(learners)
   if (is.null(series) && !is.null(sift) && verbose) {
@@ -247,7 +248,7 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
   metric <- .as_metric(metric, head$metric)
   score <- metric$fn
   levels <- sort(unique(f))
-  nested <- !is.null(inner)
+  nested <- !is.null(n_inner)
   stacking <- !isFALSE(ensemble) && nrow(fitted) >= 2L
   if (!isFALSE(ensemble) && !stacking && verbose) {
     message("no ensemble: stacking needs at least two candidates.")
@@ -260,8 +261,8 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
   # the order the candidates were declared in is both the fitting order and the order a tie falls in.
   pairs <- data.frame(grain = fitted$representation, learner = fitted$learner,
                       stringsAsFactors = FALSE)
-  ctx <- .selection_context(built, y_matrix, learners, pairs, pairs, rule,
-                            if (nested) .inner_splitter(inner, group) else NULL,
+  ctx <- .selection_context(built, y_matrix, learners, pairs, pairs, choose,
+                            if (nested) .inner_splitter(n_inner, group) else NULL,
                             response, metric_arg %||% head$metric, control, group)
   n_cand <- nrow(fitted)
   blank <- matrix(NA_real_, nrow = nrow(y_matrix), ncol = ncol(y_matrix),
@@ -297,7 +298,11 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
         st <- .fold_stack(search$lad, fitted, y_matrix[train, , drop = FALSE], ensemble)
         combined <- ensemble_combine(st, stats::setNames(refit$preds, fitted$candidate))
         p_ensemble[rownames(combined), colnames(combined)] <- combined
-        fold_weights[[i]] <- as.data.frame(as.list(c(fold = k, st$weights)), check.names = FALSE)
+        # A candidate the fold's stack left out, below `min_score` there, carries no weight in it,
+        # so every fold's row names every candidate.
+        w <- stats::setNames(numeric(n_cand), fitted$candidate)
+        w[names(st$weights)] <- st$weights
+        fold_weights[[i]] <- as.data.frame(as.list(c(fold = k, w)), check.names = FALSE)
       }
     }
     if (verbose) {

@@ -354,7 +354,7 @@ print.timesift_fit <- function(x, ...) {
 #' `c()` again splices, so a set can be added to rather than rewritten, which is what `list()`
 #' cannot do: `c(base, cnn())` where `base` is already a set.
 #'
-#' `models` and `sift` take either form. A length-one string is the name of a registered learner.
+#' `learners` and `sift` take either form. A length-one string is the name of a registered learner.
 #'
 #' @param ... Learners, representations, or sets of either.
 #' @return A `timesift_models` for learners and a `timesift_sift` for representations.
@@ -390,7 +390,7 @@ print.timesift_models <- function(x, ...) {
   invisible(x)
 }
 
-# The set a `c()` of learners is, validated by the same call every entry point resolves `models`
+# The set a `c()` of learners is, validated by the same call every entry point resolves `learners`
 # with, so a set and a bare list cannot disagree about what a valid one is.
 .models <- function(x) {
   structure(.learner_list(x), class = "timesift_models")

@@ -40,7 +40,7 @@
 #'   cells$sp1 <- rbinom(30, 1, plogis(cells$elev))
 #'   cells$sp2 <- rbinom(30, 1, plogis(-cells$slope))
 #'   fit <- timesift(cells, y = c(sp1, sp2), id = cell, static = c(elev, slope),
-#'                   models = elasticnet(), ensemble = FALSE, inner = NULL,
+#'                   learners = elasticnet(), ensemble = FALSE, n_inner = NULL,
 #'                   resampling = cv(v = 3), verbose = FALSE)
 #'   project(fit, static = static, candidate = "elasticnet / static")
 #' }

@@ -245,7 +245,7 @@ def oracle_lookback_matrix(data, id, time, value, at, span, lag="0 days", bins=1
 
 
 def oracle_grain_matrix(data, id, time, value, *, grain="day", stats=("mean",),
-                         year_start="09-01", tz=None):
+                         year_start="01-01", tz=None):
     unit = np.asarray([str(v) for v in data[id]])
     when = np.asarray(data[time], dtype="datetime64[s]")
     reading = np.asarray(data[value], dtype=np.float64)

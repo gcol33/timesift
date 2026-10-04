@@ -146,7 +146,9 @@ column of one is left out; mgcv refuses the first and the last of those. A colum
 part the columns before it already span keeps its penalised part and loses the linear one.</p>
 <p>The case weights are the response head's, <code><a href="positive_weights.html">positive_weights()</a></code> under presence-absence, and enter
 the likelihood as mgcv's prior weights. The model holds at most as many coefficients as there are
-units, as mgcv's does: one for the intercept and <code>k - 1</code> per column.</p>
+units, as mgcv's does: one for the intercept and <code>k - 1</code> per column.
+Under the shipped presence-absence head those weights are on, so a default <code>additive()</code> is
+mgcv's specification fitted under them; a head registered without <code>weights</code> fits it unweighted.</p>
 <p>The basis, the fit and the choice of the smoothing parameters live in the core the Python package
 calls, pinned against mgcv in the fixtures, so the two languages fit the same model. A response
 holding one value is predicted its mean and named in <code>unfitted</code>; one whose smoothing parameter

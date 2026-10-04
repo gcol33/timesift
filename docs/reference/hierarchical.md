@@ -103,7 +103,9 @@ grid of `nodes` points per hyperparameter, centred on the mode of their
 posterior and weighted by it (Rue, Martino and Chopin 2009). With an
 intercept alone its standard deviation is set at the mode of its
 posterior; with neither the fit is the posterior mode of the
-coefficients. A prediction at new units interpolates the field to their
+coefficients, so at `spatial = "none"` and `random = FALSE` the learner
+is a penalised logistic model, every coefficient shrunk towards zero by
+its prior. A prediction at new units interpolates the field to their
 coordinates, so
 [`predict.timesift()`](https://gillescolling.com/timesift/reference/predict.timesift.md)
 is given targets that carry the same coordinate columns. The head's case

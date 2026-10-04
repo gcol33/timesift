@@ -65,7 +65,7 @@ fit = ts.timesift(
 fit
 ```
 
-Every representation named in `sift` was built, and with `models` left at its default of
+Every representation named in `sift` was built, and with `learners` left at its default of
 `[ts.elasticnet()]`, a penalised logistic regression was fitted on each of them over the same five
 folds. The report has two parts.
 
@@ -165,7 +165,7 @@ how many it has.
 
 ```python error=true
 ts.timesift(targets, series, y="sp*", id="plot", time="t",
-            models=[ts.elasticnet()], sift=ts.native(), verbose=False)
+            learners=[ts.elasticnet()], sift=ts.native(), verbose=False)
 ```
 
 Inside a set such a pair is skipped and listed as `not applicable` by `ts.summary()`; named
@@ -205,8 +205,8 @@ Pooling strength across responses is what makes the rarer ones learnable at thes
 core the R package calls rather than by a fitter on either side: the penalty path, the
 standardisation and the cross-validated choice of penalty are one implementation, and the two
 languages return the same coefficients for the same design. `s` reads that fit at
-`"lambda.min"`, at `"lambda.1se"`, or at a penalty of your own, and `thresh` trades how close the
-descent settles to the optimum against what it costs.
+`"lambda.1se"`, glmnet's default, at `"lambda.min"`, or at a penalty of your own, and `tol` trades
+how close the descent settles to the optimum against what it costs.
 
 Architecture belongs to the constructor and training belongs to `ts.train_control()`, which every
 neural learner of a run reads. A learner given a control of its own overrides the run's on the
@@ -262,7 +262,7 @@ weighted_logistic = ts.Learner("weighted_logistic", fit=logistic_fit,
                                predict=logistic_predict, data=ts.grain("month"))
 
 both = ts.timesift(targets, series, y="sp*", id="plot", time="t",
-                   models=[ts.elasticnet(), nearest_neighbour, weighted_logistic],
+                   learners=[ts.elasticnet(), nearest_neighbour, weighted_logistic],
                    sift=ts.grains("week", "month"), resampling=ts.cv(v=5), verbose=False)
 print(ts.summary(both))
 ```

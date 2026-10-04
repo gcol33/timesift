@@ -63,8 +63,8 @@ test_that("mars refuses settings it has no pass for", {
   expect_error(mars(degree = 0), "whole number")
   expect_error(mars(degree = 1.5), "whole number")
   expect_error(mars(penalty = -2), "-1")
-  expect_error(mars(thresh = 1), "\\[0, 1\\)")
-  expect_error(mars(nk = 0), "whole number")
+  expect_error(mars(min_gain = 1), "\\[0, 1\\)")
+  expect_error(mars(max_terms = 0), "whole number")
   expect_error(mars(prune = NA), "TRUE or FALSE")
   x <- matrix(c(1, 3, 2, 5, 4, 6), ncol = 1L)
   expect_error(.mars_fit(x, c(0, 1, 0, 1, 0, 1), c(1, 1, -1, 1, 1, 1), "gaussian"),

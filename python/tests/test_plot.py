@@ -44,7 +44,7 @@ def test_a_ladder_is_drawn_at_its_summary_levels(run):
 
 def test_a_selection_marks_the_candidate_each_fold_chose(run):
     x, y = run
-    sel = select_grain(x, y, elasticnet(n_inner=3), folds=fold_map(y, v=3), inner=3,
+    sel = select_grain(x, y, elasticnet(n_inner=3), folds=fold_map(y, v=3), n_inner=3,
                        verbose=False)
     inner = plot(sel, title="inner scores")
     assert len(inner) == len(sel.inner)

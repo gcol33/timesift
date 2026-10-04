@@ -205,8 +205,8 @@ your own goes through.
   the knot `t` that most reduce the residual sum of squares of a
   least-squares fit to the response; a knot at a column’s least value
   enters the column linearly. `degree` bounds how many hinges a term
-  multiplies. The pass stops at `nk` terms, when a step raises the
-  R-squared by less than `thresh`, or when no term reduces the
+  multiplies. The pass stops at `max_terms` terms, when a step raises
+  the R-squared by less than `min_gain`, or when no term reduces the
   residuals.
 
 - [`discriminant()`](https://gillescolling.com/timesift/articles/python-learners.html#discriminant):
@@ -405,7 +405,9 @@ its own best threshold, and what a fitted model read.
   distinct predictions.
 
 - [`kappa_score()`](https://gillescolling.com/timesift/articles/python-scoring.html#kappa_score):
-  Cohen’s kappa of a model’s decisions against the observed response.
+
+  Cohen’s kappa of a model’s decisions against the observed response,
+  cut by `rule`.
 
 - [`table_metric()`](https://gillescolling.com/timesift/articles/python-scoring.html#table_metric):
   A metric of the two-by-two table of decisions against observations.

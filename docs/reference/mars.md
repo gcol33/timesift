@@ -9,8 +9,9 @@ column and the knot `t` that most reduce the residual sum of squares of
 a least-squares fit to the response. A knot at a column's least value
 enters the column linearly. `degree` bounds how many hinges a term
 multiplies, so `degree = 1` is an additive model and `2` admits pairwise
-interactions. The pass stops at `nk` terms, when a step raises the
-R-squared by less than `thresh`, or when no term reduces the residuals.
+interactions. The pass stops at `max_terms` terms, when a step raises
+the R-squared by less than `min_gain`, or when no term reduces the
+residuals.
 
 ## Usage
 
@@ -19,8 +20,8 @@ mars(
   data = NULL,
   degree = 1L,
   penalty = NULL,
-  nk = NULL,
-  thresh = 0.001,
+  max_terms = NULL,
+  min_gain = 0.001,
   minspan = 0L,
   endspan = 0L,
   fast_k = 20L,
@@ -47,12 +48,12 @@ mars(
   The generalised cross-validation's charge per knot. `NULL` is earth's,
   2 at degree one and 3 above; -1 charges nothing.
 
-- nk:
+- max_terms:
 
   The most terms the forward pass reaches, the intercept included.
   `NULL` is `min(200, max(20, 2 p)) + 1` for `p` columns.
 
-- thresh:
+- min_gain:
 
   The least rise in R-squared a forward step is kept for.
 
@@ -100,12 +101,12 @@ refitted by least squares.
 
 The defaults are earth's own, which biomod2 uses under its default
 option set and under `"bigboss"` alike: degree one, `penalty = 2`,
-`thresh = 0.001`, `nk = min(200, max(20, 2 p)) + 1` for `p` columns,
-Friedman's rules for the spans between knots, and Fast MARS over the 20
-best parents. The forward pass, the pruning pass and the refit live in
-the core the Python package calls, pinned against earth in the fixtures,
-so the two languages keep the same terms and return the same
-coefficients.
+`min_gain = 0.001`, `max_terms = min(200, max(20, 2 p)) + 1` for `p`
+columns, Friedman's rules for the spans between knots, and Fast MARS
+over the 20 best parents. The forward pass, the pruning pass and the
+refit live in the core the Python package calls, pinned against earth in
+the fixtures, so the two languages keep the same terms and return the
+same coefficients.
 
 The case weights are the response head's,
 [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
@@ -113,7 +114,10 @@ under presence-absence, and weigh both passes and the refit as earth
 weighs them. earth refits the whole basis by QR at every candidate knot
 of a weighted fit; the core reaches the same residual sums with
 Friedman's running updates, which is what makes a weighted fit over
-hundreds of columns affordable.
+hundreds of columns affordable. Under the shipped presence-absence head
+those weights are on, so a default `mars()` is earth's specification
+fitted under them; a head registered without `weights` fits it
+unweighted.
 
 A response holding one value is predicted its mean.
 

@@ -6,9 +6,9 @@
 #' `max(0, x - t)` and `max(0, t - x)`, taking the parent, the column and the knot `t` that most
 #' reduce the residual sum of squares of a least-squares fit to the response. A knot at a column's
 #' least value enters the column linearly. `degree` bounds how many hinges a term multiplies, so
-#' `degree = 1` is an additive model and `2` admits pairwise interactions. The pass stops at `nk`
-#' terms, when a step raises the R-squared by less than `thresh`, or when no term reduces the
-#' residuals.
+#' `degree = 1` is an additive model and `2` admits pairwise interactions. The pass stops at
+#' `max_terms` terms, when a step raises the R-squared by less than `min_gain`, or when no term
+#' reduces the residuals.
 #'
 #' The pruning pass then removes terms one at a time, each time the one whose loss raises the
 #' residuals least, and keeps the subset of least generalised cross-validation, which charges
@@ -19,16 +19,18 @@
 #' mean count; under a squared-error head they are refitted by least squares.
 #'
 #' The defaults are earth's own, which biomod2 uses under its default option set and under
-#' `"bigboss"` alike: degree one, `penalty = 2`, `thresh = 0.001`, `nk = min(200, max(20, 2 p)) + 1`
-#' for `p` columns, Friedman's rules for the spans between knots, and Fast MARS over the 20 best
-#' parents. The forward pass, the pruning pass and the refit live in the core the Python package
-#' calls, pinned against earth in the fixtures, so the two languages keep the same terms and return the same
-#' coefficients.
+#' `"bigboss"` alike: degree one, `penalty = 2`, `min_gain = 0.001`,
+#' `max_terms = min(200, max(20, 2 p)) + 1` for `p` columns, Friedman's rules for the spans
+#' between knots, and Fast MARS over the 20 best parents. The forward pass, the pruning pass and
+#' the refit live in the core the Python package calls, pinned against earth in the fixtures, so
+#' the two languages keep the same terms and return the same coefficients.
 #'
 #' The case weights are the response head's, [positive_weights()] under presence-absence, and weigh
 #' both passes and the refit as earth weighs them. earth refits the whole basis by QR at every
 #' candidate knot of a weighted fit; the core reaches the same residual sums with Friedman's running
 #' updates, which is what makes a weighted fit over hundreds of columns affordable.
+#' Under the shipped presence-absence head those weights are on, so a default `mars()` is
+#' earth's specification fitted under them; a head registered without `weights` fits it unweighted.
 #'
 #' A response holding one value is predicted its mean.
 #'
@@ -36,9 +38,9 @@
 #' @param degree The most hinges a term multiplies.
 #' @param penalty The generalised cross-validation's charge per knot. `NULL` is earth's, 2 at
 #'   degree one and 3 above; -1 charges nothing.
-#' @param nk The most terms the forward pass reaches, the intercept included. `NULL` is
+#' @param max_terms The most terms the forward pass reaches, the intercept included. `NULL` is
 #'   `min(200, max(20, 2 p)) + 1` for `p` columns.
-#' @param thresh The least rise in R-squared a forward step is kept for.
+#' @param min_gain The least rise in R-squared a forward step is kept for.
 #' @param minspan,endspan Units between knots, and units at either end of a column no knot is
 #'   placed among. 0 is Friedman's rule; a negative `minspan` asks for that many knots per column.
 #' @param fast_k,fast_beta Fast MARS: parents tried at each step, and how fast an untried parent
@@ -55,11 +57,11 @@
 #' mars(data = grain("season"), nprune = 10L)
 #'
 #' @export
-mars <- function(data = NULL, degree = 1L, penalty = NULL, nk = NULL, thresh = 0.001,
-                 minspan = 0L, endspan = 0L, fast_k = 20L, fast_beta = 1, prune = TRUE,
-                 nprune = NULL, threads = 1L) {
+mars <- function(data = NULL, degree = 1L, penalty = NULL, max_terms = NULL,
+                 min_gain = 0.001, minspan = 0L, endspan = 0L, fast_k = 20L, fast_beta = 1,
+                 prune = TRUE, nprune = NULL, threads = 1L) {
   .check_count(degree, "degree", 1)
-  if (!is.null(nk)) .check_count(nk, "nk", 1)
+  if (!is.null(max_terms)) .check_count(max_terms, "max_terms", 1)
   if (!is.null(nprune)) .check_count(nprune, "nprune", 1)
   .check_count(endspan, "endspan", 0)
   .check_count(fast_k, "fast_k", 0)
@@ -72,9 +74,9 @@ mars <- function(data = NULL, degree = 1L, penalty = NULL, nk = NULL, thresh = 0
     stop("`penalty` is one number of zero or more, or -1, got ", .describe(penalty), ".",
          call. = FALSE)
   }
-  if (!is.numeric(thresh) || length(thresh) != 1L || is.na(thresh) || thresh < 0 ||
-      thresh >= 1) {
-    stop("`thresh` is one number in [0, 1), got ", .describe(thresh), ".", call. = FALSE)
+  if (!is.numeric(min_gain) || length(min_gain) != 1L || is.na(min_gain) || min_gain < 0 ||
+      min_gain >= 1) {
+    stop("`min_gain` is one number in [0, 1), got ", .describe(min_gain), ".", call. = FALSE)
   }
   if (!is.numeric(fast_beta) || length(fast_beta) != 1L || is.na(fast_beta) || fast_beta < 0) {
     stop("`fast_beta` is one number of zero or more, got ", .describe(fast_beta), ".",
@@ -86,12 +88,12 @@ mars <- function(data = NULL, degree = 1L, penalty = NULL, nk = NULL, thresh = 0
   learner(
     name = "mars",
     data = data, reads = "tabular", multi = "separate",
-    params = list(degree = as.integer(degree), penalty = penalty, nk = nk, thresh = thresh,
-                  minspan = as.integer(minspan), endspan = as.integer(endspan),
+    params = list(degree = as.integer(degree), penalty = penalty, max_terms = max_terms,
+                  min_gain = min_gain, minspan = as.integer(minspan), endspan = as.integer(endspan),
                   fast_k = as.integer(fast_k), fast_beta = fast_beta, prune = prune,
                   nprune = nprune, threads = as.integer(threads)),
-    fit = function(x, y, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_beta, prune,
-                   nprune, threads, head, weights, ...) {
+    fit = function(x, y, degree, penalty, max_terms, min_gain, minspan, endspan, fast_k,
+                   fast_beta, prune, nprune, threads, head, weights, ...) {
       family <- .head_family(head)
       m <- .flatten(x)
       models <- lapply(seq_len(ncol(y)), function(j) {
@@ -99,9 +101,10 @@ mars <- function(data = NULL, degree = 1L, penalty = NULL, nk = NULL, thresh = 0
         if (length(unique(yj)) < 2L) {
           return(mean(yj))
         }
-        .mars_fit(m, yj, weights[, j], family, degree = degree, penalty = penalty, nk = nk,
-                  thresh = thresh, minspan = minspan, endspan = endspan, fast_k = fast_k,
-                  fast_beta = fast_beta, prune = prune, nprune = nprune, threads = threads)
+        .mars_fit(m, yj, weights[, j], family, degree = degree, penalty = penalty,
+                  nk = max_terms, thresh = min_gain, minspan = minspan, endspan = endspan,
+                  fast_k = fast_k, fast_beta = fast_beta, prune = prune, nprune = nprune,
+                  threads = threads)
       })
       stopped <- colnames(y)[vapply(models, function(f) is.list(f) && !f$converged, logical(1L))]
       list(models = models, columns = colnames(m), family = family, stopped = stopped)

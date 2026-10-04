@@ -17,7 +17,7 @@ grain_matrix(
     *,
     grain='day',
     stats=('mean',),
-    year_start='09-01',
+    year_start='01-01',
     partial='keep',
     tz=None,
 )
@@ -106,7 +106,7 @@ in instants could not.
 ## `coverage()`
 
 ``` python
-coverage(data=None, id=None, time=None, *, grain='day', year_start='09-01', tz=None)
+coverage(data=None, id=None, time=None, *, grain='day', year_start='01-01', tz=None)
 ```
 
 Which units reach which bins.

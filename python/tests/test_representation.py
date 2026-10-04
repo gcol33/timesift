@@ -96,7 +96,7 @@ def test_a_bin_the_record_does_not_fill_is_reported_and_can_be_dropped():
     # and year of the calendar and neither the first nor the last week of it.
     aligned = hourly(units=("a",), hours=26304, start="2021-09-01")
     for w in ("native", "halfday", "day", "month", "season", "year"):
-        x = grain_matrix(aligned, "id", "time", "value", grain=w)
+        x = grain_matrix(aligned, "id", "time", "value", grain=w, year_start="09-01")
         assert not x.bin_partial.any(), w
     week = grain_matrix(aligned, "id", "time", "value", grain="week")
     assert np.flatnonzero(week.bin_partial).tolist() == [0, 156]
@@ -136,7 +136,7 @@ def test_a_caller_supplied_calendar_owns_its_own_bin_lengths():
 
     # The same record on the named grain counts three calendar months from the anniversary, so it
     # is a different rule and a different number of bins, not a different implementation of one.
-    named = grain_matrix(d, "id", "time", "value", grain="season")
+    named = grain_matrix(d, "id", "time", "value", grain="season", year_start="09-01")
     assert named.values.shape[1] == 3
     assert [b[:10] for b in named.bins] == ["2021-09-01", "2021-12-01", "2022-03-01"]
 
@@ -144,9 +144,9 @@ def test_a_caller_supplied_calendar_owns_its_own_bin_lengths():
 def test_the_hydrological_year_boundary_moves_with_year_start():
     t = np.datetime64("2021-08-25T00:00:00", "s") + np.arange(24 * 20) * np.timedelta64(1, "h")
     d = {"id": ["a"] * len(t), "time": list(t), "value": [1.0] * len(t)}
-    assert grain_matrix(d, "id", "time", "value", grain="year").values.shape[1] == 2
+    assert grain_matrix(d, "id", "time", "value", grain="year").values.shape[1] == 1
     assert grain_matrix(d, "id", "time", "value", grain="year",
-                         year_start="01-01").values.shape[1] == 1
+                         year_start="09-01").values.shape[1] == 2
 
 
 def test_naming_several_grains_returns_one_representation_per_grain():

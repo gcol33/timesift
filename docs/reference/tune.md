@@ -10,7 +10,7 @@ a grid per algorithm by the same device.
 ## Usage
 
 ``` r
-tune(learner, grid = NULL, metric = NULL, inner = 5L, seed = 1L)
+tune(learner, grid = NULL, metric = NULL, n_inner = 5L, seed = 1L)
 ```
 
 ## Arguments
@@ -31,7 +31,7 @@ tune(learner, grid = NULL, metric = NULL, inner = 5L, seed = 1L)
   The registered metric, or a function of `(y, p)`, a setting is scored
   by. Left unset it is the response head's own.
 
-- inner:
+- n_inner:
 
   Number of inner folds.
 
@@ -91,6 +91,6 @@ holds and a grid does not reach.
 ## Examples
 
 ``` r
-tuned <- tune(forest(), list(mtry = c(2, 4), min_node = c(1, 5)), inner = 3L)
+tuned <- tune(forest(), list(mtry = c(2, 4), min_node = c(1, 5)), n_inner = 3L)
 tuned
 ```

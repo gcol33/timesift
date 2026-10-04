@@ -12,7 +12,7 @@ tree(
   max_depth = NULL,
   prune = c("se_sum", "one_se", "min", "none"),
   n_inner = NULL,
-  preset = c("package", "bigboss"),
+  preset = c("default", "bigboss"),
   shrink = 1,
   seed = 1L
 )
@@ -33,7 +33,7 @@ representation of the run.}
 
 \item{n_inner}{Folds of the inner cross-validation the pruning reads.}
 
-\item{preset}{Whose defaults the settings left \code{NULL} take: \code{"package"} or \code{"bigboss"}.}
+\item{preset}{Whose defaults the settings left \code{NULL} take: \code{"default"} or \code{"bigboss"}.}
 
 \item{shrink}{Under a count head, the coefficient of variation of the gamma prior a leaf's rate
 is shrunk by; \code{0} for no shrinkage. rpart's default is \code{1}.}
@@ -62,7 +62,7 @@ biomod2 prunes its classification tree; \code{"one_se"} takes the smallest tree 
 error of the least cross-validated error; \code{"min"} the first row reaching the least error; and
 \code{"none"} keeps the tree as grown.
 
-\code{preset} says whose defaults the settings left \code{NULL} take. \code{"package"} is rpart's own, which is
+\code{preset} says whose defaults the settings left \code{NULL} take. \code{"default"} is rpart's own, which is
 what biomod2's default option set fits: \code{min_split = 20}, \code{min_leaf = round(min_split / 3)}
 (or \code{min_split = 3 * min_leaf} where only \code{min_leaf} is given), \code{cp = 0.01}, \code{max_depth = 30}
 and ten inner folds. \code{"bigboss"} is biomod2's tuned option set: \code{min_split = 5}, \code{min_leaf = 5},
@@ -71,6 +71,8 @@ and ten inner folds. \code{"bigboss"} is biomod2's tuned option set: \code{min_s
 The case weights are the response head's, \code{\link[=positive_weights]{positive_weights()}} under presence-absence. They
 weigh every class count, sum of squares and event count the tree is grown on; \code{min_split} and
 \code{min_leaf} count observations, as rpart's do.
+Under the shipped presence-absence head those weights are on, so a default \code{tree()} is
+rpart's specification fitted under them; a head registered without \code{weights} fits it unweighted.
 
 Under a count head a leaf predicts a rate, and the rate is shrunk towards the rate of the units
 the tree is grown on, as rpart's \code{method = "poisson"} shrinks it: the posterior mean of a gamma

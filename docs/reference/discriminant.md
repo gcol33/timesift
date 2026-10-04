@@ -16,8 +16,8 @@ discriminant(
   data = NULL,
   degree = 1L,
   penalty = NULL,
-  nk = NULL,
-  thresh = 0.001,
+  max_terms = NULL,
+  min_gain = 0.001,
   prune = TRUE,
   calibrate = TRUE,
   threads = 1L
@@ -41,13 +41,13 @@ discriminant(
   degree of freedom, taken at half. `NULL` is mda's, 2 at degree one and
   3 above.
 
-- nk:
+- max_terms:
 
   The most terms the forward pass reaches, the intercept included.
   `NULL` is `max(21, 2 p + 1)` for `p` columns; an even number is taken
   one lower.
 
-- thresh:
+- min_gain:
 
   The least share of the residuals a forward step is kept for.
 
@@ -78,21 +78,23 @@ which differs from earth's that
 reproduces. Each forward step adds a column linearly or a pair of hinges
 on it, `max(0, x - t)` and `max(0, t - x)`, choosing by Friedman's
 running updates, and the pass stops when a step lowers the residuals by
-less than `thresh` of them, when they fall to `thresh` of the null
+less than `min_gain` of them, when they fall to `min_gain` of the null
 model's, when the generalised cross-validation passes ten times the null
-model's, or at `nk` terms. The pruning pass drops the term of least t
-statistic, one at a time, and keeps the subset of least generalised
-cross-validation, which counts each term beyond the intercept as
-`1 + penalty / 2` degrees of freedom. The defaults are mda's, which
-biomod2 passes unchanged under its default option set and under
-`"bigboss"`: degree one, `penalty = 2`, `thresh = 0.001` and
-`nk = max(21, 2 p + 1)` for `p` columns.
+model's, or at `max_terms` terms. The pruning pass drops the term of
+least t statistic, one at a time, and keeps the subset of least
+generalised cross-validation, which counts each term beyond the
+intercept as `1 + penalty / 2` degrees of freedom. The defaults are
+mda's, which biomod2 passes unchanged under its default option set and
+under `"bigboss"`: degree one, `penalty = 2`, `min_gain = 0.001` and
+`max_terms = max(21, 2 p + 1)` for `p` columns.
 
 The case weights are the response head's,
 [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)
 under presence-absence. They set the classes' scores and the variate, as
 `fda()` reads them, and not the basis: mda's forward pass sets them to
-one.
+one. Under the shipped presence-absence head those weights are on, so a
+default `discriminant()` is mda's specification fitted under them; a
+head registered without `weights` fits it unweighted.
 
 biomod2 always recalibrates an `FDA` posterior by a probit regression of
 the response on it, under the case weights, and predicts through that

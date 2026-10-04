@@ -154,7 +154,7 @@ def timesift_set(x) -> TimesiftSet:
 
 
 def grain_matrix(data=None, id=None, time=None, value=None, *, grain="day", stats=("mean",),
-                  year_start="09-01", partial="keep", tz=None):
+                  year_start="01-01", partial="keep", tz=None):
     """Bin readings by the calendar and summarise every bin.
 
     ``data`` is a mapping of column name to sequence, or any object with ``__getitem__`` over the
@@ -258,7 +258,7 @@ class Coverage:
         return "\n".join(lines)
 
 
-def coverage(data=None, id=None, time=None, *, grain="day", year_start="09-01",
+def coverage(data=None, id=None, time=None, *, grain="day", year_start="01-01",
              tz=None) -> Coverage:
     """Which units reach which bins.
 
