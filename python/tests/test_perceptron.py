@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 from timesift import Response, fit_learner, grain_matrix, perceptron
-from timesift._perceptron import perceptron_fit, perceptron_predict
+from timesift._perceptron import perceptron_fit, perceptron_fits, perceptron_predict
 
 FIXTURES = Path(__file__).resolve().parents[2] / "inst" / "spec" / "fixtures"
 HELD = ("unit", "y_gaussian", "y_binomial", "w", "fold")
@@ -150,3 +150,35 @@ def test_a_network_too_large_for_its_inverse_hessian_is_refused_with_its_size():
     x, y = planted()
     with pytest.raises(ValueError, match="approximate inverse Hessian"):
         fit_learner(perceptron(hidden=10, max_hessian=1e-6), x, y)
+
+
+def test_networks_fitted_on_several_threads_are_the_networks_each_response_gets_alone(nn_input):
+    x, yb, w = nn_input["x"], nn_input["y"]["y_binomial"], nn_input["w"]
+    y = np.column_stack([yb, 1 - yb, yb[::-1]])
+    ws = np.column_stack([w, np.ones(len(w)), w])
+    seeds = [3, 11, 29]
+    many = perceptron_fits(x, y, ws, "binomial", seeds, decay=0.05, threads=3)
+    for j in range(3):
+        one = perceptron_fit(x, y[:, j], ws[:, j], "binomial", decay=0.05, seed=seeds[j])
+        np.testing.assert_array_equal(many[j]["weights"], one["weights"])
+        assert many[j]["value"] == one["value"]
+    with pytest.raises(ValueError, match="threads"):
+        perceptron(threads=0)
+
+
+def test_a_standardised_network_is_the_network_on_the_standardised_columns(nn_input):
+    x, y, w = nn_input["x"], nn_input["y"]["y_binomial"], nn_input["w"]
+    a = perceptron_fit(x, y, w, "binomial", decay=0.05, standardise=True)
+    np.testing.assert_allclose(a["centre"], x.mean(axis=0), rtol=1e-12)
+    np.testing.assert_allclose(a["scale"], x.std(axis=0, ddof=1), rtol=1e-12)
+
+    def scaled(m):
+        return np.asfortranarray((m - a["centre"]) / a["scale"])
+
+    b = perceptron_fit(scaled(x), y, w, "binomial", decay=0.05)
+    np.testing.assert_array_equal(a["weights"], b["weights"])
+    np.testing.assert_array_equal(perceptron_predict(a, x * 1.01),
+                                  perceptron_predict(b, scaled(x * 1.01)))
+    assert len(perceptron_fit(x, y, w, "binomial")["centre"]) == 0
+    with pytest.raises(ValueError, match="standardise"):
+        perceptron(standardise=None)

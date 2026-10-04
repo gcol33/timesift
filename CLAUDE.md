@@ -230,6 +230,7 @@ is 365 days and a month is 30 days there, because a lookback of a fixed length i
   same starting weights it ends at nnet's weights to the bit, which takes nnet's order of
   summation in the gradient; the fixtures are asserted at the spread a last-bit jitter of the
   starting weights gives each case, since another platform's `exp()` moves the path that much.
+  `hierarchical()` finds the mode of its hyperparameters with the same minimiser.
 - **Every core is timesift's own code, written from the published method.** A reference package
   fixes the numbers a core must give, never its code: the structure, the decomposition and the
   names are ours, comments cite the paper, and the reference is named only where a comment states

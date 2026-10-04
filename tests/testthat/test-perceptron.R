@@ -150,3 +150,31 @@ test_that("a network too large for its inverse Hessian is refused with its size"
   expect_error(fit_learner(perceptron(hidden = 10L, max_hessian = 0.001), x, y),
                "approximate inverse Hessian")
 })
+
+test_that("networks fitted on several threads are the networks each response gets alone", {
+  fx <- perceptron_fixture()
+  y <- cbind(fx$y$y_binomial, 1 - fx$y$y_binomial, rev(fx$y$y_binomial))
+  w <- cbind(fx$w, rep(1, nrow(y)), fx$w)
+  seeds <- c(3L, 11L, 29L)
+  many <- .perceptron_fits(fx$x, y, w, "binomial", seeds = seeds, decay = 0.05, threads = 3L)
+  for (j in seq_len(ncol(y))) {
+    one <- .perceptron_fit(fx$x, y[, j], w[, j], "binomial", decay = 0.05, seed = seeds[j])
+    expect_identical(many[[j]], one)
+  }
+  expect_error(perceptron(threads = 0L), "threads")
+})
+
+test_that("a standardised network is the network on the standardised columns", {
+  fx <- perceptron_fixture()
+  a <- .perceptron_fit(fx$x, fx$y$y_binomial, fx$w, "binomial", decay = 0.05,
+                       standardise = TRUE)
+  expect_equal(a$centre, unname(colMeans(fx$x)), tolerance = 1e-12)
+  expect_equal(a$scale, unname(apply(fx$x, 2L, stats::sd)), tolerance = 1e-12)
+  scaled <- function(m) sweep(sweep(m, 2L, a$centre), 2L, a$scale, "/")
+  b <- .perceptron_fit(scaled(fx$x), fx$y$y_binomial, fx$w, "binomial", decay = 0.05)
+  expect_identical(a$weights, b$weights)
+  expect_identical(.perceptron_predict(a, fx$x * 1.01),
+                   .perceptron_predict(b, scaled(fx$x * 1.01)))
+  expect_length(.perceptron_fit(fx$x, fx$y$y_binomial, fx$w, "binomial")$centre, 0L)
+  expect_error(perceptron(standardise = NA), "standardise")
+})

@@ -765,40 +765,57 @@ NB_MODULE(_core, m) {
         nb::arg("fit"), nb::arg("newx"));
 
   m.def("perceptron_fit",
-        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int hidden, bool skip,
-           double decay, double range, int max_iter, double abs_tol, double rel_tol, int seed,
+        [](ConstMat x, ConstMat y, ConstMat w, const std::vector<std::int64_t>& seeds,
+           const std::string& family, int hidden, bool skip, bool standardise, double decay,
+           double range, int max_iter, double abs_tol, double rel_tol, int threads,
            ConstF64 start) {
+          if (y.shape(0) != x.shape(0) || w.shape(0) != x.shape(0) || w.shape(1) != y.shape(1) ||
+              seeds.size() != y.shape(1)) {
+            throw std::invalid_argument(
+                "a network is fitted on one response, one weight and one seed per column");
+          }
           timesift::PerceptronSpec spec;
           spec.family = timesift::family_from_name(family);
           spec.hidden = hidden;
           spec.skip = skip;
+          spec.standardise = standardise;
           spec.decay = decay;
           spec.range = range;
           spec.max_iter = max_iter;
           spec.abs_tol = abs_tol;
           spec.rel_tol = rel_tol;
-          spec.seed = static_cast<std::uint32_t>(seed);
+          std::vector<std::uint32_t> seed(seeds.size());
+          for (std::size_t s = 0; s < seeds.size(); ++s) {
+            seed[s] = static_cast<std::uint32_t>(seeds[s]);
+          }
           const std::vector<double> init(start.data(), start.data() + start.shape(0));
-          timesift::Perceptron fit;
+          std::vector<timesift::Perceptron> fits;
           {
             nb::gil_scoped_release release;
-            fit = timesift::perceptron_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
-                                           spec, init);
+            fits = timesift::perceptron_fit(x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+                                            y.shape(1), seed.data(), spec, threads, init);
           }
-          nb::dict out;
-          out["family"] = std::string(timesift::family_name(fit.family));
-          out["n_column"] = fit.n_column;
-          out["hidden"] = fit.hidden;
-          out["skip"] = fit.skip;
-          out["weights"] = give(std::move(fit.weights));
-          out["value"] = fit.value;
-          out["iterations"] = fit.iterations;
-          out["converged"] = fit.converged;
+          nb::list out;
+          for (timesift::Perceptron& fit : fits) {
+            nb::dict one;
+            one["family"] = std::string(timesift::family_name(fit.family));
+            one["n_column"] = fit.n_column;
+            one["hidden"] = fit.hidden;
+            one["skip"] = fit.skip;
+            one["centre"] = give(std::move(fit.centre));
+            one["scale"] = give(std::move(fit.scale));
+            one["weights"] = give(std::move(fit.weights));
+            one["value"] = fit.value;
+            one["iterations"] = fit.iterations;
+            one["converged"] = fit.converged;
+            out.append(one);
+          }
           return out;
         },
-        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("hidden"),
-        nb::arg("skip"), nb::arg("decay"), nb::arg("range"), nb::arg("max_iter"),
-        nb::arg("abs_tol"), nb::arg("rel_tol"), nb::arg("seed"), nb::arg("start"));
+        nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("seeds"), nb::arg("family"),
+        nb::arg("hidden"), nb::arg("skip"), nb::arg("standardise"), nb::arg("decay"),
+        nb::arg("range"), nb::arg("max_iter"), nb::arg("abs_tol"), nb::arg("rel_tol"),
+        nb::arg("threads"), nb::arg("start"));
 
   m.def("perceptron_predict",
         [](const nb::dict& fit, ConstMat newx) {
@@ -807,6 +824,8 @@ NB_MODULE(_core, m) {
           s.n_column = nb::cast<std::int32_t>(fit["n_column"]);
           s.hidden = nb::cast<std::int32_t>(fit["hidden"]);
           s.skip = nb::cast<bool>(fit["skip"]);
+          s.centre = take_field<double>(fit, "centre");
+          s.scale = take_field<double>(fit, "scale");
           s.weights = take_field<double>(fit, "weights");
           std::vector<double> out(newx.shape(0));
           timesift::perceptron_predict(s, newx.data(), newx.shape(0), newx.shape(1), out.data());

@@ -21,10 +21,12 @@ perceptron(
   range = NULL,
   max_iter = NULL,
   skip = FALSE,
+  standardise = FALSE,
   abs_tol = 1e-04,
   rel_tol = 1e-08,
   preset = c("default", "bigboss"),
   max_hessian = 2,
+  threads = 1L,
   seed = 1L
 )
 ```
@@ -56,6 +58,10 @@ perceptron(
 
   Whether the output also takes every column directly.
 
+- standardise:
+
+  Whether each column is centred and scaled before the fit.
+
 - abs_tol, rel_tol:
 
   The fit stops when the objective falls below `abs_tol`, or when an
@@ -68,7 +74,12 @@ perceptron(
 
 - max_hessian:
 
-  Gigabytes the minimiser's approximate inverse Hessian may take.
+  Gigabytes the minimisers' approximate inverse Hessians may take
+  together.
+
+- threads:
+
+  Responses fitted at once.
 
 - seed:
 
@@ -97,14 +108,22 @@ sets them, and nnet's own `decay = 0`, `range = 0.7` and
 units, `decay = 0.1`, `range = 0.1` and `max_iter = 200`. A setting
 given explicitly beats either.
 
+nnet reads the columns as given, and so does the default: a record in
+its own units saturates the hidden units sooner the wider its range.
+With `standardise = TRUE` each column is centred on its mean and divided
+by its sample standard deviation over the fitting units, and a
+prediction centres and scales by the fit's own.
+
 The network, its objective and the minimiser live in the core the Python
 package calls, pinned against nnet in the fixtures from the same
 starting weights, so the two languages fit the same network. The
 starting weights are drawn from the core's own generator, so a fit does
-not repeat nnet's from the same R seed. The minimiser holds an
-approximate inverse Hessian of one number per pair of weights; a network
-that would need more than `max_hessian` gigabytes for it is refused with
-the size, and a coarser grain or fewer hidden units shrinks it.
+not repeat nnet's from the same R seed. `threads` fit that many
+responses at once, each network the same as when fitted alone. The
+minimiser holds an approximate inverse Hessian of one number per pair of
+weights for every network fitted at once; a fit that would need more
+than `max_hessian` gigabytes for them is refused with the size, and a
+coarser grain, fewer hidden units or fewer threads shrinks it.
 
 The case weights are the response head's,
 [`positive_weights()`](https://gillescolling.com/timesift/reference/positive_weights.md)

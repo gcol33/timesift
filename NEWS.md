@@ -48,7 +48,9 @@
   option set (two hidden units, nnet's `decay = 0`, `rang = 0.7`, `maxit = 100`) and
   `preset = "bigboss"` its tuned one; `tune()` searches biomod2's `ANN` grid of `hidden` and
   `decay`. Under a presence-absence head it fits the cross-entropy, nnet's `entropy = TRUE`, where
-  biomod2 leaves nnet's least squares on the logistic output.
+  biomod2 leaves nnet's least squares on the logistic output. `threads` fits that many responses
+  at once, each network the one it gets alone, and `standardise = TRUE` centres and scales the
+  columns first, which nnet and the default do not.
 * `train_control()` takes `optimizer` (`"adamw"`, the default, `"adam"` or `"sgd"`), a `penalty`
   with its `alpha`, cito's `lambda` and `alpha` with `alpha` read as `elasticnet()` reads it, and a
   `schedule` (`"cosine"`, the default, `"constant"` or `"plateau"` with `plateau_factor` and
@@ -68,6 +70,9 @@
   presence-absence head it is fitted under `positive_weights()`, so a default `tree()` is rpart's
   specification under those case weights. `hierarchical()` says that at `spatial = "none"` and
   `random = FALSE` it is a penalised logistic model.
+* `hierarchical()` finds the mode of its hyperparameters with the variable metric minimiser
+  `perceptron()` uses, where it carried a second BFGS of its own with a capped step. The mode, and
+  with it the nodes and the fit, can move at the size of the search's tolerance.
 
 * In Python a representation, a learner and a training control print as they do in R, where they
   printed as their dataclass fields and a learner's functions.

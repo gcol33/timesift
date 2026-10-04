@@ -1446,7 +1446,8 @@ def _mars_predict(model, x):
 
 
 def perceptron(data=None, hidden=None, decay=None, range=None, max_iter=None, skip=False,
-               abs_tol=1e-4, rel_tol=1e-8, preset="default", max_hessian=2.0, seed=1) -> Learner:
+               standardise=False, abs_tol=1e-4, rel_tol=1e-8, preset="default", max_hessian=2.0,
+               threads=1, seed=1) -> Learner:
     """One network per variable over every bin-by-channel column, fitted as the nnet package fits
     it and as biomod2 fits ``ANN``. Each of ``hidden`` logistic units takes a bias and every
     column, and the output takes a bias, every hidden unit and, with ``skip``, every column again.
@@ -1469,12 +1470,17 @@ def perceptron(data=None, hidden=None, decay=None, range=None, max_iter=None, sk
     units, ``decay=0.1``, ``range=0.1`` and ``max_iter=200``. A setting given explicitly beats
     either.
 
+    nnet reads the columns as given, and so does the default: a record in its own units saturates
+    the hidden units sooner the wider its range. With ``standardise=True`` each column is centred
+    on its mean and divided by its sample standard deviation over the fitting units, and a
+    prediction centres and scales by the fit's own.
+
     The network, its objective and the minimiser live in the core the R package calls, pinned
     against nnet in the fixtures from the same starting weights, so the two languages fit the same
-    network. Neither scales the columns, as nnet does not, so a record read in its own units
-    saturates the hidden units sooner the wider its range. The minimiser holds an approximate
-    inverse Hessian of one number per pair of weights; a network that would need more than
-    ``max_hessian`` gigabytes for it is refused with the size. The case weights are the head's and
+    network. ``threads`` fit that many variables at once, each network the same as when fitted
+    alone. The minimiser holds an approximate inverse Hessian of one number per pair of weights for
+    every network fitted at once; a fit that would need more than ``max_hessian`` gigabytes for
+    them is refused with the size. The case weights are the head's and
     weigh each unit's term of the loss; under the shipped presence-absence head they are on, so a
     default ``perceptron()`` is biomod2's ``ANN`` specification fitted under them, and a head
     registered without ``weights`` fits it unweighted. A variable holding one value is predicted
@@ -1486,15 +1492,18 @@ def perceptron(data=None, hidden=None, decay=None, range=None, max_iter=None, sk
                     ("abs_tol", abs_tol), ("rel_tol", rel_tol)):
         if isinstance(v, bool) or not isinstance(v, (int, float)) or not v >= 0:
             raise ValueError(f"`{name}` is one number of zero or more, got {v!r}.")
-    if not isinstance(skip, (bool, np.bool_)):
-        raise ValueError(f"`skip` is True or False, got {skip!r}.")
+    for name, v in (("skip", skip), ("standardise", standardise)):
+        if not isinstance(v, (bool, np.bool_)):
+            raise ValueError(f"`{name}` is True or False, got {v!r}.")
+    _whole(threads, "threads", 1)
     if isinstance(max_hessian, bool) or not isinstance(max_hessian, (int, float)) \
             or not max_hessian > 0:
         raise ValueError(f"`max_hessian` is one positive number, got {max_hessian!r}.")
     return Learner(name="perceptron", fit=_perceptron_fit, predict=_perceptron_predict, data=data,
                    reads="tabular", multi="separate",
-                   params=dict(settings, skip=bool(skip), abs_tol=float(abs_tol),
-                               rel_tol=float(rel_tol), max_hessian=float(max_hessian),
+                   params=dict(settings, skip=bool(skip), standardise=bool(standardise),
+                               abs_tol=float(abs_tol), rel_tol=float(rel_tol),
+                               max_hessian=float(max_hessian), threads=int(threads),
                                seed=int(seed)))
 
 
@@ -1514,25 +1523,30 @@ def _perceptron_settings(preset, hidden, decay, range_, max_iter) -> dict:
     return out
 
 
-def _perceptron_fit(x, y, hidden, decay, range, max_iter, skip, abs_tol, rel_tol, max_hessian,
-                    seed, head, variables, **_):
-    from ._perceptron import perceptron_fit
+def _perceptron_fit(x, y, hidden, decay, range, max_iter, skip, standardise, abs_tol, rel_tol,
+                    max_hessian, threads, seed, head, variables, **_):
+    from ._perceptron import perceptron_fits
     family = _family(head)
     m = flatten(x)
+    fittable = np.array([len(np.unique(column)) > 1 for column in y.T], dtype=bool)
+    at_once = max(min(threads, int(fittable.sum())), 1)
     n_weight = hidden * (m.shape[1] + 1) + hidden + 1 + (m.shape[1] if skip else 0)
-    need = n_weight * (n_weight + 1) / 2 * 8 / 2**30
+    need = at_once * n_weight * (n_weight + 1) / 2 * 8 / 2**30
     if need > max_hessian:
-        raise ValueError(f"A network of {hidden} hidden units over {m.shape[1]} columns has "
-                         f"{n_weight} weights, and its approximate inverse Hessian would take "
-                         f"{need:.1f} GB, above `max_hessian = {max_hessian:g}`. A coarser grain or "
-                         "fewer hidden units shrinks it.")
-
-    def make(design, yj, seed_j, w):
-        return perceptron_fit(design, yj, w, family, hidden=hidden, decay=decay, range_=range,
-                              max_iter=max_iter, skip=skip, abs_tol=abs_tol, rel_tol=rel_tol,
-                              seed=seed_j)
-
-    models = _fit_columns(m, y, make, _variable_seeds(seed, variables), _head_weights(head, y))
+        raise ValueError(f"{at_once} network(s) of {hidden} hidden units over {m.shape[1]} "
+                         f"columns, {n_weight} weights each, fitted at once would hold approximate "
+                         f"inverse Hessians of {need:.1f} GB, above `max_hessian = "
+                         f"{max_hessian:g}`. A coarser grain, fewer hidden units or fewer threads "
+                         "shrinks it.")
+    models = [float(v) for v in y.mean(axis=0)]
+    if fittable.any():
+        seeds = np.asarray(_variable_seeds(seed, variables))[fittable]
+        fits = perceptron_fits(m, y[:, fittable], _head_weights(head, y)[:, fittable], family,
+                               seeds, hidden=hidden, decay=decay, range_=range,
+                               max_iter=max_iter, skip=skip, standardise=standardise,
+                               abs_tol=abs_tol, rel_tol=rel_tol, threads=threads)
+        for j, f in zip(np.flatnonzero(fittable), fits):
+            models[j] = f
     return dict(models=models, n_col=m.shape[1], family=family,
                 stopped=[str(v) for v, f in zip(variables, models)
                          if isinstance(f, dict) and not f["converged"]])

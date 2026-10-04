@@ -2279,6 +2279,13 @@ languages compile, fitted by the minimiser of `src/ts_quasi_newton.cpp`.
   binomial and Poisson families and `2 (y - t)` under the Gaussian,
   through each hidden unit as `e v h (1 - h)`, and the row’s case weight
   multiplies the error where it enters a slope.
+- With `standardise`, each column is centred on its mean and divided by
+  its sample standard deviation over the fitting rows, by one where that
+  is zero, before the network reads it, and a prediction centres and
+  scales by the fit’s own. Without it, as in nnet, the columns are read
+  as given.
+- Each response’s network is fitted on its own, so fitting several at
+  once on several threads gives each the network it gets alone.
 
 The minimiser is Nash’s variable metric method (Compact Numerical
 Methods for Computers, 1990, Algorithm 21). From the identity, each
@@ -2385,8 +2392,14 @@ likelihood scaled by its case weight.
   the log posterior is the conditional log marginal plus the log
   hyperprior. Without a field the mode of `log sd_u` is the fit, the
   empirical-Bayes estimate, and without either the fit is the posterior
-  mode of the coefficients. With a field the mode is found by BFGS on
-  central differences, the curvature there by finite differences, and
+  mode of the coefficients. The mode of the hyperparameters is found
+  from `log sd = 0` and `log r = log r0` by the minimiser **The
+  network** describes, on the negated log posterior with no `abs_tol`,
+  `rel_tol = 1e-13` and `max_iter = 200`, its gradient by central
+  differences of step `1e-4`; the search ends at the last accepted point
+  where a difference reaches a value that is not finite. Each trial’s
+  conditional fit starts from the one at the last accepted point. With a
+  field the curvature at the mode is taken by finite differences, and
   each axis of its eigendecomposition is spread `nodes` points `1.25`
   standard deviations apart, the deviation held within `[0.05, 2]`. Each
   node’s conditional fit is weighted by `exp` of its log posterior, and

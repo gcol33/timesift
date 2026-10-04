@@ -661,12 +661,14 @@ smoothing parameter search stopped short of its tolerance is named in
 <span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    <span class="bu">range</span><span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    max_iter<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>    skip<span class="op">=</span><span class="va">False</span>,</span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>    abs_tol<span class="op">=</span><span class="fl">0.0001</span>,</span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>    rel_tol<span class="op">=</span><span class="fl">1e-08</span>,</span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'default'</span>,</span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>    max_hessian<span class="op">=</span><span class="fl">2.0</span>,</span>
-<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
-<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>    standardise<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>    abs_tol<span class="op">=</span><span class="fl">0.0001</span>,</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>    rel_tol<span class="op">=</span><span class="fl">1e-08</span>,</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>    preset<span class="op">=</span><span class="st">'default'</span>,</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>    max_hessian<span class="op">=</span><span class="fl">2.0</span>,</span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>    threads<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>)</span></code></pre></div>
 <p>One network per variable over every bin-by-channel column, fitted as
 the nnet package fits it and as biomod2 fits <code>ANN</code>. Each of
 <code>hidden</code> logistic units takes a bias and every column, and
@@ -696,14 +698,19 @@ option set fits: two hidden units, as biomod2 sets them, and nnet’s own
 option set: five hidden units, <code>decay=0.1</code>,
 <code>range=0.1</code> and <code>max_iter=200</code>. A setting given
 explicitly beats either.</p>
+<p>nnet reads the columns as given, and so does the default: a record in
+its own units saturates the hidden units sooner the wider its range.
+With <code>standardise=True</code> each column is centred on its mean
+and divided by its sample standard deviation over the fitting units, and
+a prediction centres and scales by the fit’s own.</p>
 <p>The network, its objective and the minimiser live in the core the R
 package calls, pinned against nnet in the fixtures from the same
-starting weights, so the two languages fit the same network. Neither
-scales the columns, as nnet does not, so a record read in its own units
-saturates the hidden units sooner the wider its range. The minimiser
-holds an approximate inverse Hessian of one number per pair of weights;
-a network that would need more than <code>max_hessian</code> gigabytes
-for it is refused with the size. The case weights are the head’s and
+starting weights, so the two languages fit the same network.
+<code>threads</code> fit that many variables at once, each network the
+same as when fitted alone. The minimiser holds an approximate inverse
+Hessian of one number per pair of weights for every network fitted at
+once; a fit that would need more than <code>max_hessian</code> gigabytes
+for them is refused with the size. The case weights are the head’s and
 weigh each unit’s term of the loss; under the shipped presence-absence
 head they are on, so a default <code><a href="../reference/perceptron.html">perceptron()</a></code> is biomod2’s
 <code>ANN</code> specification fitted under them, and a head registered

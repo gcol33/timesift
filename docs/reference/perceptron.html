@@ -105,10 +105,12 @@ than <code>rel_tol</code> of itself.</p>
 <span>  range <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_iter <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  skip <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  standardise <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  abs_tol <span class="op">=</span> <span class="fl">1e-04</span>,</span>
 <span>  rel_tol <span class="op">=</span> <span class="fl">1e-08</span>,</span>
 <span>  preset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"default"</span>, <span class="st">"bigboss"</span><span class="op">)</span>,</span>
 <span>  max_hessian <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  threads <span class="op">=</span> <span class="fl">1L</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">1L</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -142,6 +144,10 @@ representation of the run.</p></dd>
 <dd><p>Whether the output also takes every column directly.</p></dd>
 
 
+<dt id="arg-standardise">standardise<a class="anchor" aria-label="anchor" href="#arg-standardise"></a></dt>
+<dd><p>Whether each column is centred and scaled before the fit.</p></dd>
+
+
 <dt id="arg-abs-tol-rel-tol">abs_tol, rel_tol<a class="anchor" aria-label="anchor" href="#arg-abs-tol-rel-tol"></a></dt>
 <dd><p>The fit stops when the objective falls below <code>abs_tol</code>, or when an
 iteration lowers it by no more than <code>rel_tol</code> of itself.</p></dd>
@@ -152,7 +158,11 @@ iteration lowers it by no more than <code>rel_tol</code> of itself.</p></dd>
 
 
 <dt id="arg-max-hessian">max_hessian<a class="anchor" aria-label="anchor" href="#arg-max-hessian"></a></dt>
-<dd><p>Gigabytes the minimiser's approximate inverse Hessian may take.</p></dd>
+<dd><p>Gigabytes the minimisers' approximate inverse Hessians may take together.</p></dd>
+
+
+<dt id="arg-threads">threads<a class="anchor" aria-label="anchor" href="#arg-threads"></a></dt>
+<dd><p>Responses fitted at once.</p></dd>
 
 
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
@@ -175,12 +185,18 @@ on the logistic output; the learner fits the head's loss, as every learner does.
 option set fits: two hidden units, as biomod2 sets them, and nnet's own <code>decay = 0</code>,
 <code>range = 0.7</code> and <code>max_iter = 100</code>. <code>"bigboss"</code> is biomod2's tuned option set: five hidden units,
 <code>decay = 0.1</code>, <code>range = 0.1</code> and <code>max_iter = 200</code>. A setting given explicitly beats either.</p>
+<p>nnet reads the columns as given, and so does the default: a record in its own units saturates
+the hidden units sooner the wider its range. With <code>standardise = TRUE</code> each column is centred on
+its mean and divided by its sample standard deviation over the fitting units, and a prediction
+centres and scales by the fit's own.</p>
 <p>The network, its objective and the minimiser live in the core the Python package calls, pinned
 against nnet in the fixtures from the same starting weights, so the two languages fit the same
 network. The starting weights are drawn from the core's own generator, so a fit does not repeat
-nnet's from the same R seed. The minimiser holds an approximate inverse Hessian of one number per
-pair of weights; a network that would need more than <code>max_hessian</code> gigabytes for it is refused
-with the size, and a coarser grain or fewer hidden units shrinks it.</p>
+nnet's from the same R seed. <code>threads</code> fit that many responses at once, each network the same as
+when fitted alone. The minimiser holds an approximate inverse Hessian of one number per pair of
+weights for every network fitted at once; a fit that would need more than <code>max_hessian</code>
+gigabytes for them is refused with the size, and a coarser grain, fewer hidden units or fewer
+threads shrinks it.</p>
 <p>The case weights are the response head's, <code><a href="positive_weights.html">positive_weights()</a></code> under presence-absence, and weigh
 each unit's term of the loss as nnet's <code>weights</code> do.
 Under the shipped presence-absence head those weights are on, so a default <code>perceptron()</code> is

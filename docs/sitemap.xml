@@ -1,5 +1,6 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://gillescolling.com/timesift/404.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/LICENSE-text.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/articles/biomod2.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/articles/contract.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/articles/index.html</loc></url>
@@ -19,7 +20,6 @@
 <url><loc>https://gillescolling.com/timesift/articles/timesift.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/authors.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/index.html</loc></url>
-<url><loc>https://gillescolling.com/timesift/LICENSE-text.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/news/index.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/additive.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/artifacts.html</loc></url>
@@ -46,10 +46,10 @@
 <url><loc>https://gillescolling.com/timesift/reference/fit_learner.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/fold_map.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/forest.html</loc></url>
-<url><loc>https://gillescolling.com/timesift/reference/grains.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/grain_contrasts.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/grain_ladder.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/grain_matrix.html</loc></url>
+<url><loc>https://gillescolling.com/timesift/reference/grains.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/hierarchical.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/implied_skill.html</loc></url>
 <url><loc>https://gillescolling.com/timesift/reference/index.html</loc></url>

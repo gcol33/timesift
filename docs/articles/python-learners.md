@@ -566,10 +566,12 @@ perceptron(
     range=None,
     max_iter=None,
     skip=False,
+    standardise=False,
     abs_tol=0.0001,
     rel_tol=1e-08,
     preset='default',
     max_hessian=2.0,
+    threads=1,
     seed=1,
 )
 ```
@@ -601,16 +603,21 @@ sets them, and nnet’s own `decay=0`, `range=0.7` and `max_iter=100`.
 `decay=0.1`, `range=0.1` and `max_iter=200`. A setting given explicitly
 beats either.
 
+nnet reads the columns as given, and so does the default: a record in
+its own units saturates the hidden units sooner the wider its range.
+With `standardise=True` each column is centred on its mean and divided
+by its sample standard deviation over the fitting units, and a
+prediction centres and scales by the fit’s own.
+
 The network, its objective and the minimiser live in the core the R
 package calls, pinned against nnet in the fixtures from the same
-starting weights, so the two languages fit the same network. Neither
-scales the columns, as nnet does not, so a record read in its own units
-saturates the hidden units sooner the wider its range. The minimiser
-holds an approximate inverse Hessian of one number per pair of weights;
-a network that would need more than `max_hessian` gigabytes for it is
-refused with the size. The case weights are the head’s and weigh each
-unit’s term of the loss; under the shipped presence-absence head they
-are on, so a default
+starting weights, so the two languages fit the same network. `threads`
+fit that many variables at once, each network the same as when fitted
+alone. The minimiser holds an approximate inverse Hessian of one number
+per pair of weights for every network fitted at once; a fit that would
+need more than `max_hessian` gigabytes for them is refused with the
+size. The case weights are the head’s and weigh each unit’s term of the
+loss; under the shipped presence-absence head they are on, so a default
 [`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md)
 is biomod2’s `ANN` specification fitted under them, and a head
 registered without `weights` fits it unweighted. A variable holding one

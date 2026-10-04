@@ -2995,6 +2995,13 @@ the rows in order. A row’s error is carried back unweighted,
 <code>2 (y - t)</code> under the Gaussian, through each hidden unit as
 <code>e v h (1 - h)</code>, and the row’s case weight multiplies the
 error where it enters a slope.</li>
+<li>With <code>standardise</code>, each column is centred on its mean
+and divided by its sample standard deviation over the fitting rows, by
+one where that is zero, before the network reads it, and a prediction
+centres and scales by the fit’s own. Without it, as in nnet, the columns
+are read as given.</li>
+<li>Each response’s network is fitted on its own, so fitting several at
+once on several threads gives each the network it gets alone.</li>
 </ul>
 <p>The minimiser is Nash’s variable metric method (Compact Numerical
 Methods for Computers, 1990, Algorithm 21). From the identity, each
@@ -3130,9 +3137,16 @@ and the coefficients by a Schur complement under a sparse one.</li>
 posterior is the conditional log marginal plus the log hyperprior.
 Without a field the mode of <code>log sd_u</code> is the fit, the
 empirical-Bayes estimate, and without either the fit is the posterior
-mode of the coefficients. With a field the mode is found by BFGS on
-central differences, the curvature there by finite differences, and each
-axis of its eigendecomposition is spread <code>nodes</code> points
+mode of the coefficients. The mode of the hyperparameters is found from
+<code>log sd = 0</code> and <code>log r = log r0</code> by the minimiser
+<strong>The network</strong> describes, on the negated log posterior
+with no <code>abs_tol</code>, <code>rel_tol = 1e-13</code> and
+<code>max_iter = 200</code>, its gradient by central differences of step
+<code>1e-4</code>; the search ends at the last accepted point where a
+difference reaches a value that is not finite. Each trial’s conditional
+fit starts from the one at the last accepted point. With a field the
+curvature at the mode is taken by finite differences, and each axis of
+its eigendecomposition is spread <code>nodes</code> points
 <code>1.25</code> standard deviations apart, the deviation held within
 <code>[0.05, 2]</code>. Each node’s conditional fit is weighted by
 <code>exp</code> of its log posterior, and the fit is their weighted

@@ -23,6 +23,10 @@
 // skipped columns; they start uniform on `[-range, range]` and are fitted by the variable metric
 // method of `src/ts_quasi_newton.cpp`. The objective, the order and the stopping rules are pinned
 // against nnet's in the fixtures from the same starting weights.
+//
+// With `standardise`, each column is first centred on its mean and divided by its sample standard
+// deviation over the fitting rows, one where the column is constant, and a prediction centres and
+// scales by the fit's own. nnet reads the columns as given, and so does the default.
 namespace timesift {
 
 struct PerceptronSpec {
@@ -34,7 +38,7 @@ struct PerceptronSpec {
   int max_iter = 100;
   double abs_tol = 1e-4;
   double rel_tol = 1e-8;
-  std::uint32_t seed = 1;
+  bool standardise = false;
 };
 
 struct Perceptron {
@@ -42,6 +46,8 @@ struct Perceptron {
   std::int32_t n_column = 0;
   std::int32_t hidden = 0;
   bool skip = false;
+  std::vector<double> centre;  // empty where the columns were read as given
+  std::vector<double> scale;
   std::vector<double> weights;
   double value = 0.0;       // the objective at the weights
   std::int32_t iterations = 0;
@@ -51,11 +57,15 @@ struct Perceptron {
 // The number of weights a network of `hidden` units over `p` columns carries.
 std::size_t perceptron_weight_count(std::size_t p, int hidden, bool skip);
 
-// `x` [n, p] column-major, `y` the response, `w` the case weights. `start` holds the starting
-// weights where it is not empty; otherwise they are drawn from stream 0 of `spec.seed`.
-Perceptron perceptron_fit(const double* x, const double* y, const double* w, std::size_t n,
-                          std::size_t p, const PerceptronSpec& spec,
-                          const std::vector<double>& start = {});
+// One network per response over the shared design `x` [n, p] column-major: response `s` is column
+// `s` of `y` [n, r] under column `s` of the case weights `w` [n, r]. `start` holds the starting
+// weights of every network where it is not empty; otherwise response `s` draws them from stream 0
+// of `seeds[s]`. `threads` fit that many responses at once, and each network is the one its
+// response gives fitted alone.
+std::vector<Perceptron> perceptron_fit(const double* x, std::size_t n, std::size_t p,
+                                       const double* y, const double* w, std::size_t r,
+                                       const std::uint32_t* seeds, const PerceptronSpec& spec,
+                                       int threads, const std::vector<double>& start = {});
 
 // The fitted mean at every row of `x` [n, p].
 void perceptron_predict(const Perceptron& fit, const double* x, std::size_t n, std::size_t p,

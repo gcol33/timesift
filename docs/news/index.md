@@ -93,7 +93,9 @@
   searches biomod2’s `ANN` grid of `hidden` and `decay`. Under a
   presence-absence head it fits the cross-entropy, nnet’s
   `entropy = TRUE`, where biomod2 leaves nnet’s least squares on the
-  logistic output.
+  logistic output. `threads` fits that many responses at once, each
+  network the one it gets alone, and `standardise = TRUE` centres and
+  scales the columns first, which nnet and the default do not.
 - [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md)
   takes `optimizer` (`"adamw"`, the default, `"adam"` or `"sgd"`), a
   `penalty` with its `alpha`, cito’s `lambda` and `alpha` with `alpha`
@@ -125,6 +127,14 @@
   [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
   says that at `spatial = "none"` and `random = FALSE` it is a penalised
   logistic model.
+
+- [`hierarchical()`](https://gillescolling.com/timesift/reference/hierarchical.md)
+  finds the mode of its hyperparameters with the variable metric
+  minimiser
+  [`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md)
+  uses, where it carried a second BFGS of its own with a capped step.
+  The mode, and with it the nodes and the fit, can move at the size of
+  the search’s tolerance.
 
 - In Python a representation, a learner and a training control print as
   they do in R, where they printed as their dataclass fields and a

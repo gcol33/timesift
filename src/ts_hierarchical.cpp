@@ -1,6 +1,7 @@
 #include "ts_hierarchical.h"
 
 #include "ts_internal.h"
+#include "ts_quasi_newton.h"
 #include "ts_sparse.h"
 
 #include <algorithm>
@@ -842,109 +843,56 @@ class Hyper {
   const FieldModel& model_;
 };
 
-// The mode of `hyper`'s log posterior by BFGS on central differences, from `start`; the
-// conditional fit at the mode is kept in `at_mode`. False where no starting point gave a finite
-// value.
+// Raised by the gradient where a central difference reaches a point with no finite log posterior,
+// which ends the search at the point the minimiser last accepted.
+struct NoGradient {};
+
+// The mode of `hyper`'s log posterior by the variable metric method of `src/ts_quasi_newton.cpp` on
+// its negation, the gradient by central differences, from `start`; the conditional fit at the mode
+// is kept in `at_mode`. Each trial's conditional fit starts from the one at the last accepted
+// point. False where the start has no finite log posterior.
 bool find_mode(const Hyper& hyper, std::vector<double> start, std::vector<double>& mode,
                Conditional& at_mode, double& log_post) {
   const std::size_t k = start.size();
-  Conditional warm;
-  double f = hyper.value(start, nullptr, &warm);
-  if (!std::isfinite(f)) return false;
-  std::vector<double> x = start;
   const double h = 1e-4;
-  auto gradient = [&](const std::vector<double>& at, const Conditional& near, std::vector<double>& g) {
+  Conditional warm;
+  if (!std::isfinite(hyper.value(start, nullptr, &warm))) return false;
+  // The conditional fit at the last point the objective was taken at; the minimiser takes a
+  // gradient only at a point it has accepted, which is then that point.
+  Conditional last;
+  std::vector<double> last_at;
+  auto objective = [&](const std::vector<double>& at) {
+    Conditional c;
+    const double v = hyper.value(at, &warm, &c);
+    if (!std::isfinite(v)) return std::numeric_limits<double>::infinity();
+    last = std::move(c);
+    last_at = at;
+    return -v;
+  };
+  auto gradient = [&](const std::vector<double>& at, std::vector<double>& g) {
+    if (at == last_at) warm = std::move(last);
     g.assign(k, 0.0);
     for (std::size_t a = 0; a < k; ++a) {
       std::vector<double> up = at, down = at;
       up[a] += h;
       down[a] -= h;
-      const double fu = hyper.value(up, &near, nullptr);
-      const double fd = hyper.value(down, &near, nullptr);
-      if (!std::isfinite(fu) || !std::isfinite(fd)) return false;
-      g[a] = (fu - fd) / (2.0 * h);
+      const double fu = hyper.value(up, &warm, nullptr);
+      const double fd = hyper.value(down, &warm, nullptr);
+      if (!std::isfinite(fu) || !std::isfinite(fd)) throw NoGradient();
+      g[a] = -(fu - fd) / (2.0 * h);
     }
-    return true;
   };
-  std::vector<double> g, g_next;
-  if (!gradient(x, warm, g)) return false;
-  // The inverse Hessian of the negated log posterior, started at the identity.
-  std::vector<double> inv(k * k, 0.0);
-  for (std::size_t a = 0; a < k; ++a) inv[a + a * k] = 1.0;
-  for (int it = 0; it < 200; ++it) {
-    double gmax = 0.0;
-    for (double v : g) gmax = std::max(gmax, std::fabs(v));
-    if (gmax < 1e-7) break;
-    // The ascent direction `inv g`, limited to a step of at most two on the log scale.
-    std::vector<double> dir(k, 0.0);
-    for (std::size_t a = 0; a < k; ++a) {
-      for (std::size_t b = 0; b < k; ++b) dir[a] += inv[a + b * k] * g[b];
-    }
-    double longest = 0.0, slope = 0.0;
-    for (std::size_t a = 0; a < k; ++a) {
-      longest = std::max(longest, std::fabs(dir[a]));
-      slope += dir[a] * g[a];
-    }
-    if (!(slope > 0.0)) {
-      for (std::size_t a = 0; a < k; ++a) {
-        dir[a] = g[a];
-        for (std::size_t b = 0; b < k; ++b) inv[a + b * k] = a == b ? 1.0 : 0.0;
-      }
-      longest = gmax;
-      slope = 0.0;
-      for (std::size_t a = 0; a < k; ++a) slope += g[a] * g[a];
-    }
-    double t = longest > 2.0 ? 2.0 / longest : 1.0;
-    std::vector<double> trial(k);
-    Conditional trial_fit;
-    double f_next = kNegInf;
-    bool moved = false;
-    for (int half = 0; half < 40; ++half) {
-      for (std::size_t a = 0; a < k; ++a) trial[a] = x[a] + t * dir[a];
-      f_next = hyper.value(trial, &warm, &trial_fit);
-      if (std::isfinite(f_next) && f_next >= f + 1e-4 * t * slope) {
-        moved = true;
-        break;
-      }
-      t *= 0.5;
-    }
-    if (!moved) break;
-    if (!gradient(trial, trial_fit, g_next)) break;
-    // The BFGS update of the inverse Hessian from the step `s` and the change in gradient `y`.
-    std::vector<double> sv(k), yv(k);
-    double sy = 0.0;
-    for (std::size_t a = 0; a < k; ++a) {
-      sv[a] = trial[a] - x[a];
-      yv[a] = g[a] - g_next[a];
-      sy += sv[a] * yv[a];
-    }
-    const double gain = f_next - f;
-    x = trial;
-    f = f_next;
-    warm = std::move(trial_fit);
-    g = g_next;
-    if (sy > 1e-12) {
-      std::vector<double> iy(k, 0.0);
-      double yiy = 0.0;
-      for (std::size_t a = 0; a < k; ++a) {
-        for (std::size_t b = 0; b < k; ++b) iy[a] += inv[a + b * k] * yv[b];
-        yiy += yv[a] * iy[a];
-      }
-      for (std::size_t a = 0; a < k; ++a) {
-        for (std::size_t b = 0; b < k; ++b) {
-          inv[a + b * k] += (1.0 + yiy / sy) * sv[a] * sv[b] / sy - (iy[a] * sv[b] + sv[a] * iy[b]) / sy;
-        }
-      }
-    }
-    if (gain < 1e-13 * (1.0 + std::fabs(f))) {
-      double gm = 0.0;
-      for (double v : g) gm = std::max(gm, std::fabs(v));
-      if (gm < 1e-5) break;
-    }
+  // The negated log posterior has no floor, so no value of it ends the search.
+  try {
+    variable_metric(start, objective, gradient, 200, -std::numeric_limits<double>::infinity(),
+                    1e-13);
+  } catch (const NoGradient&) {
   }
-  mode = x;
-  at_mode = std::move(warm);
-  log_post = f;
+  mode = start;
+  log_post = hyper.value(mode, &warm, &at_mode);
+  if (!std::isfinite(log_post)) {
+    throw Error("the hierarchical model's conditional fit did not settle at the posterior mode.");
+  }
   return true;
 }
 
