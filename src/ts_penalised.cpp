@@ -9,6 +9,8 @@
 #include <system_error>
 #include <thread>
 
+#include "ts_internal.h"
+
 // The elastic net by pathwise coordinate descent (Friedman, Hastie and Tibshirani 2010, "Regularization
 // paths for generalized linear models via coordinate descent", Journal of Statistical Software
 // 33(1)): the penalised objective is minimised one coefficient at a time by soft thresholding, at
@@ -1175,6 +1177,17 @@ PenaltyCV penalised_cv(const double* x, const double* y, const double* w, std::s
     }
   }
   return out;
+}
+
+std::vector<PenaltyCV> penalised_cvs(const double* x, std::size_t n, std::size_t p,
+                                     const double* y, const double* w, std::size_t r,
+                                     Family family, const PenaltySpec& spec,
+                                     const std::int32_t* fold, const std::int32_t* n_fold) {
+  return detail::fit_responses(r, spec.threads, [&](std::size_t s, int inner) {
+    PenaltySpec each = spec;
+    each.threads = inner;
+    return penalised_cv(x, y + s * n, w + s * n, n, p, family, each, fold + s * n, n_fold[s]);
+  });
 }
 
 }  // namespace timesift

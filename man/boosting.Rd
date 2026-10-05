@@ -50,8 +50,8 @@ keep them all.}
 
 \item{seed}{Seed for the subsamples and the inner folds.}
 
-\item{threads}{Fits of one response's inner cross-validation run at once. The model is the same
-on any number.}
+\item{threads}{Responses fitted at once, or, with one response to fit, the fits of its inner
+cross-validation. The model is the same on any number.}
 }
 \value{
 A \code{\link[=learner]{learner()}}.

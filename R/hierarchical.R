@@ -50,6 +50,8 @@
 #' @param m Eigenfunctions per axis of an `"hsgp"` field.
 #' @param boundary The factor by which an `"hsgp"` field's box is wider than the coordinates.
 #' @param nodes Grid points per hyperparameter.
+#' @param threads Conditional fits over the hyperparameter grid run at once. What comes back does
+#'   not depend on it.
 #'
 #' @return A [learner()].
 #'

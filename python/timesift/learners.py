@@ -734,13 +734,35 @@ def _inner_fittable(yj: np.ndarray, fold: np.ndarray) -> bool:
                for k in np.unique(fold))
 
 
-def _fit_columns(m: np.ndarray, y: np.ndarray, make, seeds, weights) -> list:
-    out = []
+def _response_folds(y: np.ndarray, v: int, seeds, group=None):
+    """The inner folds of every response at once, as the cores take them: ``fold`` [n, r] of
+    0-based indices, ``n_fold`` one count per response, and whether each response's inner training
+    sets pass :func:`_inner_fittable`."""
+    fold = np.zeros(y.shape, dtype=np.int32)
+    n_fold = []
+    fittable = np.zeros(y.shape[1], dtype=bool)
     for j in range(y.shape[1]):
-        yj = y[:, j]
-        out.append(float(yj.mean()) if len(np.unique(yj)) < 2
-                   else make(m, yj, seeds[j], weights[:, j]))
-    return out
+        inner = _inner_folds(y[:, j], v, seeds[j], group)
+        fold[:, j] = inner
+        n_fold.append(int(inner.max()) + 1)
+        fittable[j] = _inner_fittable(y[:, j], inner)
+    return fold, n_fold, fittable
+
+
+def _varies(y: np.ndarray) -> np.ndarray:
+    """Whether each response holds more than one value; one that does not is predicted its mean."""
+    return np.array([len(np.unique(column)) > 1 for column in y.T], dtype=bool)
+
+
+def _fit_responses(y: np.ndarray, fittable: np.ndarray, fit) -> list:
+    """One model per response: its mean where ``fittable`` is false, and otherwise its fit out of
+    ``fit(columns)``, which fits the responses at ``columns`` together."""
+    models = [float(v) for v in y.mean(axis=0)]
+    columns = np.flatnonzero(fittable)
+    if columns.size:
+        for j, f in zip(columns, fit(columns)):
+            models[j] = f
+    return models
 
 
 def _variable_seeds(seed: int, variables) -> list:
@@ -804,9 +826,9 @@ def elasticnet(data=None, alpha=0.5, n_inner=10, squares=True, s="lambda.1se", n
     path. The fit names every response whose path on the fitting units, or on any inner fold,
     ended that way in ``stopped``.
 
-    ``threads`` is how many fits of one response's inner cross-validation run at once. The path on
-    every fitting unit and the path of each inner fold are one independent fit each, so they
-    parallelise without sharing anything, and ``n_inner + 1`` threads is as many as a response can
+    ``threads`` is how many responses are fitted at once, or, with one response to fit, how many
+    fits of its inner cross-validation: the path on every fitting unit and the path of each inner
+    fold are one independent fit each, so ``n_inner + 1`` threads is as many as a lone response can
     use. The default is serial, because a package does not take a machine's cores without being
     asked. What comes back does not depend on it.
     """
@@ -818,21 +840,27 @@ def elasticnet(data=None, alpha=0.5, n_inner=10, squares=True, s="lambda.1se", n
 
 def _elasticnet_fit(x, y, alpha, n_inner, squares, s, n_lambda, tol, threads, seed, head,
                     variables, group=None, **_):
-    from .penalised import penalised_cv
+    from .penalised import penalised_cvs
     family = _family(head)
     m = _design(x, squares)
-
+    w = _head_weights(head, y)
+    fittable = _varies(y)
     # The inner folds are dealt here rather than inside the path, so a grouping the outer folds
     # keep whole stays whole where the penalty is chosen, and a rare outcome is spread over them
     # rather than left to a plain deal.
-    def make(design, yj, seed_j, w):
-        fold = _inner_folds(yj, n_inner, seed_j, group)
-        if family == "binomial" and not _inner_fittable(yj, fold):
-            return float(yj.mean())
-        return penalised_cv(design, yj, w, family, alpha, fold, int(fold.max()) + 1,
-                            n_lambda=n_lambda, thresh=tol, threads=threads)
+    seeds = np.asarray(_variable_seeds(seed, variables))
+    fold = np.zeros(y.shape, dtype=np.int32)
+    n_fold = np.zeros(y.shape[1], dtype=np.int64)
+    if fittable.any():
+        fold[:, fittable], counts, inner_ok = _response_folds(y[:, fittable], n_inner,
+                                                              seeds[fittable], group)
+        n_fold[fittable] = counts
+        if family == "binomial":
+            fittable[fittable] = inner_ok
 
-    models = _fit_columns(m, y, make, _variable_seeds(seed, variables), _head_weights(head, y))
+    models = _fit_responses(y, fittable, lambda cols: penalised_cvs(
+        m, y[:, cols], w[:, cols], family, alpha, fold[:, cols], n_fold[cols],
+        n_lambda=n_lambda, thresh=tol, threads=threads))
     return dict(models=models, squares=squares, s=s, n_col=m.shape[1], family=family,
                 unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)],
                 stopped=[str(v) for v, f in zip(variables, models) if _penalised_stopped(f)])
@@ -909,18 +937,16 @@ def _forest_settings(preset, family, n_column, trees, mtry, min_node) -> dict:
 
 
 def _rf_fit(x, y, trees, mtry, min_node, balance, preset, seed, threads, head, variables, **_):
-    from ._tree import forest_fit
+    from ._tree import forest_fits
     family = _family(head)
     m = flatten(x)
     settings = _forest_settings(preset, family, m.shape[1], trees, mtry, min_node)
-
-    def make(design, yj, seed_j, w):
-        return forest_fit(design, yj, w, family, settings["trees"], settings["mtry"],
-                          settings["min_node"], balance, seed_j, threads)
-
-    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables),
-                                    _head_weights(head, y)),
-                n_col=m.shape[1], family=family)
+    w = _head_weights(head, y)
+    seeds = np.asarray(_variable_seeds(seed, variables))
+    models = _fit_responses(y, _varies(y), lambda cols: forest_fits(
+        m, y[:, cols], w[:, cols], family, settings["trees"], settings["mtry"],
+        settings["min_node"], balance, seeds[cols], threads))
+    return dict(models=models, n_col=m.shape[1], family=family)
 
 
 def _rf_predict(model, x):
@@ -1018,22 +1044,21 @@ def _boost_settings(preset, method, trees, depth, shrinkage, min_leaf, subsample
 
 def _boost_fit(x, y, trees, depth, shrinkage, min_leaf, subsample, colsample, method, lambda_,
                gamma, n_inner, seed, threads, head, variables, group=None, **_):
-    from ._tree import boost_fit
+    from ._tree import boost_fits
     family = _family(head)
     m = flatten(x)
+    w = _head_weights(head, y)
+    seeds = np.asarray(_variable_seeds(seed, variables))
 
-    def make(design, yj, seed_j, w):
-        fold, n_fold = None, 0
+    def fit(cols):
+        fold, n_fold = None, ()
         if n_inner > 0:
-            fold = _inner_folds(yj, n_inner, seed_j, group)
-            n_fold = int(fold.max()) + 1
-        return boost_fit(design, yj, w, family, trees, depth, shrinkage, min_leaf, subsample,
-                         colsample, method == "xgboost", lambda_, gamma, seed_j, fold, n_fold,
-                         threads)
+            fold, n_fold, _ = _response_folds(y[:, cols], n_inner, seeds[cols], group)
+        return boost_fits(m, y[:, cols], w[:, cols], family, trees, depth, shrinkage, min_leaf,
+                          subsample, colsample, method == "xgboost", lambda_, gamma, seeds[cols],
+                          fold=fold, n_fold=n_fold, threads=threads)
 
-    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables),
-                                    _head_weights(head, y)),
-                n_col=m.shape[1], family=family)
+    return dict(models=_fit_responses(y, _varies(y), fit), n_col=m.shape[1], family=family)
 
 
 def _boost_predict(model, x):
@@ -1124,29 +1149,25 @@ def _maxnet_fit(x, y, classes, regmult, formulation, type, knots, add_samples, c
         raise ValueError("maxnet fits a presence-absence response, under a head whose loss is the "
                          f"binary cross-entropy; this head's loss is {head['loss']!r}.")
     m = flatten(x)
-    seeds = _variable_seeds(seed, variables)
-    models = [float(v) for v in y.mean(axis=0)]
-    fittable = np.array([len(np.unique(c)) > 1 and (c == 1).sum() >= 2 for c in y.T], dtype=bool)
-    fold, n_fold = None, []
+    seeds = np.asarray(_variable_seeds(seed, variables))
+    w = _head_weights(head, y)
+    fittable = _varies(y) & ((y == 1).sum(axis=0) >= 2)
+    fold, n_fold = None, np.zeros(y.shape[1], dtype=np.int64)
     if formulation == "absence":
         fold = np.zeros(y.shape, dtype=np.int32)
-        n_fold = np.zeros(y.shape[1], dtype=np.int64)
-        for j in np.flatnonzero(fittable):
-            inner = _inner_folds(y[:, j], n_inner, seeds[j], group)
-            if not _inner_fittable(y[:, j], inner):
-                fittable[j] = False
-                continue
-            fold[:, j] = inner
-            n_fold[j] = int(inner.max()) + 1
-        fold, n_fold = fold[:, fittable], [int(k) for k in n_fold[fittable]]
-    if fittable.any():
-        fits = maxnet_fits(m, y[:, fittable], _head_weights(head, y)[:, fittable],
-                           classes=classes, knots=knots, regmult=regmult,
-                           formulation=formulation, add_samples=add_samples, thresh=tol,
-                           one_se=s == "lambda.1se", fold=fold, n_fold=n_fold, threads=threads,
-                           max_design=max_design)
-        for j, f in zip(np.flatnonzero(fittable), fits):
-            models[j] = f
+        if fittable.any():
+            fold[:, fittable], counts, inner_ok = _response_folds(y[:, fittable], n_inner,
+                                                                  seeds[fittable], group)
+            n_fold[fittable] = counts
+            fittable[fittable] = inner_ok
+    def fit(cols):
+        inner = {} if fold is None else dict(fold=fold[:, cols], n_fold=n_fold[cols])
+        return maxnet_fits(m, y[:, cols], w[:, cols], classes=classes, knots=knots,
+                           regmult=regmult, formulation=formulation, add_samples=add_samples,
+                           thresh=tol, one_se=s == "lambda.1se", threads=threads,
+                           max_design=max_design, **inner)
+
+    models = _fit_responses(y, fittable, fit)
     return dict(models=models, n_col=m.shape[1], type=type, clamp=clamp,
                 unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)],
                 stopped=[str(v) for v, f in zip(variables, models)
@@ -1160,7 +1181,7 @@ def _maxnet_predict(model, x):
 
 
 def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prune="se_sum",
-         n_inner=None, preset="default", shrink=1.0, seed=1) -> Learner:
+         n_inner=None, preset="default", shrink=1.0, seed=1, threads=1) -> Learner:
     """One classification or regression tree per variable, over every bin-by-channel column,
     grown under rpart's rules: the Gini index under a presence-absence head, the sum of squares
     under a head with a squared-error loss and the Poisson deviance under a count head, a split
@@ -1197,16 +1218,20 @@ def tree(data=None, min_split=None, min_leaf=None, cp=None, max_depth=None, prun
     of a gamma prior whose coefficient of variation is ``shrink``, ``0`` for none and rpart's
     default ``1``. A split is chosen on the deviance of the unshrunk rates, and a subtree's risk,
     its complexity and the pruning's cross-validated error are read on the shrunk ones.
+
+    ``threads`` grow that many responses' trees at once; what comes back does not depend on it.
     """
     from ._tree import PRUNE_RULES
     if prune not in PRUNE_RULES:
         raise ValueError(f"`prune` is one of {', '.join(PRUNE_RULES)}, got {prune!r}.")
     if isinstance(shrink, bool) or not isinstance(shrink, (int, float)) or not shrink >= 0:
         raise ValueError(f"`shrink` is one number of zero or more, got {shrink!r}.")
+    _whole(threads, "threads", 1)
     settings = _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner)
     return Learner(name="tree", fit=_tree_fit, predict=_tree_predict, data=data,
                    reads="tabular", multi="separate",
-                   params=dict(settings, prune=prune, shrink=float(shrink), seed=int(seed)))
+                   params=dict(settings, prune=prune, shrink=float(shrink), seed=int(seed),
+                               threads=int(threads)))
 
 
 def _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner) -> dict:
@@ -1231,25 +1256,27 @@ def _tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner) -> dict:
     return out
 
 
-def _tree_fit(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, shrink, seed, head,
-              variables, group=None, **_):
-    from ._tree import tree_fit, tree_prune, tree_prune_cp
+def _tree_fit(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, shrink, seed, threads,
+              head, variables, group=None, **_):
+    from ._tree import tree_fits, tree_prune, tree_prune_cp
     family = _family(head)
     m = flatten(x)
+    w = _head_weights(head, y)
+    seeds = np.asarray(_variable_seeds(seed, variables))
 
-    def make(design, yj, seed_j, w):
-        fold, n_fold = None, 0
-        if prune != "none":
-            fold = _inner_folds(yj, n_inner, seed_j, group)
-            n_fold = int(fold.max()) + 1
-        grown = tree_fit(design, yj, w, family, min_split, min_leaf, cp, max_depth, fold, n_fold,
-                         shrink)
+    def pruned(grown):
         at = tree_prune_cp(grown, prune)
         return grown if at is None else tree_prune(grown, at)
 
-    return dict(models=_fit_columns(m, y, make, _variable_seeds(seed, variables),
-                                    _head_weights(head, y)),
-                n_col=m.shape[1], family=family)
+    def fit(cols):
+        fold, n_fold = None, ()
+        if prune != "none":
+            fold, n_fold, _ = _response_folds(y[:, cols], n_inner, seeds[cols], group)
+        return [pruned(g) for g in tree_fits(m, y[:, cols], w[:, cols], family, min_split,
+                                             min_leaf, cp, max_depth, fold=fold, n_fold=n_fold,
+                                             shrink=shrink, threads=threads)]
+
+    return dict(models=_fit_responses(y, _varies(y), fit), n_col=m.shape[1], family=family)
 
 
 def _tree_predict(model, x):
@@ -1289,8 +1316,9 @@ def linear(data=None, select="both", terms="power", max_terms=math.inf, degree=2
     25 iterations is refused rather than taken, and the fit names every response whose final model
     did not settle in ``stopped``. A model with nothing but the intercept predicts the response's
     share among the fitting units. The search runs on the core the R package calls, so the two
-    select the same terms and return the same coefficients; ``threads`` runs one step's candidate
-    fits at once and does not change what comes back.
+    select the same terms and return the same coefficients; ``threads`` searches that many
+    responses at once, or, with one response to fit, runs one step's candidate fits at once, and
+    does not change what comes back.
     """
     if select not in ("both", "forward", "backward", "none"):
         raise ValueError('`select` is "both", "forward", "backward" or "none", '
@@ -1308,15 +1336,13 @@ def linear(data=None, select="both", terms="power", max_terms=math.inf, degree=2
                                degree=int(degree), threads=int(threads)))
 
 def _linear_fit(x, y, select, terms, max_terms, degree, threads, head, variables, **_):
-    from ._stepwise import stepwise_fit
+    from ._stepwise import stepwise_fits
     family = _family(head)
     m = flatten(x)
-
-    def make(design, yj, seed_j, w):
-        return stepwise_fit(design, yj, w, family, max_terms=max_terms, degree=degree,
-                            direction=select, terms=terms, threads=threads)
-
-    models = _fit_columns(m, y, make, [0] * y.shape[1], _head_weights(head, y))
+    w = _head_weights(head, y)
+    models = _fit_responses(y, _varies(y), lambda cols: stepwise_fits(
+        m, y[:, cols], w[:, cols], family, max_terms=max_terms, degree=degree, direction=select,
+        terms=terms, threads=threads))
     return dict(models=models, n_col=m.shape[1], family=family,
                 stopped=[str(v) for v, f in zip(variables, models)
                          if isinstance(f, dict) and not f["converged"]])
@@ -1355,8 +1381,8 @@ def _envelope_fit(x, y, quantile, head, variables, **_):
         raise ValueError("the envelope is drawn around presences, under a head whose loss is the "
                          f"binary cross-entropy; this head's loss is {head['loss']!r}.")
     m = flatten(x)
-    models = _fit_columns(m, y, lambda design, yj, seed_j, w: envelope_fit(design, yj, quantile),
-                          [0] * y.shape[1], np.ones(y.shape))
+    models = _fit_responses(y, _varies(y),
+                            lambda cols: [envelope_fit(m, y[:, j], quantile) for j in cols])
     return dict(models=models, n_col=m.shape[1],
                 unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)])
 
@@ -1399,9 +1425,9 @@ def mars(data=None, degree=1, penalty=None, max_terms=None, min_gain=0.001, mins
     the head's and weigh both passes and the refit; under the shipped presence-absence head they
     are on, so a default ``mars()`` is earth's specification fitted under them, and a head
     registered without ``weights`` fits it unweighted. The passes run on the core the R package calls, so the two
-    keep the same terms and return the same coefficients; ``threads`` searches that many columns
-    at once and does not change what comes back. A variable holding one value is predicted its
-    mean.
+    keep the same terms and return the same coefficients; ``threads`` fits that many responses at
+    once, or, with one response to fit, searches that many columns at once, and does not change
+    what comes back. A variable holding one value is predicted its mean.
     """
     _whole(degree, "degree", 1)
     if max_terms is not None:
@@ -1434,16 +1460,14 @@ def mars(data=None, degree=1, penalty=None, max_terms=None, min_gain=0.001, mins
 
 def _mars_fit(x, y, degree, penalty, max_terms, min_gain, minspan, endspan, fast_k, fast_beta,
               prune, nprune, threads, head, variables, **_):
-    from ._mars import mars_fit
+    from ._mars import mars_fits
     family = _family(head)
     m = flatten(x)
-
-    def make(design, yj, seed_j, w):
-        return mars_fit(design, yj, w, family, degree=degree, penalty=penalty, nk=max_terms,
-                        thresh=min_gain, minspan=minspan, endspan=endspan, fast_k=fast_k,
-                        fast_beta=fast_beta, prune=prune, nprune=nprune, threads=threads)
-
-    models = _fit_columns(m, y, make, [0] * y.shape[1], _head_weights(head, y))
+    w = _head_weights(head, y)
+    models = _fit_responses(y, _varies(y), lambda cols: mars_fits(
+        m, y[:, cols], w[:, cols], family, degree=degree, penalty=penalty, nk=max_terms,
+        thresh=min_gain, minspan=minspan, endspan=endspan, fast_k=fast_k, fast_beta=fast_beta,
+        prune=prune, nprune=nprune, threads=threads))
     return dict(models=models, n_col=m.shape[1], family=family,
                 stopped=[str(v) for v, f in zip(variables, models)
                          if isinstance(f, dict) and not f["converged"]])
@@ -1537,7 +1561,7 @@ def _perceptron_fit(x, y, hidden, decay, range, max_iter, skip, standardise, abs
     from ._perceptron import perceptron_fits
     family = _family(head)
     m = flatten(x)
-    fittable = np.array([len(np.unique(column)) > 1 for column in y.T], dtype=bool)
+    fittable = _varies(y)
     at_once = max(min(threads, int(fittable.sum())), 1)
     n_weight = hidden * (m.shape[1] + 1) + hidden + 1 + (m.shape[1] if skip else 0)
     need = at_once * n_weight * (n_weight + 1) / 2 * 8 / 2**30
@@ -1547,15 +1571,12 @@ def _perceptron_fit(x, y, hidden, decay, range, max_iter, skip, standardise, abs
                          f"inverse Hessians of {need:.1f} GB, above `max_hessian = "
                          f"{max_hessian:g}`. A coarser grain, fewer hidden units or fewer threads "
                          "shrinks it.")
-    models = [float(v) for v in y.mean(axis=0)]
-    if fittable.any():
-        seeds = np.asarray(_variable_seeds(seed, variables))[fittable]
-        fits = perceptron_fits(m, y[:, fittable], _head_weights(head, y)[:, fittable], family,
-                               seeds, hidden=hidden, decay=decay, range_=range,
-                               max_iter=max_iter, skip=skip, standardise=standardise,
-                               abs_tol=abs_tol, rel_tol=rel_tol, threads=threads)
-        for j, f in zip(np.flatnonzero(fittable), fits):
-            models[j] = f
+    w = _head_weights(head, y)
+    seeds = np.asarray(_variable_seeds(seed, variables))
+    models = _fit_responses(y, fittable, lambda cols: perceptron_fits(
+        m, y[:, cols], w[:, cols], family, seeds[cols], hidden=hidden, decay=decay, range_=range,
+        max_iter=max_iter, skip=skip, standardise=standardise, abs_tol=abs_tol, rel_tol=rel_tol,
+        threads=threads))
     return dict(models=models, n_col=m.shape[1], family=family,
                 stopped=[str(v) for v, f in zip(variables, models)
                          if isinstance(f, dict) and not f["converged"]])
@@ -1662,7 +1683,8 @@ def discriminant(data=None, degree=1, penalty=None, max_terms=None, min_gain=0.0
     regression of the response on it under the case weights, on the fitting units, as biomod2
     always does for ``FDA``; ``False`` predicts the posterior. The passes run on the core the R
     package calls, so the two keep the same terms and predict the same probabilities; ``threads``
-    searches that many columns at once and does not change what comes back. A variable holding one
+    fits that many responses at once, or, with one response to fit, searches that many columns at
+    once, and does not change what comes back. A variable holding one
     value, or one the basis does not reach, is predicted its mean and named in ``unfitted``. The
     learner needs a presence-absence response, under a head whose loss is the binary
     cross-entropy.
@@ -1689,18 +1711,16 @@ def discriminant(data=None, degree=1, penalty=None, max_terms=None, min_gain=0.0
 
 def _discriminant_fit(x, y, degree, penalty, max_terms, min_gain, prune, calibrate, threads, head,
                       variables, **_):
-    from ._fda import fda_fit
+    from ._fda import fda_fits
     if _family(head) != "binomial":
         raise ValueError("a discriminant separates presences from absences, under a head whose "
                          f"loss is the binary cross-entropy; this head's loss is "
                          f"{head['loss']!r}.")
     m = flatten(x)
-
-    def make(design, yj, seed_j, w):
-        return fda_fit(design, yj, w, degree=degree, penalty=penalty, nk=max_terms, thresh=min_gain,
-                       prune=prune, calibrate=calibrate, threads=threads)
-
-    models = _fit_columns(m, y, make, [0] * y.shape[1], _head_weights(head, y))
+    w = _head_weights(head, y)
+    models = _fit_responses(y, _varies(y), lambda cols: fda_fits(
+        m, y[:, cols], w[:, cols], degree=degree, penalty=penalty, nk=max_terms, thresh=min_gain,
+        prune=prune, calibrate=calibrate, threads=threads))
     return dict(models=models, n_col=m.shape[1],
                 unfitted=[str(v) for v, f in zip(variables, models)
                           if isinstance(f, float) or not f["discriminates"]],
@@ -1815,12 +1835,13 @@ def _hierarchical_fit(x, y, spatial, random, cov, neighbours, m, boundary, nodes
     levels = sorted(set(units.tolist())) if random else None
     index = None if not random else np.array([levels.index(u) for u in units], dtype=np.int32)
 
-    def make(d, yj, seed_j, w):
-        return hierarchical_fit(d, yj, w, unit=index, n_unit=len(levels or []), coords=coords,
-                                field=spatial, m=m, boundary=boundary, neighbours=neighbours,
+    def make(j):
+        return hierarchical_fit(design, y[:, j], weights[:, j], unit=index,
+                                n_unit=len(levels or []), coords=coords, field=spatial, m=m,
+                                boundary=boundary, neighbours=neighbours,
                                 cov=COVARIANCES.index(cov), nodes=nodes, threads=threads)
 
-    models = _fit_columns(design, y, make, [0] * y.shape[1], weights)
+    models = _fit_responses(y, _varies(y), lambda cols: [make(j) for j in cols])
     return dict(models=models, keep=keep, centre=centre, scale=scale, levels=levels,
                 spatial=spatial, random=random,
                 unfitted=[str(v) for v, f in zip(variables, models) if isinstance(f, float)],

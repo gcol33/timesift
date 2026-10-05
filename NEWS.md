@@ -54,6 +54,11 @@
 * `maxent(threads)` fits that many responses at once under either formulation, each the fit it
   gets alone; it reached only the absence formulation's inner folds, so a background fit ran on
   one thread. The designs held at once share `max_design`.
+* `elasticnet()`, `linear()`, `tree()`, `forest()`, `boosting()`, `mars()` and `discriminant()`
+  hand their core every response at once, as `perceptron()`, `maxent()` and `additive()` do, and
+  `threads` fits that many responses at once. With one response to fit it goes where it went
+  before: the inner folds, a step's candidate fits, a forest's trees or the column search.
+  `tree()` takes `threads`. Each response is the fit it gets alone, so no number moves.
 * `train_control()` takes `optimizer` (`"adamw"`, the default, `"adam"` or `"sgd"`), a `penalty`
   with its `alpha`, cito's `lambda` and `alpha` with `alpha` read as `elasticnet()` reads it, and a
   `schedule` (`"cosine"`, the default, `"constant"` or `"plateau"` with `plateau_factor` and

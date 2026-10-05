@@ -65,6 +65,12 @@ struct Stepwise {
 Stepwise stepwise_fit(const double* x, const double* y, const double* w, std::size_t n,
                       std::size_t p, const StepwiseSpec& spec);
 
+// One fit per column of `y` and `w` [n, r]. `spec.threads` fit that many responses at once, or a
+// lone response's candidate fits of one step; a fit is the same either way.
+std::vector<Stepwise> stepwise_fits(const double* x, std::size_t n, std::size_t p,
+                                    const double* y, const double* w, std::size_t r,
+                                    const StepwiseSpec& spec);
+
 // The fitted mean at every row of `x` [n, p].
 void stepwise_predict(const Stepwise& fit, const double* x, std::size_t n, std::size_t p,
                       double* out);

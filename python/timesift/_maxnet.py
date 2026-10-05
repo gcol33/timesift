@@ -14,12 +14,9 @@ from __future__ import annotations
 import numpy as np
 
 from . import _core
+from ._responses import as_design, as_fold_counts, as_fold_map, as_responses
 
 __all__ = ["maxnet_design", "maxnet_fit", "maxnet_predict"]
-
-
-def _design(x) -> np.ndarray:
-    return np.asfortranarray(np.asarray(x, dtype=np.float64))
 
 
 def _vector(v) -> np.ndarray:
@@ -30,8 +27,8 @@ def maxnet_design(x, y, classes=None, knots=50, regmult=1.0, formulation="backgr
                   add_samples=True, max_design=2.0) -> dict:
     """The rows a fit reads, background rows added, their response, the features and each
     feature's penalty factor. ``rows`` are 0-based."""
-    return _core.maxnet_design(_design(x), _vector(y), classes or "", int(knots), float(regmult),
-                               formulation, bool(add_samples), float(max_design))
+    return _core.maxnet_design(as_design(x), _vector(y), classes or "", int(knots),
+                               float(regmult), formulation, bool(add_samples), float(max_design))
 
 
 def maxnet_fits(x, y, w, classes=None, knots=50, regmult=1.0, formulation="background",
@@ -41,17 +38,10 @@ def maxnet_fits(x, y, w, classes=None, knots=50, regmult=1.0, formulation="backg
     the last of maxnet's penalties, or the absence formulation at the penalty its folds choose,
     where column ``s`` of ``fold`` gives response ``s`` one 0-based fold index per unit over
     ``n_fold[s]`` folds."""
-    y = np.asarray(y, dtype=np.float64)
-    w = np.asarray(w, dtype=np.float64)
-    if y.ndim == 1:
-        y, w = y[:, None], w[:, None]
-    if fold is not None:
-        fold = np.asarray(fold, dtype=np.int32)
-        fold = np.asfortranarray(fold[:, None] if fold.ndim == 1 else fold)
-    return _core.maxnet_fit(_design(x), np.asfortranarray(y), np.asfortranarray(w),
-                            classes or "", int(knots), float(regmult), formulation,
-                            bool(add_samples), float(thresh), float(max_pass), int(n_lambda),
-                            bool(one_se), fold, [int(k) for k in np.atleast_1d(n_fold)],
+    y, w = as_responses(y, w)
+    return _core.maxnet_fit(as_design(x), y, w, classes or "", int(knots), float(regmult),
+                            formulation, bool(add_samples), float(thresh), float(max_pass),
+                            int(n_lambda), bool(one_se), as_fold_map(fold), as_fold_counts(n_fold),
                             int(threads), float(max_design))
 
 
@@ -65,4 +55,4 @@ def maxnet_predict(fit: dict, newx, clamp=True, type="cloglog") -> np.ndarray:
     """maxnet's output at each row of ``newx``: ``"link"``, ``"exponential"``, ``"cloglog"`` or
     ``"logistic"`` under the background formulation, the link or the probability,
     ``"logistic"``, under the absence one."""
-    return _core.maxnet_predict(fit, _design(newx), bool(clamp), type)
+    return _core.maxnet_predict(fit, as_design(newx), bool(clamp), type)

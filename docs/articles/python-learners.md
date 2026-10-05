@@ -63,12 +63,13 @@ where a rare outcome is nearly separable at the small end of the path.
 The fit names every response whose path on the fitting units, or on any
 inner fold, ended that way in `stopped`.
 
-`threads` is how many fits of one response’s inner cross-validation run
-at once. The path on every fitting unit and the path of each inner fold
-are one independent fit each, so they parallelise without sharing
-anything, and `n_inner + 1` threads is as many as a response can use.
-The default is serial, because a package does not take a machine’s cores
-without being asked. What comes back does not depend on it.
+`threads` is how many responses are fitted at once, or, with one
+response to fit, how many fits of its inner cross-validation: the path
+on every fitting unit and the path of each inner fold are one
+independent fit each, so `n_inner + 1` threads is as many as a lone
+response can use. The default is serial, because a package does not take
+a machine’s cores without being asked. What comes back does not depend
+on it.
 
 ## `linear()`
 
@@ -115,8 +116,9 @@ refused rather than taken, and the fit names every response whose final
 model did not settle in `stopped`. A model with nothing but the
 intercept predicts the response’s share among the fitting units. The
 search runs on the core the R package calls, so the two select the same
-terms and return the same coefficients; `threads` runs one step’s
-candidate fits at once and does not change what comes back.
+terms and return the same coefficients; `threads` searches that many
+responses at once, or, with one response to fit, runs one step’s
+candidate fits at once, and does not change what comes back.
 
 ## `forest()`
 
@@ -185,6 +187,7 @@ tree(
     preset='default',
     shrink=1.0,
     seed=1,
+    threads=1,
 )
 ```
 
@@ -233,6 +236,9 @@ whose coefficient of variation is `shrink`, `0` for none and rpart’s
 default `1`. A split is chosen on the deviance of the unshrunk rates,
 and a subtree’s risk, its complexity and the pruning’s cross-validated
 error are read on the shrunk ones.
+
+`threads` grow that many responses’ trees at once; what comes back does
+not depend on it.
 
 ## `boosting()`
 
@@ -459,8 +465,9 @@ presence-absence head they are on, so a default
 earth’s specification fitted under them, and a head registered without
 `weights` fits it unweighted. The passes run on the core the R package
 calls, so the two keep the same terms and return the same coefficients;
-`threads` searches that many columns at once and does not change what
-comes back. A variable holding one value is predicted its mean.
+`threads` fits that many responses at once, or, with one response to
+fit, searches that many columns at once, and does not change what comes
+back. A variable holding one value is predicted its mean.
 
 ## `discriminant()`
 
@@ -507,10 +514,11 @@ posterior by a probit regression of the response on it under the case
 weights, on the fitting units, as biomod2 always does for `FDA`; `False`
 predicts the posterior. The passes run on the core the R package calls,
 so the two keep the same terms and predict the same probabilities;
-`threads` searches that many columns at once and does not change what
-comes back. A variable holding one value, or one the basis does not
-reach, is predicted its mean and named in `unfitted`. The learner needs
-a presence-absence response, under a head whose loss is the binary
+`threads` fits that many responses at once, or, with one response to
+fit, searches that many columns at once, and does not change what comes
+back. A variable holding one value, or one the basis does not reach, is
+predicted its mean and named in `unfitted`. The learner needs a
+presence-absence response, under a head whose loss is the binary
 cross-entropy.
 
 ## `additive()`

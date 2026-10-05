@@ -13,21 +13,27 @@ from __future__ import annotations
 import numpy as np
 
 from . import _core
+from ._responses import as_design, as_responses
 
-__all__ = ["fda_fit", "fda_predict"]
+__all__ = ["fda_fit", "fda_fits", "fda_predict"]
 
 
-def fda_fit(x, y, w, degree=1, penalty=None, nk=None, thresh=0.001, prune=True, calibrate=True,
-            threads=1) -> dict:
-    """The discriminant of the zero-one ``y`` on the columns of ``x`` under the case weights ``w``."""
-    return _core.fda_fit(np.asfortranarray(np.asarray(x, dtype=np.float64)),
-                         np.ascontiguousarray(y, dtype=np.float64),
-                         np.ascontiguousarray(w, dtype=np.float64), int(degree),
+def fda_fits(x, y, w, degree=1, penalty=None, nk=None, thresh=0.001, prune=True, calibrate=True,
+             threads=1) -> list:
+    """The discriminant of each zero-one column of ``y`` on the columns of ``x``, under the
+    matching column of the case weights ``w``."""
+    y, w = as_responses(y, w)
+    return _core.fda_fit(as_design(x), y, w, int(degree),
                          float("nan") if penalty is None else float(penalty),
                          0 if nk is None else int(nk), float(thresh), bool(prune),
                          bool(calibrate), int(threads))
 
 
+def fda_fit(x, y, w, **settings) -> dict:
+    """The discriminant of the one zero-one response ``y``."""
+    return fda_fits(x, y, w, **settings)[0]
+
+
 def fda_predict(fit: dict, newx) -> np.ndarray:
     """The probability of the second class at each row of ``newx``."""
-    return _core.fda_predict(fit, np.asfortranarray(np.asarray(newx, dtype=np.float64)))
+    return _core.fda_predict(fit, as_design(newx))

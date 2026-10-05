@@ -1382,6 +1382,31 @@ them, not sampling.</p>
 </div>
 </div>
 <div class="section level2">
+<h2 id="one-fit-per-response">One fit per response<a class="anchor" aria-label="anchor" href="#one-fit-per-response"></a>
+</h2>
+<p>The learners below that fit one model per response hand their core
+every response at once: the design once, <code>y</code> and the case
+weights <code>[unit, response]</code>, one seed per response where the
+fit draws, and where it chooses a setting by cross-validation a fold map
+<code>[unit, response]</code> with one count of folds per response.
+Which responses are fitted, and their inner folds, are settled above the
+core in each language, the same way in both: a response holding one
+value is predicted its mean and never reaches the core, and each
+response’s folds are dealt under its own seed, so a response is the same
+fit alone as beside others.</p>
+<p><code>threads</code> is spent by one rule in every core
+(<code>detail::fit_responses()</code> in
+<code>src/ts_internal.h</code>): with several responses to fit, it fits
+that many at once, each on one thread; with one, it goes to that
+response’s own work, which is what the sections below name. Each
+response’s fit writes its own slot and reads nothing another writes, so
+what comes back does not depend on <code>threads</code> in either case.
+Both suites assert, for every learner of this kind, that a run of
+several responses on several threads equals the serial run to the bit,
+and that a response fitted alone equals the same response fitted beside
+others.</p>
+</div>
+<div class="section level2">
 <h2 id="the-penalised-fit">The penalised fit<a class="anchor" aria-label="anchor" href="#the-penalised-fit"></a>
 </h2>
 <p><code><a href="../reference/elasticnet.html">elasticnet()</a></code> is one elastic net per response, over
@@ -1473,11 +1498,11 @@ error of it.</li>
 index per unit, so a grouping the outer map keeps whole stays whole
 where the penalty is chosen. Nothing inside the core draws.</li>
 <li>The fit on every unit and the fit of each fold are independent of
-one another, so <code>threads</code> runs them at once. What comes back
-is the same numbers either way, to the bit: the fits share the design
-they read and nothing else, and the held-out deviance is summarised
-after all of them have finished, in fold order. Both suites assert
-it.</li>
+one another, so a lone response’s <code>threads</code> run them at once.
+What comes back is the same numbers either way, to the bit: the fits
+share the design they read and nothing else, and the held-out deviance
+is summarised after all of them have finished, in fold order. Both
+suites assert it.</li>
 </ul>
 <div class="section level3">
 <h3 id="the-fixtures">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures"></a>
@@ -2271,9 +2296,9 @@ criterion, whether the last fit settled, and the number of steps. A
 model holding no term predicts the mean of the response over the rows
 fitted, unweighted. Otherwise the prediction is the linear predictor
 through the link.</li>
-<li>The candidate fits of one step are independent, and
-<code>threads</code> runs them at once without changing what comes
-back.</li>
+<li>The candidate fits of one step are independent, and a lone
+response’s <code>threads</code> run them at once without changing what
+comes back.</li>
 </ul>
 <div class="section level3">
 <h3 id="the-fixtures-6">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-6"></a>
@@ -2507,9 +2532,10 @@ kept term as the product of its factors, <code>max(0, x - t)</code>,
 <code>max(0, t - x)</code> or <code>x</code>, then the linear predictor,
 through the logit link under the binomial family and the exponential
 under the Poisson one.</li>
-<li>The columns of one parent are independent searches, and
-<code>threads</code> runs them at once; their results are taken in
-column order afterwards, so what comes back does not depend on it.</li>
+<li>The columns of one parent are independent searches, and a lone
+response’s <code>threads</code> run them at once; their results are
+taken in column order afterwards, so what comes back does not depend on
+it.</li>
 </ul>
 <div class="section level3">
 <h3 id="the-fixtures-7">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-7"></a>
@@ -2701,9 +2727,10 @@ their coefficients, the count of forward terms, the kept subset’s
 generalised cross-validation, the variate’s sign and scale, the
 centroids and priors, and the recalibration’s two coefficients and
 whether it settled.</li>
-<li>The columns of one parent are independent searches, and
-<code>threads</code> runs them at once; their results are taken in
-column order afterwards, so what comes back does not depend on it.</li>
+<li>The columns of one parent are independent searches, and a lone
+response’s <code>threads</code> run them at once; their results are
+taken in column order afterwards, so what comes back does not depend on
+it.</li>
 </ul>
 <div class="section level3">
 <h3 id="the-fixtures-8">The fixtures<a class="anchor" aria-label="anchor" href="#the-fixtures-8"></a>

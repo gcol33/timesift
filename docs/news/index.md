@@ -100,6 +100,23 @@
   formulation, each the fit it gets alone; it reached only the absence
   formulation’s inner folds, so a background fit ran on one thread. The
   designs held at once share `max_design`.
+- [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md),
+  [`linear()`](https://gillescolling.com/timesift/reference/linear.md),
+  [`tree()`](https://gillescolling.com/timesift/reference/tree.md),
+  [`forest()`](https://gillescolling.com/timesift/reference/forest.md),
+  [`boosting()`](https://gillescolling.com/timesift/reference/boosting.md),
+  [`mars()`](https://gillescolling.com/timesift/reference/mars.md) and
+  [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
+  hand their core every response at once, as
+  [`perceptron()`](https://gillescolling.com/timesift/reference/perceptron.md),
+  [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md)
+  and
+  [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
+  do, and `threads` fits that many responses at once. With one response
+  to fit it goes where it went before: the inner folds, a step’s
+  candidate fits, a forest’s trees or the column search.
+  [`tree()`](https://gillescolling.com/timesift/reference/tree.md) takes
+  `threads`. Each response is the fit it gets alone, so no number moves.
 - [`train_control()`](https://gillescolling.com/timesift/reference/train_control.md)
   takes `optimizer` (`"adamw"`, the default, `"adam"` or `"sgd"`), a
   `penalty` with its `alpha`, cito’s `lambda` and `alpha` with `alpha`

@@ -69,6 +69,11 @@ struct Fda {
 Fda fda_fit(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
             const FdaSpec& spec);
 
+// One fit per column of `y` and `w` [n, r]. `spec.threads` fit that many responses at once, or
+// search a lone response's columns; a fit is the same either way.
+std::vector<Fda> fda_fits(const double* x, std::size_t n, std::size_t p, const double* y,
+                          const double* w, std::size_t r, const FdaSpec& spec);
+
 // The second class's posterior at every row of `x` [n, p], recalibrated where the fit was.
 void fda_predict(const Fda& fit, const double* x, std::size_t n, std::size_t p, double* out);
 

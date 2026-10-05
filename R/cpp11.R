@@ -32,8 +32,8 @@ ts_penalised_path_ <- function(x, y, w, n, p, family, alpha, n_lambda, lambda_mi
   .Call(`_timesift_ts_penalised_path_`, x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, max_pass)
 }
 
-ts_penalised_cv_ <- function(x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, fold, n_fold, max_pass, threads) {
-  .Call(`_timesift_ts_penalised_cv_`, x, y, w, n, p, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, fold, n_fold, max_pass, threads)
+ts_penalised_cv_ <- function(x, y, w, n, p, r, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, fold, n_fold, max_pass, threads) {
+  .Call(`_timesift_ts_penalised_cv_`, x, y, w, n, p, r, family, alpha, n_lambda, lambda_min_ratio, lambda, thresh, standardize, intercept, fold, n_fold, max_pass, threads)
 }
 
 ts_penalised_predict_ <- function(lambda, a0, beta, family, at, newx, n) {
@@ -44,8 +44,8 @@ ts_penalised_coef_ <- function(lambda, a0, beta, family, at) {
   .Call(`_timesift_ts_penalised_coef_`, lambda, a0, beta, family, at)
 }
 
-ts_tree_fit_ <- function(x, y, w, n, p, family, min_split, min_leaf, cp, max_depth, shrink, fold, n_fold) {
-  .Call(`_timesift_ts_tree_fit_`, x, y, w, n, p, family, min_split, min_leaf, cp, max_depth, shrink, fold, n_fold)
+ts_tree_fit_ <- function(x, y, w, n, p, r, family, min_split, min_leaf, cp, max_depth, shrink, fold, n_fold, threads) {
+  .Call(`_timesift_ts_tree_fit_`, x, y, w, n, p, r, family, min_split, min_leaf, cp, max_depth, shrink, fold, n_fold, threads)
 }
 
 ts_tree_prune_ <- function(tree, cp) {
@@ -56,16 +56,16 @@ ts_tree_predict_ <- function(tree, newx, n, p) {
   .Call(`_timesift_ts_tree_predict_`, tree, newx, n, p)
 }
 
-ts_forest_fit_ <- function(x, y, w, n, p, family, trees, mtry, min_leaf, balance, seed, threads) {
-  .Call(`_timesift_ts_forest_fit_`, x, y, w, n, p, family, trees, mtry, min_leaf, balance, seed, threads)
+ts_forest_fit_ <- function(x, y, w, n, p, r, family, trees, mtry, min_leaf, balance, seeds, threads) {
+  .Call(`_timesift_ts_forest_fit_`, x, y, w, n, p, r, family, trees, mtry, min_leaf, balance, seeds, threads)
 }
 
 ts_forest_predict_ <- function(forest, newx, n, p) {
   .Call(`_timesift_ts_forest_predict_`, forest, newx, n, p)
 }
 
-ts_boost_fit_ <- function(x, y, w, n, p, family, trees, depth, shrinkage, min_leaf, subsample, colsample, newton, lambda, gamma, seed, fold, n_fold, threads) {
-  .Call(`_timesift_ts_boost_fit_`, x, y, w, n, p, family, trees, depth, shrinkage, min_leaf, subsample, colsample, newton, lambda, gamma, seed, fold, n_fold, threads)
+ts_boost_fit_ <- function(x, y, w, n, p, r, family, trees, depth, shrinkage, min_leaf, subsample, colsample, newton, lambda, gamma, seeds, fold, n_fold, threads) {
+  .Call(`_timesift_ts_boost_fit_`, x, y, w, n, p, r, family, trees, depth, shrinkage, min_leaf, subsample, colsample, newton, lambda, gamma, seeds, fold, n_fold, threads)
 }
 
 ts_boost_predict_ <- function(fit, newx, n, p) {
@@ -96,16 +96,16 @@ ts_envelope_predict_ <- function(fit, newx, n, p) {
   .Call(`_timesift_ts_envelope_predict_`, fit, newx, n, p)
 }
 
-ts_stepwise_fit_ <- function(x, y, w, n, p, family, max_terms, degree, direction, terms, threads) {
-  .Call(`_timesift_ts_stepwise_fit_`, x, y, w, n, p, family, max_terms, degree, direction, terms, threads)
+ts_stepwise_fit_ <- function(x, y, w, n, p, r, family, max_terms, degree, direction, terms, threads) {
+  .Call(`_timesift_ts_stepwise_fit_`, x, y, w, n, p, r, family, max_terms, degree, direction, terms, threads)
 }
 
 ts_stepwise_predict_ <- function(fit, newx, n, p) {
   .Call(`_timesift_ts_stepwise_predict_`, fit, newx, n, p)
 }
 
-ts_mars_fit_ <- function(x, y, w, n, p, family, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_beta, prune, nprune, threads) {
-  .Call(`_timesift_ts_mars_fit_`, x, y, w, n, p, family, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_beta, prune, nprune, threads)
+ts_mars_fit_ <- function(x, y, w, n, p, r, family, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_beta, prune, nprune, threads) {
+  .Call(`_timesift_ts_mars_fit_`, x, y, w, n, p, r, family, degree, penalty, nk, thresh, minspan, endspan, fast_k, fast_beta, prune, nprune, threads)
 }
 
 ts_mars_predict_ <- function(fit, newx, n, p) {
@@ -120,8 +120,8 @@ ts_perceptron_predict_ <- function(fit, newx, n, p) {
   .Call(`_timesift_ts_perceptron_predict_`, fit, newx, n, p)
 }
 
-ts_fda_fit_ <- function(x, y, w, n, p, degree, penalty, nk, thresh, prune, calibrate, threads) {
-  .Call(`_timesift_ts_fda_fit_`, x, y, w, n, p, degree, penalty, nk, thresh, prune, calibrate, threads)
+ts_fda_fit_ <- function(x, y, w, n, p, r, degree, penalty, nk, thresh, prune, calibrate, threads) {
+  .Call(`_timesift_ts_fda_fit_`, x, y, w, n, p, r, degree, penalty, nk, thresh, prune, calibrate, threads)
 }
 
 ts_fda_predict_ <- function(fit, newx, n, p) {

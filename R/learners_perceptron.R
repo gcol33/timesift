@@ -103,7 +103,7 @@ perceptron <- function(data = NULL, hidden = NULL, decay = NULL, range = NULL, m
                    max_hessian, threads, seed, head, weights, ...) {
       family <- .head_family(head)
       m <- .flatten(x)
-      fittable <- vapply(seq_len(ncol(y)), function(j) length(unique(y[, j])) > 1L, logical(1L))
+      fittable <- .varies(y)
       at_once <- max(min(threads, sum(fittable)), 1L)
       n_weight <- hidden * (ncol(m) + 1) + hidden + 1 + if (skip) ncol(m) else 0
       need <- at_once * n_weight * (n_weight + 1) / 2 * 8 / 2^30

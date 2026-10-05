@@ -33,7 +33,8 @@ freedom, taken at half. \code{NULL} is mda's, 2 at degree one and 3 above.}
 
 \item{calibrate}{Whether the posterior is recalibrated by a probit regression, as biomod2 does.}
 
-\item{threads}{Columns searched at once. The model is the same on any number.}
+\item{threads}{Responses fitted at once, or, with one response to fit, columns searched at once.
+The model is the same on any number.}
 }
 \value{
 A \code{\link[=learner]{learner()}}.

@@ -65,10 +65,10 @@ elasticnet(
 
 - threads:
 
-  How many fits of one response's inner cross-validation run at once.
-  The path on every fitting unit and the path of each inner fold are one
-  independent fit each, so they parallelise without sharing anything,
-  and `n_inner + 1` threads is as many as a response can use. The
+  How many responses are fitted at once, or, with one response to fit,
+  how many fits of its inner cross-validation: the path on every fitting
+  unit and the path of each inner fold are one independent fit each, so
+  `n_inner + 1` threads is as many as a lone response can use. The
   default is serial, because a package does not take a machine's cores
   without being asked. What comes back does not depend on it.
 

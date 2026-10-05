@@ -45,7 +45,8 @@
 #' @param min_gain The least share of the residuals a forward step is kept for.
 #' @param prune Whether the pruning pass runs. Without it every term of the forward pass is kept.
 #' @param calibrate Whether the posterior is recalibrated by a probit regression, as biomod2 does.
-#' @param threads Columns searched at once. The model is the same on any number.
+#' @param threads Responses fitted at once, or, with one response to fit, columns searched at once.
+#'   The model is the same on any number.
 #'
 #' @return A [learner()].
 #'
@@ -87,14 +88,14 @@ discriminant <- function(data = NULL, degree = 1L, penalty = NULL, max_terms = N
              call. = FALSE)
       }
       m <- .flatten(x)
-      models <- lapply(seq_len(ncol(y)), function(j) {
-        yj <- y[, j]
-        if (length(unique(yj)) < 2L) {
-          return(mean(yj))
-        }
-        .fda_fit(m, yj, weights[, j], degree = degree, penalty = penalty, nk = max_terms,
-                 thresh = min_gain, prune = prune, calibrate = calibrate, threads = threads)
-      })
+      fit <- .varies(y)
+      models <- as.list(unname(colMeans(y)))
+      if (any(fit)) {
+        models[fit] <- .fda_fits(m, y[, fit, drop = FALSE], weights[, fit, drop = FALSE],
+                                 degree = degree, penalty = penalty, nk = max_terms,
+                                 thresh = min_gain, prune = prune, calibrate = calibrate,
+                                 threads = threads)
+      }
       unfitted <- vapply(models, function(f) is.numeric(f) || !f$discriminates, logical(1L))
       stopped <- vapply(models, function(f) is.list(f) && !f$converged, logical(1L))
       list(models = models, columns = colnames(m), unfitted = colnames(y)[unfitted],
@@ -112,12 +113,18 @@ discriminant <- function(data = NULL, degree = 1L, penalty = NULL, max_terms = N
 # The discriminant, over the core `src/ts_fda.cpp` compiles into both languages. A fit is a plain
 # list of numbers, the kept terms as their factors, their coefficients, the variate and the
 # recalibration, so it round trips through `saveRDS()` and predicts on another machine.
-.fda_fit <- function(x, y, w, degree = 1L, penalty = NULL, nk = NULL, thresh = 0.001,
-                     prune = TRUE, calibrate = TRUE, threads = 1L) {
-  ts_fda_fit_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x), as.integer(degree),
-              if (is.null(penalty)) NA_real_ else as.numeric(penalty),
+.fda_fits <- function(x, y, w, degree = 1L, penalty = NULL, nk = NULL, thresh = 0.001,
+                      prune = TRUE, calibrate = TRUE, threads = 1L) {
+  y <- as.matrix(y)
+  ts_fda_fit_(as.numeric(x), as.numeric(y), as.numeric(as.matrix(w)), nrow(x), ncol(x), ncol(y),
+              as.integer(degree), if (is.null(penalty)) NA_real_ else as.numeric(penalty),
               if (is.null(nk)) 0L else as.integer(nk), as.numeric(thresh), isTRUE(prune),
               isTRUE(calibrate), as.integer(threads))
+}
+
+# The discriminant of one response.
+.fda_fit <- function(x, y, w, ...) {
+  .fda_fits(x, y, w, ...)[[1L]]
 }
 
 .fda_predict <- function(fit, newx) {

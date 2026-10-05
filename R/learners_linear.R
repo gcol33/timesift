@@ -48,9 +48,9 @@
 #' @param tol Where the coordinate descent stops, read off the largest coefficient move of a
 #'   pass. The default leaves the fit as close to the optimum as glmnet's own default does; a
 #'   looser one is faster and a tighter one costs time roughly in proportion.
-#' @param threads How many fits of one response's inner cross-validation run at once. The path on
-#'   every fitting unit and the path of each inner fold are one independent fit each, so they
-#'   parallelise without sharing anything, and `n_inner + 1` threads is as many as a response can
+#' @param threads How many responses are fitted at once, or, with one response to fit, how many
+#'   fits of its inner cross-validation: the path on every fitting unit and the path of each inner
+#'   fold are one independent fit each, so `n_inner + 1` threads is as many as a lone response can
 #'   use. The default is serial, because a package does not take a machine's cores without being
 #'   asked. What comes back does not depend on it.
 #' @param seed Seed for the inner cross-validation's fold draw, which is random and would otherwise
@@ -80,24 +80,24 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 10L, squares = TRUE,
       }
       old <- .seed_state()
       on.exit(.restore_seed(old), add = TRUE)
-      seeds <- .variable_seeds(seed, y)
       weights <- .head_weights(head, y)
-      models <- lapply(seq_len(ncol(y)), function(j) {
-        yj <- y[, j]
-        if (length(unique(yj)) < 2L) {
-          return(mean(yj))
-        }
+      models <- as.list(unname(colMeans(y)))
+      fit <- .varies(y)
+      if (any(fit)) {
         # The inner folds are dealt here rather than inside the path, so a grouping the outer
         # folds keep whole stays whole where the penalty is chosen, and a rare outcome is spread
         # over them rather than left to a plain deal.
-        inner <- .inner_folds(yj, n_inner, seeds[j], group)
-        if (identical(family, "binomial") && !.inner_fittable(yj, inner)) {
-          return(mean(yj))
-        }
-        labels <- sort(unique(inner))
-        .penalised_cv(m, yj, weights[, j], family, alpha, match(inner, labels) - 1L,
-                      length(labels), n_lambda = n_lambda, thresh = tol, threads = threads)
-      })
+        folds <- .response_folds(y[, fit, drop = FALSE], n_inner,
+                                 .variable_seeds(seed, y)[fit], group)
+        keep <- if (identical(family, "binomial")) folds$fittable else rep(TRUE, sum(fit))
+        fit[fit] <- keep
+      }
+      if (any(fit)) {
+        models[fit] <- .penalised_cvs(m, y[, fit, drop = FALSE], weights[, fit, drop = FALSE],
+                                      family, alpha, folds$fold[, keep, drop = FALSE],
+                                      folds$n_fold[keep], n_lambda = n_lambda, thresh = tol,
+                                      threads = threads)
+      }
       unfitted <- colnames(y)[vapply(models, is.numeric, logical(1L))]
       stopped <- colnames(y)[vapply(models, .penalised_stopped, logical(1L))]
       list(models = models, squares = squares, s = s, columns = colnames(m),
@@ -163,8 +163,8 @@ elasticnet <- function(data = NULL, alpha = 0.5, n_inner = 10L, squares = TRUE,
 #' @param select `"both"`, `"forward"`, `"backward"` or `"none"`.
 #' @param terms `"power"` for each power of a column its own term, `"column"` for a column's
 #'   polynomial as one term.
-#' @param threads How many of one step's candidate fits run at once. What comes back does not
-#'   depend on it.
+#' @param threads How many responses are searched at once, or, with one response to fit, how many
+#'   of one step's candidate fits run at once. What comes back does not depend on it.
 #'
 #' @return A [learner()].
 #'
@@ -196,14 +196,13 @@ linear <- function(data = NULL, select = c("both", "forward", "backward", "none"
       family <- .head_family(head)
       m <- .flatten(x)
       weights <- .head_weights(head, y)
-      models <- lapply(seq_len(ncol(y)), function(j) {
-        yj <- y[, j]
-        if (length(unique(yj)) < 2L) {
-          return(mean(yj))
-        }
-        .stepwise_fit(m, yj, weights[, j], family, max_terms = max_terms, degree = degree,
-                      direction = select, terms = terms, threads = threads)
-      })
+      fit <- .varies(y)
+      models <- as.list(unname(colMeans(y)))
+      if (any(fit)) {
+        models[fit] <- .stepwise_fits(m, y[, fit, drop = FALSE], weights[, fit, drop = FALSE],
+                                      family, max_terms = max_terms, degree = degree,
+                                      direction = select, terms = terms, threads = threads)
+      }
       stopped <- colnames(y)[vapply(models, function(f) is.list(f) && !f$converged, logical(1L))]
       list(models = models, columns = colnames(m), family = family, stopped = stopped)
     },
@@ -219,11 +218,17 @@ linear <- function(data = NULL, select = c("both", "forward", "backward", "none"
 # the response and the case weights are settled above; a fit is a plain list of numbers, its terms
 # as the column each reads and the recurrence of its polynomial, so it round trips through
 # `saveRDS()` and predicts on another machine.
-.stepwise_fit <- function(x, y, w, family, max_terms = 3, degree = 2L, direction = "forward",
-                          terms = "column", threads = 1L) {
-  ts_stepwise_fit_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x), family,
-                   as.numeric(max_terms), as.integer(degree), direction, terms,
+.stepwise_fits <- function(x, y, w, family, max_terms = 3, degree = 2L, direction = "forward",
+                           terms = "column", threads = 1L) {
+  y <- as.matrix(y)
+  ts_stepwise_fit_(as.numeric(x), as.numeric(y), as.numeric(as.matrix(w)), nrow(x), ncol(x),
+                   ncol(y), family, as.numeric(max_terms), as.integer(degree), direction, terms,
                    as.integer(threads))
+}
+
+# The stepwise model of one response.
+.stepwise_fit <- function(x, y, w, family, ...) {
+  .stepwise_fits(x, y, w, family, ...)[[1L]]
 }
 
 .stepwise_predict <- function(fit, newx) {

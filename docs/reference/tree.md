@@ -24,7 +24,8 @@ tree(
   n_inner = NULL,
   preset = c("default", "bigboss"),
   shrink = 1,
-  seed = 1L
+  seed = 1L,
+  threads = 1L
 )
 ```
 
@@ -74,6 +75,10 @@ tree(
 - seed:
 
   Seed for the inner cross-validation's fold draw.
+
+- threads:
+
+  Responses grown at once. What comes back does not depend on it.
 
 ## Value
 

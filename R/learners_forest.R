@@ -40,7 +40,8 @@
 #' @param balance Whether each tree draws as many units from each class as the smaller holds.
 #' @param preset Whose defaults the settings left `NULL` take: `"default"` or `"bigboss"`.
 #' @param seed Seed for the bootstrap draws and the column draws.
-#' @param threads Trees grown at once. The forest is the same on any number.
+#' @param threads Responses' forests grown at once, or, with one response to fit, its trees. The
+#'   forest is the same on any number.
 #'
 #' @return A [learner()].
 #'
@@ -62,15 +63,13 @@ forest <- function(data = NULL, trees = NULL, mtry = NULL, min_node = NULL, bala
       family <- .head_family(head)
       m <- .flatten(x)
       settings <- .forest_settings(preset, family, ncol(m), trees, mtry, min_node)
-      seeds <- .variable_seeds(seed, y)
-      models <- lapply(seq_len(ncol(y)), function(j) {
-        yj <- y[, j]
-        if (length(unique(yj)) < 2L) {
-          return(mean(yj))
-        }
-        .forest_fit(m, yj, weights[, j], family, settings$trees, settings$mtry,
-                    settings$min_node, balance, seeds[j], threads)
-      })
+      fit <- .varies(y)
+      models <- as.list(unname(colMeans(y)))
+      if (any(fit)) {
+        models[fit] <- .forest_fits(m, y[, fit, drop = FALSE], weights[, fit, drop = FALSE],
+                                    family, settings$trees, settings$mtry, settings$min_node,
+                                    balance, .variable_seeds(seed, y)[fit], threads)
+      }
       list(models = models, columns = colnames(m), family = family)
     },
     predict = function(model, x) {

@@ -31,7 +31,8 @@ representation of the run.}
 
 \item{seed}{Seed for the bootstrap draws and the column draws.}
 
-\item{threads}{Trees grown at once. The forest is the same on any number.}
+\item{threads}{Responses' forests grown at once, or, with one response to fit, its trees. The
+forest is the same on any number.}
 }
 \value{
 A \code{\link[=learner]{learner()}}.

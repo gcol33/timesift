@@ -36,11 +36,8 @@ the coordinates.}
 
 \item{nodes}{Grid points per hyperparameter.}
 
-\item{threads}{How many fits of one response's inner cross-validation run at once. The path on
-every fitting unit and the path of each inner fold are one independent fit each, so they
-parallelise without sharing anything, and \code{n_inner + 1} threads is as many as a response can
-use. The default is serial, because a package does not take a machine's cores without being
-asked. What comes back does not depend on it.}
+\item{threads}{Conditional fits over the hyperparameter grid run at once. What comes back does
+not depend on it.}
 }
 \value{
 A \code{\link[=learner]{learner()}}.

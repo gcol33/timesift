@@ -975,6 +975,28 @@ planted skill**, which is well inside the Monte Carlo error of either
 one alone and far below the +0.110 the claim rests on. A disagreement
 beyond that is a bug in one of them, not sampling.
 
+## One fit per response
+
+The learners below that fit one model per response hand their core every
+response at once: the design once, `y` and the case weights
+`[unit, response]`, one seed per response where the fit draws, and where
+it chooses a setting by cross-validation a fold map `[unit, response]`
+with one count of folds per response. Which responses are fitted, and
+their inner folds, are settled above the core in each language, the same
+way in both: a response holding one value is predicted its mean and
+never reaches the core, and each response’s folds are dealt under its
+own seed, so a response is the same fit alone as beside others.
+
+`threads` is spent by one rule in every core (`detail::fit_responses()`
+in `src/ts_internal.h`): with several responses to fit, it fits that
+many at once, each on one thread; with one, it goes to that response’s
+own work, which is what the sections below name. Each response’s fit
+writes its own slot and reads nothing another writes, so what comes back
+does not depend on `threads` in either case. Both suites assert, for
+every learner of this kind, that a run of several responses on several
+threads equals the serial run to the bit, and that a response fitted
+alone equals the same response fitted beside others.
+
 ## The penalised fit
 
 [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
@@ -1061,10 +1083,11 @@ was agreement with it rather than an elastic net of our own.
   per unit, so a grouping the outer map keeps whole stays whole where
   the penalty is chosen. Nothing inside the core draws.
 - The fit on every unit and the fit of each fold are independent of one
-  another, so `threads` runs them at once. What comes back is the same
-  numbers either way, to the bit: the fits share the design they read
-  and nothing else, and the held-out deviance is summarised after all of
-  them have finished, in fold order. Both suites assert it.
+  another, so a lone response’s `threads` run them at once. What comes
+  back is the same numbers either way, to the bit: the fits share the
+  design they read and nothing else, and the held-out deviance is
+  summarised after all of them have finished, in fold order. Both suites
+  assert it.
 
 ### The fixtures
 
@@ -1719,8 +1742,8 @@ ran and the rest is what a biomod2 user’s `GLM` is.
   no term predicts the mean of the response over the rows fitted,
   unweighted. Otherwise the prediction is the linear predictor through
   the link.
-- The candidate fits of one step are independent, and `threads` runs
-  them at once without changing what comes back.
+- The candidate fits of one step are independent, and a lone response’s
+  `threads` run them at once without changing what comes back.
 
 ### The fixtures
 
@@ -1900,9 +1923,9 @@ from `src/ts_glm.cpp`, which the stepwise model shares.
   `max(0, t - x)` or `x`, then the linear predictor, through the logit
   link under the binomial family and the exponential under the Poisson
   one.
-- The columns of one parent are independent searches, and `threads` runs
-  them at once; their results are taken in column order afterwards, so
-  what comes back does not depend on it.
+- The columns of one parent are independent searches, and a lone
+  response’s `threads` run them at once; their results are taken in
+  column order afterwards, so what comes back does not depend on it.
 
 ### The fixtures
 
@@ -2047,9 +2070,9 @@ computed as R computes it (Cody’s `pnorm`, Wichura’s AS 241 `qnorm`,
   generalised cross-validation, the variate’s sign and scale, the
   centroids and priors, and the recalibration’s two coefficients and
   whether it settled.
-- The columns of one parent are independent searches, and `threads` runs
-  them at once; their results are taken in column order afterwards, so
-  what comes back does not depend on it.
+- The columns of one parent are independent searches, and a lone
+  response’s `threads` run them at once; their results are taken in
+  column order afterwards, so what comes back does not depend on it.
 
 ### The fixtures
 

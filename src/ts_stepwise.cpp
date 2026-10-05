@@ -423,4 +423,14 @@ void stepwise_predict(const Stepwise& fit, const double* x, std::size_t n, std::
   }
 }
 
+std::vector<Stepwise> stepwise_fits(const double* x, std::size_t n, std::size_t p,
+                                    const double* y, const double* w, std::size_t r,
+                                    const StepwiseSpec& spec) {
+  return detail::fit_responses(r, spec.threads, [&](std::size_t s, int inner) {
+    StepwiseSpec each = spec;
+    each.threads = inner;
+    return stepwise_fit(x, y + s * n, w + s * n, n, p, each);
+  });
+}
+
 }  // namespace timesift

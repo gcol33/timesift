@@ -745,4 +745,18 @@ void boost_predict(const Boosted& model, const double* x, std::size_t n, std::si
   }
 }
 
+std::vector<Boosted> boost_fits(const double* x, std::size_t n, std::size_t p, const double* y,
+                                const double* w, std::size_t r, Family family,
+                                const BoostSpec& spec, const std::uint32_t* seeds,
+                                const std::int32_t* fold, const std::int32_t* n_fold) {
+  return detail::fit_responses(r, spec.threads, [&](std::size_t s, int inner) {
+    BoostSpec each = spec;
+    each.seed = seeds[s];
+    each.threads = inner;
+    return boost_fit(x, y + s * n, w + s * n, n, p, family, each,
+                     detail::response_fold(fold, n, s),
+                     detail::response_fold_count(fold, n_fold, s));
+  });
+}
+
 }  // namespace timesift

@@ -46,7 +46,8 @@ linear(
 
 - threads:
 
-  How many of one step's candidate fits run at once. What comes back
+  How many responses are searched at once, or, with one response to fit,
+  how many of one step's candidate fits run at once. What comes back
   does not depend on it.
 
 ## Value

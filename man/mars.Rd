@@ -43,7 +43,8 @@ ages up the queue. \code{fast_k = 0} tries every term.}
 
 \item{nprune}{The most terms kept, the intercept included; \code{NULL} for no bound.}
 
-\item{threads}{Columns searched at once. The model is the same on any number.}
+\item{threads}{Responses fitted at once, or, with one response to fit, columns searched at once.
+The model is the same on any number.}
 }
 \value{
 A \code{\link[=learner]{learner()}}.

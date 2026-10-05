@@ -59,7 +59,8 @@ forest(
 
 - threads:
 
-  Trees grown at once. The forest is the same on any number.
+  Responses' forests grown at once, or, with one response to fit, its
+  trees. The forest is the same on any number.
 
 ## Value
 

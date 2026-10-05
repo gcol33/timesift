@@ -332,6 +332,53 @@ timesift::PenaltyPath take(cpp11::doubles lambda, cpp11::doubles a0, cpp11::doub
   return path;
 }
 
+// One 0-based fold index per observation, or none.
+std::vector<std::int32_t> take_folds(cpp11::sexp fold) {
+  std::vector<std::int32_t> which;
+  if (fold != R_NilValue) {
+    cpp11::integers given(fold);
+    for (R_xlen_t i = 0; i < given.size(); ++i) which.push_back(given[i]);
+  }
+  return which;
+}
+
+// A fold map of one 0-based index per unit and response, [n, r], with one count of folds per
+// response, or no map at all.
+struct ResponseFolds {
+  std::vector<std::int32_t> which;
+  std::vector<std::int32_t> count;
+  const std::int32_t* fold() const { return which.empty() ? nullptr : which.data(); }
+  const std::int32_t* n_fold() const { return which.empty() ? nullptr : count.data(); }
+};
+
+ResponseFolds take_response_folds(cpp11::sexp fold, cpp11::integers n_fold, int n, int r,
+                                  const char* who) {
+  ResponseFolds out;
+  out.which = take_folds(fold);
+  out.count.assign(n_fold.begin(), n_fold.end());
+  if (!out.which.empty() &&
+      (out.which.size() != static_cast<std::size_t>(n) * static_cast<std::size_t>(r) ||
+       out.count.size() != static_cast<std::size_t>(r))) {
+    throw std::invalid_argument(std::string(who) + "'s folds are one per unit and response, and "
+                                "one count per response");
+  }
+  return out;
+}
+
+// A seed is a number modulo 2^32, which an R integer cannot carry, so it crosses as a double.
+std::uint32_t take_seed(double seed) {
+  return static_cast<std::uint32_t>(static_cast<std::uint64_t>(seed));
+}
+
+std::vector<std::uint32_t> take_seeds(cpp11::doubles seeds, int r, const char* who) {
+  if (seeds.size() != r) {
+    throw std::invalid_argument(std::string(who) + " is fitted under one seed per response");
+  }
+  std::vector<std::uint32_t> out;
+  for (double s : seeds) out.push_back(take_seed(s));
+  return out;
+}
+
 }  // namespace
 
 [[cpp11::register]]
@@ -348,29 +395,37 @@ cpp11::list ts_penalised_path_(cpp11::doubles x, cpp11::doubles y, cpp11::double
   return give(path);
 }
 
+// `y` and `w` are [n, r], one cross-validated path per column under its own column of `fold`
+// [n, r].
 [[cpp11::register]]
 cpp11::list ts_penalised_cv_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
-                             std::string family, double alpha, int n_lambda,
+                             int r, std::string family, double alpha, int n_lambda,
                              double lambda_min_ratio, cpp11::sexp lambda, double thresh,
-                             bool standardize, bool intercept, cpp11::integers fold, int n_fold,
-                             double max_pass, int threads) {
+                             bool standardize, bool intercept, cpp11::sexp fold,
+                             cpp11::integers n_fold, double max_pass, int threads) {
   const timesift::PenaltySpec spec = penalty_spec(alpha, n_lambda, lambda_min_ratio, lambda,
                                                   thresh, standardize, intercept, max_pass,
                                                   threads);
-  std::vector<std::int32_t> which(static_cast<std::size_t>(n));
-  for (int i = 0; i < n; ++i) which[static_cast<std::size_t>(i)] = fold[i];
-  const timesift::PenaltyCV cv =
-      timesift::penalised_cv(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
-                             static_cast<std::size_t>(p), timesift::family_from_name(family),
-                             spec, which.data(), n_fold);
+  const ResponseFolds folds = take_response_folds(fold, n_fold, n, r, "a penalised fit");
+  if (folds.fold() == nullptr) {
+    throw std::invalid_argument("a cross-validated penalty is handed its folds");
+  }
+  const std::vector<timesift::PenaltyCV> fits = timesift::penalised_cvs(
+      REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
+      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r),
+      timesift::family_from_name(family), spec, folds.fold(), folds.n_fold());
   using namespace cpp11::literals;
-  cpp11::writable::list out = give(cv.path);
-  out.push_back("cv_mean"_nm = give(cv.cv_mean));
-  out.push_back("cv_sd"_nm = give(cv.cv_sd));
-  out.push_back("index_min"_nm = cpp11::as_sexp(static_cast<int>(cv.index_min) + 1));
-  out.push_back("index_1se"_nm = cpp11::as_sexp(static_cast<int>(cv.index_1se) + 1));
-  out.push_back("fold_stalled"_nm = give(cv.fold_stalled));
-  return out;
+  cpp11::writable::list all;
+  for (const timesift::PenaltyCV& cv : fits) {
+    cpp11::writable::list out = give(cv.path);
+    out.push_back("cv_mean"_nm = give(cv.cv_mean));
+    out.push_back("cv_sd"_nm = give(cv.cv_sd));
+    out.push_back("index_min"_nm = cpp11::as_sexp(static_cast<int>(cv.index_min) + 1));
+    out.push_back("index_1se"_nm = cpp11::as_sexp(static_cast<int>(cv.index_1se) + 1));
+    out.push_back("fold_stalled"_nm = give(cv.fold_stalled));
+    all.push_back(out);
+  }
+  return all;
 }
 
 [[cpp11::register]]
@@ -441,16 +496,6 @@ std::vector<T> take_field(const cpp11::list& tree, const char* name) {
   return out;
 }
 
-// One 0-based fold index per observation, or none.
-std::vector<std::int32_t> take_folds(cpp11::sexp fold) {
-  std::vector<std::int32_t> which;
-  if (fold != R_NilValue) {
-    cpp11::integers given(fold);
-    for (R_xlen_t i = 0; i < given.size(); ++i) which.push_back(given[i]);
-  }
-  return which;
-}
-
 timesift::Tree take_tree(const cpp11::list& tree) {
   timesift::Tree out;
   out.family = timesift::family_from_name(cpp11::as_cpp<std::string>(tree["family"]));
@@ -476,22 +521,26 @@ timesift::Tree take_tree(const cpp11::list& tree) {
 
 }  // namespace
 
+// `y` and `w` are [n, r], one tree per column, and `fold` [n, r] where given.
 [[cpp11::register]]
 cpp11::list ts_tree_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
-                         std::string family, int min_split, int min_leaf, double cp,
-                         int max_depth, double shrink, cpp11::sexp fold, int n_fold) {
+                         int r, std::string family, int min_split, int min_leaf, double cp,
+                         int max_depth, double shrink, cpp11::sexp fold, cpp11::integers n_fold,
+                         int threads) {
   timesift::TreeSpec spec;
   spec.min_split = min_split;
   spec.min_leaf = min_leaf;
   spec.cp = cp;
   spec.max_depth = max_depth;
   spec.shrink = shrink;
-  const std::vector<std::int32_t> which = take_folds(fold);
-  const timesift::Tree tree = timesift::tree_fit(
-      REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
-      static_cast<std::size_t>(p), timesift::family_from_name(family), spec,
-      which.empty() ? nullptr : which.data(), which.empty() ? 0 : n_fold);
-  return give(tree);
+  const ResponseFolds folds = take_response_folds(fold, n_fold, n, r, "a tree");
+  const std::vector<timesift::Tree> trees = timesift::tree_fits(
+      REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
+      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r),
+      timesift::family_from_name(family), spec, folds.fold(), folds.n_fold(), threads);
+  cpp11::writable::list out;
+  for (const timesift::Tree& tree : trees) out.push_back(give(tree));
+  return out;
 }
 
 [[cpp11::register]]
@@ -508,13 +557,8 @@ cpp11::doubles ts_tree_predict_(cpp11::list tree, cpp11::doubles newx, int n, in
 }
 
 // A forest and a boosted fit cross the same way: one vector per field of their node table, the
-// trees one after another, and the offset of each tree's first node. A seed is a number modulo
-// 2^32, which an R integer cannot carry, so it crosses as a double.
+// trees one after another, and the offset of each tree's first node.
 namespace {
-
-std::uint32_t take_seed(double seed) {
-  return static_cast<std::uint32_t>(static_cast<std::uint64_t>(seed));
-}
 
 void give_table(cpp11::writable::list& out, const timesift::TreeTable& table) {
   using namespace cpp11::literals;
@@ -541,27 +585,33 @@ timesift::TreeTable take_table(const cpp11::list& from) {
 
 }  // namespace
 
+// `y` and `w` are [n, r], one forest per column, each under its own seed.
 [[cpp11::register]]
 cpp11::list ts_forest_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
-                           std::string family, int trees, int mtry, int min_leaf, bool balance,
-                           double seed, int threads) {
+                           int r, std::string family, int trees, int mtry, int min_leaf,
+                           bool balance, cpp11::doubles seeds, int threads) {
   using namespace cpp11::literals;
   timesift::ForestSpec spec;
   spec.trees = trees;
   spec.mtry = mtry;
   spec.min_leaf = min_leaf;
   spec.balance = balance;
-  spec.seed = take_seed(seed);
   spec.threads = threads;
-  const timesift::Forest forest = timesift::forest_fit(
-      REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
-      static_cast<std::size_t>(p), timesift::family_from_name(family), spec);
-  cpp11::writable::list out({
-    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(forest.family))),
-    "n_column"_nm = cpp11::as_sexp(forest.n_column)
-  });
-  give_table(out, forest.trees);
-  return out;
+  const std::vector<std::uint32_t> seed = take_seeds(seeds, r, "a forest");
+  const std::vector<timesift::Forest> forests = timesift::forest_fits(
+      REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
+      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r),
+      timesift::family_from_name(family), spec, seed.data());
+  cpp11::writable::list all;
+  for (const timesift::Forest& forest : forests) {
+    cpp11::writable::list out({
+      "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(forest.family))),
+      "n_column"_nm = cpp11::as_sexp(forest.n_column)
+    });
+    give_table(out, forest.trees);
+    all.push_back(out);
+  }
+  return all;
 }
 
 [[cpp11::register]]
@@ -576,12 +626,14 @@ cpp11::doubles ts_forest_predict_(cpp11::list forest, cpp11::doubles newx, int n
   return give(out);
 }
 
+// `y` and `w` are [n, r], one boosted fit per column, each under its own seed and, where given,
+// its own column of `fold` [n, r].
 [[cpp11::register]]
 cpp11::list ts_boost_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
-                          std::string family, int trees, int depth, double shrinkage,
+                          int r, std::string family, int trees, int depth, double shrinkage,
                           double min_leaf, double subsample, double colsample, bool newton,
-                          double lambda, double gamma, double seed, cpp11::sexp fold, int n_fold,
-                          int threads) {
+                          double lambda, double gamma, cpp11::doubles seeds, cpp11::sexp fold,
+                          cpp11::integers n_fold, int threads) {
   using namespace cpp11::literals;
   timesift::BoostSpec spec;
   spec.trees = trees;
@@ -593,21 +645,25 @@ cpp11::list ts_boost_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, 
   spec.newton = newton;
   spec.lambda = lambda;
   spec.gamma = gamma;
-  spec.seed = take_seed(seed);
   spec.threads = threads;
-  const std::vector<std::int32_t> which = take_folds(fold);
-  const timesift::Boosted fit = timesift::boost_fit(
-      REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(n),
-      static_cast<std::size_t>(p), timesift::family_from_name(family), spec,
-      which.empty() ? nullptr : which.data(), which.empty() ? 0 : n_fold);
-  cpp11::writable::list out({
-    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
-    "n_column"_nm = cpp11::as_sexp(fit.n_column),
-    "init"_nm = cpp11::as_sexp(fit.init),
-    "cv_error"_nm = give(fit.cv_error)
-  });
-  give_table(out, fit.trees);
-  return out;
+  const std::vector<std::uint32_t> seed = take_seeds(seeds, r, "a boosted fit");
+  const ResponseFolds folds = take_response_folds(fold, n_fold, n, r, "a boosted fit");
+  const std::vector<timesift::Boosted> fits = timesift::boost_fits(
+      REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
+      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r),
+      timesift::family_from_name(family), spec, seed.data(), folds.fold(), folds.n_fold());
+  cpp11::writable::list all;
+  for (const timesift::Boosted& fit : fits) {
+    cpp11::writable::list out({
+      "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
+      "n_column"_nm = cpp11::as_sexp(fit.n_column),
+      "init"_nm = cpp11::as_sexp(fit.init),
+      "cv_error"_nm = give(fit.cv_error)
+    });
+    give_table(out, fit.trees);
+    all.push_back(out);
+  }
+  return all;
 }
 
 [[cpp11::register]]
@@ -705,17 +761,11 @@ cpp11::list ts_maxnet_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w,
   const timesift::MaxnetSpec spec = maxnet_spec(classes, knots, regmult, formulation, add_samples,
                                                 thresh, max_pass, n_lambda, one_se, threads,
                                                 max_design);
-  const std::vector<std::int32_t> which = take_folds(fold);
-  const std::vector<std::int32_t> folds(n_fold.begin(), n_fold.end());
-  if (!which.empty() && (which.size() != static_cast<std::size_t>(n) * static_cast<std::size_t>(r) ||
-                         folds.size() != static_cast<std::size_t>(r))) {
-    throw std::invalid_argument("maxnet's folds are one per unit and response, and one count per "
-                                "response");
-  }
+  const ResponseFolds folds = take_response_folds(fold, n_fold, n, r, "maxnet");
   const std::vector<timesift::Maxnet> fits = timesift::maxnet_fit(
       REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
-      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec,
-      which.empty() ? nullptr : which.data(), which.empty() ? nullptr : folds.data());
+      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec, folds.fold(),
+      folds.n_fold());
   using namespace cpp11::literals;
   cpp11::writable::list all;
   for (const timesift::Maxnet& fit : fits) {
@@ -795,9 +845,10 @@ cpp11::doubles ts_envelope_predict_(cpp11::list fit, cpp11::doubles newx, int n,
 
 // The stepwise model, from the same core the Python side calls. A fit crosses into R as a list of
 // plain vectors, its terms one field each, and comes back the same way to predict.
+// `y` and `w` are [n, r], one search per column.
 [[cpp11::register]]
 cpp11::list ts_stepwise_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
-                             std::string family, double max_terms, int degree,
+                             int r, std::string family, double max_terms, int degree,
                              std::string direction, std::string terms, int threads) {
   timesift::StepwiseSpec spec;
   spec.family = timesift::family_from_name(family);
@@ -806,26 +857,30 @@ cpp11::list ts_stepwise_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles 
   spec.direction = timesift::step_direction_from_name(direction);
   spec.terms = timesift::step_terms_from_name(terms);
   spec.threads = threads;
-  const timesift::Stepwise fit =
-      timesift::stepwise_fit(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()),
-                             static_cast<std::size_t>(n), static_cast<std::size_t>(p), spec);
+  const std::vector<timesift::Stepwise> fits = timesift::stepwise_fits(
+      REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
+      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec);
   using namespace cpp11::literals;
-  return cpp11::writable::list({
-    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
-    "n_column"_nm = cpp11::as_sexp(fit.n_column),
-    "constant"_nm = cpp11::as_sexp(fit.constant),
-    "term_column"_nm = give(fit.term_column),
-    "term_power"_nm = give(fit.term_power),
-    "term_degree"_nm = give(fit.term_degree),
-    "alpha"_nm = give(fit.alpha),
-    "norm2"_nm = give(fit.norm2),
-    "beta"_nm = give(fit.beta),
-    "rank"_nm = cpp11::as_sexp(fit.rank),
-    "deviance"_nm = cpp11::as_sexp(fit.deviance),
-    "aic"_nm = cpp11::as_sexp(fit.aic),
-    "converged"_nm = cpp11::as_sexp(fit.converged),
-    "steps"_nm = cpp11::as_sexp(fit.steps)
-  });
+  cpp11::writable::list all;
+  for (const timesift::Stepwise& fit : fits) {
+    all.push_back(cpp11::writable::list({
+      "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
+      "n_column"_nm = cpp11::as_sexp(fit.n_column),
+      "constant"_nm = cpp11::as_sexp(fit.constant),
+      "term_column"_nm = give(fit.term_column),
+      "term_power"_nm = give(fit.term_power),
+      "term_degree"_nm = give(fit.term_degree),
+      "alpha"_nm = give(fit.alpha),
+      "norm2"_nm = give(fit.norm2),
+      "beta"_nm = give(fit.beta),
+      "rank"_nm = cpp11::as_sexp(fit.rank),
+      "deviance"_nm = cpp11::as_sexp(fit.deviance),
+      "aic"_nm = cpp11::as_sexp(fit.aic),
+      "converged"_nm = cpp11::as_sexp(fit.converged),
+      "steps"_nm = cpp11::as_sexp(fit.steps)
+    }));
+  }
+  return all;
 }
 
 [[cpp11::register]]
@@ -848,11 +903,12 @@ cpp11::doubles ts_stepwise_predict_(cpp11::list fit, cpp11::doubles newx, int n,
 
 // MARS, from the same core the Python side calls. A fit crosses into R as a list of plain vectors:
 // every term of the forward pass as its factors, the terms kept, and their coefficients.
+// `y` and `w` are [n, r], one fit per column.
 [[cpp11::register]]
 cpp11::list ts_mars_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
-                         std::string family, int degree, double penalty, int nk, double thresh,
-                         int minspan, int endspan, int fast_k, double fast_beta, bool prune,
-                         int nprune, int threads) {
+                         int r, std::string family, int degree, double penalty, int nk,
+                         double thresh, int minspan, int endspan, int fast_k, double fast_beta,
+                         bool prune, int nprune, int threads) {
   timesift::MarsSpec spec;
   spec.family = timesift::family_from_name(family);
   spec.degree = degree;
@@ -866,23 +922,27 @@ cpp11::list ts_mars_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, i
   spec.prune = prune;
   spec.nprune = nprune;
   spec.threads = threads;
-  const timesift::Mars fit =
-      timesift::mars_fit(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()),
-                         static_cast<std::size_t>(n), static_cast<std::size_t>(p), spec);
+  const std::vector<timesift::Mars> fits = timesift::mars_fits(
+      REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
+      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec);
   using namespace cpp11::literals;
-  return cpp11::writable::list({
-    "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
-    "n_column"_nm = cpp11::as_sexp(fit.n_column),
-    "factor_start"_nm = give(fit.factor_start),
-    "factor_column"_nm = give(fit.factor_column),
-    "factor_dir"_nm = give(fit.factor_dir),
-    "factor_cut"_nm = give(fit.factor_cut),
-    "selected"_nm = give(fit.selected),
-    "beta"_nm = give(fit.beta),
-    "termcond"_nm = cpp11::as_sexp(fit.termcond),
-    "gcv"_nm = cpp11::as_sexp(fit.gcv),
-    "converged"_nm = cpp11::as_sexp(fit.converged)
-  });
+  cpp11::writable::list all;
+  for (const timesift::Mars& fit : fits) {
+    all.push_back(cpp11::writable::list({
+      "family"_nm = cpp11::as_sexp(std::string(timesift::family_name(fit.family))),
+      "n_column"_nm = cpp11::as_sexp(fit.n_column),
+      "factor_start"_nm = give(fit.factor_start),
+      "factor_column"_nm = give(fit.factor_column),
+      "factor_dir"_nm = give(fit.factor_dir),
+      "factor_cut"_nm = give(fit.factor_cut),
+      "selected"_nm = give(fit.selected),
+      "beta"_nm = give(fit.beta),
+      "termcond"_nm = cpp11::as_sexp(fit.termcond),
+      "gcv"_nm = cpp11::as_sexp(fit.gcv),
+      "converged"_nm = cpp11::as_sexp(fit.converged)
+    }));
+  }
+  return all;
 }
 
 [[cpp11::register]]
@@ -967,10 +1027,10 @@ cpp11::doubles ts_perceptron_predict_(cpp11::list fit, cpp11::doubles newx, int 
 
 // Flexible discriminant analysis, from the same core the Python side calls. A fit crosses into R as
 // a list of plain vectors: the kept terms as their factors, their coefficients, the variate and the
-// recalibration.
+// recalibration. `y` and `w` are [n, r], one fit per column.
 [[cpp11::register]]
 cpp11::list ts_fda_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p,
-                        int degree, double penalty, int nk, double thresh, bool prune,
+                        int r, int degree, double penalty, int nk, double thresh, bool prune,
                         bool calibrate, int threads) {
   timesift::FdaSpec spec;
   spec.degree = degree;
@@ -980,29 +1040,33 @@ cpp11::list ts_fda_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, in
   spec.prune = prune;
   spec.calibrate = calibrate;
   spec.threads = threads;
-  const timesift::Fda fit =
-      timesift::fda_fit(REAL_RO(x.data()), REAL_RO(y.data()), REAL_RO(w.data()),
-                        static_cast<std::size_t>(n), static_cast<std::size_t>(p), spec);
+  const std::vector<timesift::Fda> fits = timesift::fda_fits(
+      REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
+      REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec);
   using namespace cpp11::literals;
-  return cpp11::writable::list({
-    "n_column"_nm = cpp11::as_sexp(fit.n_column),
-    "factor_start"_nm = give(fit.factor_start),
-    "factor_column"_nm = give(fit.factor_column),
-    "factor_dir"_nm = give(fit.factor_dir),
-    "factor_cut"_nm = give(fit.factor_cut),
-    "coef"_nm = give(fit.coef),
-    "forward_terms"_nm = cpp11::as_sexp(fit.forward_terms),
-    "gcv"_nm = cpp11::as_sexp(fit.gcv),
-    "discriminates"_nm = cpp11::as_sexp(fit.discriminates),
-    "mean"_nm = cpp11::as_sexp(fit.mean),
-    "direction"_nm = cpp11::as_sexp(fit.direction),
-    "scale"_nm = cpp11::as_sexp(fit.scale),
-    "centroid"_nm = give(std::vector<double>(fit.centroid, fit.centroid + 2)),
-    "prior"_nm = give(std::vector<double>(fit.prior, fit.prior + 2)),
-    "calibrated"_nm = cpp11::as_sexp(fit.calibrated),
-    "calibration"_nm = give(std::vector<double>(fit.calibration, fit.calibration + 2)),
-    "converged"_nm = cpp11::as_sexp(fit.converged)
-  });
+  cpp11::writable::list all;
+  for (const timesift::Fda& fit : fits) {
+    all.push_back(cpp11::writable::list({
+      "n_column"_nm = cpp11::as_sexp(fit.n_column),
+      "factor_start"_nm = give(fit.factor_start),
+      "factor_column"_nm = give(fit.factor_column),
+      "factor_dir"_nm = give(fit.factor_dir),
+      "factor_cut"_nm = give(fit.factor_cut),
+      "coef"_nm = give(fit.coef),
+      "forward_terms"_nm = cpp11::as_sexp(fit.forward_terms),
+      "gcv"_nm = cpp11::as_sexp(fit.gcv),
+      "discriminates"_nm = cpp11::as_sexp(fit.discriminates),
+      "mean"_nm = cpp11::as_sexp(fit.mean),
+      "direction"_nm = cpp11::as_sexp(fit.direction),
+      "scale"_nm = cpp11::as_sexp(fit.scale),
+      "centroid"_nm = give(std::vector<double>(fit.centroid, fit.centroid + 2)),
+      "prior"_nm = give(std::vector<double>(fit.prior, fit.prior + 2)),
+      "calibrated"_nm = cpp11::as_sexp(fit.calibrated),
+      "calibration"_nm = give(std::vector<double>(fit.calibration, fit.calibration + 2)),
+      "converged"_nm = cpp11::as_sexp(fit.converged)
+    }));
+  }
+  return all;
 }
 
 [[cpp11::register]]

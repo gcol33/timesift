@@ -47,7 +47,8 @@
 #'   ages up the queue. `fast_k = 0` tries every term.
 #' @param prune Whether the pruning pass runs. Without it every term of the forward pass is kept.
 #' @param nprune The most terms kept, the intercept included; `NULL` for no bound.
-#' @param threads Columns searched at once. The model is the same on any number.
+#' @param threads Responses fitted at once, or, with one response to fit, columns searched at once.
+#'   The model is the same on any number.
 #'
 #' @return A [learner()].
 #'
@@ -96,16 +97,15 @@ mars <- function(data = NULL, degree = 1L, penalty = NULL, max_terms = NULL,
                    fast_beta, prune, nprune, threads, head, weights, ...) {
       family <- .head_family(head)
       m <- .flatten(x)
-      models <- lapply(seq_len(ncol(y)), function(j) {
-        yj <- y[, j]
-        if (length(unique(yj)) < 2L) {
-          return(mean(yj))
-        }
-        .mars_fit(m, yj, weights[, j], family, degree = degree, penalty = penalty,
-                  nk = max_terms, thresh = min_gain, minspan = minspan, endspan = endspan,
-                  fast_k = fast_k, fast_beta = fast_beta, prune = prune, nprune = nprune,
-                  threads = threads)
-      })
+      fit <- .varies(y)
+      models <- as.list(unname(colMeans(y)))
+      if (any(fit)) {
+        models[fit] <- .mars_fits(m, y[, fit, drop = FALSE], weights[, fit, drop = FALSE],
+                                  family, degree = degree, penalty = penalty, nk = max_terms,
+                                  thresh = min_gain, minspan = minspan, endspan = endspan,
+                                  fast_k = fast_k, fast_beta = fast_beta, prune = prune,
+                                  nprune = nprune, threads = threads)
+      }
       stopped <- colnames(y)[vapply(models, function(f) is.list(f) && !f$converged, logical(1L))]
       list(models = models, columns = colnames(m), family = family, stopped = stopped)
     },
@@ -121,15 +121,21 @@ mars <- function(data = NULL, degree = 1L, penalty = NULL, max_terms = NULL,
 # MARS, over the core `src/ts_mars.cpp` compiles into both languages. A fit is a plain list of
 # numbers, every forward term as its factors and the kept ones' coefficients, so it round trips
 # through `saveRDS()` and predicts on another machine.
-.mars_fit <- function(x, y, w, family, degree = 1L, penalty = NULL, nk = NULL, thresh = 0.001,
-                      minspan = 0L, endspan = 0L, fast_k = 20L, fast_beta = 1, prune = TRUE,
-                      nprune = NULL, threads = 1L) {
-  ts_mars_fit_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x), family,
-               as.integer(degree), if (is.null(penalty)) NA_real_ else as.numeric(penalty),
+.mars_fits <- function(x, y, w, family, degree = 1L, penalty = NULL, nk = NULL, thresh = 0.001,
+                       minspan = 0L, endspan = 0L, fast_k = 20L, fast_beta = 1, prune = TRUE,
+                       nprune = NULL, threads = 1L) {
+  y <- as.matrix(y)
+  ts_mars_fit_(as.numeric(x), as.numeric(y), as.numeric(as.matrix(w)), nrow(x), ncol(x), ncol(y),
+               family, as.integer(degree), if (is.null(penalty)) NA_real_ else as.numeric(penalty),
                if (is.null(nk)) 0L else as.integer(nk), as.numeric(thresh),
                as.integer(minspan), as.integer(endspan), as.integer(fast_k),
                as.numeric(fast_beta), isTRUE(prune),
                if (is.null(nprune)) 0L else as.integer(nprune), as.integer(threads))
+}
+
+# MARS on one response.
+.mars_fit <- function(x, y, w, family, ...) {
+  .mars_fits(x, y, w, family, ...)[[1L]]
 }
 
 .mars_predict <- function(fit, newx) {

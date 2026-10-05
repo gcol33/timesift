@@ -54,8 +54,8 @@
 #'   keep them all.
 #' @param preset Whose defaults the settings left `NULL` take: `"default"` or `"bigboss"`.
 #' @param seed Seed for the subsamples and the inner folds.
-#' @param threads Fits of one response's inner cross-validation run at once. The model is the same
-#'   on any number.
+#' @param threads Responses fitted at once, or, with one response to fit, the fits of its inner
+#'   cross-validation. The model is the same on any number.
 #'
 #' @return A [learner()].
 #'
@@ -82,24 +82,17 @@ boosting <- function(data = NULL, method = c("gbm", "xgboost"), trees = NULL, de
                    gamma, n_inner, seed, threads, head, weights, group = NULL, ...) {
       family <- .head_family(head)
       m <- .flatten(x)
-      seeds <- .variable_seeds(seed, y)
-      models <- lapply(seq_len(ncol(y)), function(j) {
-        yj <- y[, j]
-        if (length(unique(yj)) < 2L) {
-          return(mean(yj))
-        }
-        fold <- NULL
-        n_fold <- 0L
-        if (n_inner > 0L) {
-          inner <- .inner_folds(yj, n_inner, seeds[j], group)
-          labels <- sort(unique(inner))
-          fold <- match(inner, labels) - 1L
-          n_fold <- length(labels)
-        }
-        .boost_fit(m, yj, weights[, j], family, trees, depth, shrinkage, min_leaf, subsample,
-                   colsample, method == "xgboost", lambda, gamma, seeds[j], fold, n_fold,
-                   threads)
-      })
+      fit <- .varies(y)
+      models <- as.list(unname(colMeans(y)))
+      if (any(fit)) {
+        seeds <- .variable_seeds(seed, y)[fit]
+        folds <- if (n_inner > 0L) .response_folds(y[, fit, drop = FALSE], n_inner, seeds, group)
+        models[fit] <- .boost_fits(m, y[, fit, drop = FALSE], weights[, fit, drop = FALSE],
+                                   family, trees, depth, shrinkage, min_leaf, subsample,
+                                   colsample, method == "xgboost", lambda, gamma, seeds,
+                                   fold = folds$fold, n_fold = folds$n_fold %||% integer(0),
+                                   threads = threads)
+      }
       list(models = models, columns = colnames(m), family = family)
     },
     predict = function(model, x) {

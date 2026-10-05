@@ -62,10 +62,10 @@ extern "C" SEXP _timesift_ts_penalised_path_(SEXP x, SEXP y, SEXP w, SEXP n, SEX
   END_CPP11
 }
 // ts_r.cpp
-cpp11::list ts_penalised_cv_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, double alpha, int n_lambda, double lambda_min_ratio, cpp11::sexp lambda, double thresh, bool standardize, bool intercept, cpp11::integers fold, int n_fold, double max_pass, int threads);
-extern "C" SEXP _timesift_ts_penalised_cv_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP alpha, SEXP n_lambda, SEXP lambda_min_ratio, SEXP lambda, SEXP thresh, SEXP standardize, SEXP intercept, SEXP fold, SEXP n_fold, SEXP max_pass, SEXP threads) {
+cpp11::list ts_penalised_cv_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int r, std::string family, double alpha, int n_lambda, double lambda_min_ratio, cpp11::sexp lambda, double thresh, bool standardize, bool intercept, cpp11::sexp fold, cpp11::integers n_fold, double max_pass, int threads);
+extern "C" SEXP _timesift_ts_penalised_cv_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP r, SEXP family, SEXP alpha, SEXP n_lambda, SEXP lambda_min_ratio, SEXP lambda, SEXP thresh, SEXP standardize, SEXP intercept, SEXP fold, SEXP n_fold, SEXP max_pass, SEXP threads) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_penalised_cv_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<double>>(alpha), cpp11::as_cpp<cpp11::decay_t<int>>(n_lambda), cpp11::as_cpp<cpp11::decay_t<double>>(lambda_min_ratio), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(lambda), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<bool>>(standardize), cpp11::as_cpp<cpp11::decay_t<bool>>(intercept), cpp11::as_cpp<cpp11::decay_t<cpp11::integers>>(fold), cpp11::as_cpp<cpp11::decay_t<int>>(n_fold), cpp11::as_cpp<cpp11::decay_t<double>>(max_pass), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
+    return cpp11::as_sexp(ts_penalised_cv_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<int>>(r), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<double>>(alpha), cpp11::as_cpp<cpp11::decay_t<int>>(n_lambda), cpp11::as_cpp<cpp11::decay_t<double>>(lambda_min_ratio), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(lambda), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<bool>>(standardize), cpp11::as_cpp<cpp11::decay_t<bool>>(intercept), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<cpp11::integers>>(n_fold), cpp11::as_cpp<cpp11::decay_t<double>>(max_pass), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
   END_CPP11
 }
 // ts_r.cpp
@@ -83,10 +83,10 @@ extern "C" SEXP _timesift_ts_penalised_coef_(SEXP lambda, SEXP a0, SEXP beta, SE
   END_CPP11
 }
 // ts_r.cpp
-cpp11::list ts_tree_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, int min_split, int min_leaf, double cp, int max_depth, double shrink, cpp11::sexp fold, int n_fold);
-extern "C" SEXP _timesift_ts_tree_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP min_split, SEXP min_leaf, SEXP cp, SEXP max_depth, SEXP shrink, SEXP fold, SEXP n_fold) {
+cpp11::list ts_tree_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int r, std::string family, int min_split, int min_leaf, double cp, int max_depth, double shrink, cpp11::sexp fold, cpp11::integers n_fold, int threads);
+extern "C" SEXP _timesift_ts_tree_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP r, SEXP family, SEXP min_split, SEXP min_leaf, SEXP cp, SEXP max_depth, SEXP shrink, SEXP fold, SEXP n_fold, SEXP threads) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_tree_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(min_split), cpp11::as_cpp<cpp11::decay_t<int>>(min_leaf), cpp11::as_cpp<cpp11::decay_t<double>>(cp), cpp11::as_cpp<cpp11::decay_t<int>>(max_depth), cpp11::as_cpp<cpp11::decay_t<double>>(shrink), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<int>>(n_fold)));
+    return cpp11::as_sexp(ts_tree_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<int>>(r), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(min_split), cpp11::as_cpp<cpp11::decay_t<int>>(min_leaf), cpp11::as_cpp<cpp11::decay_t<double>>(cp), cpp11::as_cpp<cpp11::decay_t<int>>(max_depth), cpp11::as_cpp<cpp11::decay_t<double>>(shrink), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<cpp11::integers>>(n_fold), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
   END_CPP11
 }
 // ts_r.cpp
@@ -104,10 +104,10 @@ extern "C" SEXP _timesift_ts_tree_predict_(SEXP tree, SEXP newx, SEXP n, SEXP p)
   END_CPP11
 }
 // ts_r.cpp
-cpp11::list ts_forest_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, int trees, int mtry, int min_leaf, bool balance, double seed, int threads);
-extern "C" SEXP _timesift_ts_forest_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP trees, SEXP mtry, SEXP min_leaf, SEXP balance, SEXP seed, SEXP threads) {
+cpp11::list ts_forest_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int r, std::string family, int trees, int mtry, int min_leaf, bool balance, cpp11::doubles seeds, int threads);
+extern "C" SEXP _timesift_ts_forest_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP r, SEXP family, SEXP trees, SEXP mtry, SEXP min_leaf, SEXP balance, SEXP seeds, SEXP threads) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_forest_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(trees), cpp11::as_cpp<cpp11::decay_t<int>>(mtry), cpp11::as_cpp<cpp11::decay_t<int>>(min_leaf), cpp11::as_cpp<cpp11::decay_t<bool>>(balance), cpp11::as_cpp<cpp11::decay_t<double>>(seed), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
+    return cpp11::as_sexp(ts_forest_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<int>>(r), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(trees), cpp11::as_cpp<cpp11::decay_t<int>>(mtry), cpp11::as_cpp<cpp11::decay_t<int>>(min_leaf), cpp11::as_cpp<cpp11::decay_t<bool>>(balance), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(seeds), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
   END_CPP11
 }
 // ts_r.cpp
@@ -118,10 +118,10 @@ extern "C" SEXP _timesift_ts_forest_predict_(SEXP forest, SEXP newx, SEXP n, SEX
   END_CPP11
 }
 // ts_r.cpp
-cpp11::list ts_boost_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, int trees, int depth, double shrinkage, double min_leaf, double subsample, double colsample, bool newton, double lambda, double gamma, double seed, cpp11::sexp fold, int n_fold, int threads);
-extern "C" SEXP _timesift_ts_boost_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP trees, SEXP depth, SEXP shrinkage, SEXP min_leaf, SEXP subsample, SEXP colsample, SEXP newton, SEXP lambda, SEXP gamma, SEXP seed, SEXP fold, SEXP n_fold, SEXP threads) {
+cpp11::list ts_boost_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int r, std::string family, int trees, int depth, double shrinkage, double min_leaf, double subsample, double colsample, bool newton, double lambda, double gamma, cpp11::doubles seeds, cpp11::sexp fold, cpp11::integers n_fold, int threads);
+extern "C" SEXP _timesift_ts_boost_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP r, SEXP family, SEXP trees, SEXP depth, SEXP shrinkage, SEXP min_leaf, SEXP subsample, SEXP colsample, SEXP newton, SEXP lambda, SEXP gamma, SEXP seeds, SEXP fold, SEXP n_fold, SEXP threads) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_boost_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(trees), cpp11::as_cpp<cpp11::decay_t<int>>(depth), cpp11::as_cpp<cpp11::decay_t<double>>(shrinkage), cpp11::as_cpp<cpp11::decay_t<double>>(min_leaf), cpp11::as_cpp<cpp11::decay_t<double>>(subsample), cpp11::as_cpp<cpp11::decay_t<double>>(colsample), cpp11::as_cpp<cpp11::decay_t<bool>>(newton), cpp11::as_cpp<cpp11::decay_t<double>>(lambda), cpp11::as_cpp<cpp11::decay_t<double>>(gamma), cpp11::as_cpp<cpp11::decay_t<double>>(seed), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<int>>(n_fold), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
+    return cpp11::as_sexp(ts_boost_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<int>>(r), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(trees), cpp11::as_cpp<cpp11::decay_t<int>>(depth), cpp11::as_cpp<cpp11::decay_t<double>>(shrinkage), cpp11::as_cpp<cpp11::decay_t<double>>(min_leaf), cpp11::as_cpp<cpp11::decay_t<double>>(subsample), cpp11::as_cpp<cpp11::decay_t<double>>(colsample), cpp11::as_cpp<cpp11::decay_t<bool>>(newton), cpp11::as_cpp<cpp11::decay_t<double>>(lambda), cpp11::as_cpp<cpp11::decay_t<double>>(gamma), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(seeds), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(fold), cpp11::as_cpp<cpp11::decay_t<cpp11::integers>>(n_fold), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
   END_CPP11
 }
 // ts_r.cpp
@@ -174,10 +174,10 @@ extern "C" SEXP _timesift_ts_envelope_predict_(SEXP fit, SEXP newx, SEXP n, SEXP
   END_CPP11
 }
 // ts_r.cpp
-cpp11::list ts_stepwise_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, double max_terms, int degree, std::string direction, std::string terms, int threads);
-extern "C" SEXP _timesift_ts_stepwise_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP max_terms, SEXP degree, SEXP direction, SEXP terms, SEXP threads) {
+cpp11::list ts_stepwise_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int r, std::string family, double max_terms, int degree, std::string direction, std::string terms, int threads);
+extern "C" SEXP _timesift_ts_stepwise_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP r, SEXP family, SEXP max_terms, SEXP degree, SEXP direction, SEXP terms, SEXP threads) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_stepwise_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<double>>(max_terms), cpp11::as_cpp<cpp11::decay_t<int>>(degree), cpp11::as_cpp<cpp11::decay_t<std::string>>(direction), cpp11::as_cpp<cpp11::decay_t<std::string>>(terms), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
+    return cpp11::as_sexp(ts_stepwise_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<int>>(r), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<double>>(max_terms), cpp11::as_cpp<cpp11::decay_t<int>>(degree), cpp11::as_cpp<cpp11::decay_t<std::string>>(direction), cpp11::as_cpp<cpp11::decay_t<std::string>>(terms), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
   END_CPP11
 }
 // ts_r.cpp
@@ -188,10 +188,10 @@ extern "C" SEXP _timesift_ts_stepwise_predict_(SEXP fit, SEXP newx, SEXP n, SEXP
   END_CPP11
 }
 // ts_r.cpp
-cpp11::list ts_mars_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, std::string family, int degree, double penalty, int nk, double thresh, int minspan, int endspan, int fast_k, double fast_beta, bool prune, int nprune, int threads);
-extern "C" SEXP _timesift_ts_mars_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP family, SEXP degree, SEXP penalty, SEXP nk, SEXP thresh, SEXP minspan, SEXP endspan, SEXP fast_k, SEXP fast_beta, SEXP prune, SEXP nprune, SEXP threads) {
+cpp11::list ts_mars_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int r, std::string family, int degree, double penalty, int nk, double thresh, int minspan, int endspan, int fast_k, double fast_beta, bool prune, int nprune, int threads);
+extern "C" SEXP _timesift_ts_mars_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP r, SEXP family, SEXP degree, SEXP penalty, SEXP nk, SEXP thresh, SEXP minspan, SEXP endspan, SEXP fast_k, SEXP fast_beta, SEXP prune, SEXP nprune, SEXP threads) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_mars_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(degree), cpp11::as_cpp<cpp11::decay_t<double>>(penalty), cpp11::as_cpp<cpp11::decay_t<int>>(nk), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<int>>(minspan), cpp11::as_cpp<cpp11::decay_t<int>>(endspan), cpp11::as_cpp<cpp11::decay_t<int>>(fast_k), cpp11::as_cpp<cpp11::decay_t<double>>(fast_beta), cpp11::as_cpp<cpp11::decay_t<bool>>(prune), cpp11::as_cpp<cpp11::decay_t<int>>(nprune), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
+    return cpp11::as_sexp(ts_mars_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<int>>(r), cpp11::as_cpp<cpp11::decay_t<std::string>>(family), cpp11::as_cpp<cpp11::decay_t<int>>(degree), cpp11::as_cpp<cpp11::decay_t<double>>(penalty), cpp11::as_cpp<cpp11::decay_t<int>>(nk), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<int>>(minspan), cpp11::as_cpp<cpp11::decay_t<int>>(endspan), cpp11::as_cpp<cpp11::decay_t<int>>(fast_k), cpp11::as_cpp<cpp11::decay_t<double>>(fast_beta), cpp11::as_cpp<cpp11::decay_t<bool>>(prune), cpp11::as_cpp<cpp11::decay_t<int>>(nprune), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
   END_CPP11
 }
 // ts_r.cpp
@@ -216,10 +216,10 @@ extern "C" SEXP _timesift_ts_perceptron_predict_(SEXP fit, SEXP newx, SEXP n, SE
   END_CPP11
 }
 // ts_r.cpp
-cpp11::list ts_fda_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int degree, double penalty, int nk, double thresh, bool prune, bool calibrate, int threads);
-extern "C" SEXP _timesift_ts_fda_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP degree, SEXP penalty, SEXP nk, SEXP thresh, SEXP prune, SEXP calibrate, SEXP threads) {
+cpp11::list ts_fda_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, int n, int p, int r, int degree, double penalty, int nk, double thresh, bool prune, bool calibrate, int threads);
+extern "C" SEXP _timesift_ts_fda_fit_(SEXP x, SEXP y, SEXP w, SEXP n, SEXP p, SEXP r, SEXP degree, SEXP penalty, SEXP nk, SEXP thresh, SEXP prune, SEXP calibrate, SEXP threads) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ts_fda_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<int>>(degree), cpp11::as_cpp<cpp11::decay_t<double>>(penalty), cpp11::as_cpp<cpp11::decay_t<int>>(nk), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<bool>>(prune), cpp11::as_cpp<cpp11::decay_t<bool>>(calibrate), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
+    return cpp11::as_sexp(ts_fda_fit_(cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(x), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(y), cpp11::as_cpp<cpp11::decay_t<cpp11::doubles>>(w), cpp11::as_cpp<cpp11::decay_t<int>>(n), cpp11::as_cpp<cpp11::decay_t<int>>(p), cpp11::as_cpp<cpp11::decay_t<int>>(r), cpp11::as_cpp<cpp11::decay_t<int>>(degree), cpp11::as_cpp<cpp11::decay_t<double>>(penalty), cpp11::as_cpp<cpp11::decay_t<int>>(nk), cpp11::as_cpp<cpp11::decay_t<double>>(thresh), cpp11::as_cpp<cpp11::decay_t<bool>>(prune), cpp11::as_cpp<cpp11::decay_t<bool>>(calibrate), cpp11::as_cpp<cpp11::decay_t<int>>(threads)));
   END_CPP11
 }
 // ts_r.cpp
@@ -264,36 +264,36 @@ static const R_CallMethodDef CallEntries[] = {
     {"_timesift_ts_additive_predict_",     (DL_FUNC) &_timesift_ts_additive_predict_,      4},
     {"_timesift_ts_bin_nexts_",            (DL_FUNC) &_timesift_ts_bin_nexts_,             4},
     {"_timesift_ts_bin_starts_",           (DL_FUNC) &_timesift_ts_bin_starts_,            4},
-    {"_timesift_ts_boost_fit_",            (DL_FUNC) &_timesift_ts_boost_fit_,            19},
+    {"_timesift_ts_boost_fit_",            (DL_FUNC) &_timesift_ts_boost_fit_,            20},
     {"_timesift_ts_boost_predict_",        (DL_FUNC) &_timesift_ts_boost_predict_,         4},
     {"_timesift_ts_coverage_",             (DL_FUNC) &_timesift_ts_coverage_,              8},
     {"_timesift_ts_cycle_fraction_",       (DL_FUNC) &_timesift_ts_cycle_fraction_,        3},
     {"_timesift_ts_cycle_phase_",          (DL_FUNC) &_timesift_ts_cycle_phase_,           3},
     {"_timesift_ts_envelope_fit_",         (DL_FUNC) &_timesift_ts_envelope_fit_,          5},
     {"_timesift_ts_envelope_predict_",     (DL_FUNC) &_timesift_ts_envelope_predict_,      4},
-    {"_timesift_ts_fda_fit_",              (DL_FUNC) &_timesift_ts_fda_fit_,              12},
+    {"_timesift_ts_fda_fit_",              (DL_FUNC) &_timesift_ts_fda_fit_,              13},
     {"_timesift_ts_fda_predict_",          (DL_FUNC) &_timesift_ts_fda_predict_,           4},
-    {"_timesift_ts_forest_fit_",           (DL_FUNC) &_timesift_ts_forest_fit_,           12},
+    {"_timesift_ts_forest_fit_",           (DL_FUNC) &_timesift_ts_forest_fit_,           13},
     {"_timesift_ts_forest_predict_",       (DL_FUNC) &_timesift_ts_forest_predict_,        4},
     {"_timesift_ts_forest_stream_",        (DL_FUNC) &_timesift_ts_forest_stream_,         3},
     {"_timesift_ts_hierarchical_fit_",     (DL_FUNC) &_timesift_ts_hierarchical_fit_,     22},
     {"_timesift_ts_hierarchical_predict_", (DL_FUNC) &_timesift_ts_hierarchical_predict_,  6},
-    {"_timesift_ts_mars_fit_",             (DL_FUNC) &_timesift_ts_mars_fit_,             17},
+    {"_timesift_ts_mars_fit_",             (DL_FUNC) &_timesift_ts_mars_fit_,             18},
     {"_timesift_ts_mars_predict_",         (DL_FUNC) &_timesift_ts_mars_predict_,          4},
     {"_timesift_ts_maxnet_design_",        (DL_FUNC) &_timesift_ts_maxnet_design_,        10},
     {"_timesift_ts_maxnet_fit_",           (DL_FUNC) &_timesift_ts_maxnet_fit_,           19},
     {"_timesift_ts_maxnet_predict_",       (DL_FUNC) &_timesift_ts_maxnet_predict_,        6},
     {"_timesift_ts_penalised_coef_",       (DL_FUNC) &_timesift_ts_penalised_coef_,        5},
-    {"_timesift_ts_penalised_cv_",         (DL_FUNC) &_timesift_ts_penalised_cv_,         17},
+    {"_timesift_ts_penalised_cv_",         (DL_FUNC) &_timesift_ts_penalised_cv_,         18},
     {"_timesift_ts_penalised_path_",       (DL_FUNC) &_timesift_ts_penalised_path_,       14},
     {"_timesift_ts_penalised_predict_",    (DL_FUNC) &_timesift_ts_penalised_predict_,     7},
     {"_timesift_ts_perceptron_fit_",       (DL_FUNC) &_timesift_ts_perceptron_fit_,       18},
     {"_timesift_ts_perceptron_predict_",   (DL_FUNC) &_timesift_ts_perceptron_predict_,    4},
     {"_timesift_ts_reduce_",               (DL_FUNC) &_timesift_ts_reduce_,               11},
     {"_timesift_ts_reduce_lookbacks_",     (DL_FUNC) &_timesift_ts_reduce_lookbacks_,     12},
-    {"_timesift_ts_stepwise_fit_",         (DL_FUNC) &_timesift_ts_stepwise_fit_,         11},
+    {"_timesift_ts_stepwise_fit_",         (DL_FUNC) &_timesift_ts_stepwise_fit_,         12},
     {"_timesift_ts_stepwise_predict_",     (DL_FUNC) &_timesift_ts_stepwise_predict_,      4},
-    {"_timesift_ts_tree_fit_",             (DL_FUNC) &_timesift_ts_tree_fit_,             13},
+    {"_timesift_ts_tree_fit_",             (DL_FUNC) &_timesift_ts_tree_fit_,             15},
     {"_timesift_ts_tree_predict_",         (DL_FUNC) &_timesift_ts_tree_predict_,          4},
     {"_timesift_ts_tree_prune_",           (DL_FUNC) &_timesift_ts_tree_prune_,            2},
     {NULL, NULL, 0}

@@ -63,7 +63,8 @@ discriminant(
 
 - threads:
 
-  Columns searched at once. The model is the same on any number.
+  Responses fitted at once, or, with one response to fit, columns
+  searched at once. The model is the same on any number.
 
 ## Value
 

@@ -89,8 +89,8 @@ boosting(
 
 - threads:
 
-  Fits of one response's inner cross-validation run at once. The model
-  is the same on any number.
+  Responses fitted at once, or, with one response to fit, the fits of
+  its inner cross-validation. The model is the same on any number.
 
 ## Value
 

@@ -168,8 +168,7 @@ std::vector<Perceptron> perceptron_fit(const double* x, std::size_t n, std::size
     scaled = standardised(x, n, p, centre, scale);
     design = scaled.data();
   }
-  std::vector<Perceptron> fits(r);
-  detail::run_tasks(r, threads, [&](std::size_t s) {
+  return detail::fit_responses(r, threads, [&](std::size_t s, int) {
     std::vector<double> wt;
     if (!start.empty()) {
       wt = start;
@@ -183,7 +182,7 @@ std::vector<Perceptron> perceptron_fit(const double* x, std::size_t n, std::size
         wt, [&](const std::vector<double>& at) { return net.objective(at); },
         [&](const std::vector<double>& at, std::vector<double>& g) { net.gradient(at, g); },
         spec.max_iter, spec.abs_tol, spec.rel_tol);
-    Perceptron& fit = fits[s];
+    Perceptron fit;
     fit.family = spec.family;
     fit.n_column = static_cast<std::int32_t>(p);
     fit.hidden = spec.hidden;
@@ -194,8 +193,8 @@ std::vector<Perceptron> perceptron_fit(const double* x, std::size_t n, std::size
     fit.value = res.value;
     fit.iterations = res.iterations;
     fit.converged = res.converged;
+    return fit;
   });
-  return fits;
 }
 
 void perceptron_predict(const Perceptron& fit, const double* x, std::size_t n, std::size_t p,

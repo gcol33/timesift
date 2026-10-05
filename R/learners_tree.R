@@ -46,6 +46,7 @@
 #' @param shrink Under a count head, the coefficient of variation of the gamma prior a leaf's rate
 #'   is shrunk by; `0` for no shrinkage. rpart's default is `1`.
 #' @param seed Seed for the inner cross-validation's fold draw.
+#' @param threads Responses grown at once. What comes back does not depend on it.
 #'
 #' @return A [learner()].
 #'
@@ -56,40 +57,37 @@
 #' @export
 tree <- function(data = NULL, min_split = NULL, min_leaf = NULL, cp = NULL, max_depth = NULL,
                  prune = c("se_sum", "one_se", "min", "none"), n_inner = NULL,
-                 preset = c("default", "bigboss"), shrink = 1, seed = 1L) {
+                 preset = c("default", "bigboss"), shrink = 1, seed = 1L, threads = 1L) {
   prune <- match.arg(prune)
   preset <- match.arg(preset)
   if (!is.numeric(shrink) || length(shrink) != 1L || is.na(shrink) || shrink < 0) {
     stop("`shrink` is one number of zero or more, got ", .describe(shrink), ".", call. = FALSE)
   }
+  .check_count(threads, "threads", 1)
   settings <- .tree_settings(preset, min_split, min_leaf, cp, max_depth, n_inner)
   learner(
     name = "tree",
     data = data, reads = "tabular", multi = "separate",
-    params = c(settings, list(prune = prune, shrink = as.numeric(shrink), seed = as.integer(seed))),
-    fit = function(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, shrink, seed, head,
-                   weights, group = NULL, ...) {
+    params = c(settings, list(prune = prune, shrink = as.numeric(shrink), seed = as.integer(seed),
+                              threads = as.integer(threads))),
+    fit = function(x, y, min_split, min_leaf, cp, max_depth, n_inner, prune, shrink, seed,
+                   threads, head, weights, group = NULL, ...) {
       family <- .head_family(head)
       m <- .flatten(x)
-      seeds <- .variable_seeds(seed, y)
-      models <- lapply(seq_len(ncol(y)), function(j) {
-        yj <- y[, j]
-        if (length(unique(yj)) < 2L) {
-          return(mean(yj))
-        }
-        fold <- NULL
-        n_fold <- 0L
-        if (!identical(prune, "none")) {
-          inner <- .inner_folds(yj, n_inner, seeds[j], group)
-          labels <- sort(unique(inner))
-          fold <- match(inner, labels) - 1L
-          n_fold <- length(labels)
-        }
-        grown <- .tree_fit(m, yj, weights[, j], family, min_split, min_leaf, cp, max_depth,
-                           fold, n_fold, shrink)
-        at <- .tree_prune_cp(grown, prune)
-        if (is.null(at)) grown else .tree_prune(grown, at)
-      })
+      fit <- .varies(y)
+      models <- as.list(unname(colMeans(y)))
+      if (any(fit)) {
+        folds <- if (identical(prune, "none")) NULL else
+          .response_folds(y[, fit, drop = FALSE], n_inner, .variable_seeds(seed, y)[fit], group)
+        grown <- .tree_fits(m, y[, fit, drop = FALSE], weights[, fit, drop = FALSE], family,
+                            min_split, min_leaf, cp, max_depth, fold = folds$fold,
+                            n_fold = folds$n_fold %||% integer(0), shrink = shrink,
+                            threads = threads)
+        models[fit] <- lapply(grown, function(g) {
+          at <- .tree_prune_cp(g, prune)
+          if (is.null(at)) g else .tree_prune(g, at)
+        })
+      }
       list(models = models, columns = colnames(m), family = family)
     },
     predict = function(model, x) {

@@ -1144,4 +1144,25 @@ void forest_stream(std::uint32_t seed, std::uint32_t tree, std::size_t n, std::u
   for (std::size_t i = 0; i < n; ++i) out[i] = stream.next();
 }
 
+std::vector<Tree> tree_fits(const double* x, std::size_t n, std::size_t p, const double* y,
+                            const double* w, std::size_t r, Family family, const TreeSpec& spec,
+                            const std::int32_t* fold, const std::int32_t* n_fold, int threads) {
+  return detail::fit_responses(r, threads, [&](std::size_t s, int) {
+    return tree_fit(x, y + s * n, w + s * n, n, p, family, spec,
+                    detail::response_fold(fold, n, s),
+                    detail::response_fold_count(fold, n_fold, s));
+  });
+}
+
+std::vector<Forest> forest_fits(const double* x, std::size_t n, std::size_t p, const double* y,
+                                const double* w, std::size_t r, Family family,
+                                const ForestSpec& spec, const std::uint32_t* seeds) {
+  return detail::fit_responses(r, spec.threads, [&](std::size_t s, int inner) {
+    ForestSpec each = spec;
+    each.seed = seeds[s];
+    each.threads = inner;
+    return forest_fit(x, y + s * n, w + s * n, n, p, family, each);
+  });
+}
+
 }  // namespace timesift

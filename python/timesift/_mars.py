@@ -13,22 +13,28 @@ from __future__ import annotations
 import numpy as np
 
 from . import _core
+from ._responses import as_design, as_responses
 
-__all__ = ["mars_fit", "mars_predict"]
+__all__ = ["mars_fit", "mars_fits", "mars_predict"]
 
 
-def mars_fit(x, y, w, family, degree=1, penalty=None, nk=None, thresh=0.001, minspan=0,
-             endspan=0, fast_k=20, fast_beta=1.0, prune=True, nprune=None, threads=1) -> dict:
-    """The forward and pruning passes over the columns of ``x`` under the case weights ``w``."""
-    return _core.mars_fit(np.asfortranarray(np.asarray(x, dtype=np.float64)),
-                          np.ascontiguousarray(y, dtype=np.float64),
-                          np.ascontiguousarray(w, dtype=np.float64), family, int(degree),
+def mars_fits(x, y, w, family, degree=1, penalty=None, nk=None, thresh=0.001, minspan=0,
+              endspan=0, fast_k=20, fast_beta=1.0, prune=True, nprune=None, threads=1) -> list:
+    """The forward and pruning passes over the columns of ``x``, one fit per column of ``y`` under
+    the matching column of the case weights ``w``."""
+    y, w = as_responses(y, w)
+    return _core.mars_fit(as_design(x), y, w, family, int(degree),
                           float("nan") if penalty is None else float(penalty),
                           0 if nk is None else int(nk), float(thresh), int(minspan),
                           int(endspan), int(fast_k), float(fast_beta), bool(prune),
                           0 if nprune is None else int(nprune), int(threads))
 
 
+def mars_fit(x, y, w, family, **settings) -> dict:
+    """MARS on the one response ``y``."""
+    return mars_fits(x, y, w, family, **settings)[0]
+
+
 def mars_predict(fit: dict, newx) -> np.ndarray:
     """The fitted mean at each row of ``newx``."""
-    return _core.mars_predict(fit, np.asfortranarray(np.asarray(newx, dtype=np.float64)))
+    return _core.mars_predict(fit, as_design(newx))

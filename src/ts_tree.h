@@ -67,6 +67,13 @@ Tree tree_fit(const double* x, const double* y, const double* w, std::size_t n, 
               Family family, const TreeSpec& spec, const std::int32_t* fold,
               std::int32_t n_fold);
 
+// One tree per column of `y` and `w` [n, r], response `s` under column `s` of `fold` [n, r] and
+// `n_fold[s]` folds, or under none where `fold` is null. `threads` grow that many trees at once,
+// each the tree it is alone.
+std::vector<Tree> tree_fits(const double* x, std::size_t n, std::size_t p, const double* y,
+                            const double* w, std::size_t r, Family family, const TreeSpec& spec,
+                            const std::int32_t* fold, const std::int32_t* n_fold, int threads);
+
 // The tree with every split of complexity at or below `cp` collapsed. The complexity table is
 // kept whole.
 Tree tree_prune(const Tree& tree, double cp);
@@ -117,6 +124,12 @@ struct Forest {
 // Poisson family or on a response one class of which weighs nothing.
 Forest forest_fit(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
                   Family family, const ForestSpec& spec);
+
+// One forest per column of `y` and `w` [n, r], response `s` seeded `seeds[s]`. `spec.threads` grow
+// that many forests at once, or a lone response's trees; a forest is the same either way.
+std::vector<Forest> forest_fits(const double* x, std::size_t n, std::size_t p, const double* y,
+                                const double* w, std::size_t r, Family family,
+                                const ForestSpec& spec, const std::uint32_t* seeds);
 
 // The mean over the trees of the leaf each row of `x` falls into.
 void forest_predict(const Forest& forest, const double* x, std::size_t n, std::size_t p,
@@ -172,6 +185,15 @@ struct Boosted {
 Boosted boost_fit(const double* x, const double* y, const double* w, std::size_t n,
                   std::size_t p, Family family, const BoostSpec& spec, const std::int32_t* fold,
                   std::int32_t n_fold);
+
+// One boosted fit per column of `y` and `w` [n, r], response `s` seeded `seeds[s]` and under column
+// `s` of `fold` [n, r] and `n_fold[s]` folds, or under none where `fold` is null. `spec.threads` fit
+// that many responses at once, or a lone response's fits on every unit and on each fold's
+// complement; a fit is the same either way.
+std::vector<Boosted> boost_fits(const double* x, std::size_t n, std::size_t p, const double* y,
+                                const double* w, std::size_t r, Family family,
+                                const BoostSpec& spec, const std::uint32_t* seeds,
+                                const std::int32_t* fold, const std::int32_t* n_fold);
 
 // The score of each row, through the logistic function under a binomial family and the exponential
 // under a Poisson one.

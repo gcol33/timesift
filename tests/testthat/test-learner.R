@@ -502,3 +502,25 @@ test_that("every shipped learner fits a rare response under the head's weight", 
     expect_gt(mean(weighted[present, 1L]), mean(plain[present, 1L]))
   }
 })
+
+test_that("responses fitted at once on several threads are each the fit it gets alone", {
+  sim <- sim_series(n_unit = 60L, days = 60L, seed = 41L)
+  y <- sim_response(sim, n_var = 3L, seed = 42L)
+  y <- cbind(y, flat = 0)
+  x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
+  makers <- list(elasticnet = function(t) elasticnet(n_inner = 5L, threads = t),
+                 tree = function(t) tree(threads = t),
+                 forest = function(t) forest(trees = 50L, threads = t),
+                 boosting = function(t) boosting(n_inner = 3L, threads = t),
+                 linear = function(t) linear(select = "forward", max_terms = 3, threads = t),
+                 mars = function(t) mars(threads = t),
+                 discriminant = function(t) discriminant(threads = t))
+  for (name in names(makers)) {
+    one <- fit_learner(makers[[name]](1L), x, y)$model$models
+    many <- fit_learner(makers[[name]](3L), x, y)$model$models
+    expect_identical(many, one, info = name)
+    alone <- fit_learner(makers[[name]](1L), x, y[, 2L, drop = FALSE])$model$models
+    expect_identical(alone[[1L]], one[[2L]], info = name)
+    expect_identical(one[[4L]], 0, info = name)
+  }
+})

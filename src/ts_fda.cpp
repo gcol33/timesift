@@ -711,4 +711,13 @@ void fda_predict(const Fda& fit, const double* x, std::size_t n, std::size_t p, 
   }
 }
 
+std::vector<Fda> fda_fits(const double* x, std::size_t n, std::size_t p, const double* y,
+                          const double* w, std::size_t r, const FdaSpec& spec) {
+  return detail::fit_responses(r, spec.threads, [&](std::size_t s, int inner) {
+    FdaSpec each = spec;
+    each.threads = inner;
+    return fda_fit(x, y + s * n, w + s * n, n, p, each);
+  });
+}
+
 }  // namespace timesift

@@ -26,8 +26,8 @@ polynomial as one term.}
 
 \item{degree}{Polynomial degree each column enters at.}
 
-\item{threads}{How many of one step's candidate fits run at once. What comes back does not
-depend on it.}
+\item{threads}{How many responses are searched at once, or, with one response to fit, how many
+of one step's candidate fits run at once. What comes back does not depend on it.}
 }
 \value{
 A \code{\link[=learner]{learner()}}.

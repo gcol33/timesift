@@ -535,6 +535,28 @@ as.matrix.timesift_matrix <- function(x, ...) {
   }, logical(1L)))
 }
 
+# The inner folds of every response at once, as the cores take them: `fold` [n, r] of 0-based
+# indices and `n_fold` one count per response, each response's dealt as `.inner_folds()` deals it,
+# and `fittable`, whether each response's inner training sets pass `.inner_fittable()`.
+.response_folds <- function(y, v, seeds, group = NULL) {
+  fold <- matrix(0L, nrow(y), ncol(y))
+  n_fold <- integer(ncol(y))
+  fittable <- logical(ncol(y))
+  for (j in seq_len(ncol(y))) {
+    inner <- .inner_folds(y[, j], v, seeds[j], group)
+    labels <- sort(unique(inner))
+    fold[, j] <- match(inner, labels) - 1L
+    n_fold[j] <- length(labels)
+    fittable[j] <- .inner_fittable(y[, j], inner)
+  }
+  list(fold = fold, n_fold = n_fold, fittable = fittable)
+}
+
+# Whether each response holds more than one value; one that does not is predicted its mean.
+.varies <- function(y) {
+  vapply(seq_len(ncol(y)), function(j) length(unique(y[, j])) > 1L, logical(1L))
+}
+
 # Scaling belongs to the fold it is computed on: each column is centred on its mean and divided by
 # its sample standard deviation, both taken over the fitting units alone. A linear model reads the
 # bin-by-channel columns through it; a sequence encoder reads the channels through the same scaler,

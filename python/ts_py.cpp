@@ -121,6 +121,22 @@ timesift::PenaltyPath take(ConstF64 lambda, ConstF64 a0, ConstF64 beta,
   return path;
 }
 
+// A fit over several responses takes `y` and `w` [n, r], one seed per response where it draws, and,
+// where given, a fold map [n, r] with one count of folds per response.
+void check_responses(const ConstMat& x, const ConstMat& y, const ConstMat& w,
+                     const std::optional<ConstMatI32>& fold, std::size_t n_fold,
+                     std::optional<std::size_t> n_seed, const char* who) {
+  const std::size_t n = x.shape(0), r = y.shape(1);
+  if (y.shape(0) != n || w.shape(0) != n || w.shape(1) != r ||
+      (fold.has_value() && (fold->shape(0) != n || fold->shape(1) != r || n_fold != r)) ||
+      (n_seed.has_value() && *n_seed != r)) {
+    throw std::invalid_argument(std::string(who) + " is fitted on one response and one weight per "
+                                "unit and response, one seed per response where it draws, and "
+                                "where given one fold per unit and response with one count per "
+                                "response");
+  }
+}
+
 // maxnet's settings, and a fit as a dict of arrays, the features it gave a coefficient one field
 // each.
 timesift::MaxnetSpec maxnet_spec(const std::string& classes, int knots, double regmult,
@@ -368,22 +384,32 @@ NB_MODULE(_core, m) {
         nb::arg("max_pass") = 1e6);
 
   m.def("penalised_cv",
-        [](ConstMat x, ConstF64 y, ConstF64 w, ConstI32 fold, int n_fold,
-           const std::string& family, double alpha, int n_lambda, double lambda_min_ratio,
-           double thresh, bool standardize, bool intercept, double max_pass, int threads) {
-          const timesift::PenaltyCV cv = timesift::penalised_cv(
-              x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
-              timesift::family_from_name(family),
+        [](ConstMat x, ConstMat y, ConstMat w, ConstMatI32 fold,
+           const std::vector<std::int32_t>& n_fold, const std::string& family, double alpha,
+           int n_lambda, double lambda_min_ratio, double thresh, bool standardize, bool intercept,
+           double max_pass, int threads) {
+          check_responses(x, y, w, fold, n_fold.size(), std::nullopt, "a penalised fit");
+          const timesift::PenaltySpec spec =
               penalty_spec(alpha, n_lambda, lambda_min_ratio, std::nullopt, thresh, standardize,
-                           intercept, max_pass, threads),
-              fold.data(), n_fold);
-          nb::dict out = give(cv.path);
-          out["cv_mean"] = give(std::vector<double>(cv.cv_mean));
-          out["cv_sd"] = give(std::vector<double>(cv.cv_sd));
-          out["index_min"] = static_cast<std::int64_t>(cv.index_min);
-          out["index_1se"] = static_cast<std::int64_t>(cv.index_1se);
-          out["fold_stalled"] = give(std::vector<std::int32_t>(cv.fold_stalled));
-          return out;
+                           intercept, max_pass, threads);
+          std::vector<timesift::PenaltyCV> fits;
+          {
+            nb::gil_scoped_release release;
+            fits = timesift::penalised_cvs(x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+                                           y.shape(1), timesift::family_from_name(family), spec,
+                                           fold.data(), n_fold.data());
+          }
+          nb::list all;
+          for (const timesift::PenaltyCV& cv : fits) {
+            nb::dict out = give(cv.path);
+            out["cv_mean"] = give(std::vector<double>(cv.cv_mean));
+            out["cv_sd"] = give(std::vector<double>(cv.cv_sd));
+            out["index_min"] = static_cast<std::int64_t>(cv.index_min);
+            out["index_1se"] = static_cast<std::int64_t>(cv.index_1se);
+            out["fold_stalled"] = give(std::vector<std::int32_t>(cv.fold_stalled));
+            all.append(out);
+          }
+          return all;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("fold"), nb::arg("n_fold"),
         nb::arg("family"), nb::arg("alpha") = 1.0, nb::arg("n_lambda") = 100,
@@ -412,23 +438,32 @@ NB_MODULE(_core, m) {
         nb::arg("lambda"), nb::arg("a0"), nb::arg("beta"), nb::arg("family"), nb::arg("at"));
 
   m.def("tree_fit",
-        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int min_split,
-           int min_leaf, double cp, int max_depth, std::optional<ConstI32> fold, int n_fold,
-           double shrink) {
+        [](ConstMat x, ConstMat y, ConstMat w, const std::string& family, int min_split,
+           int min_leaf, double cp, int max_depth, std::optional<ConstMatI32> fold,
+           const std::vector<std::int32_t>& n_fold, double shrink, int threads) {
+          check_responses(x, y, w, fold, n_fold.size(), std::nullopt, "a tree");
           timesift::TreeSpec spec;
           spec.min_split = min_split;
           spec.min_leaf = min_leaf;
           spec.cp = cp;
           spec.max_depth = max_depth;
           spec.shrink = shrink;
-          return give(timesift::tree_fit(
-              x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
-              timesift::family_from_name(family), spec,
-              fold.has_value() ? fold->data() : nullptr, fold.has_value() ? n_fold : 0));
+          std::vector<timesift::Tree> trees;
+          {
+            nb::gil_scoped_release release;
+            trees = timesift::tree_fits(x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+                                        y.shape(1), timesift::family_from_name(family), spec,
+                                        fold.has_value() ? fold->data() : nullptr,
+                                        fold.has_value() ? n_fold.data() : nullptr, threads);
+          }
+          nb::list all;
+          for (const timesift::Tree& tree : trees) all.append(give(tree));
+          return all;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("min_split"),
         nb::arg("min_leaf"), nb::arg("cp"), nb::arg("max_depth"), nb::arg("fold") = nb::none(),
-        nb::arg("n_fold") = 0, nb::arg("shrink") = 1.0);
+        nb::arg("n_fold") = std::vector<std::int32_t>(), nb::arg("shrink") = 1.0,
+        nb::arg("threads") = 1);
 
   m.def("tree_prune",
         [](const nb::dict& tree, double cp) {
@@ -446,29 +481,34 @@ NB_MODULE(_core, m) {
         nb::arg("tree"), nb::arg("newx"));
 
   m.def("forest_fit",
-        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int trees, int mtry,
-           int min_leaf, bool balance, std::uint32_t seed, int threads) {
+        [](ConstMat x, ConstMat y, ConstMat w, const std::string& family, int trees, int mtry,
+           int min_leaf, bool balance, const std::vector<std::uint32_t>& seeds, int threads) {
+          check_responses(x, y, w, std::nullopt, 0, seeds.size(), "a forest");
           timesift::ForestSpec spec;
           spec.trees = trees;
           spec.mtry = mtry;
           spec.min_leaf = min_leaf;
           spec.balance = balance;
-          spec.seed = seed;
           spec.threads = threads;
-          timesift::Forest forest;
+          std::vector<timesift::Forest> forests;
           {
             nb::gil_scoped_release release;
-            forest = timesift::forest_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
-                                          timesift::family_from_name(family), spec);
+            forests = timesift::forest_fits(x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+                                            y.shape(1), timesift::family_from_name(family), spec,
+                                            seeds.data());
           }
-          nb::dict out;
-          out["family"] = std::string(timesift::family_name(forest.family));
-          out["n_column"] = forest.n_column;
-          give_table(out, std::move(forest.trees));
-          return out;
+          nb::list all;
+          for (timesift::Forest& forest : forests) {
+            nb::dict out;
+            out["family"] = std::string(timesift::family_name(forest.family));
+            out["n_column"] = forest.n_column;
+            give_table(out, std::move(forest.trees));
+            all.append(out);
+          }
+          return all;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("trees"),
-        nb::arg("mtry"), nb::arg("min_leaf"), nb::arg("balance"), nb::arg("seed"),
+        nb::arg("mtry"), nb::arg("min_leaf"), nb::arg("balance"), nb::arg("seeds"),
         nb::arg("threads") = 1);
 
   m.def("forest_predict",
@@ -484,10 +524,12 @@ NB_MODULE(_core, m) {
         nb::arg("forest"), nb::arg("newx"));
 
   m.def("boost_fit",
-        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int trees, int depth,
+        [](ConstMat x, ConstMat y, ConstMat w, const std::string& family, int trees, int depth,
            double shrinkage, double min_leaf, double subsample, double colsample, bool newton,
-           double lambda, double gamma, std::uint32_t seed, std::optional<ConstI32> fold,
-           int n_fold, int threads) {
+           double lambda, double gamma, const std::vector<std::uint32_t>& seeds,
+           std::optional<ConstMatI32> fold, const std::vector<std::int32_t>& n_fold,
+           int threads) {
+          check_responses(x, y, w, fold, n_fold.size(), seeds.size(), "a boosted fit");
           timesift::BoostSpec spec;
           spec.trees = trees;
           spec.depth = depth;
@@ -498,29 +540,32 @@ NB_MODULE(_core, m) {
           spec.newton = newton;
           spec.lambda = lambda;
           spec.gamma = gamma;
-          spec.seed = seed;
           spec.threads = threads;
-          timesift::Boosted fit;
+          std::vector<timesift::Boosted> fits;
           {
             nb::gil_scoped_release release;
-            fit = timesift::boost_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
-                                      timesift::family_from_name(family), spec,
-                                      fold.has_value() ? fold->data() : nullptr,
-                                      fold.has_value() ? n_fold : 0);
+            fits = timesift::boost_fits(x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+                                        y.shape(1), timesift::family_from_name(family), spec,
+                                        seeds.data(), fold.has_value() ? fold->data() : nullptr,
+                                        fold.has_value() ? n_fold.data() : nullptr);
           }
-          nb::dict out;
-          out["family"] = std::string(timesift::family_name(fit.family));
-          out["n_column"] = fit.n_column;
-          out["init"] = fit.init;
-          out["cv_error"] = give(std::move(fit.cv_error));
-          give_table(out, std::move(fit.trees));
-          return out;
+          nb::list all;
+          for (timesift::Boosted& fit : fits) {
+            nb::dict out;
+            out["family"] = std::string(timesift::family_name(fit.family));
+            out["n_column"] = fit.n_column;
+            out["init"] = fit.init;
+            out["cv_error"] = give(std::move(fit.cv_error));
+            give_table(out, std::move(fit.trees));
+            all.append(out);
+          }
+          return all;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("trees"),
         nb::arg("depth"), nb::arg("shrinkage"), nb::arg("min_leaf"), nb::arg("subsample"),
         nb::arg("colsample"), nb::arg("newton"), nb::arg("lambda"), nb::arg("gamma"),
-        nb::arg("seed"), nb::arg("fold") = nb::none(), nb::arg("n_fold") = 0,
-        nb::arg("threads") = 1);
+        nb::arg("seeds"), nb::arg("fold") = nb::none(),
+        nb::arg("n_fold") = std::vector<std::int32_t>(), nb::arg("threads") = 1);
 
   m.def("boost_predict",
         [](const nb::dict& fit, ConstMat newx) {
@@ -566,12 +611,7 @@ NB_MODULE(_core, m) {
            double regmult, const std::string& formulation, bool add_samples, double thresh,
            double max_pass, int n_lambda, bool one_se, std::optional<ConstMatI32> fold,
            const std::vector<std::int32_t>& n_fold, int threads, double max_design) {
-          if (y.shape(0) != x.shape(0) || w.shape(0) != x.shape(0) || w.shape(1) != y.shape(1) ||
-              (fold.has_value() && (fold->shape(0) != x.shape(0) || fold->shape(1) != y.shape(1) ||
-                                    n_fold.size() != y.shape(1)))) {
-            throw std::invalid_argument("maxnet is fitted on one response, one weight and, under "
-                                        "the absences, one fold per unit and response");
-          }
+          check_responses(x, y, w, fold, n_fold.size(), std::nullopt, "maxnet");
           const timesift::MaxnetSpec spec =
               maxnet_spec(classes, knots, regmult, formulation, add_samples, thresh, max_pass,
                           n_lambda, one_se, threads, max_design);
@@ -665,8 +705,9 @@ NB_MODULE(_core, m) {
         nb::arg("fit"), nb::arg("newx"));
 
   m.def("stepwise_fit",
-        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, double max_terms,
+        [](ConstMat x, ConstMat y, ConstMat w, const std::string& family, double max_terms,
            int degree, const std::string& direction, const std::string& terms, int threads) {
+          check_responses(x, y, w, std::nullopt, 0, std::nullopt, "the stepwise model");
           timesift::StepwiseSpec spec;
           spec.family = timesift::family_from_name(family);
           spec.max_terms = max_terms;
@@ -674,28 +715,32 @@ NB_MODULE(_core, m) {
           spec.direction = timesift::step_direction_from_name(direction);
           spec.terms = timesift::step_terms_from_name(terms);
           spec.threads = threads;
-          timesift::Stepwise fit;
+          std::vector<timesift::Stepwise> fits;
           {
             nb::gil_scoped_release release;
-            fit = timesift::stepwise_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1),
-                                         spec);
+            fits = timesift::stepwise_fits(x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+                                           y.shape(1), spec);
           }
-          nb::dict out;
-          out["family"] = std::string(timesift::family_name(fit.family));
-          out["n_column"] = fit.n_column;
-          out["constant"] = fit.constant;
-          out["term_column"] = give(std::move(fit.term_column));
-          out["term_power"] = give(std::move(fit.term_power));
-          out["term_degree"] = give(std::move(fit.term_degree));
-          out["alpha"] = give(std::move(fit.alpha));
-          out["norm2"] = give(std::move(fit.norm2));
-          out["beta"] = give(std::move(fit.beta));
-          out["rank"] = fit.rank;
-          out["deviance"] = fit.deviance;
-          out["aic"] = fit.aic;
-          out["converged"] = fit.converged;
-          out["steps"] = fit.steps;
-          return out;
+          nb::list all;
+          for (timesift::Stepwise& fit : fits) {
+            nb::dict out;
+            out["family"] = std::string(timesift::family_name(fit.family));
+            out["n_column"] = fit.n_column;
+            out["constant"] = fit.constant;
+            out["term_column"] = give(std::move(fit.term_column));
+            out["term_power"] = give(std::move(fit.term_power));
+            out["term_degree"] = give(std::move(fit.term_degree));
+            out["alpha"] = give(std::move(fit.alpha));
+            out["norm2"] = give(std::move(fit.norm2));
+            out["beta"] = give(std::move(fit.beta));
+            out["rank"] = fit.rank;
+            out["deviance"] = fit.deviance;
+            out["aic"] = fit.aic;
+            out["converged"] = fit.converged;
+            out["steps"] = fit.steps;
+            all.append(out);
+          }
+          return all;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("max_terms"),
         nb::arg("degree"), nb::arg("direction"), nb::arg("terms"), nb::arg("threads") = 1);
@@ -719,9 +764,10 @@ NB_MODULE(_core, m) {
         nb::arg("fit"), nb::arg("newx"));
 
   m.def("mars_fit",
-        [](ConstMat x, ConstF64 y, ConstF64 w, const std::string& family, int degree,
+        [](ConstMat x, ConstMat y, ConstMat w, const std::string& family, int degree,
            double penalty, int nk, double thresh, int minspan, int endspan, int fast_k,
            double fast_beta, bool prune, int nprune, int threads) {
+          check_responses(x, y, w, std::nullopt, 0, std::nullopt, "MARS");
           timesift::MarsSpec spec;
           spec.family = timesift::family_from_name(family);
           spec.degree = degree;
@@ -735,24 +781,29 @@ NB_MODULE(_core, m) {
           spec.prune = prune;
           spec.nprune = nprune;
           spec.threads = threads;
-          timesift::Mars fit;
+          std::vector<timesift::Mars> fits;
           {
             nb::gil_scoped_release release;
-            fit = timesift::mars_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1), spec);
+            fits = timesift::mars_fits(x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+                                       y.shape(1), spec);
           }
-          nb::dict out;
-          out["family"] = std::string(timesift::family_name(fit.family));
-          out["n_column"] = fit.n_column;
-          out["factor_start"] = give(std::move(fit.factor_start));
-          out["factor_column"] = give(std::move(fit.factor_column));
-          out["factor_dir"] = give(std::move(fit.factor_dir));
-          out["factor_cut"] = give(std::move(fit.factor_cut));
-          out["selected"] = give(std::move(fit.selected));
-          out["beta"] = give(std::move(fit.beta));
-          out["termcond"] = fit.termcond;
-          out["gcv"] = fit.gcv;
-          out["converged"] = fit.converged;
-          return out;
+          nb::list all;
+          for (timesift::Mars& fit : fits) {
+            nb::dict out;
+            out["family"] = std::string(timesift::family_name(fit.family));
+            out["n_column"] = fit.n_column;
+            out["factor_start"] = give(std::move(fit.factor_start));
+            out["factor_column"] = give(std::move(fit.factor_column));
+            out["factor_dir"] = give(std::move(fit.factor_dir));
+            out["factor_cut"] = give(std::move(fit.factor_cut));
+            out["selected"] = give(std::move(fit.selected));
+            out["beta"] = give(std::move(fit.beta));
+            out["termcond"] = fit.termcond;
+            out["gcv"] = fit.gcv;
+            out["converged"] = fit.converged;
+            all.append(out);
+          }
+          return all;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("family"), nb::arg("degree"),
         nb::arg("penalty"), nb::arg("nk"), nb::arg("thresh"), nb::arg("minspan"),
@@ -921,8 +972,9 @@ NB_MODULE(_core, m) {
         nb::arg("fit"), nb::arg("newx"));
 
   m.def("fda_fit",
-        [](ConstMat x, ConstF64 y, ConstF64 w, int degree, double penalty, int nk, double thresh,
+        [](ConstMat x, ConstMat y, ConstMat w, int degree, double penalty, int nk, double thresh,
            bool prune, bool calibrate, int threads) {
+          check_responses(x, y, w, std::nullopt, 0, std::nullopt, "the discriminant");
           timesift::FdaSpec spec;
           spec.degree = degree;
           spec.penalty = penalty;
@@ -931,30 +983,35 @@ NB_MODULE(_core, m) {
           spec.prune = prune;
           spec.calibrate = calibrate;
           spec.threads = threads;
-          timesift::Fda fit;
+          std::vector<timesift::Fda> fits;
           {
             nb::gil_scoped_release release;
-            fit = timesift::fda_fit(x.data(), y.data(), w.data(), x.shape(0), x.shape(1), spec);
+            fits = timesift::fda_fits(x.data(), x.shape(0), x.shape(1), y.data(), w.data(),
+                                      y.shape(1), spec);
           }
-          nb::dict out;
-          out["n_column"] = fit.n_column;
-          out["factor_start"] = give(std::move(fit.factor_start));
-          out["factor_column"] = give(std::move(fit.factor_column));
-          out["factor_dir"] = give(std::move(fit.factor_dir));
-          out["factor_cut"] = give(std::move(fit.factor_cut));
-          out["coef"] = give(std::move(fit.coef));
-          out["forward_terms"] = fit.forward_terms;
-          out["gcv"] = fit.gcv;
-          out["discriminates"] = fit.discriminates;
-          out["mean"] = fit.mean;
-          out["direction"] = fit.direction;
-          out["scale"] = fit.scale;
-          out["centroid"] = give(std::vector<double>(fit.centroid, fit.centroid + 2));
-          out["prior"] = give(std::vector<double>(fit.prior, fit.prior + 2));
-          out["calibrated"] = fit.calibrated;
-          out["calibration"] = give(std::vector<double>(fit.calibration, fit.calibration + 2));
-          out["converged"] = fit.converged;
-          return out;
+          nb::list all;
+          for (timesift::Fda& fit : fits) {
+            nb::dict out;
+            out["n_column"] = fit.n_column;
+            out["factor_start"] = give(std::move(fit.factor_start));
+            out["factor_column"] = give(std::move(fit.factor_column));
+            out["factor_dir"] = give(std::move(fit.factor_dir));
+            out["factor_cut"] = give(std::move(fit.factor_cut));
+            out["coef"] = give(std::move(fit.coef));
+            out["forward_terms"] = fit.forward_terms;
+            out["gcv"] = fit.gcv;
+            out["discriminates"] = fit.discriminates;
+            out["mean"] = fit.mean;
+            out["direction"] = fit.direction;
+            out["scale"] = fit.scale;
+            out["centroid"] = give(std::vector<double>(fit.centroid, fit.centroid + 2));
+            out["prior"] = give(std::vector<double>(fit.prior, fit.prior + 2));
+            out["calibrated"] = fit.calibrated;
+            out["calibration"] = give(std::vector<double>(fit.calibration, fit.calibration + 2));
+            out["converged"] = fit.converged;
+            all.append(out);
+          }
+          return all;
         },
         nb::arg("x"), nb::arg("y"), nb::arg("w"), nb::arg("degree"), nb::arg("penalty"),
         nb::arg("nk"), nb::arg("thresh"), nb::arg("prune"), nb::arg("calibrate"),

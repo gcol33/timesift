@@ -71,6 +71,30 @@ void run_tasks(std::size_t count, int workers, Task task) {
   }
 }
 
+// Response `s`'s column of a fold map [n, r] of 0-based indices, and its count of folds; null and 0
+// where no map was given.
+inline const std::int32_t* response_fold(const std::int32_t* fold, std::size_t n, std::size_t s) {
+  return fold == nullptr ? nullptr : fold + s * n;
+}
+
+inline std::int32_t response_fold_count(const std::int32_t* fold, const std::int32_t* n_fold,
+                                        std::size_t s) {
+  return fold == nullptr ? 0 : n_fold[s];
+}
+
+// One fit per response, `fit(s, inner)` for `s` from 0 to `count - 1`. With several responses the
+// workers go across them and each fit is handed one; with one response, that fit is handed every
+// worker for its own work. A fit is the one it gets alone either way, so what comes back does not
+// depend on how the workers were spent.
+template <typename Fit>
+auto fit_responses(std::size_t count, int workers, Fit fit)
+    -> std::vector<decltype(fit(std::size_t{0}, 1))> {
+  std::vector<decltype(fit(std::size_t{0}, 1))> out(count);
+  const int inner = count == 1 ? workers : 1;
+  run_tasks(count, workers, [&](std::size_t s) { out[s] = fit(s, inner); });
+  return out;
+}
+
 }  // namespace detail
 }  // namespace timesift
 

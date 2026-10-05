@@ -586,17 +586,16 @@ Maxnet fit_response(const double* x, const double* y, const double* w, std::size
 std::vector<Maxnet> maxnet_fit(const double* x, std::size_t n, std::size_t p, const double* y,
                                const double* w, std::size_t r, const MaxnetSpec& spec,
                                const std::int32_t* fold, const std::int32_t* n_fold) {
-  MaxnetSpec each = spec;
-  each.sharing = static_cast<int>(std::max<std::size_t>(
+  MaxnetSpec shared = spec;
+  shared.sharing = static_cast<int>(std::max<std::size_t>(
       std::min<std::size_t>(static_cast<std::size_t>(std::max(spec.threads, 1)), r), 1));
-  each.threads = r == 1 ? spec.threads : 1;
-  std::vector<Maxnet> fits(r);
-  detail::run_tasks(r, spec.threads, [&](std::size_t s) {
-    fits[s] = fit_response(x, y + s * n, w == nullptr ? nullptr : w + s * n, n, p, each,
-                           fold == nullptr ? nullptr : fold + s * n,
-                           n_fold == nullptr ? 0 : n_fold[s]);
+  return detail::fit_responses(r, spec.threads, [&](std::size_t s, int inner) {
+    MaxnetSpec each = shared;
+    each.threads = inner;
+    return fit_response(x, y + s * n, w == nullptr ? nullptr : w + s * n, n, p, each,
+                        detail::response_fold(fold, n, s),
+                        detail::response_fold_count(fold, n_fold, s));
   });
-  return fits;
 }
 
 void maxnet_predict(const Maxnet& fit, const double* x, std::size_t n, std::size_t p, bool clamp,

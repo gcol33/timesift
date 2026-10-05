@@ -94,6 +94,14 @@ PenaltyCV penalised_cv(const double* x, const double* y, const double* w, std::s
                        std::size_t p, Family family, const PenaltySpec& spec,
                        const std::int32_t* fold, std::int32_t n_fold);
 
+// One cross-validated path per column of `y` and `w` [n, r], response `s` under column `s` of
+// `fold` [n, r] and `n_fold[s]` folds. `spec.threads` fit that many responses at once, or a lone
+// response's fits on every unit and on each fold's complement; a fit is the same either way.
+std::vector<PenaltyCV> penalised_cvs(const double* x, std::size_t n, std::size_t p,
+                                     const double* y, const double* w, std::size_t r,
+                                     Family family, const PenaltySpec& spec,
+                                     const std::int32_t* fold, const std::int32_t* n_fold);
+
 // The coefficients at one penalty, interpolated between the two points of the path around it
 // where the penalty is not one of them: linear in the penalty, the reading the fixtures pin
 // against glmnet's `predict(s = )`.

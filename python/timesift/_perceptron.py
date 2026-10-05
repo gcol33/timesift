@@ -14,6 +14,7 @@ from __future__ import annotations
 import numpy as np
 
 from . import _core
+from ._responses import as_design, as_responses
 
 __all__ = ["perceptron_fit", "perceptron_fits", "perceptron_predict"]
 
@@ -24,15 +25,10 @@ def perceptron_fits(x, y, w, family, seeds, hidden=2, decay=0.0, range_=0.7, max
     """One network per column of ``y`` over the columns of ``x``, under the matching column of the
     case weights ``w`` and seed of ``seeds``; ``start``, where given, replaces every network's drawn
     starting weights."""
-    y = np.asarray(y, dtype=np.float64)
-    w = np.asarray(w, dtype=np.float64)
-    if y.ndim == 1:
-        y, w = y[:, None], w[:, None]
-    return _core.perceptron_fit(np.asfortranarray(np.asarray(x, dtype=np.float64)),
-                                np.asfortranarray(y), np.asfortranarray(w),
-                                [int(s) for s in seeds], family, int(hidden), bool(skip),
-                                bool(standardise), float(decay), float(range_), int(max_iter),
-                                float(abs_tol), float(rel_tol), int(threads),
+    y, w = as_responses(y, w)
+    return _core.perceptron_fit(as_design(x), y, w, [int(s) for s in seeds], family, int(hidden),
+                                bool(skip), bool(standardise), float(decay), float(range_),
+                                int(max_iter), float(abs_tol), float(rel_tol), int(threads),
                                 np.ascontiguousarray([] if start is None else start,
                                                      dtype=np.float64))
 
@@ -44,4 +40,4 @@ def perceptron_fit(x, y, w, family, seed=1, **settings) -> dict:
 
 def perceptron_predict(fit: dict, newx) -> np.ndarray:
     """The fitted mean at each row of ``newx``."""
-    return _core.perceptron_predict(fit, np.asfortranarray(np.asarray(newx, dtype=np.float64)))
+    return _core.perceptron_predict(fit, as_design(newx))

@@ -1362,11 +1362,10 @@ Additive additive_fit(const double* x, std::size_t n, std::size_t p, const doubl
 
   // One fit per response, over the shared design: the threads run the responses at once where
   // there are several, and a lone response's derivatives where there is one.
-  std::vector<ResponseFit> fits(r);
-  const int inner = r == 1 ? spec.threads : 1;
-  detail::run_tasks(r, spec.threads, [&](std::size_t s) {
-    fits[s] = fit_response(design, y + s * n, w + s * n, spec, inner);
-  });
+  const std::vector<ResponseFit> fits =
+      detail::fit_responses(r, spec.threads, [&](std::size_t s, int inner) {
+        return fit_response(design, y + s * n, w + s * n, spec, inner);
+      });
 
   Additive out;
   out.family = spec.family;

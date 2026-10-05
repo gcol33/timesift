@@ -8,8 +8,8 @@ import pytest
 from dataclasses import replace
 
 from timesift.control import train_control
-from timesift.learners import (Learner, elasticnet, fit_learner, flatten, forest, linear, tree,
-                               _design)
+from timesift.learners import (Learner, boosting, discriminant, elasticnet, fit_learner, flatten,
+                               forest, linear, mars, tree, _design)
 from timesift.metrics import roc_auc
 from timesift.representation import grain_matrix
 from timesift.response import Response
@@ -431,3 +431,38 @@ def test_every_shipped_learner_fits_a_rare_response_under_the_heads_weight(tempo
         assert not np.allclose(weighted, plain), make().name
         # Presences weigh more than twice an absence, so the weighted fit predicts them higher.
         assert weighted[present].mean() > plain[present].mean(), make().name
+
+
+def _same_fit(a, b):
+    assert type(a) is type(b)
+    if isinstance(a, dict):
+        assert a.keys() == b.keys()
+        for k in a:
+            if isinstance(a[k], np.ndarray):
+                np.testing.assert_array_equal(a[k], b[k], err_msg=k)
+            else:
+                assert a[k] == b[k], k
+    else:
+        assert a == b
+
+
+@pytest.mark.parametrize("make", [
+    lambda t: elasticnet(n_inner=5, threads=t),
+    lambda t: tree(threads=t),
+    lambda t: forest(trees=50, threads=t),
+    lambda t: boosting(n_inner=3, threads=t),
+    lambda t: linear(select="forward", max_terms=3, threads=t),
+    lambda t: mars(threads=t),
+    lambda t: discriminant(threads=t),
+])
+def test_responses_fitted_at_once_on_several_threads_are_each_the_fit_it_gets_alone(make):
+    x, y = planted(n_unit=60, seed=41)
+    values = np.column_stack([y.values, y.values[::-1, 0], np.zeros(len(y.units))])
+    y = Response(values, y.units, ("sp1", "sp2", "sp3", "flat"))
+    one = fit_learner(make(1), x, y).model["models"]
+    many = fit_learner(make(3), x, y).model["models"]
+    for a, b in zip(one, many):
+        _same_fit(a, b)
+    alone = fit_learner(make(1), x, Response(values[:, [1]], y.units, ("sp2",))).model["models"]
+    _same_fit(alone[0], one[1])
+    assert one[3] == 0.0

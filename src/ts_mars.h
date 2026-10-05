@@ -82,6 +82,11 @@ struct Mars {
 Mars mars_fit(const double* x, const double* y, const double* w, std::size_t n, std::size_t p,
               const MarsSpec& spec);
 
+// One fit per column of `y` and `w` [n, r]. `spec.threads` fit that many responses at once, or
+// search a lone response's columns; a fit is the same either way.
+std::vector<Mars> mars_fits(const double* x, std::size_t n, std::size_t p, const double* y,
+                            const double* w, std::size_t r, const MarsSpec& spec);
+
 // The kept terms at every row of `x` [n, p], into `out` [n, selected] column-major.
 void mars_basis(const Mars& fit, const double* x, std::size_t n, std::size_t p, double* out);
 

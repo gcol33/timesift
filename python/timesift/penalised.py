@@ -14,12 +14,11 @@ from __future__ import annotations
 import numpy as np
 
 from . import _core
+from ._responses import as_design as _design
+from ._responses import as_fold_counts, as_fold_map, as_responses
 
-__all__ = ["penalised_path", "penalised_cv", "penalised_predict", "penalised_coef"]
-
-
-def _design(x: np.ndarray) -> np.ndarray:
-    return np.asfortranarray(np.asarray(x, dtype=np.float64))
+__all__ = ["penalised_path", "penalised_cv", "penalised_cvs", "penalised_predict",
+           "penalised_coef"]
 
 
 def penalised_path(x, y, w=None, family="binomial", alpha=1.0, n_lambda=100, lambda_=None,
@@ -36,24 +35,32 @@ def penalised_path(x, y, w=None, family="binomial", alpha=1.0, n_lambda=100, lam
     return _shape(out)
 
 
-def penalised_cv(x, y, w, family, alpha, fold, n_fold, n_lambda=100, thresh=1e-8,
-                 standardize=True, intercept=True, max_pass=1e6, threads=1) -> dict:
-    """The path fitted on every unit, and the same penalties scored on units held out fold by
-    fold. ``fold`` is one 0-based fold index per unit, which is what keeps a grouping whole: the
-    caller deals the folds, not this."""
-    m = _design(x)
-    out = _core.penalised_cv(m, np.asarray(y, dtype=np.float64),
-                             np.asarray(w, dtype=np.float64),
-                             np.ascontiguousarray(fold, dtype=np.int32), int(n_fold), family,
-                             alpha, int(n_lambda), 0.0, float(thresh), bool(standardize),
-                             bool(intercept), float(max_pass), int(threads))
-    fit = _shape(out)
-    fit["cv_mean"] = out["cv_mean"]
-    fit["cv_sd"] = out["cv_sd"]
-    fit["lambda_min"] = float(out["lambda"][out["index_min"]])
-    fit["lambda_1se"] = float(out["lambda"][out["index_1se"]])
-    fit["fold_stalled"] = out["fold_stalled"]
-    return fit
+def penalised_cvs(x, y, w, family, alpha, fold, n_fold, n_lambda=100, thresh=1e-8,
+                  standardize=True, intercept=True, max_pass=1e6, threads=1) -> list:
+    """One path per column of ``y`` fitted on every unit, and the same penalties scored on units
+    held out fold by fold. Column ``s`` of ``fold`` gives response ``s`` one 0-based fold index per
+    unit over ``n_fold[s]`` folds, which is what keeps a grouping whole: the caller deals the folds,
+    not this."""
+    y, w = as_responses(y, w)
+    fits = []
+    for out in _core.penalised_cv(_design(x), y, w, as_fold_map(fold), as_fold_counts(n_fold),
+                                  family, alpha, int(n_lambda), 0.0, float(thresh),
+                                  bool(standardize), bool(intercept), float(max_pass),
+                                  int(threads)):
+        fit = _shape(out)
+        fit["cv_mean"] = out["cv_mean"]
+        fit["cv_sd"] = out["cv_sd"]
+        fit["lambda_min"] = float(out["lambda"][out["index_min"]])
+        fit["lambda_1se"] = float(out["lambda"][out["index_1se"]])
+        fit["fold_stalled"] = out["fold_stalled"]
+        fits.append(fit)
+    return fits
+
+
+def penalised_cv(x, y, w, family, alpha, fold, n_fold, **settings) -> dict:
+    """The cross-validated path of the one response ``y``, ``fold`` one 0-based fold index per
+    unit."""
+    return penalised_cvs(x, y, w, family, alpha, fold, [n_fold], **settings)[0]
 
 
 def _shape(out: dict) -> dict:

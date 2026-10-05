@@ -100,26 +100,14 @@ maxent <- function(data = NULL, classes = NULL, regmult = 1,
       m <- .flatten(x)
       seeds <- .variable_seeds(seed, y)
       models <- as.list(unname(colMeans(y)))
-      fittable <- vapply(seq_len(ncol(y)), function(j) {
-        length(unique(y[, j])) > 1L && sum(y[, j] == 1) >= 2L
-      }, logical(1L))
+      fittable <- .varies(y) & unname(colSums(y == 1)) >= 2L
       folds <- NULL
       n_fold <- integer(0)
-      if (identical(formulation, "absence")) {
-        folds <- matrix(0L, nrow(y), ncol(y))
-        n_fold <- integer(ncol(y))
-        for (j in which(fittable)) {
-          inner <- .inner_folds(y[, j], n_inner, seeds[j], group)
-          if (!.inner_fittable(y[, j], inner)) {
-            fittable[j] <- FALSE
-            next
-          }
-          labels <- sort(unique(inner))
-          folds[, j] <- match(inner, labels) - 1L
-          n_fold[j] <- length(labels)
-        }
-        folds <- folds[, fittable, drop = FALSE]
-        n_fold <- n_fold[fittable]
+      if (identical(formulation, "absence") && any(fittable)) {
+        inner <- .response_folds(y[, fittable, drop = FALSE], n_inner, seeds[fittable], group)
+        fittable[fittable] <- inner$fittable
+        folds <- inner$fold[, inner$fittable, drop = FALSE]
+        n_fold <- inner$n_fold[inner$fittable]
       }
       if (any(fittable)) {
         models[fittable] <- .maxnet_fits(

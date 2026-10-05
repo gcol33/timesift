@@ -14,19 +14,30 @@
                    colnames(x))
 }
 
-.penalised_cv <- function(x, y, w, family, alpha, fold, n_fold, n_lambda = 100L, thresh = 1e-8,
-                          standardize = TRUE, intercept = TRUE, max_pass = 1e6,
-                          threads = 1L) {
-  fit <- ts_penalised_cv_(as.numeric(x), as.numeric(y), as.numeric(w), nrow(x), ncol(x), family,
-                          alpha, as.integer(n_lambda), 0, NULL, thresh, standardize, intercept,
-                          as.integer(fold), as.integer(n_fold), max_pass, as.integer(threads))
-  out <- .penalised_shape(fit, colnames(x))
-  out$cv_mean <- fit$cv_mean
-  out$cv_sd <- fit$cv_sd
-  out$lambda_min <- fit$lambda[fit$index_min]
-  out$lambda_1se <- fit$lambda[fit$index_1se]
-  out$fold_stalled <- fit$fold_stalled
-  out
+# One cross-validated path per column of `y`, under the matching column of `w` and of `fold`
+# [n, r], whose response `j` holds `n_fold[j]` folds.
+.penalised_cvs <- function(x, y, w, family, alpha, fold, n_fold, n_lambda = 100L, thresh = 1e-8,
+                           standardize = TRUE, intercept = TRUE, max_pass = 1e6,
+                           threads = 1L) {
+  y <- as.matrix(y)
+  fits <- ts_penalised_cv_(as.numeric(x), as.numeric(y), as.numeric(as.matrix(w)), nrow(x),
+                           ncol(x), ncol(y), family, alpha, as.integer(n_lambda), 0, NULL, thresh,
+                           standardize, intercept, as.integer(fold), as.integer(n_fold), max_pass,
+                           as.integer(threads))
+  lapply(fits, function(fit) {
+    out <- .penalised_shape(fit, colnames(x))
+    out$cv_mean <- fit$cv_mean
+    out$cv_sd <- fit$cv_sd
+    out$lambda_min <- fit$lambda[fit$index_min]
+    out$lambda_1se <- fit$lambda[fit$index_1se]
+    out$fold_stalled <- fit$fold_stalled
+    out
+  })
+}
+
+# The cross-validated path of one response, `fold` one 0-based index per unit.
+.penalised_cv <- function(x, y, w, family, alpha, fold, n_fold, ...) {
+  .penalised_cvs(x, y, w, family, alpha, fold, n_fold, ...)[[1L]]
 }
 
 # Whether a cross-validated fit's path, on every unit or on any fold, ended at a penalty it did
