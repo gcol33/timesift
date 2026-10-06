@@ -1,6 +1,9 @@
 #include <cpp11.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -25,6 +28,16 @@ std::vector<timesift::seconds> as_seconds(const cpp11::doubles& x) {
         static_cast<timesift::seconds>(std::floor(x[i]));
   }
   return out;
+}
+
+// The number of workers a core may start. Under R CMD check with `_R_CHECK_LIMIT_CORES_` set to
+// anything but "false", the rule the parallel package applies, at most two.
+int worker_count(int threads) {
+  const char* limit = std::getenv("_R_CHECK_LIMIT_CORES_");
+  if (limit == nullptr || *limit == '\0') return threads;
+  std::string value(limit);
+  for (char& c : value) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return value == "false" ? threads : std::min(threads, 2);
 }
 
 // The storage a Request points into, built once for the reduction and for the coverage so the
@@ -283,7 +296,7 @@ timesift::PenaltySpec penalty_spec(double alpha, int n_lambda, double lambda_min
   spec.lambda_min_ratio = lambda_min_ratio;
   spec.thresh = thresh;
   spec.max_pass = static_cast<int>(max_pass);
-  spec.threads = threads;
+  spec.threads = worker_count(threads);
   spec.standardize = standardize;
   spec.intercept = intercept;
   if (lambda != R_NilValue) {
@@ -537,7 +550,7 @@ cpp11::list ts_tree_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, i
   const std::vector<timesift::Tree> trees = timesift::tree_fits(
       REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
       REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r),
-      timesift::family_from_name(family), spec, folds.fold(), folds.n_fold(), threads);
+      timesift::family_from_name(family), spec, folds.fold(), folds.n_fold(), worker_count(threads));
   cpp11::writable::list out;
   for (const timesift::Tree& tree : trees) out.push_back(give(tree));
   return out;
@@ -596,7 +609,7 @@ cpp11::list ts_forest_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w,
   spec.mtry = mtry;
   spec.min_leaf = min_leaf;
   spec.balance = balance;
-  spec.threads = threads;
+  spec.threads = worker_count(threads);
   const std::vector<std::uint32_t> seed = take_seeds(seeds, r, "a forest");
   const std::vector<timesift::Forest> forests = timesift::forest_fits(
       REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
@@ -645,7 +658,7 @@ cpp11::list ts_boost_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, 
   spec.newton = newton;
   spec.lambda = lambda;
   spec.gamma = gamma;
-  spec.threads = threads;
+  spec.threads = worker_count(threads);
   const std::vector<std::uint32_t> seed = take_seeds(seeds, r, "a boosted fit");
   const ResponseFolds folds = take_response_folds(fold, n_fold, n, r, "a boosted fit");
   const std::vector<timesift::Boosted> fits = timesift::boost_fits(
@@ -705,7 +718,7 @@ timesift::MaxnetSpec maxnet_spec(const std::string& classes, int knots, double r
   spec.max_pass = static_cast<int>(max_pass);
   spec.n_lambda = n_lambda;
   spec.one_se = one_se;
-  spec.threads = threads;
+  spec.threads = worker_count(threads);
   spec.max_design = max_design;
   return spec;
 }
@@ -856,7 +869,7 @@ cpp11::list ts_stepwise_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles 
   spec.degree = degree;
   spec.direction = timesift::step_direction_from_name(direction);
   spec.terms = timesift::step_terms_from_name(terms);
-  spec.threads = threads;
+  spec.threads = worker_count(threads);
   const std::vector<timesift::Stepwise> fits = timesift::stepwise_fits(
       REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
       REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec);
@@ -921,7 +934,7 @@ cpp11::list ts_mars_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, i
   spec.fast_beta = fast_beta;
   spec.prune = prune;
   spec.nprune = nprune;
-  spec.threads = threads;
+  spec.threads = worker_count(threads);
   const std::vector<timesift::Mars> fits = timesift::mars_fits(
       REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
       REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec);
@@ -989,7 +1002,7 @@ cpp11::list ts_perceptron_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::double
   const std::vector<timesift::Perceptron> fits = timesift::perceptron_fit(
       REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
       REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), seed.data(), spec,
-      threads, init);
+      worker_count(threads), init);
   using namespace cpp11::literals;
   cpp11::writable::list out;
   for (const timesift::Perceptron& fit : fits) {
@@ -1039,7 +1052,7 @@ cpp11::list ts_fda_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles w, in
   spec.thresh = thresh;
   spec.prune = prune;
   spec.calibrate = calibrate;
-  spec.threads = threads;
+  spec.threads = worker_count(threads);
   const std::vector<timesift::Fda> fits = timesift::fda_fits(
       REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
       REAL_RO(y.data()), REAL_RO(w.data()), static_cast<std::size_t>(r), spec);
@@ -1109,7 +1122,7 @@ cpp11::list ts_additive_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doubles 
   spec.k = k;
   spec.gamma = gamma;
   spec.max_knots = max_knots;
-  spec.threads = threads;
+  spec.threads = worker_count(threads);
   spec.sp.assign(sp.begin(), sp.end());
   const timesift::Additive fit = timesift::additive_fit(
       REAL_RO(x.data()), static_cast<std::size_t>(n), static_cast<std::size_t>(p),
@@ -1219,7 +1232,7 @@ cpp11::list ts_hierarchical_fit_(cpp11::doubles x, cpp11::doubles y, cpp11::doub
   spec.cov = cov;
   spec.nodes = nodes;
   spec.step = step;
-  spec.threads = threads;
+  spec.threads = worker_count(threads);
   if (theta != R_NilValue) {
     cpp11::doubles t(theta);
     for (R_xlen_t i = 0; i < t.size(); ++i) spec.theta.push_back(t[i]);

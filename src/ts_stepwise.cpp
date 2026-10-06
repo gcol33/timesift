@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 #include "ts_core.h"
 #include "ts_glm.h"

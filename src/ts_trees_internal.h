@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ts_core.h"
