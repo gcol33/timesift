@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -71,9 +71,9 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="development version" id="timesift-development-version">timesift (development version)<a class="anchor" aria-label="anchor" href="#timesift-development-version"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.6.0" id="timesift-060">timesift 0.6.0<a class="anchor" aria-label="anchor" href="#timesift-060"></a></h2>
 <div class="section level3">
-<h3 id="breaking-changes-development-version">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-development-version"></a></h3>
+<h3 id="breaking-changes-0-6-0">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-6-0"></a></h3>
 <ul><li>
 <code>stepwise()</code> is <code><a href="../reference/linear.html">linear()</a></code>, named after the model it fits as <code><a href="../reference/additive.html">additive()</a></code> is, and its defaults are biomod2’s <code>GLM</code>: every column as <code>x + I(x^2)</code>, searched both ways by AIC as <code><a href="https://rdrr.io/pkg/MASS/man/stepAIC.html" class="external-link">MASS::stepAIC()</a></code> searches, with no bound on the terms kept. The search is the <code>select</code> argument (<code>"both"</code>, <code>"forward"</code>, <code>"backward"</code> or <code>"none"</code>), formerly <code>direction</code>. The old defaults were the study’s forward arm, which is now <code>linear(select = "forward", terms = "column", max_terms = 3)</code>. The learner registers and reports as <code>linear</code>.</li>
 <li>
@@ -98,7 +98,7 @@
 <code><a href="../reference/kappa_score.html">decision_threshold()</a></code> on a fit takes <code>perc</code> for the <code>"mpa"</code> rule in both languages; in Python <code>candidate</code> and <code>perc</code> are keyword-only, so the R call <code>decision_threshold(fit, "ensemble")</code> errors there instead of reading <code>"ensemble"</code> as predictions.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="new-development-version">New<a class="anchor" aria-label="anchor" href="#new-development-version"></a></h3>
+<h3 id="new-0-6-0">New<a class="anchor" aria-label="anchor" href="#new-0-6-0"></a></h3>
 <ul><li>
 <code><a href="../reference/perceptron.html">perceptron()</a></code> fits one network of a single hidden layer per response, as nnet fits it and biomod2 fits <code>ANN</code>: logistic hidden units, a bias and optional skip-layer connections, the weights fitted by Nash’s variable metric (BFGS) method on the head’s loss plus a decay on the squared weights. It runs on a new core, <code>src/ts_perceptron.cpp</code> over the minimiser in <code>src/ts_quasi_newton.cpp</code>, that both languages call, and from the same starting weights it ends at nnet’s weights to the bit on the fixture design. <code>preset = "default"</code> is biomod2’s default option set (two hidden units, nnet’s <code>decay = 0</code>, <code>rang = 0.7</code>, <code>maxit = 100</code>) and <code>preset = "bigboss"</code> its tuned one; <code><a href="../reference/tune.html">tune()</a></code> searches biomod2’s <code>ANN</code> grid of <code>hidden</code> and <code>decay</code>. Under a presence-absence head it fits the cross-entropy, nnet’s <code>entropy = TRUE</code>, where biomod2 leaves nnet’s least squares on the logistic output. <code>threads</code> fits that many responses at once, each network the one it gets alone, and <code>standardise = TRUE</code> centres and scales the columns first, which nnet and the default do not.</li>
 <li>
@@ -109,11 +109,11 @@
 <code><a href="../reference/train_control.html">train_control()</a></code> takes <code>optimizer</code> (<code>"adamw"</code>, the default, <code>"adam"</code> or <code>"sgd"</code>), a <code>penalty</code> with its <code>alpha</code>, cito’s <code>lambda</code> and <code>alpha</code> with <code>alpha</code> read as <code><a href="../reference/elasticnet.html">elasticnet()</a></code> reads it, and a <code>schedule</code> (<code>"cosine"</code>, the default, <code>"constant"</code> or <code>"plateau"</code> with <code>plateau_factor</code> and <code>plateau_patience</code>). biomod2’s <code>DNN</code> is cito’s <code>dnn()</code>, and both its option sets are now settings of <code><a href="../reference/torch_learners.html">mlp()</a></code>; the biomod2 article spells them out. The defaults train as before.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h3>
+<h3 id="bug-fixes-0-6-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-6-0"></a></h3>
 <ul><li>A nested run whose ensemble sets <code>min_score</code> no longer fails with “numbers of columns of arguments do not match” when an outer fold’s stack leaves a candidate out. <code>fold_weights</code> has a column per candidate in every fold, 0 where that fold left it out; in Python every row carries every candidate, where a fold’s row named only the candidates it kept.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="other-changes-development-version">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-development-version"></a></h3>
+<h3 id="other-changes-0-6-0">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-0-6-0"></a></h3>
 <ul><li><p>Every learner whose defaults follow a reference package says that under the shipped presence-absence head it is fitted under <code><a href="../reference/positive_weights.html">positive_weights()</a></code>, so a default <code><a href="../reference/tree.html">tree()</a></code> is rpart’s specification under those case weights. <code><a href="../reference/hierarchical.html">hierarchical()</a></code> says that at <code>spatial = "none"</code> and <code>random = FALSE</code> it is a penalised logistic model.</p></li>
 <li><p><code><a href="../reference/hierarchical.html">hierarchical()</a></code> finds the mode of its hyperparameters with the variable metric minimiser <code><a href="../reference/perceptron.html">perceptron()</a></code> uses, where it carried a second BFGS of its own with a capped step. The mode, and with it the nodes and the fit, can move at the size of the search’s tolerance.</p></li>
 <li><p>In Python a representation, a learner and a training control print as they do in R, where they printed as their dataclass fields and a learner’s functions.</p></li>
