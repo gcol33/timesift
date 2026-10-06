@@ -1,4 +1,4 @@
-# timesift (development version)
+# timesift 0.6.0
 
 ## Breaking changes
 

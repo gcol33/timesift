@@ -1,24 +1,31 @@
 # cran-comments
 
+## Reason for this update
+
+This release fixes the installation error the CRAN team reported on 2026-10-06 under the clang23
+additional checks (LLVM 23.1, libc++): `src/ts_penalised.cpp` used `std::exception_ptr`,
+`std::current_exception()` and `std::rethrow_exception()` without including `<exception>`, which
+libc++ 23 no longer reaches transitively. Every source file now includes the header of each
+standard-library name it uses; a scan of `src/` against the declaring headers finds nothing else
+missing.
+
+It comes four days after 0.3.1 because of that request. It also carries the development since
+0.3.1, listed in NEWS.md.
+
+The native learners take a `threads` argument (default 1). When `_R_CHECK_LIMIT_CORES_` is set,
+the package starts at most two threads, as the parallel package does.
+
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note
-
-* This is a new release.
-
-The note also lists seven possibly misspelled words in the Description. Five are the surnames of
-the authors of the two papers cited there: Allouche, Hastie, Kadmon, Tibshirani and Tsoar. The
-other two are spelled as intended: `lookback()` is one of the package's exported functions and the
-name of the representation it builds, and a record the package leaves unreduced is described as
-unreduced.
+0 errors | 0 warnings | 0 notes
 
 ## Test environments
 
+* win-builder: R-devel
 * local: Windows 11, R 4.6.1, `--as-cran`
-* win-builder: R-devel (2026-09-21 r90579) and R-release (4.6.1), both `Status: 1 NOTE`
 * GitHub Actions: ubuntu-latest (R-release, R-devel), windows-latest, macos-latest
 
-## Notes on two things a search of the sources will find
+## Notes on things a search of the sources will find
 
 **`globalenv()` in `R/folds.R`.** `.seed_state()` and `.restore_seed()` read and write
 `.Random.seed` in the global environment, and they do so to leave the session as they found it:
@@ -30,12 +37,11 @@ assigned there, and nothing else in the package writes to the global environment
 by the user with `Rscript` and not reachable from the package, from a test or from a vignette.
 Neither carries a default output path: the reproduction driver takes its output directory as its
 second argument, and the benchmark summariser writes a file only when `--csv=` names one. Nothing
-in `R/` writes to disk except the three exported `write_*()` functions, whose `file` argument is
+in `R/` writes to disk except the exported `write_*()` functions, whose `file` argument is
 required and whose examples write to `tempfile()` and `unlink()` it.
 
-**`install.packages()` in three error messages.** `R/contrasts.R`, `R/learner.R` and
-`R/learners_torch.R` name the command in the text of a `stop()` when an optional package from
-`Suggests` is missing. Nothing is installed by the package.
+**`install.packages()` in error messages.** Several files name the command in the text of a
+`stop()` when an optional package from `Suggests` is missing. Nothing is installed by the package.
 
 ## The torch learners
 
@@ -47,4 +53,4 @@ them.
 
 ## Downstream dependencies
 
-None; this is a new package.
+None.

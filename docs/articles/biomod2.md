@@ -196,7 +196,7 @@ fit
 #> candidate                  mean    won  responses
 #> SRE / season              0.532      0  separate
 #> CTA / month               0.540      0  separate
-#> ANN / month               0.554      0  separate
+#> ANN / month               0.553      0  separate
 #> XGBOOST / month           0.569      0  separate
 #> XGBOOST / season          0.597      0  separate
 #> RF / month                0.600      0  separate
@@ -205,7 +205,7 @@ fit
 #> RFd / month               0.613      0  separate
 #> RF / season               0.616      0  separate
 #> ANN / season              0.617      0  separate
-#> ANN / week                0.621      0  separate
+#> ANN / week                0.619      0  separate
 #> RFd / season              0.621      0  separate
 #> GBM / season              0.624      0  separate
 #> MARS / season             0.636      0  separate
@@ -229,7 +229,7 @@ fit
 #> 
 #> procedure, chosen and weighted inside each outer training fold
 #> selected                  0.780  se 0.012
-#> ensemble                  0.754  se 0.013
+#> ensemble                  0.755  se 0.014
 #> selected MAXNET / week in 5 of 5 folds
 #> 
 #> choice on every target  MAXNET / week
@@ -355,8 +355,8 @@ fit_ca <- timesift(
 )
 subset(fit_ca$estimate, metric %in% c("roc_auc", "tss"), c(arm, metric, score, se))
 #>         arm  metric     score         se
-#> 25 selected roc_auc 0.7800964 0.01178032
-#> 27 selected     tss 0.5580208 0.01515674
+#> 25 selected roc_auc 0.7804232 0.01208863
+#> 27 selected     tss 0.5599815 0.01711471
 #> 52 ensemble roc_auc 0.7236305 0.03402524
 #> 54 ensemble     tss 0.4526556 0.05909692
 ```
