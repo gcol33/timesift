@@ -1,0 +1,77 @@
+name: libcxx
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag, branch or commit whose sources are installed (default: the dispatched one)'
+        required: false
+        default: ''
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions: read-all
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    # CRAN's clang checks build against LLVM's own standard library, libc++, which from LLVM 23 no
+    # longer includes headers such as <exception> or <utility> through the ones a source does
+    # include. GCC's libstdc++ still does, so the other jobs compile a source that names a
+    # standard-library declaration without its header, and only this one fails on it. Installing
+    # is enough: the failure is at compile time.
+    name: clang ${{ matrix.llvm }} with libc++
+
+    strategy:
+      matrix:
+        llvm: [23]
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: devel
+          http-user-agent: release
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          dependencies: '"hard"'
+          cache-version: libcxx
+
+      - name: Install clang and libc++
+        run: |
+          wget -q https://apt.llvm.org/llvm.sh
+          sudo bash llvm.sh ${{ matrix.llvm }}
+          sudo apt-get install -y libc++-${{ matrix.llvm }}-dev libc++abi-${{ matrix.llvm }}-dev
+          clang++-${{ matrix.llvm }} --version
+
+      - name: Point R at clang and libc++
+        run: |
+          mkdir -p ~/.R
+          cxx="clang++-${{ matrix.llvm }} -stdlib=libc++"
+          {
+            echo "CXX = $cxx"
+            echo "CXX11 = $cxx"
+            echo "CXX14 = $cxx"
+            echo "CXX17 = $cxx"
+            echo "CXX20 = $cxx"
+            echo "CXX23 = $cxx"
+          } > ~/.R/Makevars
+          cat ~/.R/Makevars
+
+      - name: Install the package
+        run: R CMD INSTALL --no-test-load .
+
+      - name: Confirm the shared object links libc++
+        run: |
+          so=$(Rscript -e 'cat(system.file("libs", "timesift.so", package = "timesift"))')
+          ldd "$so" | tee /dev/stderr | grep -q 'libc++'
