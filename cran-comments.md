@@ -17,12 +17,13 @@ the package starts at most two threads, as the parallel package does.
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note
+
+The note is the incoming-feasibility "Days since last update: 4", explained above.
 
 ## Test environments
 
-* win-builder: R-devel
-* local: Windows 11, R 4.6.1, `--as-cran`
+* win-builder: R-release (4.6.1), `Status: 1 NOTE` (the one above)
 * GitHub Actions: ubuntu-latest (R-release, R-devel), windows-latest, macos-latest
 
 ## Notes on things a search of the sources will find
