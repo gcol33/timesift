@@ -66,6 +66,7 @@ test_that("the empirical-Bayes fit with an intercept for each unit is tulpa's", 
 })
 
 test_that("each node of a field's grid is tulpa's conditional fit, and the weights follow", {
+  skip_on_cran()
   fx <- hier_fixture()
   n <- nrow(fx$X)
   place <- oracle_locations(oracle_standardise(fx$coords)$xy)$of_target
@@ -195,6 +196,7 @@ test_that("a field needs the coordinates, and a fit without one does not", {
 })
 
 test_that("a field predicts from the coordinates of the new units, and survives saveRDS", {
+  skip_on_cran()
   for (spatial in c("hsgp", "nngp")) {
     run <- hier_run(spatial, coords = c(lon, lat))
     new <- run$targets[1:6, ]

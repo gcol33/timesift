@@ -48,6 +48,7 @@ test_that("the design the penalised fixtures carry is a representation", {
 })
 
 test_that("the penalised path reproduces the reference glmnet gives", {
+  skip_on_cran()
   dir <- penalised_dir()
   input <- penalised_input(dir)
   cases <- utils::read.csv(file.path(dir, "penalised_cases.csv"), stringsAsFactors = FALSE)
@@ -79,6 +80,7 @@ test_that("the penalised path reproduces the reference glmnet gives", {
 })
 
 test_that("the cross-validated penalty is the one glmnet chooses", {
+  skip_on_cran()
   dir <- penalised_dir()
   input <- penalised_input(dir)
   cases <- utils::read.csv(file.path(dir, "penalised_cases.csv"), stringsAsFactors = FALSE)

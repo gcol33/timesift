@@ -1,4 +1,5 @@
 test_that("the core reproduces the pure-R oracle on every grain and statistic", {
+  skip_on_cran()
   set.seed(20260903)
   starts <- c("2019-09-01", "2020-02-17 05:00:00", "2021-06-11 13:00:00")
   schemes <- list(c("min", "mean", "max"),
@@ -31,6 +32,7 @@ test_that("the core reproduces the pure-R oracle on every grain and statistic", 
 })
 
 test_that("the seven statistics keep the two orderings the definitions imply, in the core and the oracle", {
+  skip_on_cran()
   set.seed(20260908)
   t <- seq(as.POSIXct("2020-02-17 05:00:00", tz = "UTC"), by = "hour", length.out = 24 * 400)
   d <- data.frame(id = rep(c("p1", "p2", "p3"), each = length(t)), t = rep(t, 3),
@@ -54,6 +56,7 @@ test_that("the seven statistics keep the two orderings the definitions imply, in
 })
 
 test_that("the core reproduces the oracle at anniversaries other than the default", {
+  skip_on_cran()
   set.seed(11)
   t <- seq(as.POSIXct("2019-01-01", tz = "UTC"), by = "hour", length.out = 24 * 500)
   d <- data.frame(id = rep(c("a", "b"), each = length(t)), t = rep(t, 2),
@@ -86,6 +89,7 @@ test_that("the core reproduces the oracle under a supplied calendar", {
 })
 
 test_that("the core's calendar agrees with the oracle's, instant by instant", {
+  skip_on_cran()
   t <- seq(as.POSIXct("2018-01-01", tz = "UTC"), by = "97 min", length.out = 20000)
   ys <- list(month = 9L, day = 1L)
   for (w in c("native", "halfday", "day", "week", "month", "season", "year")) {
@@ -287,6 +291,7 @@ test_that("a day in a daylight-saving zone is a wall-clock day and a fixed offse
 })
 
 test_that("the core reproduces the oracle on a series carried in a zone that moves its clock", {
+  skip_on_cran()
   set.seed(20260908)
   # Across both of Europe/Vienna's transitions in 2021, at a sampling step that puts two readings
   # in the repeated hour and none on some local hours.

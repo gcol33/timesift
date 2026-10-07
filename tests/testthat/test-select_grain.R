@@ -119,6 +119,7 @@ test_that("the plot draws the inner scores and returns them", {
 })
 
 test_that("the contrast against a ladder runs through paired_contrast on matched cells", {
+  skip_on_cran()
   f <- selection_fixture()
   lad <- suppressWarnings(grain_ladder(f$x, f$y, selection_learner(), folds = f$folds,
                                         verbose = FALSE))
@@ -151,6 +152,7 @@ test_that("a candidate set with nothing to choose between is refused", {
 })
 
 test_that("adding a grain to the set widens the search with no other change", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 48L, days = 90L, seed = 33L)
   y <- sim_response(sim, n_var = 3L, seed = 34L)
   narrow <- grain_matrix(sim$readings, plot, t, temp, grain = c("week", "month"))
@@ -197,6 +199,7 @@ planted_response <- function(sim, n_var = 8L, strength = 3, seed = 82L) {
 }
 
 test_that("the grain the response was generated at is selected above chance", {
+  skip_on_cran()
   sim <- planted_grain()
   y <- planted_response(sim)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("day", "week", "month"))
@@ -211,6 +214,7 @@ test_that("the grain the response was generated at is selected above chance", {
 })
 
 test_that("the nested estimate stays under what choosing on the held-out units would have paid", {
+  skip_on_cran()
   sim <- planted_grain(seed = 83L)
   y <- planted_response(sim, seed = 84L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("day", "week", "month"))
@@ -240,6 +244,7 @@ test_that("the nested estimate stays under what choosing on the held-out units w
 })
 
 test_that("a fold's held-out predictions are those of the candidate it selected", {
+  skip_on_cran()
   sim <- planted_grain(n_unit = 48L, days = 90L, seed = 87L)
   y <- planted_response(sim, n_var = 4L, seed = 88L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("week", "month"))
@@ -261,6 +266,7 @@ test_that("a fold's held-out predictions are those of the candidate it selected"
 })
 
 test_that("with no signal at any grain the procedure scores at the design's own floor", {
+  skip_on_cran()
   sim <- planted_grain(seed = 85L)
   set.seed(86)
   y <- matrix(stats::rbinom(length(sim$units) * 4L, 1L, 0.35), ncol = 4L,
@@ -320,6 +326,7 @@ test_that("the one-standard-error rule takes the coarsest candidate inside the b
 })
 
 test_that("the coarsest adequate grain is the generating grain or coarser where the profile is flat", {
+  skip_on_cran()
   # The grain-invariant control of simulate_records(): the driver is the unit's constant offset,
   # which every grain reports exactly, so no candidate is better than another inside the training
   # data beyond noise. The mechanism is anchored on one season, which is the generating grain.
@@ -345,6 +352,7 @@ test_that("the coarsest adequate grain is the generating grain or coarser where 
 })
 
 test_that("where one candidate clearly separates, the coarsest adequate rule is the argmax", {
+  skip_on_cran()
   # The season mechanism on the anomaly alone: one season bin carries the driver, and the year bin,
   # which averages four seasons over a unit offset the driver does not read, carries almost
   # nothing. The year is the coarser candidate and the rule must not take it.
@@ -394,6 +402,7 @@ binormal_cut_design <- function(n = 3000L, v = 4L, skill = 0.6, seed = 21L) {
 }
 
 test_that("a cut learned on the inner folds reads the population skill a maximised cut overstates", {
+  skip_on_cran()
   d <- binormal_cut_design()
   folds <- fold_map(d$y, v = 5L, seed = 3L)
   sel <- select_grain(d$x, d$y, d$learner, folds = folds, n_inner = 5L, cut_rule = "youden",

@@ -28,6 +28,7 @@ lookback_fixture_at <- function(targets, set) {
 }
 
 test_that("the core reproduces the pure-R oracle over the lookback grid", {
+  skip_on_cran()
   d <- lookback_record()
   at <- lookback_anchors()
   schemes <- list("mean", "min", "max", "cold_day", "warm_day", "mean_daily_min",
@@ -83,6 +84,7 @@ test_that("a lookback reads only the target's own unit and only its own stretch"
 })
 
 test_that("the lookback digests are the ones the Python side reads", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
 

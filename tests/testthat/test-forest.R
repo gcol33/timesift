@@ -53,6 +53,7 @@ test_that("the generator is the spec's, output for output", {
 })
 
 test_that("the forest core grows the spec's forest, node for node", {
+  skip_on_cran()
   fx <- forest_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
@@ -76,6 +77,7 @@ test_that("the forest predicts the mean of its trees, as the spec's does", {
 })
 
 test_that("the core and the oracle agree off the fixtures too, ties and weights included", {
+  skip_on_cran()
   set.seed(83)
   n <- 45L
   x <- cbind(round(stats::rnorm(n), 1), stats::rnorm(n), sample(1:4, n, replace = TRUE),

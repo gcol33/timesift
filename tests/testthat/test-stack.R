@@ -296,6 +296,7 @@ test_that("the ensemble is not scored with weights fitted to the responses it is
 })
 
 test_that("a candidate a fold's stack leaves out below min_score is a zero in that fold's row", {
+  skip_on_cran()
   inner <- nested_run()$inner
   # The least of the folds' best inner scores: every fold keeps its best candidate, and a fold
   # whose others score below it leaves them out.
@@ -500,6 +501,7 @@ test_that("a spread is the members' mean, spread and t interval under the stack'
 })
 
 test_that("every combination lands on the numbers the contract pins", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures not found")
   y <- read_response(file.path(dir, "response.csv"))

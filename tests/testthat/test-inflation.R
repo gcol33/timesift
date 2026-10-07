@@ -45,6 +45,7 @@ test_that("measuring the inflation leaves the session's random stream alone", {
 })
 
 test_that("inverting the map recovers the skill it was planted from", {
+  skip_on_cran()
   set.seed(61)
   y <- matrix(stats::rbinom(1200, 1L, 0.2), nrow = 200,
               dimnames = list(sprintf("p%03d", 1:200), paste0("sp", 1:6)))

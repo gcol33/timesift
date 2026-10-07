@@ -24,6 +24,7 @@ test_that("the seed is left as it was found", {
 })
 
 test_that("prevalence and the driver's skill are set rather than emergent", {
+  skip_on_cran()
   sim <- simulate_records(n = 4000L, mechanism = "event", variables = 4L, days = 60L,
                           prevalence = 0.15, auc = 0.8, seed = 3L)
   expect_equal(mean(sim$y), 0.15, tolerance = 0.05)
@@ -68,6 +69,7 @@ oracle_recovery <- function(sim, grain) {
 }
 
 test_that("the planted signal is recoverable at its own grain and lost at coarser ones", {
+  skip_on_cran()
   cases <- list(
     list(mechanism = "event", days = 200L, grain = "day", coarse = c("month", "year"),
          nesting = "halfday"),
@@ -93,6 +95,7 @@ test_that("the planted signal is recoverable at its own grain and lost at coarse
 })
 
 test_that("no grain recovers anything when there is no temporal signal", {
+  skip_on_cran()
   sim <- simulate_records(n = 400L, mechanism = "none", variables = 4L, days = 200L, seed = 11L)
   for (w in c("halfday", "day", "week", "month")) {
     expect_lt(max(oracle_recovery(sim, w)), 0.2)
@@ -114,6 +117,7 @@ test_that("the offset carries the response only when it is asked to", {
 })
 
 test_that("a learner finds the planted grain end to end", {
+  skip_on_cran()
   sim <- simulate_records(n = 300L, mechanism = "event", variables = 4L, days = 120L,
                           auc = 0.9, sensor_sd = 0.05, seed = 13L)
   x <- grain_matrix(sim$readings, unit, time, reading, grain = c("day", "year"), stats = "mean")

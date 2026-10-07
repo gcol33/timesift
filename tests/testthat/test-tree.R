@@ -30,6 +30,7 @@ tree_case_fit <- function(fx, row) {
 }
 
 test_that("the tree core grows rpart's tree node for node", {
+  skip_on_cran()
   fx <- tree_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
@@ -46,6 +47,7 @@ test_that("the tree core grows rpart's tree node for node", {
 })
 
 test_that("the tree core's complexity table and its cross-validated error are rpart's", {
+  skip_on_cran()
   fx <- tree_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]

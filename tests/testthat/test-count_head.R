@@ -53,6 +53,7 @@ test_that("the count head refuses a response it cannot hold", {
 })
 
 test_that("each learner that fits a family fits a count under the Poisson one", {
+  skip_on_cran()
   d <- count_data()
   for (l in list(elasticnet(), forest(trees = 30L), boosting(trees = 30L),
                  boosting(method = "xgboost", trees = 30L, depth = 2L), tree(), linear(), mars(),
@@ -87,6 +88,7 @@ test_that("a Poisson shrinkage reaches the tree only through a count head", {
 })
 
 test_that("a run under the count head is scored by the Poisson deviance and stacked", {
+  skip_on_cran()
   d <- count_data()
   targets <- data.frame(plot = d$units, count = d$count, stringsAsFactors = FALSE)
   run <- suppressWarnings(timesift(
@@ -135,6 +137,7 @@ test_that("the combiner minimises the Poisson deviance of the combined mean", {
 })
 
 test_that("the encoders train under the Poisson deviance and predict a positive mean", {
+  skip_on_cran()
   skip_if_not_installed("torch")
   skip_if_not(torch::torch_is_installed(), "the torch runtime is not installed")
   d <- count_data(n = 60L)

@@ -34,6 +34,7 @@ additive_case_fit <- function(fx, row) {
 }
 
 test_that("the core settles where mgcv does, to the criterion, the degrees of freedom and the fit", {
+  skip_on_cran()
   fx <- additive_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
@@ -264,6 +265,7 @@ additive_sp_patterns <- function(m) {
 }
 
 test_that("a fit at given smoothing parameters is the exact penalised solve, whatever their spread", {
+  skip_on_cran()
   fx <- additive_fixture()
   cases <- list(
     list(design = "weekly", response = "y_binomial", family = "binomial", k = 10L, gamma = 1),

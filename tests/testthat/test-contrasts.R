@@ -11,6 +11,7 @@ contrast_fixture <- function() {
 }
 
 test_that("every grain is compared against the reference, and the reference is not", {
+  skip_on_cran()
   skip_if_no_mixed_model()
   lad <- contrast_fixture()
   out <- grain_contrasts(lad)
@@ -24,6 +25,7 @@ test_that("every grain is compared against the reference, and the reference is n
 })
 
 test_that("a reference of one's own is honoured", {
+  skip_on_cran()
   skip_if_no_mixed_model()
   lad <- contrast_fixture()
   out <- grain_contrasts(lad, reference = "day")
@@ -32,6 +34,7 @@ test_that("a reference of one's own is honoured", {
 })
 
 test_that("a contrast says which learner it needs and which grains it has", {
+  skip_on_cran()
   skip_if_no_mixed_model()
   lad <- contrast_fixture()
   expect_error(grain_contrasts(lad, reference = "fortnight"), "not a grain")
@@ -65,6 +68,7 @@ planted_ladder <- function(effect, n_var = 30L, n_fold = 5L, sd = 0.03, seed = 1
 }
 
 test_that("the contrast recovers a planted effect of each grain, at its stated coverage", {
+  skip_on_cran()
   skip_if_no_mixed_model()
   effect <- c(week = 0, day = -0.02, month = -0.05)
   covered <- 0L
@@ -90,6 +94,7 @@ test_that("a ladder past emmeans' default limit of 3000 observations is read the
 })
 
 test_that("with no effect of the grain the contrast finds none", {
+  skip_on_cran()
   skip_if_no_mixed_model()
   rejected <- 0L
   for (seed in 1:20) {

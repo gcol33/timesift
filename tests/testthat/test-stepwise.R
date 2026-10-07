@@ -36,6 +36,7 @@ stepwise_case_fit <- function(fx, row) {
 }
 
 test_that("the core's search chooses the terms MASS, glm and the R oracle choose", {
+  skip_on_cran()
   fx <- stepwise_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
@@ -56,6 +57,7 @@ test_that("the core's search chooses the terms MASS, glm and the R oracle choose
 })
 
 test_that("the forward search over column terms is the R oracle's on a simulated record", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 120L, seed = 33L)
   y <- sim_response(sim, n_var = 2L, seed = 34L)
   m <- .flatten(grain_matrix(sim$readings, plot, t, temp, grain = "week",

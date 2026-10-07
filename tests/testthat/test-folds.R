@@ -74,6 +74,7 @@ test_that("a stratum holding a single unit does not take the whole map with it",
 })
 
 test_that("every fold holds units across many responses and fold counts", {
+  skip_on_cran()
   for (seed in 1:25) {
     set.seed(seed)
     y <- matrix(rbinom(133 * 4, 1L, 0.1), nrow = 133,

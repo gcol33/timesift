@@ -84,6 +84,7 @@ test_that("the bias-corrected estimate one level down is the paper's formula at 
 })
 
 test_that("the triple fits fill every inner-inner prediction and nothing else", {
+  skip_on_cran()
   set.seed(3)
   y <- matrix(rbinom(80, 1, 0.4), 40, 2, dimnames = list(sprintf("u%02d", 1:40), c("a", "b")))
   m <- stats::setNames(rep(1:5, length.out = 40), rownames(y))

@@ -86,6 +86,7 @@ test_that("the core builds maxnet's features and regularises each as maxnet does
 })
 
 test_that("the core's maxnet reaches the objective maxnet's own glmnet fit does", {
+  skip_on_cran()
   fx <- maxnet_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
@@ -108,6 +109,7 @@ test_that("the core's maxnet reaches the objective maxnet's own glmnet fit does"
 })
 
 test_that("the core's maxnet predicts what maxnet's own fit does, clamped outside the range", {
+  skip_on_cran()
   fx <- maxnet_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]

@@ -47,6 +47,7 @@ test_that("a repeated resampling says how many times it is drawn", {
 })
 
 test_that("each repeat is a run on its own fold map, scored as the run alone would be", {
+  skip_on_cran()
   case <- repeat_case()
   rep3 <- run_repeat(case, cv(v = 3L, seed = 5L, repeats = 3L))
   expect_s3_class(rep3, "timesift")
@@ -96,6 +97,7 @@ test_that("the stack is fitted on the out-of-fold predictions of all the repeats
 })
 
 test_that("a nested estimate is read off all the repeats", {
+  skip_on_cran()
   case <- repeat_case()
   fit <- run_repeat(case, cv(v = 3L, seed = 5L, repeats = 2L), ensemble = ensemble("stack"), n_inner = 2L)
   expect_true(all(c("selected", "ensemble") %in% fit$estimate$arm))

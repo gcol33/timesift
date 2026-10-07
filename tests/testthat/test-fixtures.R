@@ -49,6 +49,7 @@ fixture_calendar <- function(name) {
 }
 
 test_that("every representation matches the digest the Python side reads", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
 
@@ -142,6 +143,7 @@ test_that("a digest is refused over an array that is not finite", {
 })
 
 test_that("coverage() counts the readings the fixtures pin, gaps and all", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
   expected <- read.csv(file.path(dir, "coverage.csv"), stringsAsFactors = FALSE,
@@ -168,6 +170,7 @@ test_that("coverage() counts the readings the fixtures pin, gaps and all", {
 })
 
 test_that("the reduction reads the same record however its rows are ordered", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
   record <- fixture_series(dir, "aligned")
@@ -220,6 +223,7 @@ test_that("the scorable mask orders its variables by C collation too", {
 })
 
 test_that("a supplied calendar that breaks its guarantees is refused, as the fixtures pin", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
   guards <- read.csv(file.path(dir, "grain_guards.csv"), stringsAsFactors = FALSE)
@@ -235,6 +239,7 @@ test_that("a supplied calendar that breaks its guarantees is refused, as the fix
 })
 
 test_that("every zoned digest has the oracle as its independent witness", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
   expected <- read.csv(file.path(dir, "digests.csv"), stringsAsFactors = FALSE)
@@ -265,6 +270,7 @@ test_that("every zoned digest has the oracle as its independent witness", {
 # bin sits at, which is arithmetic on the calendar; the sine and the cosine of it are the
 # platform's library, and the contract states a tolerance on them rather than hashing them.
 test_that("the calendar channels match the fraction the Python side reads", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
 

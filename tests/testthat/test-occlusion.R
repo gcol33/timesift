@@ -58,6 +58,7 @@ test_that("every substitute runs and reports the same parts", {
 })
 
 test_that("the profile is read by the metric the fit was scored under", {
+  skip_on_cran()
   sim <- planted_series(n_unit = 40L, seed = 64L)
   y <- matrix(stats::rbinom(length(sim$warmth) * 2L, 1L,
                             stats::plogis(3 * c(sim$warmth, -sim$warmth))),

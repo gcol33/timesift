@@ -45,6 +45,7 @@ projection_fit <- function(case) {
 }
 
 test_that("a projection is the fit applied to one target per cell", {
+  skip_on_cran()
   case <- projection_case()
   fit <- projection_fit(case)
   map <- project(fit, series = case$raster, candidate = "rd / month")

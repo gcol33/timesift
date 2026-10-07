@@ -76,6 +76,7 @@ test_that("a fit carries every element the layers above it read", {
 })
 
 test_that("a metric given as a function scores the run and everything that rescores it", {
+  skip_on_cran()
   case <- toy_case()
   mine <- function(y, p) tss(y, p)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
@@ -354,6 +355,7 @@ test_that("a split without names is read against the targets as they were given"
 })
 
 test_that("the combiner minimises the loss of the head the run was fitted under", {
+  skip_on_cran()
   local_response("gauss_test", list(
     prepare = function(y) .as_response(y), activation = "identity", loss = "squared_error",
     metric = "roc_auc", cells = function(y, folds) scorable_cells(y, folds)))
@@ -434,6 +436,7 @@ test_that("a fit predicts units it was never fitted on", {
 })
 
 test_that("a binary prediction cuts each response where its held-out predictions put the cut", {
+  skip_on_cran()
   case <- toy_case(n_unit = 30L, days = 60L)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
                   learners = list(a = toy(), b = toy("b")), sift = grains("week"),
@@ -619,6 +622,7 @@ test_that("the selected arm is the selection select_grain() makes on the same sp
 })
 
 test_that("an outer test fold's responses reach neither its choice nor its weights", {
+  skip_on_cran()
   case <- toy_case(n_unit = 48L, days = 90L, n_var = 3L)
   folds <- stats::setNames(rep(1:3, length.out = 48L), sort(case$units))
   run <- function(targets) {

@@ -113,6 +113,7 @@ test_that("the scorable mask the fixtures pin is the mask this implementation bu
 })
 
 test_that("every threshold metric matches the value the fixtures pin", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
 
@@ -185,6 +186,7 @@ test_that("the pseudo-absence strategies admit the units the fixtures pin", {
 })
 
 test_that("the metrics of a numeric response match the values the fixtures pin", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
 

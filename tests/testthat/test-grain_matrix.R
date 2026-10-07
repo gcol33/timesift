@@ -92,6 +92,7 @@ test_that("seasons are three calendar months counted from year_start", {
 })
 
 test_that("a bin the record does not fill is reported and can be dropped", {
+  skip_on_cran()
   # 1 September 2021 is a Wednesday, so three hydrological years from it fill every month, season
   # and year of the calendar and neither the first nor the last week of it.
   aligned <- hourly_series(units = "a", from = "2021-09-01 00:00:00", hours = 26304)
@@ -211,6 +212,7 @@ test_that("the average daily extremes are an average over days, not over reading
 })
 
 test_that("the average daily extremes match an independent reduction", {
+  skip_on_cran()
   d <- hourly_series()
   day <- format(d$t, "%Y-%m-%d", tz = "UTC")
   month <- format(d$t, "%Y-%m", tz = "UTC")
