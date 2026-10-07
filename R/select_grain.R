@@ -159,14 +159,14 @@
 #'
 #' @examples
 #' set.seed(1)
-#' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
-#' units <- sprintf("p%02d", 1:60)
-#' warmth <- rnorm(60)
+#' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 120)
+#' units <- sprintf("p%02d", 1:40)
+#' warmth <- rnorm(40)
 #' d <- data.frame(
 #'   plot = rep(units, each = length(t)), t = rep(t, length(units)),
 #'   temp = as.numeric(vapply(warmth, function(w) w + sin(seq_along(t) / 300) + rnorm(length(t)),
 #'                            numeric(length(t)))))
-#' y <- matrix(rbinom(120, 1, plogis(c(warmth, -warmth))), nrow = 60,
+#' y <- matrix(rbinom(80, 1, plogis(c(warmth, -warmth))), nrow = 40,
 #'             dimnames = list(units, c("sp1", "sp2")))
 #' x <- grain_matrix(d, plot, t, temp, grain = c("week", "month"))
 #' sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), n_inner = 3,
@@ -374,14 +374,14 @@ summary.timesift_selection <- function(object, ...) {
 #'
 #' @examples
 #' set.seed(1)
-#' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
-#' units <- sprintf("p%02d", 1:60)
-#' warmth <- rnorm(60)
+#' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 120)
+#' units <- sprintf("p%02d", 1:40)
+#' warmth <- rnorm(40)
 #' d <- data.frame(
 #'   plot = rep(units, each = length(t)), t = rep(t, length(units)),
 #'   temp = as.numeric(vapply(warmth, function(w) w + sin(seq_along(t) / 300) + rnorm(length(t)),
 #'                            numeric(length(t)))))
-#' y <- matrix(rbinom(120, 1, plogis(c(warmth, -warmth))), nrow = 60,
+#' y <- matrix(rbinom(80, 1, plogis(c(warmth, -warmth))), nrow = 40,
 #'             dimnames = list(units, c("sp1", "sp2")))
 #' x <- grain_matrix(d, plot, t, temp, grain = c("week", "month"))
 #' sel <- select_grain(x, y, elasticnet(), folds = fold_map(y, v = 3), n_inner = 3,
