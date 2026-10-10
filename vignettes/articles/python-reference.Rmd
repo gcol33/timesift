@@ -6,6 +6,28 @@ title: "Python reference"
 
 The Python package's functions, classes and values, under the sections of [the R reference](../reference/index.html) and in its order. [Get started](python.html) runs them on a simulated record.
 
+## Installation
+
+```{r, eval = FALSE}
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
+```bash
+# Install from PyPI
+pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
+```
+
 ## [The one call](python-one-call.html)
 
 Two tables to a scored comparison of representations, and the prediction that follows from it.

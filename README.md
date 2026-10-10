@@ -21,6 +21,28 @@ it chooses a candidate and fits the stack's weights on an inner split, so the sc
 the chosen candidate and for the ensemble covers the choosing. What comes back says at what grain
 the prediction needed the record, and what the whole procedure scores on targets it did not see.
 
+## Installation
+
+```r
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
+```bash
+# Install from PyPI
+pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
+```
+
 ## Quick Start
 
 <table class="lang-split">
@@ -269,28 +291,6 @@ carries.
 asserts the plot count, the species count, the cell count and the bin count of every grain before
 fitting anything. [Its README](https://github.com/gcol33/timesift/blob/master/inst/reproduce/README.md)
 says how to run each stage, what it costs, and how every number compares with the paper.
-
-## Installation
-
-```r
-# Install from CRAN
-install.packages("timesift")
-
-# Or install the development version from GitHub
-# install.packages("pak")
-pak::pak("gcol33/timesift")
-```
-
-```bash
-# Install from PyPI
-pip install timesift
-
-# with the torch encoders, the contrasts and the plots
-pip install "timesift[torch,contrasts,plot]"
-
-# Or install the development version from GitHub
-pip install git+https://github.com/gcol33/timesift
-```
 
 ## Documentation
 

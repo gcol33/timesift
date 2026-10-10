@@ -22,6 +22,28 @@ actually needed.
 This vignette runs the whole path on a small simulated record, from two tables to a scored
 comparison and the prediction that follows from it.
 
+## Installation
+
+```{r, eval = FALSE}
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
+```bash
+# Install from PyPI
+pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
+```
+
 ## Two tables
 
 `targets` is one row per thing to predict. `series` is the long, time-stamped record belonging to
