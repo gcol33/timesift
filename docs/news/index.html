@@ -45,7 +45,13 @@
   </ul></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -70,6 +76,26 @@
       <small>Source: <a href="https://github.com/gcol33/timesift/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="development version" id="timesift-development-version">timesift (development version)<a class="anchor" aria-label="anchor" href="#timesift-development-version"></a></h2>
+<div class="section level3">
+<h3 id="documentation-development-version">Documentation<a class="anchor" aria-label="anchor" href="#documentation-development-version"></a></h3>
+<ul><li>Five articles on the package site: representing a record (grains, statistics, calendars, gaps, partial bins, lookbacks), the learners, finding the grain on simulated records with a known answer, ensembles, thresholds and maps, and troubleshooting.</li>
+<li>Examples for <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code>, <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> and <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> of a run, <code><a href="../reference/build_representation.html">build_representation()</a></code>, and the plots of a response curve and of a change in range.</li>
+<li>
+<code><a href="../reference/torch_learners.html">mlp()</a></code> is described as what it is, a fully connected encoder reading the bins flattened into one block; only <code><a href="../reference/torch_learners.html">cnn()</a></code> and <code><a href="../reference/torch_learners.html">rescnn()</a></code> read them as a sequence.</li>
+<li>The lookback’s edge rule is stated as the core applies it: a bin lying wholly past the record is an error, and one the record reaches in part is summarised over the readings it holds.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h3>
+<ul><li>The map of <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> on a <code><a href="../reference/range_change.html">range_change()</a></code> labels its classes lost, kept, absent and gained, and colours a map holding only some of them by the class each cell is in.</li>
+<li>Subsetting the <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> of a run, or an <code><a href="../reference/occlusion.html">occlusion()</a></code> result, returns a plain data frame where it printed empty headers.</li>
+<li>
+<code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> on a response curve takes <code>legend</code>, its position or <code>NULL</code>, and lays more than four responses out in columns.</li>
+<li>A learner whose own inner cross-validation asks for more folds than a grouped or blocked split leaves it groups, such as the default <code><a href="../reference/elasticnet.html">elasticnet()</a></code> under <code>block_cv(v = 5)</code>, is told to lower that learner’s <code>n_inner</code>.</li>
+<li>The refusals of a record name one empty cell or one non-finite reading in the singular, and a prediction on a record with fewer bins than the fit says why a calendar grain needs the same period.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.6.0" id="timesift-060">timesift 0.6.0<a class="anchor" aria-label="anchor" href="#timesift-060"></a></h2>
 <div class="section level3">
@@ -444,7 +470,7 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

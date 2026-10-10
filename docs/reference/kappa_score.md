@@ -71,7 +71,8 @@ model_agreement(y, p_a, p_b, rule = c("youden", "kappa", "prevalence", "mpa"))
   [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
   fit, the candidate whose cut is learned: `"ensemble"`, `"selected"` or
   the name of one, as
-  [`predict()`](https://rdrr.io/r/stats/predict.html) takes it.
+  [predict()](https://gillescolling.com/timesift/reference/predict.timesift.md)
+  takes it.
 
 - p_a, p_b:
 

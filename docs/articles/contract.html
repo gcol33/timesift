@@ -64,10 +64,16 @@
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
-<li class="nav-item dropdown">
+<li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+<li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
@@ -108,9 +114,28 @@
 
     
     
+<div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Or install the development version from GitHub</span></span>
+<span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Install from PyPI</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># with the torch encoders, the contrasts and the plots</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
 <p>Normative for both implementations. R and Python must produce the
 same numbers from the same input; where this document and either
 implementation disagree, this document is right.</p>
+</div>
 <div class="section level2">
 <h2 id="input">Input<a class="anchor" aria-label="anchor" href="#input"></a>
 </h2>
@@ -635,10 +660,12 @@ day-level pair reduces the days of a bin oldest first.</p>
 </h3>
 <ul>
 <li>Every <code>(target, bin)</code> cell holds at least one reading. A
-lookback reaching past either end of the record is an error naming the
+bin lying wholly past either end of the record is an error naming the
 target and the interval, never a padded row, for the reason a grain’s
 empty cell is one: an invented value in front of a model is worse than a
-target the record cannot answer for.</li>
+target the record cannot answer for. A bin the record reaches only in
+part is summarised over the readings it holds, as a grain’s partial bin
+is, and <code>bin_n</code> records how many.</li>
 <li>The four day-level statistics reduce each calendar day first, so
 they are defined only where every calendar day lies whole inside one
 bin. A calendar settles that by itself; a lookback has to be asked, and
@@ -4235,7 +4262,7 @@ for module rather than number for number.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

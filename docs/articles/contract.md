@@ -1,5 +1,28 @@
 # The representation contract
 
+## Installation
+
+``` r
+
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
+``` bash
+# Install from PyPI
+pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
+```
+
 Normative for both implementations. R and Python must produce the same
 numbers from the same input; where this document and either
 implementation disagree, this document is right.
@@ -366,11 +389,13 @@ of a bin oldest first.
 
 ### The two guards
 
-- Every `(target, bin)` cell holds at least one reading. A lookback
-  reaching past either end of the record is an error naming the target
-  and the interval, never a padded row, for the reason a grain’s empty
-  cell is one: an invented value in front of a model is worse than a
-  target the record cannot answer for.
+- Every `(target, bin)` cell holds at least one reading. A bin lying
+  wholly past either end of the record is an error naming the target and
+  the interval, never a padded row, for the reason a grain’s empty cell
+  is one: an invented value in front of a model is worse than a target
+  the record cannot answer for. A bin the record reaches only in part is
+  summarised over the readings it holds, as a grain’s partial bin is,
+  and `bin_n` records how many.
 - The four day-level statistics reduce each calendar day first, so they
   are defined only where every calendar day lies whole inside one bin. A
   calendar settles that by itself; a lookback has to be asked, and the

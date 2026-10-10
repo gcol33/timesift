@@ -129,8 +129,9 @@ TSS (`inst/reproduce/README.md`).
 
 A fitted encoder holds its weights as plain arrays and rebuilds the
 network when it predicts, so a fit saved with
-[`saveRDS()`](https://rdrr.io/r/base/readRDS.html) predicts after
-[`readRDS()`](https://rdrr.io/r/base/readRDS.html) in a fresh session.
+[`base::saveRDS()`](https://rdrr.io/r/base/readRDS.html) predicts after
+[`base::readRDS()`](https://rdrr.io/r/base/readRDS.html) in a fresh
+session.
 
 ## Examples
 

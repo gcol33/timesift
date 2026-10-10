@@ -201,10 +201,10 @@ A `timesift` object, a list carrying:
 
 - `choice`, `models`, `stack` and `weights`: the procedure applied to
   every target, which is what
-  [`predict()`](https://rdrr.io/r/stats/predict.html) uses. Every
-  candidate is refitted on all of them; `choice` is the candidate
-  `choose` takes on the outer scores, with the outer folds as the split
-  it chooses on, and `stack` holds weights fitted on the outer
+  [predict()](https://gillescolling.com/timesift/reference/predict.timesift.md)
+  uses. Every candidate is refitted on all of them; `choice` is the
+  candidate `choose` takes on the outer scores, with the outer folds as
+  the split it chooses on, and `stack` holds weights fitted on the outer
   out-of-fold predictions.
 
 - `representations`, `fits`, `folds`, `cells`, `y`, and the `metric`,

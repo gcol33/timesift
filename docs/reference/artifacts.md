@@ -83,6 +83,7 @@ f <- fold_map(y, v = 4)
 
 path <- tempfile(fileext = ".csv")
 write_folds(f, path)
-identical(read_folds(path, names(f)), f[names(f)])
+back <- read_folds(path, names(f))
+identical(names(back), names(f)) && identical(as.integer(back), as.integer(f))
 unlink(path)
 ```

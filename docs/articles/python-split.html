@@ -67,7 +67,13 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+<li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
@@ -113,10 +119,29 @@
 defined on, computed with no model involved.</p>
 <p><a href="python-reference.html">All of the Python reference</a></p>
 <div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Or install the development version from GitHub</span></span>
+<span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Install from PyPI</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># with the torch encoders, the contrasts and the plots</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="cv">
 <code>cv()</code><a class="anchor" aria-label="anchor" href="#cv"></a>
 </h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>cv(v: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>, seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>, strata: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>, by<span class="op">=</span><span class="va">None</span>, repeats: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>cv(v: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>, seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>, strata: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>, by<span class="op">=</span><span class="va">None</span>, repeats: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>)</span></code></pre></div>
 <p>Hold out single targets, balanced within equal-count strata of the
 response.</p>
 <p><code>by</code> stratifies on a numeric column of
@@ -132,7 +157,7 @@ out-of-fold predictions of all the repeats together.</p>
 <h2 id="grouped_cv">
 <code>grouped_cv()</code><a class="anchor" aria-label="anchor" href="#grouped_cv"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>grouped_cv(group, v: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>, seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>, repeats: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>grouped_cv(group, v: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>, seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>, repeats: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>)</span></code></pre></div>
 <p>Keep every target sharing a value of the <code>group</code> column in
 one fold.</p>
 <p>It is what repeated targets on the same unit need: two visits to a
@@ -144,7 +169,7 @@ read.</p>
 <h2 id="block_cv">
 <code>block_cv()</code><a class="anchor" aria-label="anchor" href="#block_cv"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>block_cv(by, v: <span class="bu">int</span> <span class="op">=</span> <span class="dv">4</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>block_cv(by, v: <span class="bu">int</span> <span class="op">=</span> <span class="dv">4</span>)</span></code></pre></div>
 <p>Hold out a block of targets whole, the blocks cut on the columns
 <code>by</code> of <code>targets</code>.</p>
 <p>The units are split at the median of the column with the widest
@@ -159,7 +184,7 @@ with one row per target.</p>
 <h2 id="env_cv">
 <code>env_cv()</code><a class="anchor" aria-label="anchor" href="#env_cv"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>env_cv(by, v: <span class="bu">int</span> <span class="op">=</span> <span class="dv">4</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>env_cv(by, v: <span class="bu">int</span> <span class="op">=</span> <span class="dv">4</span>)</span></code></pre></div>
 <p>As <code>block_cv</code>, on columns centred and scaled first: blocks
 of predictor space.</p>
 </div>
@@ -167,7 +192,7 @@ of predictor space.</p>
 <h2 id="Resampling">
 <code>Resampling</code><a class="anchor" aria-label="anchor" href="#Resampling"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>Resampling(kind, v, seed, strata, group, folds, by, scale, repeats)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>Resampling(kind, v, seed, strata, group, folds, by, scale, repeats)</span></code></pre></div>
 <p>How the targets are split, named but not yet drawn.</p>
 <p>Attributes:</p>
 <ul>
@@ -195,7 +220,7 @@ of predictor space.</p>
 <h2 id="as_resampling">
 <code>as_resampling()</code><a class="anchor" aria-label="anchor" href="#as_resampling"></a>
 </h2>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>as_resampling(x)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>as_resampling(x)</span></code></pre></div>
 <p>A resampling spec, or a fold map somebody else built, read as a spec
 that returns it.</p>
 </div>
@@ -203,7 +228,7 @@ that returns it.</p>
 <h2 id="resolve_folds">
 <code>resolve_folds()</code><a class="anchor" aria-label="anchor" href="#resolve_folds"></a>
 </h2>
-<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>resolve_folds(resampling, y, targets, spec)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>resolve_folds(resampling, y, targets, spec)</span></code></pre></div>
 <p>Draw the fold map a resampling spec names, in the row order of the
 response.</p>
 </div>
@@ -211,7 +236,7 @@ response.</p>
 <h2 id="fold_map">
 <code>fold_map()</code><a class="anchor" aria-label="anchor" href="#fold_map"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>fold_map(y: Response, v: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>, seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>, strata: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>, by<span class="op">=</span><span class="va">None</span>, group<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>fold_map(y: Response, v: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>, seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>, strata: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>, by<span class="op">=</span><span class="va">None</span>, group<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
 <p>Assign units to folds, balanced within equal-count strata of a
 stratifying value.</p>
 <p><code>group</code> keeps every unit sharing a value in one fold,
@@ -228,7 +253,7 @@ read it in the other with <code>read_folds</code>.</p>
 <h2 id="scorable_cells">
 <code>scorable_cells()</code><a class="anchor" aria-label="anchor" href="#scorable_cells"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>scorable_cells(y: Response, folds)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>scorable_cells(y: Response, folds)</span></code></pre></div>
 <p>Which cells admit a score, from the response and the fold map
 alone.</p>
 <p>A cell needs both classes among the held-out units and both classes
@@ -241,7 +266,7 @@ cells.</p>
 <h2 id="align_folds">
 <code>align_folds()</code><a class="anchor" aria-label="anchor" href="#align_folds"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>align_folds(folds, units)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>align_folds(folds, units)</span></code></pre></div>
 <p>A fold map reaches the fitting path as an integer vector in the row
 order of the representation, whether it arrived as a <code>Folds</code>,
 a mapping of unit to fold, or a bare vector already in that order.</p>
@@ -250,7 +275,7 @@ a mapping of unit to fold, or a bare vector already in that order.</p>
 <h2 id="Folds">
 <code>Folds</code><a class="anchor" aria-label="anchor" href="#Folds"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>Folds(fold, units, grouped, group)</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>Folds(fold, units, grouped, group)</span></code></pre></div>
 <p>Which fold each unit is held out in, named by unit.</p>
 <p>Named rather than positional, because a fold map is aligned to a
 representation by unit and never by row: two tables of the same height
@@ -276,7 +301,7 @@ are not two tables in the same order.</p>
 <h3 id="Folds-coerce">
 <code>coerce()</code><a class="anchor" aria-label="anchor" href="#Folds-coerce"></a>
 </h3>
-<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="bu">coerce</span>(cls, x, units<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="bu">coerce</span>(cls, x, units<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
 <p>A <code>Folds</code>, a mapping of unit to fold, or a bare vector
 read in <code>units</code> order.</p>
 </div>
@@ -284,7 +309,7 @@ read in <code>units</code> order.</p>
 <h3 id="Folds-align">
 <code>align()</code><a class="anchor" aria-label="anchor" href="#Folds-align"></a>
 </h3>
-<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>align(<span class="va">self</span>, units)</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>align(<span class="va">self</span>, units)</span></code></pre></div>
 <p>Put the map into the row order of a representation, by unit and never
 by position.</p>
 </div>
@@ -292,7 +317,7 @@ by position.</p>
 <h3 id="Folds-as_dict">
 <code>as_dict()</code><a class="anchor" aria-label="anchor" href="#Folds-as_dict"></a>
 </h3>
-<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>as_dict(<span class="va">self</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>as_dict(<span class="va">self</span>)</span></code></pre></div>
 <p>The map as unit to fold.</p>
 </div>
 </div>
@@ -300,7 +325,7 @@ by position.</p>
 <h2 id="Cells">
 <code>Cells</code><a class="anchor" aria-label="anchor" href="#Cells"></a>
 </h2>
-<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>Cells(variable, fold, n_occ, pres_train, abs_train, pres_test, abs_test, scorable)</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>Cells(variable, fold, n_occ, pres_train, abs_train, pres_test, abs_test, scorable)</span></code></pre></div>
 <p>Which <code>(variable, fold)</code> cells admit a score, and the
 counts that decided it.</p>
 <p>Attributes:</p>
@@ -326,7 +351,7 @@ counts that decided it.</p>
 <h3 id="Cells-is_scorable">
 <code>is_scorable()</code><a class="anchor" aria-label="anchor" href="#Cells-is_scorable"></a>
 </h3>
-<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>is_scorable(<span class="va">self</span>, variable: <span class="bu">str</span>, fold: <span class="bu">int</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>is_scorable(<span class="va">self</span>, variable: <span class="bu">str</span>, fold: <span class="bu">int</span>)</span></code></pre></div>
 <p>Whether one <code>(variable, fold)</code> cell admits a score.</p>
 </div>
 </div>
@@ -337,7 +362,7 @@ counts that decided it.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

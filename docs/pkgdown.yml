@@ -3,7 +3,10 @@ pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   articles/biomod2: biomod2.html
+  articles/comparing-grains: comparing-grains.html
   articles/contract: contract.html
+  articles/learners: learners.html
+  articles/prediction: prediction.html
   articles/python-arrays: python-arrays.html
   articles/python-artifacts: python-artifacts.html
   articles/python-combining: python-combining.html
@@ -17,8 +20,10 @@ articles:
   articles/python-simulate: python-simulate.html
   articles/python-split: python-split.html
   articles/python: python.html
+  articles/representations: representations.html
   timesift: timesift.html
-last_built: 2026-10-06T17:41Z
+  articles/troubleshooting: troubleshooting.html
+last_built: 2026-10-10T13:44Z
 urls:
   reference: https://gillescolling.com/timesift/reference
   article: https://gillescolling.com/timesift/articles

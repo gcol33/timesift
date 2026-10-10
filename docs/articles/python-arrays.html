@@ -67,7 +67,13 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+<li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
@@ -113,21 +119,40 @@
 reachable without the fitting layer.</p>
 <p><a href="python-reference.html">All of the Python reference</a></p>
 <div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Or install the development version from GitHub</span></span>
+<span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Install from PyPI</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># with the torch encoders, the contrasts and the plots</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="grain_matrix">
 <code>grain_matrix()</code><a class="anchor" aria-label="anchor" href="#grain_matrix"></a>
 </h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>grain_matrix(</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>    time<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>    value<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>    <span class="op">*</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>    grain<span class="op">=</span><span class="st">'day'</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>    stats<span class="op">=</span>(<span class="st">'mean'</span>,),</span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>    year_start<span class="op">=</span><span class="st">'01-01'</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>    partial<span class="op">=</span><span class="st">'keep'</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>    tz<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>grain_matrix(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    time<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    value<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    <span class="op">*</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    grain<span class="op">=</span><span class="st">'day'</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    stats<span class="op">=</span>(<span class="st">'mean'</span>,),</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    year_start<span class="op">=</span><span class="st">'01-01'</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>    partial<span class="op">=</span><span class="st">'keep'</span>,</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>    tz<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>)</span></code></pre></div>
 <p>Bin readings by the calendar and summarise every bin.</p>
 <p><code>data</code> is a mapping of column name to sequence, or any
 object with <code>__getitem__</code> over the three column names given
@@ -163,19 +188,19 @@ one was meant to end and takes the record’s end as its end.</p>
 <h2 id="lookback_matrix">
 <code>lookback_matrix()</code><a class="anchor" aria-label="anchor" href="#lookback_matrix"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>lookback_matrix(</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>    time<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>    value<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>    at<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>    span<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>    <span class="op">*</span>,</span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>    lag<span class="op">=</span><span class="st">'0 days'</span>,</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>    bins<span class="op">=</span><span class="dv">1</span>,</span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>    stats<span class="op">=</span><span class="st">'mean'</span>,</span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>    tz<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>lookback_matrix(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    time<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    value<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    at<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    span<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    <span class="op">*</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    lag<span class="op">=</span><span class="st">'0 days'</span>,</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>    bins<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>    stats<span class="op">=</span><span class="st">'mean'</span>,</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>    tz<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>)</span></code></pre></div>
 <p>Read a fixed length of record ending a fixed lag before each target’s
 own instant.</p>
 <p>It is the reduction a calendar cannot express: two targets on the
@@ -190,8 +215,10 @@ anchored at <code>a</code> covers
 with <code>step</code> the span divided by <code>bins</code> and
 <code>b</code> counted from zero. Only the readings of the target’s own
 unit are read, and every <code>(target, bin)</code> cell must hold at
-least one: a lookback reaching past the record is an error naming the
-target, never a padded row.</p>
+least one: a bin lying wholly past the record is an error naming the
+target, never a padded row, and one the record reaches only in part is
+summarised over the readings it holds, with <code>bin_n</code> recording
+how many.</p>
 <p><code>span</code> and <code>lag</code> are read from a count and a
 unit – <code>"30 days"</code>, <code>"12 hours"</code>,
 <code>"1 year"</code> – or from a bare number of seconds. A year is 365
@@ -211,7 +238,7 @@ not.</p>
 <h2 id="coverage">
 <code>coverage()</code><a class="anchor" aria-label="anchor" href="#coverage"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>coverage(data<span class="op">=</span><span class="va">None</span>, <span class="bu">id</span><span class="op">=</span><span class="va">None</span>, time<span class="op">=</span><span class="va">None</span>, <span class="op">*</span>, grain<span class="op">=</span><span class="st">'day'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>, tz<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>coverage(data<span class="op">=</span><span class="va">None</span>, <span class="bu">id</span><span class="op">=</span><span class="va">None</span>, time<span class="op">=</span><span class="va">None</span>, <span class="op">*</span>, grain<span class="op">=</span><span class="st">'day'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>, tz<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
 <p>Which units reach which bins.</p>
 <p>A representation needs every unit in every bin, and
 <code>grain_matrix</code> refuses a record where one is missing rather
@@ -226,7 +253,7 @@ it is made on; nothing here fills a cell. <code>grain</code> and
 <h2 id="Coverage">
 <code>Coverage</code><a class="anchor" aria-label="anchor" href="#Coverage"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>Coverage(count, units, bins, grain, bin_start)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>Coverage(count, units, bins, grain, bin_start)</span></code></pre></div>
 <p>How many readings each unit has in each bin, over every bin the
 calendar tiles the record with. <code>count</code> is
 <code>[unit, bin]</code>; a unit that started late, stopped early or
@@ -255,14 +282,14 @@ is a column of zeros.</p>
 <h3 id="Coverage-units_with_gaps">
 <code>units_with_gaps()</code><a class="anchor" aria-label="anchor" href="#Coverage-units_with_gaps"></a>
 </h3>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>units_with_gaps(<span class="va">self</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>units_with_gaps(<span class="va">self</span>)</span></code></pre></div>
 <p>The units that do not reach every bin.</p>
 </div>
 <div class="section level3">
 <h3 id="Coverage-bins_no_unit_reaches">
 <code>bins_no_unit_reaches()</code><a class="anchor" aria-label="anchor" href="#Coverage-bins_no_unit_reaches"></a>
 </h3>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>bins_no_unit_reaches(<span class="va">self</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>bins_no_unit_reaches(<span class="va">self</span>)</span></code></pre></div>
 <p>The bins the whole record skips.</p>
 </div>
 </div>
@@ -270,7 +297,7 @@ is a column of zeros.</p>
 <h2 id="timesift_set">
 <code>timesift_set()</code><a class="anchor" aria-label="anchor" href="#timesift_set"></a>
 </h2>
-<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>timesift_set(x)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>timesift_set(x)</span></code></pre></div>
 <p>Every entry point that fits across grains takes a representation, a
 set, or a bare mapping, and works on a set. One coercion, so no caller
 repeats the three cases.</p>
@@ -279,7 +306,7 @@ repeats the three cases.</p>
 <h2 id="calendar_channels">
 <code>calendar_channels()</code><a class="anchor" aria-label="anchor" href="#calendar_channels"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>calendar_channels(x: TimesiftMatrix, cycles<span class="op">=</span>(<span class="st">'year'</span>,))</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>calendar_channels(x: TimesiftMatrix, cycles<span class="op">=</span>(<span class="st">'year'</span>,))</span></code></pre></div>
 <p>Where in the year, or the day, each bin sits, as the sine and cosine
 of its fractional position in each cycle named, in the order given.</p>
 <p>The position is read at the midpoint of the record each bin holds, in
@@ -291,7 +318,7 @@ normative description.</p>
 <h2 id="bind_channels">
 <code>bind_channels()</code><a class="anchor" aria-label="anchor" href="#bind_channels"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>bind_channels(<span class="op">*</span>parts: TimesiftMatrix)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>bind_channels(<span class="op">*</span>parts: TimesiftMatrix)</span></code></pre></div>
 <p>Put the channels of several representations of the same units and
 bins side by side.</p>
 <p>The channels come back in the order the arguments are given and,
@@ -303,7 +330,7 @@ which name channels and so name those of every argument.</p>
 <h2 id="feature_matrix">
 <code>feature_matrix()</code><a class="anchor" aria-label="anchor" href="#feature_matrix"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>feature_matrix(m, units<span class="op">=</span><span class="va">None</span>, features<span class="op">=</span><span class="va">None</span>, label: <span class="bu">str</span> <span class="op">=</span> <span class="st">'features'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>feature_matrix(m, units<span class="op">=</span><span class="va">None</span>, features<span class="op">=</span><span class="va">None</span>, label: <span class="bu">str</span> <span class="op">=</span> <span class="st">'features'</span>)</span></code></pre></div>
 <p>Bring an already-reduced feature table into a ladder as a one-channel
 representation.</p>
 <p>It carries no time axis, because it has none: the reduction already
@@ -314,24 +341,24 @@ unit. That is the whole point of comparing against it.</p>
 <h2 id="TimesiftMatrix">
 <code>TimesiftMatrix</code><a class="anchor" aria-label="anchor" href="#TimesiftMatrix"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>TimesiftMatrix(</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>    values,</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    units,</span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>    bins,</span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    stats,</span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    grain,</span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>    year_start,</span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>    bin_start,</span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>    bin_end,</span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>    bin_n,</span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>    bin_partial,</span>
-<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>    span,</span>
-<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>    lag,</span>
-<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>    static,</span>
-<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>    position,</span>
-<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>    coords,</span>
-<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a>    unit_ids,</span>
-<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>TimesiftMatrix(</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>    values,</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>    units,</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>    bins,</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>    stats,</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>    grain,</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>    year_start,</span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>    bin_start,</span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>    bin_end,</span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>    bin_n,</span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a>    bin_partial,</span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a>    span,</span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>    lag,</span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a>    static,</span>
+<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a>    position,</span>
+<span id="cb13-16"><a href="#cb13-16" tabindex="-1"></a>    coords,</span>
+<span id="cb13-17"><a href="#cb13-17" tabindex="-1"></a>    unit_ids,</span>
+<span id="cb13-18"><a href="#cb13-18" tabindex="-1"></a>)</span></code></pre></div>
 <p>A <code>[row, bin, channel]</code> representation and the reduction
 that produced it.</p>
 <p>A row is a unit where the calendar did the binning and a target where
@@ -396,14 +423,14 @@ it.</p>
 <h3 id="TimesiftMatrix-channel">
 <code>channel()</code><a class="anchor" aria-label="anchor" href="#TimesiftMatrix-channel"></a>
 </h3>
-<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>channel(<span class="va">self</span>, name: <span class="bu">str</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>channel(<span class="va">self</span>, name: <span class="bu">str</span>)</span></code></pre></div>
 <p>One statistic as a <code>[row, bin]</code> matrix.</p>
 </div>
 <div class="section level3">
 <h3 id="TimesiftMatrix-take_units">
 <code>take_units()</code><a class="anchor" aria-label="anchor" href="#TimesiftMatrix-take_units"></a>
 </h3>
-<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>take_units(<span class="va">self</span>, index)</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>take_units(<span class="va">self</span>, index)</span></code></pre></div>
 <p>The representation restricted to a subset of its rows, in the order
 given.</p>
 </div>
@@ -428,19 +455,19 @@ and it reads as a mapping of grain name to representation.</p>
 <h2 id="GRAINS">
 <code>GRAINS</code><a class="anchor" aria-label="anchor" href="#GRAINS"></a>
 </h2>
-<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>GRAINS <span class="op">=</span> (<span class="st">'native'</span>, <span class="st">'halfday'</span>, <span class="st">'day'</span>, <span class="st">'week'</span>, <span class="st">'month'</span>, <span class="st">'season'</span>, <span class="st">'year'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>GRAINS <span class="op">=</span> (<span class="st">'native'</span>, <span class="st">'halfday'</span>, <span class="st">'day'</span>, <span class="st">'week'</span>, <span class="st">'month'</span>, <span class="st">'season'</span>, <span class="st">'year'</span>)</span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="STATS">
 <code>STATS</code><a class="anchor" aria-label="anchor" href="#STATS"></a>
 </h2>
-<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>STATS <span class="op">=</span> (<span class="st">'mean'</span>, <span class="st">'min'</span>, <span class="st">'max'</span>) <span class="op">+</span> DAY_LEVEL_STATS</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>STATS <span class="op">=</span> (<span class="st">'mean'</span>, <span class="st">'min'</span>, <span class="st">'max'</span>) <span class="op">+</span> DAY_LEVEL_STATS</span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="DAY_LEVEL_STATS">
 <code>DAY_LEVEL_STATS</code><a class="anchor" aria-label="anchor" href="#DAY_LEVEL_STATS"></a>
 </h2>
-<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>DAY_LEVEL_STATS <span class="op">=</span> (<span class="st">'cold_day'</span>, <span class="st">'warm_day'</span>, <span class="st">'mean_daily_min'</span>, <span class="st">'mean_daily_max'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>DAY_LEVEL_STATS <span class="op">=</span> (<span class="st">'cold_day'</span>, <span class="st">'warm_day'</span>, <span class="st">'mean_daily_min'</span>, <span class="st">'mean_daily_max'</span>)</span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
@@ -449,7 +476,7 @@ and it reads as a mapping of grain name to representation.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

@@ -1,0 +1,1062 @@
+# Representing a record
+
+A learner never reads a sensor record as it was logged. It reads an
+array of numbers per unit, and between the record and that array sit
+three decisions: which stretch of time one number stands for, what that
+number summarises, and where the stretches begin. `timesift` names each
+of them as an argument, builds the array from them in one compiled core,
+and records on the array how it was built.
+
+This article follows a record from the long table it arrives in to the
+array a learner is handed. It covers the columns the package reads, the
+seven named grains and how they follow the calendar, the seven
+statistics and the difference between an extreme reading and an extreme
+day, calendars passed as functions, gaps and partial bins, the
+representation objects a run is configured with, lookbacks anchored on
+each target, calendar position channels, the tabular layout, and the
+digest that ties a representation to its specification.
+
+## Installation
+
+``` r
+
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
+``` bash
+# Install from PyPI
+pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
+```
+
+## Two tables, and the columns read from them
+
+A run takes two tables. `series` holds the record in long form, one row
+per reading, and `targets` holds one row per thing to predict. They are
+joined by a column naming the unit, which both carry. The record here is
+thirty plots, each logged hourly for 400 days from 1 September 2021,
+with a seasonal cycle, a daily cycle, a level per plot and noise.
+
+``` r
+
+hours <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 400)
+ids <- sprintf("p%02d", 1:30)
+warmth <- rnorm(30)
+doy <- as.numeric(format(hours, "%j"))
+hod <- as.numeric(format(hours, "%H"))
+
+series <- data.frame(
+  plot = rep(ids, each = length(hours)),
+  t = rep(hours, times = 30),
+  temp = as.numeric(vapply(warmth, function(w) {
+    w + 8 * sin(2 * pi * (doy - 110) / 365) + 3 * sin(2 * pi * (hod - 9) / 24) +
+      rnorm(length(hours), sd = 1.5)
+  }, numeric(length(hours))))
+)
+
+targets <- data.frame(plot = ids, elevation = round(2400 - 150 * warmth))
+targets[paste0("sp", 1:4)] <- lapply(c(1, -1, 1, -1), function(s) {
+  rbinom(30, 1, plogis(2 * s * warmth))
+})
+str(series)
+#> 'data.frame':    288000 obs. of  3 variables:
+#>  $ plot: chr  "p01" "p01" "p01" "p01" ...
+#>  $ t   : POSIXct, format: "2021-09-01 00:00:00" "2021-09-01 01:00:00" ...
+#>  $ temp: num  5.22 2.55 2.99 2.22 0.34 ...
+head(targets, 3)
+#>   plot elevation sp1 sp2 sp3 sp4
+#> 1  p01      2494   0   1   0   1
+#> 2  p02      2372   0   0   1   0
+#> 3  p03      2525   0   1   0   1
+```
+
+[`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
+reads three columns of `series`: the unit (`id`), the instant of each
+reading (`time`) and the reading itself (`value`). Each is given as a
+bare column name or as a string. The result is a numeric array of shape
+`[unit, bin, channel]`, and the attributes carry everything the binning
+decided.
+
+``` r
+
+x <- grain_matrix(series, plot, t, temp, grain = "month")
+x
+#> <timesift matrix> 30 units x 14 bins x 1 channel 
+#> grain: month   stats: mean 
+#> from  : 2021-09-01 to 2022-10-01
+dim(x)
+#> [1] 30 14  1
+names(attributes(x))
+#>  [1] "dim"         "dimnames"    "grain"       "stats"       "year_start" 
+#>  [6] "bin_start"   "bin_end"     "bin_n"       "bin_partial" "class"
+```
+
+The thirty plots became thirty rows, the 400 days fourteen monthly bins,
+and the single statistic one channel. `bin_start` and `bin_end` give
+each bin’s first instant on the calendar and its last reading, `bin_n`
+the count of readings every cell was reduced from, and `bin_partial`
+which bins the record does not cover in full. Bins are named by their
+start as an ISO 8601 instant in UTC, which is how the Python side names
+them too.
+
+A unit identifier is a name. Text and factor levels are used as they
+are, and a whole number is written as its digits, so an identifier read
+from a file as `100000` stays `100000` and never becomes `1e+05`. The
+rows are sorted under C collation, the same order on every machine and
+in both languages, which puts `"100000"` before `"7"`.
+
+``` r
+
+numeric_ids <- transform(series[series$plot %in% c("p01", "p02"), ],
+                         plot = ifelse(plot == "p01", 100000, 7))
+dimnames(grain_matrix(numeric_ids, plot, t, temp, grain = "month"))[[1]]
+#> [1] "100000" "7"
+```
+
+A number that is not whole is refused as an identifier, as is a missing
+value in the unit or the time column. A unit holding two readings at the
+same instant is refused as well, with the first duplicate named, because
+a reading counted twice would weigh twice in every mean and every daily
+extreme it reaches.
+
+``` r
+
+grain_matrix(rbind(series[1:5, ], series[3, ]), plot, t, temp, grain = "day")
+#> Error:
+#> ! 1 duplicated (unit, time) pair, first: p01 at 2021-09-01T02:00:00Z.
+```
+
+[`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+reads the same columns through its own `id` and `time` arguments, and
+`x` selects which numeric columns of `series` hold readings; by default
+every numeric column but the identifier and the time. Where it selects
+more than one, each reaches the learner as channels of its own, named by
+the column and the statistic, such as `temp_mean` beside `snow_mean`.
+
+### Time zones
+
+`time` must be `POSIXct`. Bins follow the calendar the column is carried
+in, which is its `tzone` attribute, and a column without one is read as
+UTC. The zone is resolved once, as the column enters the core, and
+everything below works on the local clock, so a day is a wall-clock day.
+In a zone that keeps summer time, the day the clock goes forward holds
+23 hourly readings.
+
+``` r
+
+spring <- seq(as.POSIXct("2021-03-26", tz = "Europe/Vienna"),
+              as.POSIXct("2021-03-30 23:00", tz = "Europe/Vienna"), by = "hour")
+vienna <- data.frame(plot = "a", t = spring, temp = seq_along(spring))
+attr(grain_matrix(vienna, plot, t, temp, grain = "day"), "bin_n")
+#>   2021-03-25T23:00:00Z 2021-03-26T23:00:00Z 2021-03-27T23:00:00Z
+#> a                   24                   24                   23
+#>   2021-03-28T22:00:00Z 2021-03-29T22:00:00Z
+#> a                   24                   24
+
+fixed <- vienna
+attr(fixed$t, "tzone") <- "Etc/GMT-1"
+attr(grain_matrix(fixed, plot, t, temp, grain = "day"), "bin_n")
+#>   2021-03-25T23:00:00Z 2021-03-26T23:00:00Z 2021-03-27T23:00:00Z
+#> a                   24                   24                   24
+#>   2021-03-28T23:00:00Z 2021-03-29T23:00:00Z
+#> a                   24                   23
+
+identical(as.numeric(grain_matrix(vienna, plot, t, temp, grain = "native")),
+          as.numeric(grain_matrix(fixed, plot, t, temp, grain = "native")))
+#> [1] TRUE
+```
+
+Carried in `"Europe/Vienna"`, 28 March 2021 holds 23 readings, and the
+bins after it start at 22:00 UTC because local midnight has moved an
+hour. The same instants carried in `"Etc/GMT-1"`, the fixed offset of
+Central European standard time, bin into days of 24 readings; the last
+day there holds 23 only because the record stops at 23:00 on the summer
+clock, which is 22:00 on the fixed one. Changing the `tzone` attribute
+changes nothing about the readings, only the calendar they are binned
+on. The `native` grain is the one grain not read on a clock: its bin is
+the reading itself, so it is the same array in either zone.
+
+A logger that keeps a fixed offset is best carried in that offset. The
+Schrankogel deposit is one such record: 26,304 hourly readings that bin
+into 1,096 days of 24.
+
+## The seven grains
+
+A grain names how much of the record one bin stands for. Naming several
+at once returns a `timesift_set`, one array per grain over the same
+units.
+
+``` r
+
+ladder <- grain_matrix(series, plot, t, temp,
+                       grain = c("native", "halfday", "day", "week", "month", "season", "year"))
+ladder
+#> <timesift set> 7 representations over 30 targets 
+#>   native          9600 bins x 1 channels (mean)
+#>   halfday          800 bins x 1 channels (mean)
+#>   day              400 bins x 1 channels (mean)
+#>   week              58 bins x 1 channels (mean)
+#>   month             14 bins x 1 channels (mean)
+#>   season             6 bins x 1 channels (mean)
+#>   year               2 bins x 1 channels (mean)
+```
+
+`native` is the record unreduced: 9,600 bins of one reading each.
+`halfday` cuts each calendar day at noon into 800 bins, and `day` gives
+400. The four coarser grains follow the calendar and give 58 weeks, 14
+months, 6 seasons and 2 years. None of them is a fixed count of hours.
+
+``` r
+
+week <- ladder[["week"]]
+head(attr(week, "bin_start"), 3)
+#> [1] "2021-08-30 UTC" "2021-09-06 UTC" "2021-09-13 UTC"
+format(head(attr(week, "bin_start"), 3), "%A")
+#> [1] "Monday" "Monday" "Monday"
+attr(ladder[["month"]], "bin_n")[1, ]
+#> 2021-09-01T00:00:00Z 2021-10-01T00:00:00Z 2021-11-01T00:00:00Z 
+#>                  720                  744                  720 
+#> 2021-12-01T00:00:00Z 2022-01-01T00:00:00Z 2022-02-01T00:00:00Z 
+#>                  744                  744                  672 
+#> 2022-03-01T00:00:00Z 2022-04-01T00:00:00Z 2022-05-01T00:00:00Z 
+#>                  744                  720                  744 
+#> 2022-06-01T00:00:00Z 2022-07-01T00:00:00Z 2022-08-01T00:00:00Z 
+#>                  720                  744                  744 
+#> 2022-09-01T00:00:00Z 2022-10-01T00:00:00Z 
+#>                  720                  120
+```
+
+A week is an ISO week, Monday to Sunday, so the first weekly bin begins
+on Monday 30 August 2021 although the record begins on the Wednesday
+after it. A month is a calendar month: the counts run 720, 744 and 672
+readings for months of 30, 31 and 28 days, and the last month holds 120
+readings because the record stops five days into October 2022.
+
+### Where the year begins
+
+`season` and `year` are counted from `year_start`, a `"MM-DD"` boundary
+that defaults to the calendar year. A season is three calendar months
+counted from that boundary, so the default gives the quarters January to
+March, April to June and so on. A hydrological year starting in
+September is `"09-01"`, and it moves the seasons with it.
+
+``` r
+
+hydro <- grain_matrix(series, plot, t, temp, grain = c("season", "year"), year_start = "09-01")
+attr(hydro[["season"]], "bin_start")
+#> [1] "2021-09-01 UTC" "2021-12-01 UTC" "2022-03-01 UTC" "2022-06-01 UTC"
+#> [5] "2022-09-01 UTC"
+attr(hydro[["year"]], "bin_n")[1, ]
+#> 2021-09-01T00:00:00Z 2022-09-01T00:00:00Z 
+#>                 8760                  840
+attr(ladder[["year"]], "bin_n")[1, ]
+#> 2021-01-01T00:00:00Z 2022-01-01T00:00:00Z 
+#>                 2928                 6672
+```
+
+On the September boundary the record is five seasons and two years, of
+8,760 and 840 readings. On the default boundary the same record splits
+into calendar years of 2,928 and 6,672 readings. Which boundary fits is
+a question about the system. The Schrankogel deposit uses a hydrological
+year from 1 September, and on the calendar year each of its winters
+falls into two bins.
+
+## Statistics
+
+Each bin is summarised by one or more statistics, one channel each, in
+the order they are named. Seven exist, and they fall into two families.
+`mean`, `min` and `max` act on the readings of the bin directly. The
+four day-level statistics first reduce each calendar day of the bin and
+then reduce again over the days: `cold_day` and `warm_day` are the
+coldest and warmest daily mean, and `mean_daily_min` and
+`mean_daily_max` are the bin’s average daily minimum and maximum.
+
+``` r
+
+stats7 <- c("min", "mean_daily_min", "cold_day", "mean", "warm_day", "mean_daily_max", "max")
+m <- grain_matrix(series, plot, t, temp, grain = "month", stats = stats7)
+round(m["p01", 1:3, ], 2)
+#>                         min mean_daily_min cold_day  mean warm_day
+#> 2021-09-01T00:00:00Z  -4.61          -1.07     1.88  3.72     5.52
+#> 2021-10-01T00:00:00Z  -8.86          -5.03    -2.40 -0.16     1.88
+#> 2021-11-01T00:00:00Z -11.46          -9.29    -5.96 -4.23    -2.19
+#>                      mean_daily_max   max
+#> 2021-09-01T00:00:00Z           8.41 11.47
+#> 2021-10-01T00:00:00Z           4.93  7.74
+#> 2021-11-01T00:00:00Z           0.57  2.88
+```
+
+Within every bin the two families order themselves around the mean:
+`min` sits below `mean_daily_min`, which sits below `mean`, and `min`
+sits below `cold_day` likewise. In September 2021 plot `p01` read a
+coldest hour of -4.61, an average daily minimum of -1.07 and a coldest
+day of 1.88, against a mean of 3.72. The figure lays the weekly versions
+of five of them over the whole record.
+
+``` r
+
+wk7 <- grain_matrix(series, plot, t, temp, grain = "week", stats = stats7)
+start <- as.Date(attr(wk7, "bin_start"))
+shown <- c("min", "cold_day", "mean", "warm_day", "max")
+matplot(start, wk7["p01", , shown], type = "l", lty = 1, lwd = c(1, 2, 2, 2, 1),
+        col = c("grey60", "steelblue", "black", "firebrick", "grey60"),
+        xaxt = "n", xlab = "", ylab = "temperature",
+        ylim = range(wk7["p01", , shown]) + c(0, 9))
+axis.Date(1, start)
+legend("top", legend = shown, lty = 1, lwd = c(1, 2, 2, 2, 1), ncol = 3, bty = "n",
+       col = c("grey60", "steelblue", "black", "firebrick", "grey60"))
+```
+
+![Weekly minimum, coldest day, mean, warmest day and maximum of one plot
+over 400 days, the day-level pair lying inside the reading-level
+pair.](representations_files/figure-html/weekly-figure-1.svg)
+
+### An extreme hour and an extreme day
+
+`min` is set by a single reading, and a single reading can be a sensor
+touching a cold stone, a logger dug up by an animal, or one cold hour
+before dawn. A day-level statistic reaches that hour only through its
+share of that day. The next chunk copies September 2021 of plot `p01`
+and makes its coldest hour 20 degrees colder, then reduces both copies.
+
+``` r
+
+one <- series[series$plot == "p01" & series$t < as.POSIXct("2021-10-01", tz = "UTC"), ]
+spiked <- one
+cold <- which.min(spiked$temp)
+spiked$temp[cold] <- spiked$temp[cold] - 20
+
+both <- rbind(transform(one, plot = "as recorded"), transform(spiked, plot = "one hour colder"))
+round(grain_matrix(both, plot, t, temp, grain = "month", stats = stats7)[, 1, ], 2)
+#>                    min mean_daily_min cold_day mean warm_day mean_daily_max
+#> as recorded      -4.61          -1.07     1.88 3.72     5.52           8.41
+#> one hour colder -24.61          -1.74     1.05 3.69     5.52           8.41
+#>                   max
+#> as recorded     11.47
+#> one hour colder 11.47
+```
+
+`min` follows the hour all the way, from -4.61 to -24.61. `cold_day`
+moves from 1.88 to 1.05, which is the 20 degrees divided over the 24
+readings of the day the hour fell on. `mean_daily_min` moves from -1.07
+to -1.74, the 20 degrees divided over the 30 daily minima of the month,
+and the mean moves by 0.03. The warm side does not move at all. An
+extreme day is a state the unit was in for a whole day; an extreme
+reading can be one hour.
+
+Where the record is clean, the two still carry different things. In the
+Schrankogel study a window’s coldest and warmest day carried more than
+its mean, and more the wider the window: the gain from adding them grew
+from 0.006 TSS at a weekly grain to 0.046 at a yearly one.
+
+The day-level statistics need whole days inside a bin, so they are
+refused at `native` and `halfday` before any record is read. At `day`
+they are allowed and coincide with the reading-level ones: a bin of one
+day has one daily mean and one daily minimum.
+
+``` r
+
+grain_matrix(series, plot, t, temp, grain = "halfday", stats = "cold_day")
+#> Error:
+#> ! `halfday` bins are shorter than a day, so cold_day is not defined there. Use a grain of `day` or coarser.
+```
+
+``` r
+
+d <- grain_matrix(series, plot, t, temp, grain = "day",
+                  stats = c("mean", "cold_day", "min", "mean_daily_min"))
+round(d["p01", 1:2, ], 2)
+#>                      mean cold_day  min mean_daily_min
+#> 2021-09-01T00:00:00Z 5.40     5.40 0.34           0.34
+#> 2021-09-02T00:00:00Z 5.52     5.52 0.64           0.64
+```
+
+## A calendar passed as a function
+
+A calendar the package does not carry is passed as `grain`, as a
+function of the reading instants that returns the start of each
+reading’s bin. Seasons cut at the solstices and equinoxes rather than on
+the first of a month are the usual case. The function below cuts on 21
+March, 21 June, 23 September and 21 December, which are fixed dates
+close to the astronomical ones.
+
+``` r
+
+solstice_seasons <- function(when) {
+  md <- format(when, "%m-%d", tz = "UTC")
+  y <- as.integer(format(when, "%Y", tz = "UTC"))
+  k <- (md >= "03-21") + (md >= "06-21") + (md >= "09-23") + (md >= "12-21")
+  start <- c("12-21", "03-21", "06-21", "09-23", "12-21")[k + 1L]
+  as.POSIXct(paste0(ifelse(k == 0L, y - 1L, y), "-", start), tz = "UTC")
+}
+s <- grain_matrix(series, plot, t, temp, grain = solstice_seasons,
+                  stats = c("cold_day", "mean", "warm_day"))
+s
+#> <timesift matrix> 30 units x 6 bins x 3 channels 
+#> grain: custom   stats: cold_day, mean, warm_day 
+#> from  : 2021-06-21 to 2022-09-23
+attr(s, "bin_n")[1, ]
+#> 2021-06-21T00:00:00Z 2021-09-23T00:00:00Z 2021-12-21T00:00:00Z 
+#>                  528                 2136                 2160 
+#> 2022-03-21T00:00:00Z 2022-06-21T00:00:00Z 2022-09-23T00:00:00Z 
+#>                 2208                 2256                  312
+attr(s, "bin_partial")
+#> [1]  TRUE FALSE FALSE FALSE FALSE FALSE
+```
+
+The array is the same shape as any other and is reported under the grain
+`custom`. The first bin opens on 21 June 2021 and holds the 528 readings
+from the record’s start to 23 September, so it is marked partial. The
+last bin holds 312 readings and is not: a supplied calendar declares
+where its bins begin but not where the last one was meant to end, so the
+record’s end is taken as its end. Day-level statistics are allowed on a
+supplied calendar as long as no bin boundary cuts through a day, and a
+calendar that does cut one is refused with the day named.
+
+The Schrankogel study’s seasonal rung was of this kind, and its
+reproduction driver passes the deposit’s astronomical seasons the same
+way.
+
+## Gaps
+
+Every unit must hold at least one reading in every bin. A logger that
+lost a week leaves a cell with nothing to summarise, and
+[`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
+refuses the record rather than pad it, because a padded value would
+reach the model as if it had been measured. Plot `p07` below loses the
+calendar week starting Monday 7 February 2022.
+
+``` r
+
+lost <- series$plot == "p07" &
+  series$t >= as.POSIXct("2022-02-07", tz = "UTC") &
+  series$t < as.POSIXct("2022-02-14", tz = "UTC")
+gappy <- series[!lost, ]
+grain_matrix(gappy, plot, t, temp, grain = "week")
+#> Error:
+#> ! 1 (unit, bin) cell holds no readings, first: unit p07 at 2022-02-07T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.
+```
+
+[`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
+lays the same binning out as a count of readings per unit and bin, which
+is where the gaps of a refused record are read off. It takes the unit
+and time columns and a grain, and no value column, since it counts and
+does not summarise.
+
+``` r
+
+cv_week <- coverage(gappy, plot, t, grain = "week")
+cv_week
+#> <timesift coverage> 30 units x 58 bins at the week grain
+#> 1 empty (unit, bin) cell in 1 unit: p07
+cv_week["p07", 22:26]
+#> 2022-01-24T00:00:00Z 2022-01-31T00:00:00Z 2022-02-07T00:00:00Z 
+#>                  168                  168                    0 
+#> 2022-02-14T00:00:00Z 2022-02-21T00:00:00Z 
+#>                  168                  168
+coverage(gappy, plot, t, grain = "month")
+#> <timesift coverage> 30 units x 14 bins at the month grain
+#> every unit reaches every bin
+```
+
+At the weekly grain the table holds one empty cell, in the week of 7
+February. At the monthly grain every unit reaches every bin, because the
+lost week sits inside February and February still holds three weeks of
+`p07`’s readings.
+
+``` r
+
+attr(grain_matrix(gappy, plot, t, temp, grain = "month"), "bin_n")[c("p06", "p07"), 5:7]
+#>     2022-01-01T00:00:00Z 2022-02-01T00:00:00Z 2022-03-01T00:00:00Z
+#> p06                  744                  672                  744
+#> p07                  744                  504                  744
+```
+
+Plot `p07`‘s February mean is taken over 504 readings where its
+neighbours’ is over 672. That is one of the three ways out of a gap:
+move to a grain the gap does not reach, drop the units that do not span
+the record, or cut the record to the span every unit covers. Which one
+is the analyst’s decision, and
+[`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
+is the table it is made on; nothing in the package fills a cell.
+
+A bin that no unit reaches is caught by a second rule: consecutive bins
+must be one bin apart on the grain’s own calendar. A month missing from
+every logger would otherwise pass as thirteen adjacent monthly bins, and
+a convolution would read January and March as neighbours. `native` and a
+supplied calendar are exempt from that rule, since the first has no
+calendar step and the second declares its own.
+
+## Partial bins
+
+A bin is partial when the record does not cover its whole calendar span,
+which happens only at the two ends of the record. Which bins those are
+follows from where the record starts and stops against the calendar.
+
+``` r
+
+attr(ladder[["week"]], "bin_partial")[c(1:2, 57:58)]
+#> [1]  TRUE FALSE FALSE  TRUE
+which(attr(ladder[["month"]], "bin_partial"))
+#> [1] 14
+which(attr(ladder[["season"]], "bin_partial"))
+#> [1] 1 6
+dropped <- grain_matrix(series, plot, t, temp, grain = "month", partial = "drop")
+dim(dropped)
+#> [1] 30 13  1
+```
+
+The record starts on a Wednesday, so the first and last weeks are
+partial. It starts on the first of a month, so only the last month, five
+days of October 2022, is partial. On the default year the first season
+opens on 1 July and the last on 1 October, so both are partial too.
+`bin_partial` is returned whichever way `partial` is set, so a partial
+bin that is kept is labelled.
+
+`partial = "keep"`, the default, keeps those bins; `partial = "drop"`
+removes them, which leaves 13 monthly bins here, and refuses if nothing
+would be left. Keeping costs a bin whose mean is taken over fewer
+readings and whose `cold_day` and `warm_day` are drawn from fewer days,
+so they sit closer to the bin’s mean than a full bin’s would. Dropping
+costs the ends of the record, up to three months at each end on a
+seasonal grain.
+[`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+builds its representations with partial bins kept.
+
+## Representations as settings
+
+[`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
+builds an array from a record. A representation describes the array
+before any record has been read, so that one object can configure a run,
+name the candidates it produced, and rebuild itself for new targets at
+prediction. There are four constructors.
+
+``` r
+
+native()
+#> <timesift representation> native 
+#> kind    : grain (a sequence) 
+#> grain   : native 
+#> stats   : mean
+grain("week", stats = c("cold_day", "mean", "warm_day"))
+#> <timesift representation> week 
+#> kind    : grain (a sequence) 
+#> grain   : week 
+#> stats   : cold_day, mean, warm_day
+multigrain(c("month", "season"), stats = c("min", "mean", "max"))
+#> <timesift representation> multigrain 
+#> kind    : multigrain (a block of features) 
+#> grains  : month, season 
+#> stats   : min, mean, max
+lookback("28 days", bins = 4)
+#> <timesift representation> 28 days x4 
+#> kind    : lookback (a sequence) 
+#> span    : 28 days in 4 bins ending 0 days before the target
+#> stats   : mean
+lookback("90 days", lag = "30 days")
+#> <timesift representation> 90 days lag 30 days 
+#> kind    : lookback (a block of features) 
+#> span    : 90 days in 1 bin ending 30 days before the target
+#> stats   : mean
+```
+
+[`native()`](https://gillescolling.com/timesift/reference/native.md) is
+`grain("native")`.
+[`grain()`](https://gillescolling.com/timesift/reference/native.md)
+takes one grain name or one calendar function, its statistics and its
+`year_start`.
+[`multigrain()`](https://gillescolling.com/timesift/reference/native.md)
+builds several grains and flattens each into one row per target, side by
+side, so a column names the grain, the statistic and the bin it came
+from; with `grains = NULL` it takes every grain the record supports.
+[`lookback()`](https://gillescolling.com/timesift/reference/native.md)
+reads a fixed span ending a fixed lag before each target’s own instant,
+cut into `bins` sub-bins.
+
+Each printout says whether the representation is a sequence or a block
+of features.
+[`native()`](https://gillescolling.com/timesift/reference/native.md),
+[`grain()`](https://gillescolling.com/timesift/reference/native.md) and
+a lookback of more than one bin are sequences, whose bins are ordered in
+time and mean something to a convolution;
+[`multigrain()`](https://gillescolling.com/timesift/reference/native.md)
+and a one-bin lookback are blocks. A learner declares which it reads,
+and that decides which pairs a run fits.
+
+The constructors check what they can without a record. A day-level
+statistic at a sub-day grain is refused at construction, as are an
+unknown grain, a duplicated statistic and a malformed `year_start`.
+
+### Sets of them
+
+[`grains()`](https://gillescolling.com/timesift/reference/grains.md) and
+[`lookbacks()`](https://gillescolling.com/timesift/reference/grains.md)
+build sets, which is what a run’s `sift` takes. Their arguments are
+separate names or one vector, and the settings after them apply to every
+member.
+
+``` r
+
+grains("day", "week", "month")
+#> <timesift sift> 3 representations 
+#>   day            grain       mean
+#>   week           grain       mean
+#>   month          grain       mean
+grains(c("month", "year"), stats = c("cold_day", "mean", "warm_day"))
+#> <timesift sift> 2 representations 
+#>   month          grain       cold_day, mean, warm_day
+#>   year           grain       cold_day, mean, warm_day
+grains("auto")
+#> <timesift sift> every grain the record carries, statistics: mean
+lookbacks("28 days", "84 days", bins = 4)
+#> <timesift sift> 2 representations 
+#>   28 days x4     lookback    mean
+#>   84 days x4     lookback    mean
+c(grain("week"), multigrain(c("month", "season")))
+#> <timesift sift> 2 representations 
+#>   week           grain       mean
+#>   multigrain     multigrain  mean
+```
+
+A set is labelled by each member’s own label, and two members that would
+share a label are refused unless the list is named. `grains("auto")`
+stands for every named grain the record gives at least two bins, in
+order from `native` to `year`, leaving out any grain the requested
+statistics are not defined at. It is resolved when a record is read,
+which is why its printout names the statistics and no grains, and why it
+cannot be combined with named grains through
+[`c()`](https://rdrr.io/r/base/c.html). There is no cap on it: on this
+record it includes `native` at 9,600 bins.
+
+## Lookbacks: several targets on one unit
+
+A calendar grain gives every unit one row. Where a unit carries several
+targets through time, such as a plot surveyed in May and again in July,
+each target needs the record leading up to its own instant.
+[`lookback_matrix()`](https://gillescolling.com/timesift/reference/lookback_matrix.md)
+reads, for every target, a fixed span ending a fixed lag before that
+target’s instant. `at` is a data frame with an `id` column naming the
+unit and an `at` column of instants, and its row names name the targets.
+
+``` r
+
+visits <- data.frame(id = c("p01", "p01", "p02"),
+                     at = as.POSIXct(c("2022-05-01", "2022-07-01", "2022-07-01"), tz = "UTC"))
+rownames(visits) <- c("p01-may", "p01-jul", "p02-jul")
+lb <- lookback_matrix(series, plot, t, temp, at = visits, span = "28 days", bins = 4,
+                      stats = c("cold_day", "mean", "warm_day"))
+lb
+#> <timesift matrix> 3 units x 4 bins x 3 channels 
+#> grain: lookback   stats: cold_day, mean, warm_day
+dimnames(lb)[[2]]
+#> [1] "-28 days" "-21 days" "-14 days" "-7 days"
+round(lb[, , "mean"], 2)
+#>         -28 days -21 days -14 days -7 days
+#> p01-may    -2.43    -1.66    -0.67    0.42
+#> p01-jul     5.36     5.60     6.13    6.65
+#> p02-jul     6.08     6.47     7.19    7.82
+```
+
+The rows are the three targets in `at`’s own order, two of them on plot
+`p01`. The four bins are named by where each opens relative to the
+anchor, oldest first, so the columns line up across targets that share
+no calendar date. The weekly means before the May visit to `p01` rise
+from -2.43 to 0.42; before the July visits they rise from 5.36 to 6.65
+on `p01` and from 6.08 to 7.82 on `p02`.
+
+A lookback measures fixed lengths: a month is 30 days and a year 365
+there, since every target has to read the same amount of record for the
+rows to be comparable. Where the calendar matters,
+[`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
+is the call that follows it. The day-level statistics need each bin to
+be a whole number of days and to start on a day boundary, which the
+anchors at midnight above satisfy.
+
+Every target and bin must hold at least one reading. A bin lying
+entirely before the start of the record is refused, with the target and
+the interval named.
+
+``` r
+
+early <- data.frame(id = "p01", at = as.POSIXct("2021-09-15", tz = "UTC"))
+lookback_matrix(series, plot, t, temp, at = early, span = "28 days", bins = 4)
+#> Error:
+#> ! 2 (target, bin) cells hold no readings, first: target 1 over [2021-08-18T00:00:00, 2021-08-25T00:00:00). A lookback reaching past the record is not padded.
+```
+
+The target on 15 September asks for four weeks from 18 August, and the
+record begins on 1 September, so the first two weeks of the lookback
+hold nothing. `bin_n` on a lookback, as on a grain, gives the number of
+readings each cell was reduced from, and is worth reading where an
+anchor sits near either end of the record.
+
+## The position of a bin in the year
+
+An encoder that ends in global pooling loses when in the year an event
+happened.
+[`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
+gives that position back as input: the sine and cosine of each bin’s
+fractional place in the year, read at the midpoint of the record the bin
+holds.
+[`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md)
+puts them beside the readings.
+
+``` r
+
+wk <- grain_matrix(series, plot, t, temp, grain = "week", stats = c("cold_day", "mean", "warm_day"))
+pos <- calendar_channels(wk)
+round(pos["p01", 1:4, ], 3)
+#>                      year_sin year_cos
+#> 2021-08-30T00:00:00Z   -0.876   -0.483
+#> 2021-09-06T00:00:00Z   -0.927   -0.374
+#> 2021-09-13T00:00:00Z   -0.966   -0.260
+#> 2021-09-20T00:00:00Z   -0.990   -0.142
+both_wk <- bind_channels(wk, pos)
+dimnames(both_wk)[[3]]
+#> [1] "cold_day" "mean"     "warm_day" "year_sin" "year_cos"
+attr(both_wk, "position")
+#> [1] "year_sin" "year_cos"
+```
+
+The two channels are identical across units and are a time index, not a
+summary of the readings, so whatever a model does with them it could
+have done with a calendar. The sine and cosine pair is continuous across
+the turn of the year, where the fraction itself jumps from one back to
+zero. The `position` attribute marks them, and the torch encoders read
+marked channels at their own amplitude instead of standardising them.
+
+On a grain finer than a day, `cycles = "day"` adds the place in the
+daily cycle as a second pair. At a day or coarser every bin would sit at
+the same place in the day, and that cycle is refused.
+
+``` r
+
+hd <- ladder[["halfday"]]
+round(calendar_channels(hd, cycles = c("year", "day"))["p01", 1:4, ], 3)
+#>                      year_sin year_cos day_sin day_cos
+#> 2021-09-01T00:00:00Z   -0.865   -0.502   0.991   0.131
+#> 2021-09-01T12:00:00Z   -0.869   -0.494  -0.991  -0.131
+#> 2021-09-02T00:00:00Z   -0.874   -0.487   0.991   0.131
+#> 2021-09-02T12:00:00Z   -0.878   -0.479  -0.991  -0.131
+```
+
+The two halves of each day alternate in sign on the daily pair, since
+the readings of one are centred on 05:30 and those of the other on
+17:30. A lookback has no place in the calendar, its bins being placed
+relative to each target, and is refused.
+
+``` r
+
+calendar_channels(lb)
+#> Error:
+#> ! a lookback's bins are placed relative to a target rather than on the calendar, so they have no position in the year. `calendar_channels()` reads a grain_matrix().
+```
+
+[`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md)
+takes any number of arrays over the same units and bins, keeps the first
+one’s attributes and joins their channel names. Two channels of the same
+name are refused. It is also how a second variable, such as a snow
+product binned to the same grain, joins the temperature.
+
+## The tabular layout
+
+A sequence learner reads the array as it is. A tabular learner, such as
+[`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
+or [`forest()`](https://gillescolling.com/timesift/reference/forest.md),
+reads a matrix with one row per unit and one column per predictor.
+[`as.matrix()`](https://rdrr.io/r/base/matrix.html) on a representation
+gives that layout, channel by channel and bin by bin within each.
+
+``` r
+
+tab <- as.matrix(grain_matrix(series, plot, t, temp, grain = "season", stats = c("min", "max")))
+dim(tab)
+#> [1] 30 12
+colnames(tab)
+#>  [1] "min@2021-07-01T00:00:00Z" "min@2021-10-01T00:00:00Z"
+#>  [3] "min@2022-01-01T00:00:00Z" "min@2022-04-01T00:00:00Z"
+#>  [5] "min@2022-07-01T00:00:00Z" "min@2022-10-01T00:00:00Z"
+#>  [7] "max@2021-07-01T00:00:00Z" "max@2021-10-01T00:00:00Z"
+#>  [9] "max@2022-01-01T00:00:00Z" "max@2022-04-01T00:00:00Z"
+#> [11] "max@2022-07-01T00:00:00Z" "max@2022-10-01T00:00:00Z"
+```
+
+Two statistics over six seasons give twelve columns, each named
+`channel@bin`. A channel that holds the same number in every bin, as a
+`static` predictor such as elevation does inside a run, becomes one
+column named by the channel alone, so a penalised fit sees it once
+rather than once per bin. This is the function to call inside a learner
+of one’s own that reads a block.
+
+[`feature_matrix()`](https://gillescolling.com/timesift/reference/feature_matrix.md)
+goes the other way: it turns a table already reduced elsewhere, such as
+a set of published bioclimatic summaries, into a `[unit, feature, 1]`
+array a learner reads like any other. Units come from the row names or
+from a leading text column.
+
+``` r
+
+bio <- data.frame(plot = ids, gdd = round(rnorm(30, 900, 80)), frost_days = rpois(30, 40))
+fm <- feature_matrix(bio, label = "bioclim")
+fm
+#> <timesift matrix> 30 units x 2 bins x 1 channel 
+#> grain: bioclim   stats: bioclim
+head(as.matrix(fm), 3)
+#>     bioclim@gdd bioclim@frost_days
+#> p01         834                 43
+#> p02         871                 37
+#> p03         859                 37
+```
+
+Each feature is a bin of the one channel, which is why the printout
+counts two bins. A feature table carries no time axis, because its
+reduction has already happened, and that is what makes it the comparison
+a grain is measured against.
+
+## Sets of built arrays
+
+[`timesift_set()`](https://gillescolling.com/timesift/reference/timesift_set.md)
+holds several built arrays over the same targets, keyed by label. It is
+what
+[`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
+returns for several grains, what
+[`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md)
+fits across, and what a fitted run keeps as its representations. A
+grain, a supplied calendar and a feature table can be members of one
+set.
+
+``` r
+
+set <- timesift_set(list(week = wk, season = s, bioclim = fm))
+set
+#> <timesift set> 3 representations over 30 targets 
+#>   week              58 bins x 3 channels (cold_day, mean, warm_day)
+#>   season             6 bins x 3 channels (cold_day, mean, warm_day)
+#>   bioclim            2 bins x 1 channels (bioclim)
+set[c("week", "bioclim")]
+#> <timesift set> 2 representations over 30 targets 
+#>   week              58 bins x 3 channels (cold_day, mean, warm_day)
+#>   bioclim            2 bins x 1 channels (bioclim)
+```
+
+Every member must cover the same targets in the same order, which is
+checked on the row names. The lookback above covers three targets where
+the weekly array covers thirty plots, so the two cannot share a set.
+
+``` r
+
+timesift_set(list(week = wk, visits = lb))
+#> Error:
+#> ! every representation in a set must cover the same targets; visits does not.
+```
+
+## Digests and the artifacts that cross languages
+
+A representation is a set of numbers fixed by a specification,
+`inst/spec/representation.md`, and
+[`digest_array()`](https://gillescolling.com/timesift/reference/digest_array.md)
+is the MD5 of an array written the way that specification defines: every
+value to twelve decimal places, unit fastest, then bin, then channel,
+joined by line feeds. The Python twin computes the same digest from the
+same array, and the package’s test fixtures pin the digest of every
+grain and statistic on a small input, so a change to binning shows up as
+a changed string.
+
+``` r
+
+digest_array(ladder[["month"]])
+#> [1] "f6710ec0e068018be42166fde3ddc80e"
+digest_array(grain_matrix(series, plot, t, temp, grain = "month"))
+#> [1] "f6710ec0e068018be42166fde3ddc80e"
+```
+
+The month built as part of the seven-grain set and the month built on
+its own give the same digest, so they are the same representation to the
+twelfth decimal place. Comparing two digests is a quick way to check
+that a representation built on another machine, in another session or in
+Python is the one expected.
+
+The representation is rebuilt in each language from the shared core. The
+fold map, the response matrix and the mask of scorable cells are built
+once and handed over as files, because two random streams seeded alike
+in R and Python still draw different folds.
+[`write_folds()`](https://gillescolling.com/timesift/reference/artifacts.md),
+[`read_folds()`](https://gillescolling.com/timesift/reference/artifacts.md)
+and their siblings for the response and the cells write and read that
+format: CSV, LF line endings and rows in C collation, byte for byte the
+same from either side.
+
+``` r
+
+y <- as.matrix(targets[paste0("sp", 1:4)])
+rownames(y) <- targets$plot
+f <- fold_map(y, v = 3)
+path <- tempfile(fileext = ".csv")
+write_folds(f, path)
+readLines(path, n = 4)
+#> [1] "id,fold" "p01,1"   "p02,1"   "p03,3"
+back <- read_folds(path, names(f))
+identical(as.integer(back), as.integer(f)) && identical(names(back), names(f))
+#> [1] TRUE
+unlink(path)
+```
+
+[`read_folds()`](https://gillescolling.com/timesift/reference/artifacts.md)
+aligns by name, never by position: `units` gives the order wanted, a
+unit the file lacks is an error, and a unit the file carries beyond them
+is dropped.
+
+## Into a run
+
+A run reaches the representations through two arguments. `sift` in
+[`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+is the set every learner without a representation of its own is fitted
+across, and `data =` on a learner pins that learner to one
+representation. The run below uses `grains("auto")` for the default
+learner and pins a second elastic net to a
+[`multigrain()`](https://gillescolling.com/timesift/reference/native.md)
+block. It compares the candidates on three folds and skips the nested
+estimate and the stack, which keeps it fast.
+
+``` r
+
+fit <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
+                learners = list(elasticnet = elasticnet(),
+                                pinned = elasticnet(data = multigrain(c("month", "season")))),
+                sift = grains("auto"), resampling = cv(v = 3), n_inner = NULL,
+                ensemble = FALSE, verbose = FALSE)
+fit$candidates[c("candidate", "representation", "bins", "channels", "status")]
+#>              candidate representation bins channels         status
+#> 1  elasticnet / native         native 9600        1 not applicable
+#> 2 elasticnet / halfday        halfday  800        1         fitted
+#> 3     elasticnet / day            day  400        1         fitted
+#> 4    elasticnet / week           week   58        1         fitted
+#> 5   elasticnet / month          month   14        1         fitted
+#> 6  elasticnet / season         season    6        1         fitted
+#> 7    elasticnet / year           year    2        1         fitted
+#> 8  pinned / multigrain     multigrain   20        1         fitted
+```
+
+`grains("auto")` resolved to all seven named grains, since this record
+gives each of them at least two bins. The elastic net reads a block of
+features, so the pair with `native` was skipped and listed as not
+applicable; the other six were fitted. The pinned learner was fitted at
+its own representation alone, and its block holds 20 columns, the 14
+months and the 6 seasons side by side. Every candidate was scored on the
+same folds and cells, so the comparison runs across rows of different
+kinds.
+
+With `target_time`, every target is anchored in time and every
+representation must be a lookback. `sift` then has to be given as
+[`lookbacks()`](https://gillescolling.com/timesift/reference/grains.md),
+since there is no default set of spans, and a grouped split keeps all
+targets of one plot on the same side of each fold.
+
+``` r
+
+anchored <- data.frame(plot = rep(ids, each = 2),
+                       when = rep(as.POSIXct(c("2022-05-01", "2022-08-01"), tz = "UTC"), 30))
+anchored$sp1 <- rbinom(60, 1, plogis(2 * rep(warmth, each = 2)))
+lfit <- timesift(anchored, series, y = sp1, id = plot, time = t, target_time = when,
+                 sift = lookbacks("28 days", "84 days", bins = 4),
+                 learners = elasticnet(), resampling = grouped_cv("plot", v = 3), n_inner = NULL,
+                 ensemble = FALSE, verbose = FALSE)
+lfit$candidates[c("candidate", "representation", "bins", "channels", "status")]
+#>                 candidate representation bins channels status
+#> 1 elasticnet / 28 days x4     28 days x4    4        1 fitted
+#> 2 elasticnet / 84 days x4     84 days x4    4        1 fitted
+```
+
+## Practical guidance
+
+### Which grains a record supports
+
+How many bins a grain gives depends on the length of the record and on
+where it starts against the calendar.
+[`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
+counts the bins without summarising anything, so it is a cheap way to
+read them off for a planned deployment. The function below does that for
+an hourly record of a given length from 1 September.
+
+``` r
+
+span_bins <- function(days, start = "2021-09-01", year_start = "01-01") {
+  t <- seq(as.POSIXct(start, tz = "UTC"), by = "hour", length.out = 24 * days)
+  one <- data.frame(plot = "a", t = t)
+  vapply(c("native", "halfday", "day", "week", "month", "season", "year"), function(g) {
+    ncol(coverage(one, plot, t, grain = g, year_start = year_start))
+  }, integer(1))
+}
+rbind(`120 days` = span_bins(120), `1 year` = span_bins(365),
+      `3 years` = span_bins(1096, year_start = "09-01"))
+#>          native halfday  day week month season year
+#> 120 days   2880     240  120   18     4      2    1
+#> 1 year     8760     730  365   53    12      5    2
+#> 3 years   26304    2192 1096  157    36     12    3
+```
+
+A record of 120 days gives one year bin, so `grains("auto")` leaves
+`year` out, and two seasons, both of them partial. One year from 1
+September already gives two calendar years, each partial, and five
+seasons. Three years on a September boundary give 36 months, 12 seasons
+and 3 years with no partial month, season or year. Every count but the
+seasons matches the Schrankogel study’s bins; its 13 seasons came from
+the astronomical calendar passed as a function.
+
+A grain with two bins is in `grains("auto")` but gives a sequence
+learner little to read, and a seasonal or yearly grain carried by
+partial bins at both ends rests on fewer readings than its name
+suggests. Reading `bin_n` and `bin_partial` before a long run settles
+both.
+
+### Memory
+
+The array a grain gives is `units x bins x channels` doubles of eight
+bytes. For the 894 plots of the Schrankogel study over three years of
+hourly readings, the native grain and the weekly three-channel grain
+compare as follows, in megabytes.
+
+``` r
+
+plots <- 894
+c(native = plots * 26304 * 1, week_three_channels = plots * 157 * 3) * 8 / 2^20
+#>              native week_three_channels 
+#>           179.41113             3.21254
+c(native = 26304, week_three_channels = 157 * 3)
+#>              native week_three_channels 
+#>               26304                 471
+```
+
+One channel at `native` is 179 MB for the array alone, before a learner
+copies it into its own tensors, and the weekly grain with three channels
+is under 4 MB: 471 numbers per plot against 26,304.
+[`native()`](https://gillescolling.com/timesift/reference/native.md) is
+meant for sequence learners, and a tabular learner given it is refused
+before the array is built. `grains("auto")` builds `native` whenever the
+record gives two readings, so on a long record a set named by hand is
+the cheaper choice.
+
+### Choosing statistics
+
+`mean` is the default and the place to start. Adding `cold_day` and
+`warm_day` beside it gives a learner the extremes a unit spent a whole
+day in, which a single bad reading moves by a twenty-fourth of its
+error, and which in the Schrankogel study carried more the coarser the
+grain. The study reported its networks on
+`c("cold_day", "mean", "warm_day")` at the weekly grain. `min` and `max`
+belong where a single reading is itself the event, such as a frost hour
+that kills tissue, and are worth checking against the record for sensor
+faults first. `mean_daily_min` and `mean_daily_max` describe a typical
+day of the bin and suit questions about daily amplitude. Each statistic
+is a channel, so three statistics triple the array and, for a tabular
+learner, the number of predictors.

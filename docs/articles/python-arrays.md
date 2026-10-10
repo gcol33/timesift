@@ -6,6 +6,29 @@ without the fitting layer.
 [All of the Python
 reference](https://gillescolling.com/timesift/articles/python-reference.md)
 
+## Installation
+
+``` r
+
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
+``` bash
+# Install from PyPI
+pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
+```
+
 ## `grain_matrix()`
 
 ``` python
@@ -86,8 +109,10 @@ them. Bin `b` of a target anchored at `a` covers
 `[a - lag - span + b * step, a - lag - span + (b + 1) * step)`, with
 `step` the span divided by `bins` and `b` counted from zero. Only the
 readings of the target’s own unit are read, and every `(target, bin)`
-cell must hold at least one: a lookback reaching past the record is an
-error naming the target, never a padded row.
+cell must hold at least one: a bin lying wholly past the record is an
+error naming the target, never a padded row, and one the record reaches
+only in part is summarised over the readings it holds, with `bin_n`
+recording how many.
 
 `span` and `lag` are read from a count and a unit – `"30 days"`,
 `"12 hours"`, `"1 year"` – or from a bare number of seconds. A year is

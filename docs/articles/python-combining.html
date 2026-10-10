@@ -67,7 +67,13 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+<li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
@@ -112,18 +118,37 @@
 <p>Weights fitted on the out-of-fold predictions alone.</p>
 <p><a href="python-reference.html">All of the Python reference</a></p>
 <div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Or install the development version from GitHub</span></span>
+<span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Install from PyPI</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># with the torch encoders, the contrasts and the plots</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="ensemble">
 <code>ensemble()</code><a class="anchor" aria-label="anchor" href="#ensemble"></a>
 </h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>ensemble(</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>    method: <span class="bu">str</span> <span class="op">=</span> <span class="st">'stack'</span>,</span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>    scope: <span class="bu">str</span> <span class="op">=</span> <span class="st">'all'</span>,</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>    metric<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>    response: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>    min_score: <span class="bu">float</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>    decay<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>    rule: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>ensemble(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    method: <span class="bu">str</span> <span class="op">=</span> <span class="st">'stack'</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    scope: <span class="bu">str</span> <span class="op">=</span> <span class="st">'all'</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    metric<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    response: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    min_score: <span class="bu">float</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    decay<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    rule: <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>)</span></code></pre></div>
 <p>Ask for an ensemble of the candidates a fit produced.</p>
 <p><code>stack</code> fits non-negative weights summing to one on the
 out-of-fold predictions, <code>mean</code> and <code>median</code>
@@ -160,7 +185,7 @@ override, and <code>ensemble_fit</code> called on its own reads
 <h2 id="ensemble_fit">
 <code>ensemble_fit()</code><a class="anchor" aria-label="anchor" href="#ensemble_fit"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>ensemble_fit(oof: <span class="bu">dict</span>, y, cells, folds, spec<span class="op">=</span><span class="va">None</span>, scores<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>ensemble_fit(oof: <span class="bu">dict</span>, y, cells, folds, spec<span class="op">=</span><span class="va">None</span>, scores<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
 <p>Fit the combiner on the out-of-fold predictions and nothing else.</p>
 <p><code>oof</code> is one <code>[target, response]</code> matrix per
 candidate, in the response’s own row order. Only the cells the mask
@@ -177,7 +202,7 @@ training targets and applied to the outer test fold.</p>
 <h2 id="ensemble_combine">
 <code>ensemble_combine()</code><a class="anchor" aria-label="anchor" href="#ensemble_combine"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>ensemble_combine(stack: Stack, preds: <span class="bu">dict</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>ensemble_combine(stack: Stack, preds: <span class="bu">dict</span>)</span></code></pre></div>
 <p>One <code>[n, response]</code> matrix from each member’s
 <code>[n, response]</code> matrix.</p>
 </div>
@@ -185,7 +210,7 @@ training targets and applied to the outer test fold.</p>
 <h2 id="ensemble_spread">
 <code>ensemble_spread()</code><a class="anchor" aria-label="anchor" href="#ensemble_spread"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>ensemble_spread(stack: Stack, preds: <span class="bu">dict</span>, alpha: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.05</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>ensemble_spread(stack: Stack, preds: <span class="bu">dict</span>, alpha: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.05</span>)</span></code></pre></div>
 <p>How far the members of an ensemble disagree: biomod2’s
 <code>EMcv</code> and <code>EMci</code>.</p>
 <p>Returns an <code>[n, response, statistic]</code> array, the
@@ -208,13 +233,13 @@ interval are NaN where fewer than two members carry weight.</p>
 <h2 id="SPREAD_STATISTICS">
 <code>SPREAD_STATISTICS</code><a class="anchor" aria-label="anchor" href="#SPREAD_STATISTICS"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>SPREAD_STATISTICS <span class="op">=</span> (<span class="st">'mean'</span>, <span class="st">'sd'</span>, <span class="st">'cv'</span>, <span class="st">'lower'</span>, <span class="st">'upper'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>SPREAD_STATISTICS <span class="op">=</span> (<span class="st">'mean'</span>, <span class="st">'sd'</span>, <span class="st">'cv'</span>, <span class="st">'lower'</span>, <span class="st">'upper'</span>)</span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="ensemble_weights">
 <code>ensemble_weights()</code><a class="anchor" aria-label="anchor" href="#ensemble_weights"></a>
 </h2>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>ensemble_weights(fit)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>ensemble_weights(fit)</span></code></pre></div>
 <p>The weight the combiner gave each of its members, or nothing where a
 run combined none.</p>
 </div>
@@ -222,7 +247,7 @@ run combined none.</p>
 <h2 id="EnsembleSpec">
 <code>EnsembleSpec</code><a class="anchor" aria-label="anchor" href="#EnsembleSpec"></a>
 </h2>
-<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>EnsembleSpec(method, scope, metric, response, min_score, decay, rule)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>EnsembleSpec(method, scope, metric, response, min_score, decay, rule)</span></code></pre></div>
 <p>How the candidates are to be combined, which of them are eligible,
 and under which head.</p>
 <p>Attributes:</p>
@@ -247,7 +272,7 @@ and under which head.</p>
 <h2 id="Stack">
 <code>Stack</code><a class="anchor" aria-label="anchor" href="#Stack"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>Stack(method, weights, members, loss, thresholds, variables)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>Stack(method, weights, members, loss, thresholds, variables)</span></code></pre></div>
 <p>A fitted combiner: what it does and what weight it gave each of its
 members.</p>
 <p>A committee also carries each member’s cut on each response,
@@ -276,7 +301,7 @@ order, NaN where a member holds no cut.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

@@ -5,15 +5,17 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Learn Predictive Representations of Time-Varying Data • timesift</title>
+<title>timesift: Learn Predictive Representations of Time-Varying Data • timesift</title>
 <script src="lightswitch.js"></script><script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><link href="extra.css" rel="stylesheet">
-<meta property="og:title" content="Learn Predictive Representations of Time-Varying Data">
-<meta name="description" content="Fits and compares representations of time-varying data against a prediction target. Given a table of targets and a table of time-stamped series belonging to them, it builds each candidate representation, from the record unreduced through a calendar grain such as a week or a month to a lookback anchored on each target, fits the requested learners on each, scores every candidate on one set of held-out folds, and stacks the out-of-fold predictions into an ensemble. Calendar-aware binning keeps a bin a real week or month rather than a fixed block of hours. Learners, response heads and metrics are registered rather than hard-coded, so adding one is a registration and not a fork of the fitting code. The penalised baseline is an elastic net fitted by cyclic coordinate descent along a warm-started path, following Friedman, Hastie and Tibshirani (2010) &lt;doi:10.18637/jss.v033.i01&gt;. The shipped default is presence-absence with a joint multi-label head scored by the true skill statistic of Allouche, Tsoar and Kadmon (2006) &lt;doi:10.1111/j.1365-2664.2006.01214.x&gt;, the setting used for species distribution modelling from microclimate loggers.">
-<meta property="og:description" content="Fits and compares representations of time-varying data against a prediction target. Given a table of targets and a table of time-stamped series belonging to them, it builds each candidate representation, from the record unreduced through a calendar grain such as a week or a month to a lookback anchored on each target, fits the requested learners on each, scores every candidate on one set of held-out folds, and stacks the out-of-fold predictions into an ensemble. Calendar-aware binning keeps a bin a real week or month rather than a fixed block of hours. Learners, response heads and metrics are registered rather than hard-coded, so adding one is a registration and not a fork of the fitting code. The penalised baseline is an elastic net fitted by cyclic coordinate descent along a warm-started path, following Friedman, Hastie and Tibshirani (2010) &lt;doi:10.18637/jss.v033.i01&gt;. The shipped default is presence-absence with a joint multi-label head scored by the true skill statistic of Allouche, Tsoar and Kadmon (2006) &lt;doi:10.1111/j.1365-2664.2006.01214.x&gt;, the setting used for species distribution modelling from microclimate loggers.">
+<meta property="og:title" content="timesift: Learn Predictive Representations of Time-Varying Data">
+<meta name="description" content="Builds each candidate representation of a time-stamped record, from the readings as recorded through a calendar week or month to a span anchored on each target, fits learners on every one, scores them on one set of held-out folds and stacks them. In R and Python over one C++ core.
+">
+<meta property="og:description" content="Builds each candidate representation of a time-stamped record, from the readings as recorded through a calendar week or month to a span anchored on each target, fits learners on every one, scores them on one set of held-out folds and stacks them. In R and Python over one C++ core.
+">
 <style>
 .lang-split { table-layout: fixed; width: 100%; border: 0; }
 .lang-split > tbody > tr > td { border: 0; padding: 0 1rem 0 0; }
@@ -69,7 +71,13 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="articles/biomod2.html">Coming from biomod2</a></li>
+<li><a class="dropdown-item" href="articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
@@ -101,9 +109,28 @@
 <p><em>sifting a record for the grain that carries the signal</em></p>
 <p><a href="https://CRAN.R-project.org/package=timesift" class="external-link"><img src="https://www.r-pkg.org/badges/version/timesift" alt="CRAN status"></a> <a href="https://cran.r-project.org/package=timesift" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/grand-total/timesift" alt="CRAN downloads"></a> <a href="https://cran.r-project.org/package=timesift" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/timesift" alt="Monthly downloads"></a> <a href="https://pypi.org/project/timesift/" class="external-link"><img src="https://img.shields.io/pypi/v/timesift" alt="PyPI"></a> <a href="https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a> <a href="https://github.com/gcol33/timesift/actions/workflows/pytest.yaml" class="external-link"><img src="https://github.com/gcol33/timesift/actions/workflows/pytest.yaml/badge.svg" alt="pytest"></a> <a href="https://github.com/gcol33/timesift/actions/workflows/contract.yaml" class="external-link"><img src="https://github.com/gcol33/timesift/actions/workflows/contract.yaml/badge.svg" alt="contract"></a> <a href="https://opensource.org/licenses/MIT" class="external-link"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></p>
 <p><strong>Learn predictive representations of time-varying data, in R and Python over one C++ core.</strong></p>
-<p>Give <code>timesift</code> one row per thing to predict and a long table of time-stamped readings belonging to those rows. It builds each candidate representation of the record, from the readings as recorded through a calendar week or month to a span anchored on each target, fits the learners you name on every one they can read, and scores them all on one set of held-out folds. Inside each training fold it chooses a candidate and fits the stack’s weights on an inner split, so the score it reports for the chosen candidate and for the ensemble covers the choosing. What comes back says at what grain the prediction needed the record, and what the whole procedure scores on targets it did not see.</p>
+<p>Hand <code>timesift</code> one row per thing to predict and a long table of time-stamped readings belonging to those rows. It builds each candidate representation of the record, from the readings as recorded through a calendar week or month to a span anchored on each target, fits the learners you name on every one they can read, and scores them all on one set of held-out folds. What comes back says at what grain the prediction needed the record, and what the whole procedure, choosing included, scores on targets it did not see.</p>
 <div class="section level2">
-<h2 id="quick-start">Quick Start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Or install the development version from GitHub</span></span>
+<span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Install from PyPI</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># with the torch encoders, the contrasts and the plots</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
 </h2>
 <table class="table lang-split">
 <tr>
@@ -111,7 +138,7 @@
 <div class="section level3">
 <h3 id="r">R<a class="anchor" aria-label="anchor" href="#r"></a>
 </h3>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://gillescolling.com/timesift/">timesift</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/timesift.html">timesift</a></span><span class="op">(</span></span>
@@ -128,15 +155,15 @@
 <div class="section level3">
 <h3 id="python">Python<a class="anchor" aria-label="anchor" href="#python"></a>
 </h3>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>    plots, logger,</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>    y<span class="op">=</span><span class="st">"sp_*"</span>,</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="st">"plot_id"</span>, time<span class="op">=</span><span class="st">"datetime"</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>    learners<span class="op">=</span>[ts.elasticnet(), ts.forest()],</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>    sift<span class="op">=</span>ts.grains(<span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span>),</span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    plots, logger,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    y<span class="op">=</span><span class="st">"sp_*"</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="st">"plot_id"</span>, time<span class="op">=</span><span class="st">"datetime"</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    learners<span class="op">=</span>[ts.elasticnet(), ts.forest()],</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    sift<span class="op">=</span>ts.grains(<span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span>),</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 </td>
 </tr>
@@ -150,7 +177,7 @@
 </tr>
 </table>
 <p><code>fit</code> prints every candidate it fitted and the score each reached on the held-out folds, then the held-out score of the procedure that chooses among them and of the stack, both chosen and weighted inside each training fold:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span></span>
 <span><span class="co">#&gt; timesift  80 targets, 4 responses, 10-fold random CV, roc_auc</span></span>
 <span><span class="co">#&gt;</span></span>
@@ -174,7 +201,7 @@
 </div>
 </div>
 <div class="section level2">
-<h2 id="statement-of-need">Statement of Need<a class="anchor" aria-label="anchor" href="#statement-of-need"></a>
+<h2 id="statement-of-need">Statement of need<a class="anchor" aria-label="anchor" href="#statement-of-need"></a>
 </h2>
 <p>A sensor records every hour for years. Before any model is fitted, that record is reduced: to monthly means, to growing-degree-days, to whatever the analyst decides, and the reduction is rarely revisited. <code>timesift</code> makes it an explicit, testable choice, with every candidate scored on the same folds and the same cells so the comparison between them is paired.</p>
 <p>Species distribution modelling from microclimate loggers is the application the package was built for and the setting its defaults serve: presence-absence, a joint multi-label head, and AUC with the true skill statistic beside it. On 894 alpine plots, 101 species and three years of hourly soil temperature:</p>
@@ -187,7 +214,7 @@
 <p>The package is what lets the same test run on other records and other responses.</p>
 </div>
 <div class="section level2">
-<h2 id="four-things-and-one-contract">Four Things, and One Contract<a class="anchor" aria-label="anchor" href="#four-things-and-one-contract"></a>
+<h2 id="targets-series-representations-and-learners">Targets, series, representations and learners<a class="anchor" aria-label="anchor" href="#targets-series-representations-and-learners"></a>
 </h2>
 <p><strong>targets</strong> is one row per thing to predict, carrying the response and optionally predictors that do not move in time. <strong>series</strong> is the long record: an identifier, an instant, and one or more value columns. A <strong>representation</strong> is how that record becomes the array a model reads. A <strong>learner</strong> is a fit and a predict pair that declares what it can be handed.</p>
 <p>A candidate is one representation paired with one learner, and every candidate emits an out-of-fold prediction for every scorable cell over the same folds. Comparison, ensembling and importance read those predictions and nothing else, which is what lets a penalised regression on monthly features and a convolution on the unreduced record be compared and then combined.</p>
@@ -199,13 +226,13 @@
 <div class="section level3">
 <h3 id="representations">Representations<a class="anchor" aria-label="anchor" href="#representations"></a>
 </h3>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/native.html">native</a></span><span class="op">(</span><span class="op">)</span>                        <span class="co"># the record as it was recorded</span></span>
 <span><span class="fu"><a href="reference/native.html">grain</a></span><span class="op">(</span><span class="st">"week"</span><span class="op">)</span>                   <span class="co"># one calendar grain</span></span>
 <span><span class="fu"><a href="reference/native.html">multigrain</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"month"</span>, <span class="st">"year"</span><span class="op">)</span><span class="op">)</span>  <span class="co"># several grains side by side as one block of features</span></span>
 <span><span class="fu"><a href="reference/native.html">lookback</a></span><span class="op">(</span><span class="st">"30 days"</span>, bins <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>   <span class="co"># a fixed span ending at each target's own instant</span></span></code></pre></div>
 <p><code>grains("day", "week", "month")</code> and <code>lookbacks("30 days", "90 days")</code> are sets of them, and <code>grains("auto")</code> reads off the record every named grain it gives at least two bins. A learner runs across the whole set, or across one representation it is pinned to:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/torch_learners.html">cnn</a></span><span class="op">(</span><span class="op">)</span>                      <span class="co"># every representation of the run</span></span>
 <span><span class="fu"><a href="reference/torch_learners.html">cnn</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="reference/native.html">native</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>       <span class="co"># the record unreduced only</span></span>
 <span><span class="fu"><a href="reference/torch_learners.html">cnn</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="reference/native.html">grain</a></span><span class="op">(</span><span class="st">"week"</span><span class="op">)</span><span class="op">)</span>  <span class="co"># weekly only</span></span></code></pre></div>
@@ -226,7 +253,7 @@
 <li>
 <strong>Bayesian</strong>: <code><a href="reference/hierarchical.html">hierarchical()</a></code>, a logistic model with unit intercepts and a spatial field</li>
 <li>
-<strong>Neural encoders</strong> (torch): <code><a href="reference/torch_learners.html">mlp()</a></code>, <code><a href="reference/torch_learners.html">cnn()</a></code>, <code><a href="reference/torch_learners.html">rescnn()</a></code>, reading a sequence through a joint multi-label head</li>
+<strong>Neural encoders</strong> (torch): <code><a href="reference/torch_learners.html">cnn()</a></code> and <code><a href="reference/torch_learners.html">rescnn()</a></code> reading the sequence of bins, <code><a href="reference/torch_learners.html">mlp()</a></code> the bins flattened, each through a joint multi-label head</li>
 <li>
 <strong>Your own</strong>: <code><a href="reference/learner.html">learner()</a></code> takes a fit and a predict pair, and <code><a href="reference/register_learner.html">register_learner()</a></code> adds it to the registry; it then goes through the same folds, the same cells and the same scoring</li>
 </ul>
@@ -267,53 +294,34 @@
 </div>
 </div>
 <div class="section level2">
-<h2 id="calendar-bins">Calendar Bins<a class="anchor" aria-label="anchor" href="#calendar-bins"></a>
+<h2 id="calendar-bins">Calendar bins<a class="anchor" aria-label="anchor" href="#calendar-bins"></a>
 </h2>
 <p>A month is 28, 30 or 31 days, and a week starts on a Monday. <code>timesift</code> bins on the calendar, so a monthly mean over three years stays in its months rather than sliding through the seasons as 730-hour blocks would, and it asserts every unit holds readings in every bin. A record that fails that assertion is refused rather than padded, and <code><a href="reference/coverage.html">coverage()</a></code> lays the same binning out as a count of readings per unit and bin, so the logger that stopped early or the month the whole record skipped shows as a row or a column of zeros.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="fu"><a href="reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">d</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span>, <span class="st">"bin_n"</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">]</span></span>
 <span><span class="co">#&gt; 2021-09-01T00:00:00Z 2021-10-01T00:00:00Z 2021-11-01T00:00:00Z</span></span>
 <span><span class="co">#&gt;                  720                  744                  720</span></span></code></pre></div>
 <p>A calendar of your own is a function: pass one that returns each reading’s bin start, and seasons cut at the equinoxes bin like any named grain. A record that begins away from a bin boundary gives a bin the calendar does not fill; <code>bin_partial</code> marks those bins and <code>partial = "drop"</code> removes them.</p>
 </div>
 <div class="section level2">
-<h2 id="extreme-days-and-extreme-readings">Extreme Days and Extreme Readings<a class="anchor" aria-label="anchor" href="#extreme-days-and-extreme-readings"></a>
+<h2 id="extreme-days-and-extreme-readings">Extreme days and extreme readings<a class="anchor" aria-label="anchor" href="#extreme-days-and-extreme-readings"></a>
 </h2>
 <p><code>min</code> and <code>max</code> take the coldest and warmest single reading in a bin. <code>cold_day</code> and <code>warm_day</code> reduce each day to its own mean first, then take the extreme over days. <code>mean_daily_min</code> and <code>mean_daily_max</code> take the mean of the daily extremes, the exposure a typical day of the bin brought. One hour at -50 sets <code>min</code> to -50 outright and reaches the day-level statistics only through its twenty-fourth of that day’s mean.</p>
 </div>
 <div class="section level2">
-<h2 id="a-maximised-tss-is-optimistic">A Maximised TSS Is Optimistic<a class="anchor" aria-label="anchor" href="#a-maximised-tss-is-optimistic"></a>
+<h2 id="a-maximised-tss-is-optimistic">A maximised TSS is optimistic<a class="anchor" aria-label="anchor" href="#a-maximised-tss-is-optimistic"></a>
 </h2>
 <p>TSS is read at the threshold that maximises it, chosen on the same held-out units the score is read on. That inflates the level where presences are thin: on the Schrankogel design, by 0.110 on average when the truth is 0.60. <code><a href="reference/tss_inflation.html">tss_inflation()</a></code> measures it for your design and <code><a href="reference/implied_skill.html">implied_skill()</a></code> says what population skill a level you read is consistent with. How large the inflation is depends on how a model’s predictions are distributed, so two models of equal skill can carry different inflations and a paired TSS difference is not free of it. Runs are therefore scored by AUC by default, with TSS beside it.</p>
 </div>
 <div class="section level2">
-<h2 id="r-and-python-agree">R and Python Agree<a class="anchor" aria-label="anchor" href="#r-and-python-agree"></a>
+<h2 id="r-and-python-agree">R and Python agree<a class="anchor" aria-label="anchor" href="#r-and-python-agree"></a>
 </h2>
 <p><code>inst/spec/representation.md</code> is normative, and <code>inst/spec/fixtures/</code> holds a synthetic series with the digest of every grain-by-statistic combination, alongside the reference coefficients of every shared learner core. Both test suites assert against the same fixtures, so R and Python give the same representation and the same baseline fits. <a href="https://gillescolling.com/timesift/articles/contract.html">The contract</a> says what each language carries.</p>
 </div>
 <div class="section level2">
-<h2 id="reproducing-the-study">Reproducing the Study<a class="anchor" aria-label="anchor" href="#reproducing-the-study"></a>
+<h2 id="reproducing-the-study">Reproducing the study<a class="anchor" aria-label="anchor" href="#reproducing-the-study"></a>
 </h2>
 <p><code>inst/reproduce/schrankogel.R</code> runs the published grid from the Zenodo deposit it was built on, and asserts the plot count, the species count, the cell count and the bin count of every grain before fitting anything. <a href="https://github.com/gcol33/timesift/blob/master/inst/reproduce/README.md" class="external-link">Its README</a> says how to run each stage, what it costs, and how every number compares with the paper.</p>
-</div>
-<div class="section level2">
-<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
-</h2>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Or install the development version from GitHub</span></span>
-<span><span class="co"># install.packages("pak")</span></span>
-<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># Install from PyPI</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co"># with the torch encoders, the contrasts and the plots</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
@@ -324,13 +332,24 @@
 <li>
 <a href="https://gillescolling.com/timesift/articles/python.html">Choosing how a record is read, in Python</a> - Getting started in Python</li>
 <li>
+<a href="https://gillescolling.com/timesift/articles/representations.html">Representing a record</a> - Grains, statistics, calendars, lookbacks and the arrays they give</li>
+<li>
+<a href="https://gillescolling.com/timesift/articles/learners.html">Learners</a> - The shipped learners, training, tuning, and a learner of your own</li>
+<li>
+<a href="https://gillescolling.com/timesift/articles/comparing-grains.html">Finding the grain</a> - Ladders, paired contrasts and nested selection on a record with a known answer</li>
+<li>
+<a href="https://gillescolling.com/timesift/articles/prediction.html">Ensembles, thresholds and maps</a> - Folds, stacking, prediction, thresholds and projection onto rasters</li>
+<li>
 <a href="https://gillescolling.com/timesift/articles/biomod2.html">Coming from biomod2</a> - The biomod2 models and where they sit in timesift</li>
+<li>
+<a href="https://gillescolling.com/timesift/articles/troubleshooting.html">Troubleshooting</a> - The errors a run raises, what causes them, and the fix</li>
 <li>
 <a href="https://gillescolling.com/timesift/articles/contract.html">The representation contract</a> - What R and Python share, and what each carries</li>
 <li>
 <a href="https://gillescolling.com/timesift/reference/index.html">R reference</a> · <a href="https://gillescolling.com/timesift/articles/python-reference.html">Python reference</a>
 </li>
 </ul>
+<p>Bug reports and questions go to the <a href="https://github.com/gcol33/timesift/issues" class="external-link">issue tracker</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="support">Support<a class="anchor" aria-label="anchor" href="#support"></a>
@@ -387,7 +406,8 @@
 <div class="developers">
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
-<li>Gilles Colling <br><small class="roles"> Author, maintainer, copyright holder </small> <a href="https://orcid.org/0000-0003-3070-6066" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
+<li>
+<a href="https://github.com/gcol33" class="external-link">Gilles Colling</a> <br><small class="roles"> Author, maintainer, copyright holder </small> <a href="https://orcid.org/0000-0003-3070-6066" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
 </ul>
 </div>
 
@@ -398,7 +418,7 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

@@ -51,7 +51,13 @@ across variables is what makes the rarer ones learnable at all at these sample s
   </ul></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -189,7 +195,7 @@ of the input carrying it. Standardised, the four calendar channels of an hourly 
 fully connected encoder's first layer 1.4 times as far per step, and on the Schrankogel record
 that costs it 0.044 TSS (<code>inst/reproduce/README.md</code>).</p>
 <p>A fitted encoder holds its weights as plain arrays and rebuilds the network when it predicts, so
-a fit saved with <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code> predicts after <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS()</a></code> in a fresh session.</p>
+a fit saved with <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">base::saveRDS()</a></code> predicts after <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">base::readRDS()</a></code> in a fresh session.</p>
     </div>
 
     <div class="section level2">
@@ -202,7 +208,7 @@ a fit saved with <code><a href="https://rdrr.io/r/base/readRDS.html" class="exte
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

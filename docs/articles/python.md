@@ -14,8 +14,27 @@ section by section. The binning, the statistics and the penalised fit
 under both languages are one compiled core, held to the same numbers by
 [the contract](https://gillescolling.com/timesift/articles/contract.md).
 
+## Installation
+
+``` r
+
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
 ``` bash
+# Install from PyPI
 pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
 ```
 
 ## Two tables
@@ -346,9 +365,10 @@ runs on matched cells.
 
 `ts.elasticnet()` and `ts.linear()` read a block of features,
 `ts.forest()` grows a probability forest over one, and the `torch`
-encoders `ts.mlp()`, `ts.cnn()` and `ts.rescnn()` read a sequence with a
-joint multi-label head, so every response is predicted together from a
-shared embedding. Pooling strength across responses is what makes the
+encoders predict every response together through a joint multi-label
+head from a shared embedding: `ts.cnn()` and `ts.rescnn()` convolve
+along the sequence of bins, and `ts.mlp()` reads the same bins flattened
+into one block. Pooling strength across responses is what makes the
 rarer ones learnable at these sample sizes.
 
 `ts.elasticnet()` is the arm a network is measured against, so it is

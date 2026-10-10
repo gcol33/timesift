@@ -9,6 +9,29 @@ the prediction actually needed.
 This vignette runs the whole path on a small simulated record, from two
 tables to a scored comparison and the prediction that follows from it.
 
+## Installation
+
+``` r
+
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
+``` bash
+# Install from PyPI
+pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
+```
+
 ## Two tables
 
 `targets` is one row per thing to predict. `series` is the long,
@@ -352,13 +375,15 @@ runs on matched cells.
 and [`linear()`](https://gillescolling.com/timesift/reference/linear.md)
 read a block of features,
 [`forest()`](https://gillescolling.com/timesift/reference/forest.md)
-grows a probability forest over one, and the `torch` encoders
-[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md),
+grows a probability forest over one, and the `torch` encoders predict
+every response together through a joint multi-label head from a shared
+embedding:
 [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
 and
 [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
-read a sequence with a joint multi-label head, so every response is
-predicted together from a shared embedding. Pooling strength across
+convolve along the sequence of bins, and
+[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
+reads the same bins flattened into one block. Pooling strength across
 responses is what makes the rarer ones learnable at these sample sizes.
 
 [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
@@ -648,3 +673,26 @@ head(aggregate(weight ~ part, weight, mean), 4)
 
 Holding a channel back instead asks what each statistic of a grain
 carries, which is the question behind keeping a bin’s extremes at all.
+
+## Where next
+
+Each part of this path has an article of its own on the package site:
+
+- [Representing a
+  record](https://gillescolling.com/timesift/articles/representations.html):
+  every grain and statistic, calendars of one’s own, partial bins,
+  coverage and lookbacks.
+- [Learners](https://gillescolling.com/timesift/articles/learners.html):
+  the shipped learners, training the encoders, tuning, and registering a
+  learner, a response or a metric.
+- [Finding the
+  grain](https://gillescolling.com/timesift/articles/comparing-grains.html):
+  the ladder, the contrasts and the nested selection on a simulated
+  record whose grain is known.
+- [Ensembles, thresholds and
+  maps](https://gillescolling.com/timesift/articles/prediction.html):
+  spatial and environmental folds, the combiners, thresholds and
+  projection onto rasters.
+- [Coming from
+  biomod2](https://gillescolling.com/timesift/articles/biomod2.html) and
+  [Troubleshooting](https://gillescolling.com/timesift/articles/troubleshooting.html).

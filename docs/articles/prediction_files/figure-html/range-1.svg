@@ -1,0 +1,109 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='468.00pt' height='324.00pt' viewBox='0 0 468.00 324.00'>
+<g class='svglite'>
+<defs>
+  <style type='text/css'><![CDATA[
+    /* theme-aware-processed */
+    .svglite line, .svglite polyline, .svglite polygon, .svglite path, .svglite circle {
+      fill: none;
+      stroke: #3E3F3A;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-miterlimit: 10.00;
+    }
+    .svglite > g > rect {
+      fill: none;
+      stroke: #3E3F3A;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-miterlimit: 10.00;
+    }
+    .svglite text {
+      white-space: pre;
+      fill: #3E3F3A;
+    }
+    .svglite g.glyphgroup path {
+      fill: inherit;
+      stroke: none;
+    }
+  ]]></style>
+</defs>
+<rect class='svg-bg' width='100%' height='100%' style='stroke: none; fill: #F5F6F8;'/>
+<defs>
+  <clipPath id='cpMC4wMHw0NjguMDB8MC4wMHwzMjQuMDA='>
+    <rect x='0.00' y='0.00' width='468.00' height='324.00' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpMC4wMHw0NjguMDB8MC4wMHwzMjQuMDA=)'>
+</g>
+<defs>
+  <clipPath id='cpNTUuMzF8MzYyLjI5fDMzLjYwfDI5MC40MA=='>
+    <rect x='55.31' y='33.60' width='306.99' height='256.80' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpNTUuMzF8MzYyLjI5fDMzLjYwfDI5MC40MA==)'>
+</g>
+<g clip-path='url(#cpMC4wMHw0NjguMDB8MC4wMHwzMjQuMDA=)'>
+<text x='55.31' y='308.04' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0</text>
+<text x='106.47' y='308.04' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>2</text>
+<text x='157.64' y='308.04' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>4</text>
+<text x='208.80' y='308.04' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>6</text>
+<text x='259.96' y='308.04' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>8</text>
+<text x='311.13' y='308.04' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>10</text>
+<text x='362.29' y='308.04' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>12</text>
+<line x1='55.31' y1='290.40' x2='55.31' y2='294.60' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='106.47' y1='290.40' x2='106.47' y2='294.60' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='157.64' y1='290.40' x2='157.64' y2='294.60' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='208.80' y1='290.40' x2='208.80' y2='294.60' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='259.96' y1='290.40' x2='259.96' y2='294.60' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='311.13' y1='290.40' x2='311.13' y2='294.60' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='362.29' y1='290.40' x2='362.29' y2='294.60' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+</g>
+<defs>
+  <clipPath id='cpMzMuNjB8Mzg0LjAwfDMzLjYwfDI5MC40MA=='>
+    <rect x='33.60' y='33.60' width='350.40' height='256.80' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpMzMuNjB8Mzg0LjAwfDMzLjYwfDI5MC40MA==)'>
+<polyline points='362.29,290.40 55.31,290.40 ' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+</g>
+<g clip-path='url(#cpMC4wMHw0NjguMDB8MC4wMHwzMjQuMDA=)'>
+<text transform='translate(46.91,290.40) rotate(-90)' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>0</text>
+<text transform='translate(46.91,239.04) rotate(-90)' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>2</text>
+<text transform='translate(46.91,187.68) rotate(-90)' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>4</text>
+<text transform='translate(46.91,136.32) rotate(-90)' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>6</text>
+<text transform='translate(46.91,84.96) rotate(-90)' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>8</text>
+<text transform='translate(46.91,33.60) rotate(-90)' text-anchor='middle' style='font-size: 0.98em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>10</text>
+<line x1='55.31' y1='290.40' x2='51.11' y2='290.40' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='55.31' y1='239.04' x2='51.11' y2='239.04' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='55.31' y1='187.68' x2='51.11' y2='187.68' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='55.31' y1='136.32' x2='51.11' y2='136.32' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='55.31' y1='84.96' x2='51.11' y2='84.96' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+<line x1='55.31' y1='33.60' x2='51.11' y2='33.60' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+</g>
+<g clip-path='url(#cpMzMuNjB8Mzg0LjAwfDMzLjYwfDI5MC40MA==)'>
+<polyline points='55.31,290.40 55.31,33.60 ' style='stroke-width: 0.75; stroke: #BEBEBE;' />
+</g>
+<g clip-path='url(#cpNTUuMzF8MzYyLjI5fDMzLjYwfDI5MC40MA==)'>
+<image width='306.99' height='256.80' x='55.31' y='33.60' preserveAspectRatio='none' image-rendering='pixelated' xlink:href='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATgAAAEECAYAAAC8xyi8AAAEWklEQVR4nO3dIW5UYRSA0VfSlYyvxDCKOjSmGoMcxUKa2gl6DFsYVFcw6K6gol1BWQEhaYb7ypdzNnD/98SX6+7F49PzyzJge9xNjMm5ebgamXPYnEbmTJn6b7xt79Z+AMC/InBAlsABWQIHZAkckCVwQJbAAVkCB2QJHJAlcECWwAFZAgdkCRyQJXBAlsABWQIHZAkckCVwQJbAAVkCB2QJHJAlcECWwAFZAgdkCRyQdTF12X7K9rhb+wln5UI7vJ4NDsgSOCBL4IAsgQOyBA7IEjggS+CALIEDsgQOyBI4IEvggCyBA7IEDsgSOCBL4IAsgQOyBA7IEjggS+CALIEDsgQOyBI4IEvggCyBA7IEDsjKXbavudvv134C/LdscECWwAFZAgdkCRyQJXBAlsABWQIHZAkckCVwQJbAAVkCB2QJHJAlcECWwAFZAgdkCRyQJXBAlsABWQIHZAkckCVwQJbAAVkCB2QJHJAlcEDW5doPOLepS/CHzWlkzrKZGVNz83C19hN4A2xwQJbAAVkCB2QJHJAlcECWwAFZAgdkCRyQJXBAlsABWQIHZAkckCVwQJbAAVkCB2QJHJAlcECWwAFZAgdkCRyQJXBAlsABWQIHZAkckCVwQFbusv2U++vbkTnb425kzpTaxfnD5jQyp/bfptjggCyBA7IEDsgSOCBL4IAsgQOyBA7IEjggS+CALIEDsgQOyBI4IEvggCyBA7IEDsgSOCBL4IAsgQOyBA7IEjggS+CALIEDsgQOyBI4IEvggKzLqcvpU5fgeZ2py+kff3wfmfPz85eROS7Ov202OCBL4IAsgQOyBA7IEjggS+CALIEDsgQOyBI4IEvggCyBA7IEDsgSOCBL4IAsgQOyBA7IEjggS+CALIEDsgQOyBI4IEvggCyBA7IEDsgSOCDr4vHp+WXtR/Bnvz59GJnz9dv7kTm8zs3D1cicw+Y0Mmfqe2xwQJbAAVkCB2QJHJAlcECWwAFZAgdkCRyQJXBAlsABWQIHZAkckCVwQJbAAVkCB2QJHJAlcECWwAFZAgdkCRyQJXBAlsABWQIHZAkckCVwQJbL9izLsizb425kzv317cicu/1+ZM7UJfgpUxfnp9jggCyBA7IEDsgSOCBL4IAsgQOyBA7IEjggS+CALIEDsgQOyBI4IEvggCyBA7IEDsgSOCBL4IAsgQOyBA7IEjggS+CALIEDsgQOyBI4IEvggCyX7UnaHndrP+Gspi7OHzankTlT32ODA7IEDsgSOCBL4IAsgQOyBA7IEjggS+CALIEDsgQOyBI4IEvggCyBA7IEDsgSOCBL4IAsgQOyBA7IEjggS+CALIEDsgQOyBI4IEvggCyBA7Iu134A8He1i/NTbHBAlsABWQIHZAkckCVwQJbAAVkCB2QJHJAlcECWwAFZAgdkCRyQJXBAlsABWQIHZAkckCVwQJbAAVkCB2QJHJAlcECWwAFZAgdkCRyQJXBA1m8dFE+rREUSyQAAAABJRU5ErkJggg=='/>
+</g>
+<g clip-path='url(#cpMC4wMHw0NjguMDB8MC4wMHwzMjQuMDA=)'>
+<rect x='372.37' y='43.68' width='8.06' height='6.72' style='stroke-width: 0.75; fill: #C0392B;' />
+<rect x='372.37' y='57.12' width='8.06' height='6.72' style='stroke-width: 0.75; fill: #7F8C8D;' />
+<rect x='372.37' y='70.56' width='8.06' height='6.72' style='stroke-width: 0.75; fill: #ECF0F1;' />
+<rect x='372.37' y='84.00' width='8.06' height='6.72' style='stroke-width: 0.75; fill: #27AE60;' />
+<text x='390.52' y='51.05' style='font-size: 1.12em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>lost</text>
+<text x='390.52' y='64.49' style='font-size: 1.12em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>kept</text>
+<text x='390.52' y='77.93' style='font-size: 1.12em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>absent</text>
+<text x='390.52' y='91.37' style='font-size: 1.12em; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>gained</text>
+</g>
+<g clip-path='url(#cpMzMuNjB8Mzg0LjAwfDMzLjYwfDI5MC40MA==)'>
+<polyline points='55.31,290.40 55.31,33.60 362.29,33.60 362.29,290.40 55.31,290.40 ' style='stroke-width: 0.75;' />
+</g>
+<g clip-path='url(#cpMC4wMHw0NjguMDB8MC4wMHwzMjQuMDA=)'>
+<text x='208.80' y='25.20' text-anchor='middle' style='font-size: 1.68em; font-weight: bold; font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;'>sp1</text>
+</g>
+<g clip-path='url(#cpNTUuMzF8MzYyLjI5fDMzLjYwfDI5MC40MA==)'>
+</g>
+</g>
+</svg>

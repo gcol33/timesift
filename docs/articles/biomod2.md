@@ -16,6 +16,29 @@ mda, mgcv, nnet), and the test fixtures check it against that package’s
 output. `timesift` calls neither biomod2 nor these packages when it fits
 a model.
 
+## Installation
+
+``` r
+
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
+``` bash
+# Install from PyPI
+pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
+```
+
 ## The mapping
 
 Each biomod2 algorithm corresponds to a learner constructor, and a

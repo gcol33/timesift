@@ -51,7 +51,13 @@ with the ones it can read; each pair is a candidate."><style>
   </ul></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -242,7 +248,7 @@ the stack.</p></li>
 <li><p><code>candidates</code>, <code>scores</code> and <code>oof</code>: every candidate, its per-cell scores on the outer folds and
 its outer out-of-fold predictions.</p></li>
 <li><p><code>choice</code>, <code>models</code>, <code>stack</code> and <code>weights</code>: the procedure applied to every target, which is
-what <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> uses. Every candidate is refitted on all of them; <code>choice</code> is the candidate
+what <a href="predict.timesift.html">predict()</a> uses. Every candidate is refitted on all of them; <code>choice</code> is the candidate
 <code>choose</code> takes on the outer scores, with the outer folds as the split it chooses on, and
 <code>stack</code> holds weights fitted on the outer out-of-fold predictions.</p></li>
 <li><p><code>representations</code>, <code>fits</code>, <code>folds</code>, <code>cells</code>, <code>y</code>, and the <code>metric</code>, <code>response</code>, <code>spec</code> and
@@ -321,7 +327,7 @@ an error.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

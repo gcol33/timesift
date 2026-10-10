@@ -99,10 +99,12 @@ zero. The interval is closed at the left and open at the right, so a
 reading on a boundary belongs to the later bin, and only the readings of
 the target's own unit are read.
 
-Every `(target, bin)` cell must hold at least one reading. A lookback
-reaching past either end of the record is an error naming the target and
+Every `(target, bin)` cell must hold at least one reading. A bin lying
+wholly past either end of the record is an error naming the target and
 the interval, never a padded row: an invented value in front of a model
-is worse than a target the record cannot answer for.
+is worse than a target the record cannot answer for. A bin the record
+reaches only in part is summarised over the readings it holds, and
+`bin_n` records how many.
 
 The four day-level statistics reduce each calendar day first, so they
 are defined only where every day lies whole inside one bin. For a

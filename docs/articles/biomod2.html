@@ -64,10 +64,16 @@
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
-<li class="nav-item dropdown">
+<li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+<li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
@@ -123,6 +129,25 @@ itself calls (rpart, randomForest, gbm, xgboost, maxnet, MASS, earth,
 mda, mgcv, nnet), and the test fixtures check it against that package’s
 output. <code>timesift</code> calls neither biomod2 nor these packages
 when it fits a model.</p>
+<div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Or install the development version from GitHub</span></span>
+<span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Install from PyPI</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># with the torch encoders, the contrasts and the plots</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
+</div>
 <div class="section level2">
 <h2 id="the-mapping">The mapping<a class="anchor" aria-label="anchor" href="#the-mapping"></a>
 </h2>
@@ -250,11 +275,11 @@ their absolute values, as <code><a href="../reference/elasticnet.html">elasticne
 one minus the other. Any of these settings can be given to
 <code><a href="../reference/torch_learners.html">mlp()</a></code> directly. biomod2’s default <code>DNN</code> is
 cito’s defaults,</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/torch_learners.html">mlp</a></span><span class="op">(</span>hidden <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">50L</span>, <span class="fl">50L</span><span class="op">)</span>, activation <span class="op">=</span> <span class="st">"selu"</span>, dropout <span class="op">=</span> <span class="fl">0</span>, optimizer <span class="op">=</span> <span class="st">"sgd"</span>,</span>
 <span>    learning_rate <span class="op">=</span> <span class="fl">0.01</span>, weight_decay <span class="op">=</span> <span class="fl">0</span>, schedule <span class="op">=</span> <span class="st">"constant"</span>, epochs <span class="op">=</span> <span class="fl">100L</span><span class="op">)</span></span></code></pre></div>
 <p>and its tuned <code>DNN</code> is</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/torch_learners.html">mlp</a></span><span class="op">(</span>hidden <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100L</span>, <span class="fl">100L</span><span class="op">)</span>, activation <span class="op">=</span> <span class="st">"selu"</span>, dropout <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>    optimizer <span class="op">=</span> <span class="st">"adam"</span>, learning_rate <span class="op">=</span> <span class="fl">0.05</span>, weight_decay <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>    penalty <span class="op">=</span> <span class="fl">0.001</span>, alpha <span class="op">=</span> <span class="fl">0</span>, schedule <span class="op">=</span> <span class="st">"plateau"</span>, plateau_patience <span class="op">=</span> <span class="fl">7L</span>,</span>
@@ -286,7 +311,7 @@ six hours for a year, and three responses that depend on the record
 through a lagged mechanism acting at weekly grain. Because the
 simulation puts the signal at the week, the comparison below can be
 checked against it.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_records.html">simulate_records</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">200L</span>, mechanism <span class="op">=</span> <span class="st">"lag"</span>, variables <span class="op">=</span> <span class="fl">3L</span>, days <span class="op">=</span> <span class="fl">365L</span>,</span>
 <span>                        step_hours <span class="op">=</span> <span class="fl">6</span>, prevalence <span class="op">=</span> <span class="fl">0.25</span>, auc <span class="op">=</span> <span class="fl">0.85</span>, seed <span class="op">=</span> <span class="fl">4L</span><span class="op">)</span></span>
 <span><span class="va">targets</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>unit <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">y</span><span class="op">)</span>, <span class="va">sim</span><span class="op">$</span><span class="va">y</span><span class="op">)</span></span>
@@ -299,7 +324,7 @@ checked against it.</p>
 under its biomod2 name. A learner without a <code>data =</code> argument
 runs at every grain listed in <code>sift</code>; a learner with
 <code>data =</code> runs only at that representation.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">models</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  CTA <span class="op">=</span> <span class="fu"><a href="../reference/tree.html">tree</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  RF <span class="op">=</span> <span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -321,7 +346,7 @@ units, and <code><a href="../reference/additive.html">additive()</a></code> refu
 columns need 17. The envelope excludes one presence in twenty at each
 end of every column, so each added column leaves fewer units inside all
 the bands, and the envelope is suited to a coarse grain.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span></span>
 <span>  <span class="va">targets</span>, <span class="va">sim</span><span class="op">$</span><span class="va">readings</span>,</span>
 <span>  y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"v"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">unit</span>, time <span class="op">=</span> <span class="va">time</span>,</span>
@@ -343,7 +368,7 @@ the bands, and the envelope is suited to a coarse grain.</p>
 the two fixed learners at one. All of them were cross-validated on the
 same five outer folds and scored on the same cells, so their mean scores
 are directly comparable.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span></span>
 <span><span class="co">#&gt; timesift  200 targets, 3 responses, 5-fold random CV, roc_auc</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -397,7 +422,7 @@ the signal. A biomod2 run shows which algorithm performs best on one
 table. Here the run also gives the grain at which each algorithm does
 best, and the ranking of grains within one algorithm need not match the
 ranking of algorithms.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></code></pre></div>
 <p><div class="svg-container"><button type="button" class="btn btn-primary btn-copy-svg" title="Copy SVG to clipboard" aria-label="Copy SVG to clipboard" data-bs-toggle="tooltip" data-bs-placement="left"><i class="fa fa-copy"></i></button>
 <svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='468.00pt' height='324.00pt' viewBox='0 0 468.00 324.00' class="r-plt inline-svg" style="width:100%;height:auto;">
@@ -663,7 +688,7 @@ cross-validation strategy and then builds the ensembles. The two calls
 below set up the same run in each package: biomod2 on a table of
 predictors, <code>timesift</code> on a record. Neither chunk is
 evaluated.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fmt</span> <span class="op">&lt;-</span> <span class="fu">BIOMOD_FormatingData</span><span class="op">(</span>resp.var <span class="op">=</span> <span class="va">y</span>, expl.var <span class="op">=</span> <span class="va">predictors</span>,</span>
 <span>                            resp.xy <span class="op">=</span> <span class="va">xy</span>, resp.name <span class="op">=</span> <span class="st">"sp1"</span><span class="op">)</span></span>
 <span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">BIOMOD_Modeling</span><span class="op">(</span><span class="va">fmt</span>, modeling.id <span class="op">=</span> <span class="st">"all"</span>,</span>
@@ -675,7 +700,7 @@ evaluated.</p>
 <span>                               em.algo <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"EMmean"</span>, <span class="st">"EMwmean"</span>, <span class="st">"EMca"</span><span class="op">)</span>,</span>
 <span>                               metric.select <span class="op">=</span> <span class="st">"TSS"</span>, metric.select.thresh <span class="op">=</span> <span class="fl">0.5</span>,</span>
 <span>                               metric.eval <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"TSS"</span>, <span class="st">"ROC"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot_id</span>, time <span class="op">=</span> <span class="va">datetime</span>,</span>
 <span>                learners <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>CTA <span class="op">=</span> <span class="fu"><a href="../reference/tree.html">tree</a></span><span class="op">(</span><span class="op">)</span>, RF <span class="op">=</span> <span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>, GBM <span class="op">=</span> <span class="fu"><a href="../reference/boosting.html">boosting</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                              XGBOOST <span class="op">=</span> <span class="fu"><a href="../reference/boosting.html">boosting</a></span><span class="op">(</span>method <span class="op">=</span> <span class="st">"xgboost"</span><span class="op">)</span>, MAXNET <span class="op">=</span> <span class="fu"><a href="../reference/maxent.html">maxent</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -685,14 +710,14 @@ evaluated.</p>
 <span>                ensemble <span class="op">=</span> <span class="fu"><a href="../reference/ensemble.html">ensemble</a></span><span class="op">(</span><span class="st">"weighted"</span>, min_score <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>,</span>
 <span>                resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>The Python interface takes the same constructors and arguments:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp_*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot_id"</span>, time<span class="op">=</span><span class="st">"datetime"</span>,</span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>                  learners<span class="op">=</span>[ts.tree(), ts.forest(), ts.boosting(method<span class="op">=</span><span class="st">"xgboost"</span>), ts.maxent(),</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>                            ts.mars(), ts.discriminant(), ts.perceptron()],</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>                  sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>, <span class="st">"season"</span>),</span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>                  ensemble<span class="op">=</span>ts.ensemble(<span class="st">"weighted"</span>, min_score<span class="op">=</span><span class="fl">0.5</span>),</span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>                  resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">5</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp_*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot_id"</span>, time<span class="op">=</span><span class="st">"datetime"</span>,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>                  learners<span class="op">=</span>[ts.tree(), ts.forest(), ts.boosting(method<span class="op">=</span><span class="st">"xgboost"</span>), ts.maxent(),</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>                            ts.mars(), ts.discriminant(), ts.perceptron()],</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>                  sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>, <span class="st">"season"</span>),</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>                  ensemble<span class="op">=</span>ts.ensemble(<span class="st">"weighted"</span>, min_score<span class="op">=</span><span class="fl">0.5</span>),</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>                  resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">5</span>))</span></code></pre></div>
 <p>biomod2 fits one species per call. In <code>timesift</code>,
 <code>y</code> selects all response columns at once, and the responses
 share one fold map, one set of scorable cells and one set of candidates.
@@ -762,7 +787,7 @@ was trained on.</p>
 <p><code>min_score = 0.5</code> excluded any candidate whose mean AUC
 was below 0.5, the role <code>metric.select.thresh</code> plays in
 biomod2. The six largest weights in this run:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">weights</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt;  MAXNET / week    MARS / week     GBM / week     FDA / week MAXNET / month </span></span>
 <span><span class="co">#&gt;          0.375          0.234          0.146          0.092          0.057 </span></span>
@@ -771,7 +796,7 @@ biomod2. The six largest weights in this run:</p>
 <p>Committee averaging converts each member’s predictions to presence or
 absence at a threshold learned from that member’s out-of-fold
 predictions, then averages these votes. A smaller run at one grain:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_ca</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span></span>
 <span>  <span class="va">targets</span>, <span class="va">sim</span><span class="op">$</span><span class="va">readings</span>,</span>
 <span>  y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"v"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">unit</span>, time <span class="op">=</span> <span class="va">time</span>,</span>
@@ -791,7 +816,7 @@ predictions, then averages these votes. A smaller run at one grain:</p>
 ensemble members disagree. <code>type = "spread"</code> returns, for
 every target and response, the weighted mean, the standard deviation,
 the coefficient of variation and an interval:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">targets</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="op">]</span>, <span class="va">sim</span><span class="op">$</span><span class="va">readings</span>, type <span class="op">=</span> <span class="st">"spread"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dimnames.html" class="external-link">dimnames</a></span><span class="op">(</span><span class="va">sp</span><span class="op">)</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span></span>
 <span><span class="co">#&gt; [1] "mean"  "sd"    "cv"    "lower" "upper"</span></span>
@@ -813,7 +838,7 @@ candidate’s threshold from its out-of-fold predictions, and
 <code><a href="../reference/tss_inflation.html">tss_inflation()</a></code> estimates how large the inflation would be
 for a given set of presence counts. For the three responses above, five
 folds and two levels of true skill:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tss_inflation.html">tss_inflation</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">y</span>, <span class="fu"><a href="../reference/fold_map.html">fold_map</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">y</span>, v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, skill <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.6</span>, <span class="fl">0.9</span><span class="op">)</span>, replicates <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   skill  reported  inflation     lower     upper replicates</span></span>
 <span><span class="co">#&gt; 1   0.6 0.7042067 0.10420666 0.6510336 0.7413138         40</span></span>
@@ -922,7 +947,7 @@ cell, each carrying the record for its own cell, and returns a raster
 with one layer per response. A map for a later period uses the same call
 with the later record, and <code><a href="../reference/range_change.html">range_change()</a></code> on the two binary
 maps replaces <code>BIOMOD_RangeSize()</code>.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">now</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/project.html">project</a></span><span class="op">(</span><span class="va">fit</span>, series <span class="op">=</span> <span class="va">temperature_now</span>, static <span class="op">=</span> <span class="va">terrain</span>, type <span class="op">=</span> <span class="st">"binary"</span><span class="op">)</span></span>
 <span><span class="va">later</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/project.html">project</a></span><span class="op">(</span><span class="va">fit</span>, series <span class="op">=</span> <span class="va">temperature_2050</span>, static <span class="op">=</span> <span class="va">terrain</span>, type <span class="op">=</span> <span class="st">"binary"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/range_change.html">range_change</a></span><span class="op">(</span><span class="va">now</span>, <span class="va">later</span><span class="op">)</span><span class="op">$</span><span class="va">table</span></span></code></pre></div>
@@ -936,7 +961,7 @@ is fitted to, it cross-validates a grid of its own settings and fits the
 best one. In a run, each outer fold tunes on its own training units
 only, so the settings are never chosen on the units that score the tuned
 candidate. The chosen settings are listed in the candidate table.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>, x <span class="op">=</span> <span class="va">temp</span>,</span>
 <span>         learners <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>RF <span class="op">=</span> <span class="fu"><a href="../reference/tune.html">tune</a></span><span class="op">(</span><span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mtry <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span>, min_node <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -967,7 +992,7 @@ and a second predictor given in <code>with</code> produces the bivariate
 surface (<code>do.bivariate</code>). A predictor is a statistic of the
 representation, so the curve for <code>"warm_day"</code> shows the
 prediction as the warmest day changes in all bins at once.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/response_curve.html">response_curve</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"ensemble"</span>, <span class="st">"warm_day"</span>, spread <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">rc</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -1044,7 +1069,7 @@ comparison gains little from switching.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

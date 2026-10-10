@@ -72,10 +72,11 @@ occlusion(x, candidate, over = c("bin", "channel"), ...)
   Name of the registered metric the rescoring is read by, or a function
   of `(y, p)`. Left unset it is the one the fit was scored under, so a
   weight is a fall in the number
-  [`summary()`](https://rdrr.io/r/base/summary.html) reports rather than
-  in a second one. `"roc_auc"` is usually the steadier reading over many
-  rescorings: it responds to every reordering of the units, where a
-  maximum over thresholds frequently does not move at all.
+  [summary()](https://gillescolling.com/timesift/reference/timesift_report.md)
+  reports rather than in a second one. `"roc_auc"` is usually the
+  steadier reading over many rescorings: it responds to every reordering
+  of the units, where a maximum over thresholds frequently does not move
+  at all.
 
 - permutations:
 

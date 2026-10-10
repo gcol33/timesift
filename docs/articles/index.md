@@ -10,10 +10,25 @@ comparison and the prediction that follows from it.
 - [Choosing how a record is read, in
   Python](https://gillescolling.com/timesift/articles/python.md):
 
+### Using timesift
+
+One topic each, in R: how a record becomes an array, the learners, the
+comparison across grains, and the step from a scored run to predictions
+and maps.
+
+- [Representing a
+  record](https://gillescolling.com/timesift/articles/representations.md):
+- [Learners](https://gillescolling.com/timesift/articles/learners.md):
+- [Finding the
+  grain](https://gillescolling.com/timesift/articles/comparing-grains.md):
+- [Ensembles, thresholds and
+  maps](https://gillescolling.com/timesift/articles/prediction.md):
+
 ### Articles
 
 - [Coming from
   biomod2](https://gillescolling.com/timesift/articles/biomod2.md):
+- [Troubleshooting](https://gillescolling.com/timesift/articles/troubleshooting.md):
 
 ### The contract
 

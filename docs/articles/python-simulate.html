@@ -67,7 +67,13 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+<li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
@@ -113,28 +119,47 @@
 a known answer.</p>
 <p><a href="python-reference.html">All of the Python reference</a></p>
 <div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Or install the development version from GitHub</span></span>
+<span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Install from PyPI</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># with the torch encoders, the contrasts and the plots</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="simulate_records">
 <code>simulate_records()</code><a class="anchor" aria-label="anchor" href="#simulate_records"></a>
 </h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>simulate_records(</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>    n: <span class="bu">int</span> <span class="op">=</span> <span class="dv">300</span>,</span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>    mechanism: <span class="bu">str</span> <span class="op">=</span> <span class="st">'none'</span>,</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>    variables: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>    prevalence: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.1</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>    auc: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.75</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>    from_: <span class="bu">str</span> <span class="op">=</span> <span class="st">'2021-09-01'</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>    days: <span class="bu">int</span> <span class="op">=</span> <span class="dv">365</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>    step_hours: <span class="bu">float</span> <span class="op">=</span> <span class="dv">3</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>    seasonal: <span class="bu">float</span> <span class="op">=</span> <span class="dv">8</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>    offset_sd: <span class="bu">float</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>    anomaly_sd: <span class="bu">float</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>    anomaly_days: <span class="bu">float</span> <span class="op">=</span> <span class="dv">2</span>,</span>
-<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>    offset_effect: <span class="bu">float</span> <span class="op">=</span> <span class="dv">0</span>,</span>
-<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>    sensor_sd: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.3</span>,</span>
-<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>    year_start: <span class="bu">str</span> <span class="op">=</span> <span class="st">'09-01'</span>,</span>
-<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>    draw: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>simulate_records(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    n: <span class="bu">int</span> <span class="op">=</span> <span class="dv">300</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    mechanism: <span class="bu">str</span> <span class="op">=</span> <span class="st">'none'</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    variables: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    prevalence: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    auc: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.75</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    from_: <span class="bu">str</span> <span class="op">=</span> <span class="st">'2021-09-01'</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    days: <span class="bu">int</span> <span class="op">=</span> <span class="dv">365</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    step_hours: <span class="bu">float</span> <span class="op">=</span> <span class="dv">3</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>    seasonal: <span class="bu">float</span> <span class="op">=</span> <span class="dv">8</span>,</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>    offset_sd: <span class="bu">float</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>    anomaly_sd: <span class="bu">float</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>    anomaly_days: <span class="bu">float</span> <span class="op">=</span> <span class="dv">2</span>,</span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>    offset_effect: <span class="bu">float</span> <span class="op">=</span> <span class="dv">0</span>,</span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>    sensor_sd: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.3</span>,</span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>    year_start: <span class="bu">str</span> <span class="op">=</span> <span class="st">'09-01'</span>,</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>    draw: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a>)</span></code></pre></div>
 <p>Draw units carrying a record and a presence-absence response acting
 at one known grain.</p>
 <p>The response is driven by <code>g_ij = sum_t w_j(t) a_i(t)</code>, a
@@ -164,7 +189,7 @@ keyword.</p>
 <h2 id="Simulation">
 <code>Simulation</code><a class="anchor" aria-label="anchor" href="#Simulation"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>Simulation(readings, y, driver, grain, weights, link, design, grain_stat, anchor)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>Simulation(readings, y, driver, grain, weights, link, design, grain_stat, anchor)</span></code></pre></div>
 <p>A simulated record, its response, and everything the draw is
 reproducible from.</p>
 <p><code>readings</code> is the long table <code>grain_matrix</code>
@@ -206,7 +231,7 @@ draw.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

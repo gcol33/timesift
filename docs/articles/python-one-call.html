@@ -67,7 +67,13 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+<li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
@@ -113,34 +119,53 @@
 prediction that follows from it.</p>
 <p><a href="python-reference.html">All of the Python reference</a></p>
 <div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Or install the development version from GitHub</span></span>
+<span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Install from PyPI</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># with the torch encoders, the contrasts and the plots</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="timesift">
 <code>timesift()</code><a class="anchor" aria-label="anchor" href="#timesift"></a>
 </h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>timesift(</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>    targets,</span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>    series<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>    <span class="op">*</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>    y,</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>    x<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>    time<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>    target_time<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>    static<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>    coords<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>    learners<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>    sift<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>    ensemble<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>    resampling<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>    choose: <span class="bu">str</span> <span class="op">=</span> <span class="st">'argmax'</span>,</span>
-<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>    response: <span class="bu">str</span> <span class="op">=</span> <span class="st">'presence_absence'</span>,</span>
-<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>    metric<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>    control<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a>    keep_fits: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>,</span>
-<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a>    verbose: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
-<span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a>    refit: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
-<span id="cb1-25"><a href="#cb1-25" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>timesift(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    targets,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    series<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    <span class="op">*</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    y,</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    x<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    time<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    target_time<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>    static<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>    coords<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>    learners<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>    sift<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>    ensemble<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>    resampling<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>    n_inner<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>    choose: <span class="bu">str</span> <span class="op">=</span> <span class="st">'argmax'</span>,</span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>    response: <span class="bu">str</span> <span class="op">=</span> <span class="st">'presence_absence'</span>,</span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a>    metric<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a>    control<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a>    keep_fits: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>,</span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a>    verbose: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a>    refit: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a>)</span></code></pre></div>
 <p>Compare every learner across every representation, and estimate
 choosing among them.</p>
 <p><code>targets</code> is one row per thing to predict and
@@ -194,32 +219,32 @@ reads; a repeated resampling asks it of its first run alone.</p>
 <h2 id="Timesift">
 <code>Timesift</code><a class="anchor" aria-label="anchor" href="#Timesift"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>Timesift(</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>    candidates,</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>    scores,</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>    oof,</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>    representations,</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>    sift,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>    stack,</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>    weights,</span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>    models,</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>    folds,</span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>    cells,</span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>    y,</span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>    metric,</span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>    scorer,</span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>    response,</span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>    spec,</span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>    fits,</span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>    control,</span>
-<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a>    estimate,</span>
-<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a>    selected,</span>
-<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a>    inner,</span>
-<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a>    fold_weights,</span>
-<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>    predictions,</span>
-<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>    choice,</span>
-<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>    repeats,</span>
-<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>Timesift(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    candidates,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    scores,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    oof,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    representations,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    sift,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    stack,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    weights,</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    models,</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>    folds,</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>    cells,</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>    y,</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>    metric,</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>    scorer,</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>    response,</span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>    spec,</span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>    fits,</span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>    control,</span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>    estimate,</span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>    selected,</span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>    inner,</span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a>    fold_weights,</span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a>    predictions,</span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a>    choice,</span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a>    repeats,</span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a>)</span></code></pre></div>
 <p>A fitted sift: every candidate’s out-of-fold predictions, their
 scores, and the combiner.</p>
 <p><code>candidates</code> and <code>scores</code> are tables held as
@@ -282,22 +307,22 @@ here was read where the score was.</p>
 <h3 id="Timesift-representation_of">
 <code>representation_of()</code><a class="anchor" aria-label="anchor" href="#Timesift-representation_of"></a>
 </h3>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>representation_of(<span class="va">self</span>, candidate: <span class="bu">str</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>representation_of(<span class="va">self</span>, candidate: <span class="bu">str</span>)</span></code></pre></div>
 <p>Which representation a candidate reads.</p>
 </div>
 <div class="section level3">
 <h3 id="Timesift-predict">
 <code>predict()</code><a class="anchor" aria-label="anchor" href="#Timesift-predict"></a>
 </h3>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>predict(</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    <span class="va">self</span>,</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    targets,</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    series<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    candidate: <span class="bu">str</span> <span class="op">=</span> <span class="st">'ensemble'</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    <span class="bu">type</span>: <span class="bu">str</span> <span class="op">=</span> <span class="st">'response'</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>,</span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    alpha: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.05</span>,</span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>predict(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    <span class="va">self</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    targets,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    series<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>    candidate: <span class="bu">str</span> <span class="op">=</span> <span class="st">'ensemble'</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    <span class="bu">type</span>: <span class="bu">str</span> <span class="op">=</span> <span class="st">'response'</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    rule: <span class="bu">str</span> <span class="op">=</span> <span class="st">'youden'</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>    alpha: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.05</span>,</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>)</span></code></pre></div>
 <p>Predict new targets, rebuilding each member’s representation from the
 stored settings.</p>
 <p>Every candidate is refitted on all the targets at the end of a fit,
@@ -324,7 +349,7 @@ map cell an uncertainty map.</p>
 <h2 id="TimesiftSpec">
 <code>TimesiftSpec</code><a class="anchor" aria-label="anchor" href="#TimesiftSpec"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>TimesiftSpec(y, x, <span class="bu">id</span>, time, target_time, static, response, metric, coords)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>TimesiftSpec(y, x, <span class="bu">id</span>, time, target_time, static, response, metric, coords)</span></code></pre></div>
 <p>How a fit was asked for: the columns each table plays, and the
 calendar they are read in.</p>
 <p>Attributes:</p>
@@ -353,7 +378,7 @@ calendar they are read in.</p>
 <h2 id="summary">
 <code>summary()</code><a class="anchor" aria-label="anchor" href="#summary"></a>
 </h2>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>summary(fit)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>summary(fit)</span></code></pre></div>
 <p>The fit as text: the candidates on the outer folds, the procedure,
 and the weights.</p>
 </div>
@@ -361,7 +386,7 @@ and the weights.</p>
 <h2 id="candidate_table">
 <code>candidate_table()</code><a class="anchor" aria-label="anchor" href="#candidate_table"></a>
 </h2>
-<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>candidate_table(fit)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>candidate_table(fit)</span></code></pre></div>
 <p>One row per candidate: its level, how many responses it was best on,
 and how it covered them.</p>
 <p>A candidate whose learner and representation could not be paired
@@ -371,7 +396,7 @@ carries no level, and is listed under the ones that do.</p>
 <h2 id="procedure_table">
 <code>procedure_table()</code><a class="anchor" aria-label="anchor" href="#procedure_table"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>procedure_table(fit)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>procedure_table(fit)</span></code></pre></div>
 <p>The selected candidate’s and the stack’s held-out level under the
 run’s own metric, with the standard error across responses: one row
 each, or none where the run made no estimate.</p>
@@ -380,7 +405,7 @@ each, or none where the run made no estimate.</p>
 <h2 id="plot">
 <code>plot()</code><a class="anchor" aria-label="anchor" href="#plot"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>plot(x, col<span class="op">=</span><span class="va">None</span>, interval: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>, ax<span class="op">=</span><span class="va">None</span>, <span class="op">**</span>kwargs)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>plot(x, col<span class="op">=</span><span class="va">None</span>, interval: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>, ax<span class="op">=</span><span class="va">None</span>, <span class="op">**</span>kwargs)</span></code></pre></div>
 <p>Draw a ladder, a run or a selection, and return the table the drawing
 was made from.</p>
 <p>A ladder is drawn as one line per learner across the grains, at the
@@ -405,15 +430,15 @@ is ignored on a selection, which draws none. Needs matplotlib.</p>
 <h2 id="project">
 <code>project()</code><a class="anchor" aria-label="anchor" href="#project"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>project(</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>    fit,</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>    series<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    static<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    candidate: <span class="bu">str</span> <span class="op">=</span> <span class="st">'ensemble'</span>,</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>    <span class="bu">type</span>: <span class="bu">str</span> <span class="op">=</span> <span class="st">'response'</span>,</span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>    chunk: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5000</span>,</span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>project(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>    fit,</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>    series<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>    static<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>    candidate: <span class="bu">str</span> <span class="op">=</span> <span class="st">'ensemble'</span>,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>    <span class="bu">type</span>: <span class="bu">str</span> <span class="op">=</span> <span class="st">'response'</span>,</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>    chunk: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5000</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>)</span></code></pre></div>
 <p>Predict one target per cell of a grid, each carrying the record of
 its own cell.</p>
 <p>This is <code>BIOMOD_Projection()</code> and
@@ -438,7 +463,7 @@ well.</p>
 <h2 id="range_change">
 <code>range_change()</code><a class="anchor" aria-label="anchor" href="#range_change"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>range_change(now, later, threshold<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>range_change(now, later, threshold<span class="op">=</span><span class="va">None</span>)</span></code></pre></div>
 <p>How the range of each response changes between two maps.</p>
 <p>Counts the cells a response is lost from, kept in and gained, as
 <code>BIOMOD_RangeSize()</code> does, a cell being in the range where
@@ -459,7 +484,7 @@ and 1, and otherwise one cut per response, or one for all.</p>
 <h2 id="RangeChange">
 <code>RangeChange</code><a class="anchor" aria-label="anchor" href="#RangeChange"></a>
 </h2>
-<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>RangeChange(table, <span class="bu">map</span>, variables)</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>RangeChange(table, <span class="bu">map</span>, variables)</span></code></pre></div>
 <p>The change in range of each response: a <code>table</code> of counts,
 and the <code>map</code> of codes (-2 lost, -1 kept, 0 absent in both, 1
 gained) of the shape of the inputs.</p>
@@ -477,21 +502,21 @@ gained) of the shape of the inputs.</p>
 <h2 id="pseudo_absences">
 <code>pseudo_absences()</code><a class="anchor" aria-label="anchor" href="#pseudo_absences"></a>
 </h2>
-<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>pseudo_absences(</span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>    pool,</span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>    presences,</span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>    n: <span class="bu">int</span>,</span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>    strategy: <span class="bu">str</span> <span class="op">=</span> <span class="st">'random'</span>,</span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>    env<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>    quantile: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.025</span>,</span>
-<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>    coords<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>    dist_min: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.0</span>,</span>
-<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a>    dist_max: <span class="bu">float</span> <span class="op">=</span> np.inf,</span>
-<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a>    lonlat: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>,</span>
-<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>    repeats: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
-<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>pseudo_absences(</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>    pool,</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>    presences,</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>    n: <span class="bu">int</span>,</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>    strategy: <span class="bu">str</span> <span class="op">=</span> <span class="st">'random'</span>,</span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>    <span class="bu">id</span><span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>    env<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>    quantile: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.025</span>,</span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>    coords<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>    dist_min: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.0</span>,</span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>    dist_max: <span class="bu">float</span> <span class="op">=</span> np.inf,</span>
+<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>    lonlat: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>,</span>
+<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>    repeats: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a>    seed: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>)</span></code></pre></div>
 <p>Draw pseudo-absences from a pool of background units.</p>
 <p>Presence-only records give a response of ones. A model needs units
 where the response is zero, and these are drawn from <code>pool</code>,
@@ -521,7 +546,7 @@ from 1) and <code>pseudo</code> (true) added; draw <code>r</code> uses
 <h2 id="select_columns">
 <code>select_columns()</code><a class="anchor" aria-label="anchor" href="#select_columns"></a>
 </h2>
-<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>select_columns(columns, spec, arg: <span class="bu">str</span>, exclude<span class="op">=</span>())</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>select_columns(columns, spec, arg: <span class="bu">str</span>, exclude<span class="op">=</span>())</span></code></pre></div>
 <p>The columns a selection names, in the order the selection names
 them.</p>
 <p>An explicit list is taken in the caller’s order, because naming the
@@ -535,7 +560,7 @@ column that does not exist.</p>
 <h2 id="column_names">
 <code>column_names()</code><a class="anchor" aria-label="anchor" href="#column_names"></a>
 </h2>
-<div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>column_names(data)</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>column_names(data)</span></code></pre></div>
 <p>The column names of a table, whether it is a mapping of arrays or a
 data frame.</p>
 </div>
@@ -543,7 +568,7 @@ data frame.</p>
 <h2 id="n_targets">
 <code>n_targets()</code><a class="anchor" aria-label="anchor" href="#n_targets"></a>
 </h2>
-<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>n_targets(targets, spec: TimesiftSpec)</span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>n_targets(targets, spec: TimesiftSpec)</span></code></pre></div>
 <p>How many rows of targets there are, read off a column the spec is
 sure of.</p>
 </div>
@@ -551,7 +576,7 @@ sure of.</p>
 <h2 id="target_labels">
 <code>target_labels()</code><a class="anchor" aria-label="anchor" href="#target_labels"></a>
 </h2>
-<div class="sourceCode" id="cb17"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>target_labels(targets, spec: TimesiftSpec)</span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>target_labels(targets, spec: TimesiftSpec)</span></code></pre></div>
 <p>What names the rows of every array in one fit.</p>
 <p>The unit identifier names them where a unit carries one target. Where
 <code>target_time</code> lets a unit carry several, no identifier tells
@@ -566,7 +591,7 @@ targets by.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

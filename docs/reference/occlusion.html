@@ -51,7 +51,13 @@ produced the reported scores rather than a fresh set of them."><style>
   </ul></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -146,7 +152,7 @@ produced the reported scores rather than a fresh set of them.</p>
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
 <dd><p>Name of the registered metric the rescoring is read by, or a function of
 <code>(y, p)</code>. Left unset it is the one the fit was scored under, so a weight is a fall in the
-number <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> reports rather than in a second one. <code>"roc_auc"</code> is usually the steadier
+number <a href="timesift_report.html">summary()</a> reports rather than in a second one. <code>"roc_auc"</code> is usually the steadier
 reading over many rescorings: it responds to every reordering of the units, where a maximum
 over thresholds frequently does not move at all.</p></dd>
 
@@ -219,7 +225,7 @@ it is rescored on. The candidate is named as <code><a href="https://rdrr.io/r/ba
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

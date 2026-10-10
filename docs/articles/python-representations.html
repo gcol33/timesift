@@ -67,7 +67,13 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+<li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
+    <li><a class="dropdown-item" href="../articles/learners.html">Learners</a></li>
+    <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
+    <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
@@ -113,17 +119,36 @@
 compared across.</p>
 <p><a href="python-reference.html">All of the Python reference</a></p>
 <div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Or install the development version from GitHub</span></span>
+<span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Install from PyPI</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># with the torch encoders, the contrasts and the plots</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="native">
 <code>native()</code><a class="anchor" aria-label="anchor" href="#native"></a>
 </h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>native(stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>native(stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
 <p>The record unreduced: one bin per reading.</p>
 </div>
 <div class="section level2">
 <h2 id="grain">
 <code>grain()</code><a class="anchor" aria-label="anchor" href="#grain"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>grain(g, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>grain(g, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
 <p>One calendar grain, named, or supplied as a function of the reading
 instants returning each reading’s bin start, which is reported as
 <code>custom</code>.</p>
@@ -132,7 +157,7 @@ instants returning each reading’s bin start, which is reported as
 <h2 id="multigrain">
 <code>multigrain()</code><a class="anchor" aria-label="anchor" href="#multigrain"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>multigrain(grains<span class="op">=</span><span class="va">None</span>, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>multigrain(grains<span class="op">=</span><span class="va">None</span>, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
 <p>Several grains flattened and bound side by side into one block of
 features.</p>
 <p>Left at <code>None</code> the grains are the ones the record
@@ -143,7 +168,7 @@ want the record unreduced among them names the grains instead.</p>
 <h2 id="lookback">
 <code>lookback()</code><a class="anchor" aria-label="anchor" href="#lookback"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>lookback(span, lag<span class="op">=</span><span class="st">'0 days'</span>, bins<span class="op">=</span><span class="dv">1</span>, stats<span class="op">=</span><span class="st">'mean'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>lookback(span, lag<span class="op">=</span><span class="st">'0 days'</span>, bins<span class="op">=</span><span class="dv">1</span>, stats<span class="op">=</span><span class="st">'mean'</span>)</span></code></pre></div>
 <p>A stretch of record of fixed length, ending a fixed lag before each
 target’s own instant.</p>
 </div>
@@ -151,7 +176,7 @@ target’s own instant.</p>
 <h2 id="grains">
 <code>grains()</code><a class="anchor" aria-label="anchor" href="#grains"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>grains(<span class="op">*</span>g, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>grains(<span class="op">*</span>g, stats<span class="op">=</span><span class="st">'mean'</span>, year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
 <p>A sift over calendar grains, named or read off the record with
 <code>"auto"</code>.</p>
 </div>
@@ -159,7 +184,7 @@ target’s own instant.</p>
 <h2 id="lookbacks">
 <code>lookbacks()</code><a class="anchor" aria-label="anchor" href="#lookbacks"></a>
 </h2>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>lookbacks(<span class="op">*</span>spans, lag<span class="op">=</span><span class="st">'0 days'</span>, bins<span class="op">=</span><span class="dv">1</span>, stats<span class="op">=</span><span class="st">'mean'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>lookbacks(<span class="op">*</span>spans, lag<span class="op">=</span><span class="st">'0 days'</span>, bins<span class="op">=</span><span class="dv">1</span>, stats<span class="op">=</span><span class="st">'mean'</span>)</span></code></pre></div>
 <p>A sift over lookbacks of several lengths, all sharing a lag and a
 number of bins.</p>
 </div>
@@ -167,7 +192,7 @@ number of bins.</p>
 <h2 id="Representation">
 <code>Representation</code><a class="anchor" aria-label="anchor" href="#Representation"></a>
 </h2>
-<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>Representation(label, kind, stats, grain, grains, span, lag, bins, sequence, year_start)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>Representation(label, kind, stats, grain, grains, span, lag, bins, sequence, year_start)</span></code></pre></div>
 <p>One reduction, named but not yet built.</p>
 <p><code>sequence</code> says whether the bins are ordered in time and
 mean something to a convolution: the record unreduced, a calendar grain
@@ -208,7 +233,7 @@ label to spec.</p>
 <h2 id="as_sift">
 <code>as_sift()</code><a class="anchor" aria-label="anchor" href="#as_sift"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>as_sift(x)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>as_sift(x)</span></code></pre></div>
 <p>A sift, whether it arrived as one, as a representation, as a grain
 name, or as a list.</p>
 </div>
@@ -216,7 +241,7 @@ name, or as a list.</p>
 <h2 id="expand_sift">
 <code>expand_sift()</code><a class="anchor" aria-label="anchor" href="#expand_sift"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>expand_sift(sift, series, spec: TimesiftSpec)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>expand_sift(sift, series, spec: TimesiftSpec)</span></code></pre></div>
 <p>The sift with <code>"auto"</code> replaced by the grains the record
 supports.</p>
 </div>
@@ -224,7 +249,7 @@ supports.</p>
 <h2 id="auto_grains">
 <code>auto_grains()</code><a class="anchor" aria-label="anchor" href="#auto_grains"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>auto_grains(series, spec: TimesiftSpec, stats<span class="op">=</span>(<span class="st">'mean'</span>,), year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>auto_grains(series, spec: TimesiftSpec, stats<span class="op">=</span>(<span class="st">'mean'</span>,), year_start<span class="op">=</span><span class="st">'01-01'</span>)</span></code></pre></div>
 <p>The named grains that give the record at least two bins, from the
 finest to the coarsest.</p>
 <p>The count comes from the calendar in the core rather than from
@@ -238,7 +263,7 @@ it will be binned by.</p>
 <h2 id="build_representation">
 <code>build_representation()</code><a class="anchor" aria-label="anchor" href="#build_representation"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>build_representation(rep: Representation, series, targets, spec: TimesiftSpec)</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>build_representation(rep: Representation, series, targets, spec: TimesiftSpec)</span></code></pre></div>
 <p>The array one representation names, for these targets, in their own
 row order.</p>
 </div>
@@ -249,7 +274,7 @@ row order.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Gilles Colling.</p>
+  <p>Developed by <a href="https://github.com/gcol33" class="external-link">Gilles Colling</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">
