@@ -4,7 +4,7 @@ resource_files:
   - python_files/figure-1.svg
 ---
 
-<!-- Written by tools/python_articles.py from python/articles/python.md (md5 e3227217b7ce03629d11320a676927eb). Do not edit. -->
+<!-- Written by tools/python_articles.py from python/articles/python.md (md5 aebb043a7f66d6f5cbfb26fc88d2f485). Do not edit. -->
 
 A sensor records every hour for years. Before any model sees it, the record is reduced: to monthly
 means, to growing-degree-days, to whatever the analyst settled on once. `timesift` makes that
@@ -36,10 +36,6 @@ pip install "timesift[torch,contrasts,plot]"
 
 # Or install the development version from GitHub
 pip install git+https://github.com/gcol33/timesift
-```
-
-```bash
-pip install timesift
 ```
 
 ## Two tables

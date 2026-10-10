@@ -28,6 +28,30 @@ UNDOCUMENTED: list[str] = []
 BANNER = "<!-- Written by tools/python_reference.py from the Python sources. Do not edit. -->"
 INDEX = "python-reference"
 
+# The Installation section every page of the site opens with, as the hand-written articles do.
+INSTALL = """## Installation
+
+```{r, eval = FALSE}
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
+```bash
+# Install from PyPI
+pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
+```
+"""
+
 # One entry per section of the R reference index, keyed by its title and in its order; the title
 # and the description are read from `_pkgdown.yml`, so a section renamed there is renamed here or
 # the script stops. Every name in `timesift.__all__` belongs to exactly one section; the script
@@ -264,7 +288,7 @@ def page_title(title: str) -> str:
 
 def render(title: str, desc: str, names, found: dict) -> str:
     out = ["---", 'title: "{}"'.format(page_title(title)), "---", "", BANNER, "",
-           desc, "", "[All of the Python reference]({}.html)".format(INDEX), ""]
+           desc, "", "[All of the Python reference]({}.html)".format(INDEX), "", INSTALL]
     for name in names:
         _, node = found[name]
         if isinstance(node, ast.ClassDef):
@@ -280,7 +304,7 @@ def render_index(sections, found: dict) -> str:
     out = ["---", 'title: "Python reference"', "---", "", BANNER, "",
            "The Python package's functions, classes and values, under the sections of "
            "[the R reference](../reference/index.html) and in its order. "
-           "[Get started](python.html) runs them on a simulated record.", ""]
+           "[Get started](python.html) runs them on a simulated record.", "", INSTALL]
     for title, desc, slug, names in sections:
         out += ["## [{}]({}.html)".format(title, slug), "", desc, ""]
         for name in names:
