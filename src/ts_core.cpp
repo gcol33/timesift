@@ -85,7 +85,8 @@ void check_finite(const double* value, std::size_t n, const std::int32_t* unit,
               " not a finite number, first: unit " +
               label_of(unit_name, static_cast<std::size_t>(unit[first])) + " at " +
               iso8601(local[first]) +
-              ". Fill or drop them before building a representation.");
+              ". Fill or drop " + (bad == 1 ? "it" : "them") +
+              " before building a representation.");
 }
 
 // Which of the three per-day quantities the requested statistics need. A day-level statistic
@@ -325,7 +326,8 @@ void check_full_grid(const std::vector<std::int32_t>& count, const std::vector<s
     }
   }
   if (empty == 0) return;
-  throw Error(plural(empty, "(unit, bin) cell") + " hold no readings, first: unit " +
+  throw Error(plural(empty, "(unit, bin) cell") + (empty == 1 ? " holds" : " hold") +
+              " no readings, first: unit " +
               label_of(req.unit_name, first % n_unit) + " at " + iso8601(bins[first / n_unit]) +
               ". Every unit must span every bin; gaps are not padded. coverage() lists them.");
 }
@@ -712,7 +714,8 @@ LookbackResult reduce_lookbacks(const LookbackRequest& req) {
     const std::size_t i = missing % n_target;
     const seconds from = req.target_at[i] - req.lag - req.span +
                          static_cast<seconds>(missing / n_target) * step;
-    throw Error(plural(empty, "(target, bin) cell") + " hold no readings, first: target " +
+    throw Error(plural(empty, "(target, bin) cell") + (empty == 1 ? " holds" : " hold") +
+                " no readings, first: target " +
                 label_of(req.target_name, i) + " over [" + iso8601(from) + ", " +
                 iso8601(from + step) + "). A lookback reaching past the record is not padded.");
   }

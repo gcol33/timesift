@@ -117,6 +117,13 @@ print.timesift_range_change <- function(x, ...) {
 #'
 #' @return `x`, invisibly.
 #'
+#' @examplesIf requireNamespace("terra", quietly = TRUE)
+#' now <- terra::rast(nrows = 10, ncols = 10, vals = rep(c(1, 0), each = 50))
+#' names(now) <- "sp1"
+#' later <- terra::rast(now)
+#' terra::values(later) <- rep(c(0, 1, 1, 0), each = 25)
+#' plot(range_change(now, later))
+#'
 #' @export
 plot.timesift_range_change <- function(x, variable = NULL, ...) {
   if (!inherits(x$map, "SpatRaster")) {
@@ -124,7 +131,10 @@ plot.timesift_range_change <- function(x, variable = NULL, ...) {
   }
   variable <- variable %||% x$table$variable[1L]
   layer <- x$map[[variable]]
-  terra::plot(layer, type = "interval", breaks = c(-2.5, -1.5, -0.5, 0.5, 1.5),
-              col = c("#C0392B", "#7F8C8D", "#ECF0F1", "#27AE60"), main = variable, ...)
+  layer <- terra::categories(layer, value = data.frame(value = c(-2, -1, 0, 1),
+                                                       change = c("lost", "kept", "absent",
+                                                                  "gained")))
+  terra::plot(layer, all_levels = TRUE, col = c("#C0392B", "#7F8C8D", "#ECF0F1", "#27AE60"),
+              main = variable, ...)
   invisible(x)
 }

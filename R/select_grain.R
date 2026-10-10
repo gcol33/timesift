@@ -403,7 +403,7 @@ plot.timesift_selection <- function(x, col = NULL, ...) {
   col <- rep_len(col, length(folds))
 
   # The candidate names are written up the axis, so the bottom margin is sized to the longest.
-  old <- graphics::par(mar = c(max(5.1, 1.5 + 0.8 * max(nchar(label)) * 0.55), 4.1, 2.1, 1.1))
+  old <- graphics::par(mar = c(max(5.1, 1.5 + 0.8 * max(nchar(label)) * 0.6), 4.1, 2.1, 1.1))
   on.exit(graphics::par(old), add = TRUE)
   span <- range(inner$score[is.finite(inner$score)])
   args <- list(x = at, y = rep(NA_real_, length(at)), ylim = span, xaxt = "n", xlab = "",

@@ -38,7 +38,7 @@
 #' that costs it 0.044 TSS (`inst/reproduce/README.md`).
 #'
 #' A fitted encoder holds its weights as plain arrays and rebuilds the network when it predicts, so
-#' a fit saved with [saveRDS()] predicts after [readRDS()] in a fresh session.
+#' a fit saved with [base::saveRDS()] predicts after [base::readRDS()] in a fresh session.
 #'
 #' @inheritParams elasticnet
 #' @param channels Channel width of each stage.

@@ -19,3 +19,12 @@
 \description{
 The map of cells lost, kept, absent and gained, for one response.
 }
+\examples{
+\dontshow{if (requireNamespace("terra", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+now <- terra::rast(nrows = 10, ncols = 10, vals = rep(c(1, 0), each = 50))
+names(now) <- "sp1"
+later <- terra::rast(now)
+terra::values(later) <- rep(c(0, 1, 1, 0), each = 25)
+plot(range_change(now, later))
+\dontshow{\}) # examplesIf}
+}

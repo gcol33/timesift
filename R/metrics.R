@@ -188,7 +188,7 @@ decision_threshold.default <- function(y, p, rule = c("youden", "kappa", "preval
 
 #' @rdname kappa_score
 #' @param candidate For a [timesift()] fit, the candidate whose cut is learned: `"ensemble"`,
-#'   `"selected"` or the name of one, as [predict()] takes it.
+#'   `"selected"` or the name of one, as [predict()][predict.timesift] takes it.
 #' @export
 decision_threshold.timesift <- function(y, candidate = "ensemble",
                                         rule = c("youden", "kappa", "prevalence", "mpa"),

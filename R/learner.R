@@ -239,19 +239,20 @@ fit_learner <- function(learner, x, y, response = "presence_absence", control = 
          "channels ", paste(channels, collapse = ", "), " here and ",
          paste(object$channels, collapse = ", "), " in the fit.", call. = FALSE)
   }
+  period <- paste0(" A calendar grain is read by its bins' instants, so a fit predicts a record ",
+                   "over the same period; a lookback reads a span relative to each target and ",
+                   "predicts any period.")
   bins <- dimnames(newdata)[[2L]]
   if (length(bins) != length(object$bins)) {
     stop("the representation predicted on has different channels or bins from the fitted one: ",
          .plural(length(bins), "bin"), " here and ", .plural(length(object$bins), "bin"),
-         " in the fit.", call. = FALSE)
+         " in the fit.", period, call. = FALSE)
   }
   differs <- which(bins != object$bins)
   if (length(differs)) {
     i <- differs[1L]
     stop("the representation predicted on has different channels or bins from the fitted one: ",
-         "bin ", i, " is ", bins[i], " here and ", object$bins[i], " in the fit. A calendar ",
-         "grain is read by its bins' instants, so a fit predicts a record over the same period; ",
-         "a lookback reads a span relative to each target and predicts any period.",
+         "bin ", i, " is ", bins[i], " here and ", object$bins[i], " in the fit.", period,
          call. = FALSE)
   }
   invisible(TRUE)
@@ -521,6 +522,11 @@ as.matrix.timesift_matrix <- function(x, ...) {
 # its count allows rather than wherever a plain deal drops it.
 .inner_folds <- function(yj, v, seed, group = NULL) {
   key <- .group_key(group, length(yj))
+  if (!is.null(group) && v > max(key)) {
+    stop("a learner's own inner cross-validation asks for `n_inner = ", v, "` folds, but the ",
+         "units it is fitted on hold ", max(key), " groups, which a grouped or blocked split ",
+         "keeps whole: give that learner `n_inner` of at most ", max(key), ".", call. = FALSE)
+  }
   .check_fold_count(v, key, grouped = !is.null(group))
   .seeded_deal(.response_strata(as.numeric(tapply(yj, key, mean))), v, seed)[key]
 }

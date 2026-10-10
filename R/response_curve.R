@@ -232,12 +232,33 @@ print.timesift_response_curve <- function(x, ...) {
 #' @param x A [response_curve()] result.
 #' @param variable For two predictors, the response to draw; the first by default.
 #' @param col One colour per response, recycled.
+#' @param legend Where the legend of the responses goes, a position [graphics::legend()] takes
+#'   such as `"bottomright"`, or `NULL` for none. Four responses go in each column of it.
 #' @param ... Passed to [graphics::plot()] or [graphics::image()].
 #'
 #' @return The data frame drawn, invisibly.
 #'
+#' @examples
+#' set.seed(1)
+#' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 90)
+#' units <- sprintf("p%02d", 1:30)
+#' warmth <- rnorm(30)
+#' logger <- data.frame(
+#'   plot = rep(units, each = length(t)), datetime = rep(t, 30),
+#'   temp = as.numeric(vapply(warmth, function(w) w + sin(seq_along(t) / 300), numeric(length(t)))))
+#' plots <- data.frame(plot = units,
+#'                     sp_a = rbinom(30, 1, plogis(2 * warmth)),
+#'                     sp_b = rbinom(30, 1, plogis(-2 * warmth)))
+#' \donttest{
+#' fit <- timesift(plots, logger, y = starts_with("sp_"), id = plot, time = datetime,
+#'                 sift = grains("month"), resampling = cv(v = 3L), ensemble = FALSE,
+#'                 n_inner = NULL, verbose = FALSE)
+#' plot(response_curve(fit, "elasticnet / month", "mean", n = 20))
+#' }
+#'
 #' @export
-plot.timesift_response_curve <- function(x, variable = NULL, col = NULL, ...) {
+plot.timesift_response_curve <- function(x, variable = NULL, col = NULL, legend = "topright",
+                                         ...) {
   tbl <- as.data.frame(x)
   if ("value_with" %in% names(tbl)) {
     variable <- variable %||% tbl$variable[1L]
@@ -257,6 +278,9 @@ plot.timesift_response_curve <- function(x, variable = NULL, col = NULL, ...) {
     one <- tbl[tbl$variable == variables[i], , drop = FALSE]
     graphics::lines(one$value, one$prediction, col = col[i], lwd = 2)
   }
-  graphics::legend("topright", legend = variables, col = col, lwd = 2, bty = "n")
+  if (!is.null(legend)) {
+    graphics::legend(legend, legend = variables, col = col, lwd = 2, bty = "n",
+                     ncol = ceiling(length(variables) / 4))
+  }
   invisible(tbl)
 }

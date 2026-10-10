@@ -59,6 +59,25 @@ With \code{type = "spread"} the ensemble's members are read side by side rather 
 interval at \code{alpha}, which is biomod2's \code{EMcv} and \code{EMci} and, on one target per map cell, an
 uncertainty map.
 }
+\examples{
+set.seed(1)
+t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 90)
+units <- sprintf("p\%02d", 1:30)
+warmth <- rnorm(30)
+logger <- data.frame(
+  plot = rep(units, each = length(t)), datetime = rep(t, 30),
+  temp = as.numeric(vapply(warmth, function(w) w + sin(seq_along(t) / 300), numeric(length(t)))))
+plots <- data.frame(plot = units,
+                    sp_a = rbinom(30, 1, plogis(2 * warmth)),
+                    sp_b = rbinom(30, 1, plogis(-2 * warmth)))
+\donttest{
+fit <- timesift(plots, logger, y = starts_with("sp_"), id = plot, time = datetime,
+                sift = grains("week", "month"), resampling = cv(v = 3L), verbose = FALSE)
+head(predict(fit, plots, logger), 3)
+predict(fit, plots, logger, type = "binary", rule = "prevalence")[1:3, ]
+}
+
+}
 \seealso{
 \code{\link[=decision_threshold]{decision_threshold()}} for the cuts themselves.
 }

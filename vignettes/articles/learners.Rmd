@@ -1,0 +1,588 @@
+---
+title: "Learners"
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5, fig.height = 4.5,
+                      dev.args = list(pointsize = 14))
+set.seed(1)
+library(timesift)
+has_torch <- requireNamespace("torch", quietly = TRUE) && torch::torch_is_installed()
+```
+
+A learner is the model half of a candidate: a representation says how the record is reduced, and a
+learner says what is fitted to the reduction. `timesift` ships fifteen learners, from a penalised
+logistic regression to a residual convolutional network. Every one of them goes through the same
+pair of functions, the same folds and the same scoring as a learner written for a single study, so
+adding a model never means changing the code that fits or scores.
+
+This article lists what ships, what each learner can be handed, how the main ones are set, how the
+neural encoders are trained and tuned, and how a learner, a response type or a metric of one's own
+is added. It ends with what each learner costs on a small record and where each is the wrong
+choice.
+
+The examples use one simulated record throughout: 150 units read every six hours for a year, and
+four presence-absence responses that depend on the record through a lagged mechanism acting at the
+weekly grain. In this simulation the response reads each unit's departure from its own mean, so a
+learner can find the signal only at a grain fine enough to keep that departure.
+
+## Installation
+
+```{r, eval = FALSE}
+# Install from CRAN
+install.packages("timesift")
+
+# Or install the development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/timesift")
+```
+
+```bash
+# Install from PyPI
+pip install timesift
+
+# with the torch encoders, the contrasts and the plots
+pip install "timesift[torch,contrasts,plot]"
+
+# Or install the development version from GitHub
+pip install git+https://github.com/gcol33/timesift
+```
+
+```{r data}
+sim <- simulate_records(n = 150L, mechanism = "lag", variables = 4L, days = 365L,
+                        step_hours = 6, prevalence = 0.3, auc = 0.85, seed = 4L)
+targets <- data.frame(unit = rownames(sim$y), sim$y)
+colSums(sim$y)
+```
+
+## One interface
+
+A learner is a list carrying a `fit` function, a `predict` function and three declarations: what it
+reads, whether it covers the responses jointly or one at a time, and which packages it needs.
+Printing one shows the declarations and the settings it carries, with `NULL` where a setting takes
+its default at the fit.
+
+```{r print}
+elasticnet()
+forest(balance = TRUE)
+```
+
+`fit` is handed a `[unit, bin, channel]` array and the response matrix of the same units, and
+`predict` returns one column per response. A learner that fits one model per response is still
+handed the whole response matrix, so nothing above the learner layer needs to know which kind it
+was. `c()` binds learners into a set, which `timesift()` takes as `learners`.
+
+```{r set}
+c(elasticnet(), forest(), cnn())
+```
+
+## The learners that ship
+
+Every shipped learner is registered under its own name, and its declarations can be read off the
+constructor:
+
+```{r catalogue}
+shipped <- learners()
+built <- lapply(shipped, function(nm) getExportedValue("timesift", nm)())
+data.frame(learner = shipped,
+           reads = vapply(built, `[[`, "", "reads"),
+           multi = vapply(built, `[[`, "", "multi"),
+           needs = vapply(built, function(l) paste(l$needs, collapse = ", "), ""))
+```
+
+Twelve learners read a tabular block and fit one model per response. `mlp()` also reads a tabular
+block, flattening the channels, but fits every response jointly through one shared embedding, as
+the two convolutional encoders do. Only `cnn()` and `rescnn()` read the bins as a sequence. The
+three encoders need `torch`. Every other learner runs on the compiled core the package ships, which
+the Python package calls as well, so the two languages fit the same model.
+
+Each compiled learner is written from the published method and is checked in the test fixtures
+against the package whose numbers it reproduces. The [biomod2 article](biomod2.html) maps each of
+them to the biomod2 algorithm it corresponds to, with the option sets biomod2 uses.
+
+| learner | model | numbers checked against | responses |
+|---|---|---|---|
+| `elasticnet()` | elastic net over every column and its square, penalty chosen by inner cross-validation | glmnet | every head |
+| `linear()` | generalised linear model, terms searched by AIC | MASS `stepAIC()`, `glm()` | every head |
+| `tree()` | classification and regression tree, pruned by inner cross-validation | rpart | every head |
+| `forest()` | random forest | randomForest | every head |
+| `boosting()` | gradient boosted trees, first or second order | gbm, xgboost | every head |
+| `maxent()` | maximum entropy over maxnet's feature classes | maxnet | presence-absence |
+| `envelope()` | surface range envelope | biomod2 `bm_SRE()` | presence-absence |
+| `mars()` | multivariate adaptive regression splines | earth | every head |
+| `discriminant()` | flexible discriminant analysis on a MARS basis | mda `fda(method = mars)` | presence-absence |
+| `additive()` | additive model of thin plate regression splines | mgcv `gam(method = "GCV.Cp")` | every head |
+| `perceptron()` | network of one hidden layer, fitted by BFGS | nnet | every head |
+| `hierarchical()` | Bayesian logistic model, optional unit intercepts and spatial field | none | presence-absence |
+| `mlp()` | fully connected encoder, joint head | torch | every head |
+| `cnn()` | convolutional encoder, joint head | torch | every head |
+| `rescnn()` | dilated residual convolutional encoder, joint head | torch | every head |
+
+"Every head" means the learner fits whatever loss the response head names: a logistic model under
+presence-absence, a Gaussian one under the continuous, abundance and ordinal heads, and a Poisson
+one under the count head. `hierarchical()` has no reference package. It finds the posterior by
+Laplace's method and integrates its hyperparameters over a grid around their mode (Rue, Martino and
+Chopin 2009), and with `spatial = "nngp"` or `"hsgp"` it adds a Gaussian-process field over the
+coordinates that `timesift(coords = )` names.
+
+## What a learner may be handed
+
+A tabular learner reads the bins as a block of predictors, one column per bin of each channel.
+Given `native()`, the record unreduced, it would be handed one column per reading, so the pair is
+refused. When the learner is pinned to `native()` through `data =`, the refusal comes before the
+record is read:
+
+```{r refuse-native, error = TRUE}
+timesift(targets, sim$readings, y = starts_with("v"), id = unit, time = time,
+         learners = forest(data = native()), verbose = FALSE)
+```
+
+Inside a `sift` the same pair is skipped and the run goes on. The candidate table keeps the skipped
+pair, with the reason in `note`.
+
+```{r skip-native}
+mixed <- timesift(targets, sim$readings, y = starts_with("v"), id = unit, time = time,
+                  learners = c(elasticnet(), forest()),
+                  sift = c(native(), grain("month")),
+                  resampling = cv(v = 5), n_inner = NULL, ensemble = FALSE, verbose = FALSE)
+mixed$candidates[c("candidate", "bins", "status")]
+```
+
+The native representation of this record has 1460 bins, one per reading. A sequence learner is
+refused the opposite case: a representation that gives one row of features, such as
+`multigrain()`, or one whose record turns out to hold a single bin. That refusal is shown with the
+encoders below.
+
+## Several learners in one run
+
+`learners` takes a set or a named list. A named list reports each candidate under its own name,
+which is how two settings of one learner sit side by side. Every learner without a `data =` runs at
+every grain of `sift`; `linear()` is pinned to the monthly grain here, and the elastic net is given
+a looser stopping tolerance, both to keep the run short. The section on settings shows what the
+tolerance changes.
+
+```{r run}
+models <- list(
+  elasticnet = elasticnet(tol = 1e-4),
+  linear = linear(data = grain("month")),
+  tree = tree(),
+  forest = forest(),
+  forest_balanced = forest(balance = TRUE),
+  gbm = boosting(),
+  xgboost = boosting(method = "xgboost"),
+  maxent = maxent()
+)
+run_time <- system.time(
+  fit <- timesift(targets, sim$readings, y = starts_with("v"), id = unit, time = time,
+                  learners = models, sift = grains("week", "month"),
+                  resampling = cv(v = 5), n_inner = 3L, verbose = FALSE)
+)
+run_time[["elapsed"]]
+```
+
+The run took `r round(run_time[["elapsed"]])` seconds for 15 candidates. With three inner folds in
+each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20 times, three inner fits and
+one outer fit in each outer fold, and once more on every target.
+
+`summary()` lists the candidates in order of their mean score on the outer folds, with the number of
+responses on which each scored highest, and then the held-out score of the procedure that chooses
+and weights them.
+
+```{r summary}
+summary(fit)
+```
+
+Each learner run at both grains scores higher at the weekly one, which is the grain the simulation
+acts at. At the monthly grain the tree, both forests and gbm score below 0.5, so they find nothing
+there. `maxent / week` has the highest mean, 0.750, and scored highest on all
+four responses. The procedure rows are the scores to report: inside each outer training fold the
+inner folds chose a candidate and fitted the stack's weights, and the outer test fold then scored
+that choice once, 0.741 for the selected candidate and 0.740 for the stack. The highest candidate
+mean was picked out on the same folds it is scored on.
+
+The candidate table records how each candidate was built: its learner, its grain, the number of
+bins and channels, whether it was fitted, and, for a tuned learner, the settings it chose.
+
+```{r candidates}
+head(fit$candidates[c("candidate", "learner", "grain", "bins", "status")], 4)
+```
+
+## One learner on one array
+
+`fit_learner()` fits a learner to an array from `grain_matrix()` without the folds and the scoring
+around it, and `predict()` on the result takes an array of the same bins and channels. The units
+below are split in half once. The two arrays are built from the two halves of the record, over the
+same calendar weeks.
+
+```{r one-array}
+train <- rownames(sim$y)[1:75]
+test <- rownames(sim$y)[76:150]
+in_train <- sim$readings$unit %in% train
+week_train <- grain_matrix(sim$readings[in_train, ], unit, time, reading, grain = "week")
+week_test <- grain_matrix(sim$readings[!in_train, ], unit, time, reading, grain = "week")
+f <- fit_learner(elasticnet(), week_train, sim$y[train, ])
+f
+f$model[c("unfitted", "stopped")]
+```
+
+`unfitted` names any response with too few presences to choose a penalty on, which is then
+predicted its share among the fitting units, and `stopped` names any response whose penalty path
+ended early. Neither applies here. The fit carries the bins it was made on, and an array with other
+bins is refused:
+
+```{r one-array-refuse, error = TRUE}
+month_train <- grain_matrix(sim$readings[in_train, ], unit, time, reading, grain = "month")
+month_test <- grain_matrix(sim$readings[!in_train, ], unit, time, reading, grain = "month")
+predict(f, month_test)
+```
+
+## Settings of the main learners
+
+The settings below are the ones most often changed; each constructor's documentation lists the rest.
+
+`elasticnet()` fits one penalised model per response over every column and, with `squares = TRUE`,
+its square. `alpha` mixes the two penalties, `1` being the lasso and `0` ridge. `s` is where the
+penalty path is read: `"lambda.1se"`, the largest penalty within one standard error of the least
+held-out deviance, is glmnet's default, `"lambda.min"` is the penalty of least deviance, and a
+number is a penalty given directly. `tol` is where the coordinate descent stops; the default leaves
+the fit as close to the optimum as glmnet's own default does, and a looser one is faster.
+
+`forest()` grows 500 trees by default, with `mtry` the square root of the column count under
+presence-absence. `balance = TRUE` draws as many units of each class into every tree as the smaller
+class holds, so a rare response's presences are half of each tree's draw. `boosting()` fits gbm's
+first-order trees by default and XGBoost's second-order trees with `method = "xgboost"`, whose
+`lambda` and `gamma` are the penalty on a leaf and the least gain a split must make. `maxent()`
+builds maxnet's feature classes, the letters of `classes`: `l` linear, `q` quadratic, `p` pairwise
+products, `h` hinges and `t` thresholds. Left `NULL`, the classes follow each response's presence
+count, as maxnet chooses them.
+
+The function below fits a learner on the training half and returns its AUC on the other half,
+averaged over the four responses.
+
+```{r settings}
+held_out_auc <- function(l) {
+  f <- fit_learner(l, week_train, sim$y[train, ])
+  p <- predict(f, week_test)
+  mean(vapply(colnames(p), function(v) roc_auc(sim$y[test, v], p[, v]), numeric(1)))
+}
+variants <- list(
+  `elasticnet()` = elasticnet(),
+  `elasticnet(s = "lambda.min")` = elasticnet(s = "lambda.min"),
+  `elasticnet(alpha = 1)` = elasticnet(alpha = 1),
+  `elasticnet(tol = 1e-4)` = elasticnet(tol = 1e-4),
+  `forest()` = forest(),
+  `forest(balance = TRUE)` = forest(balance = TRUE),
+  `boosting()` = boosting(),
+  `boosting(method = "xgboost")` = boosting(method = "xgboost"),
+  `maxent()` = maxent(),
+  `maxent(classes = "lq")` = maxent(classes = "lq")
+)
+round(vapply(variants, held_out_auc, numeric(1)), 3)
+```
+
+On this split the elastic net read at `"lambda.min"` scores 0.680 against 0.631 at the default
+`"lambda.1se"`, and the lasso scores 0.608. The looser tolerance gives the same AUC as the default to
+three decimals, and the timings at the end of the article show what it saves.
+`maxent(classes = "lq")` scores 0.693 against 0.665 for the classes maxnet chooses, and both forests
+score close to 0.5 at this grain on 75 units. A single split of 75 units is a noisy comparison, so a
+difference of this size is worth checking under `timesift()`'s folds, with the two settings as two
+named candidates, before acting on it.
+
+## Neural encoders
+
+The encoders separate architecture from training. `mlp()`, `cnn()` and `rescnn()` take the layer
+widths, the kernel and the dropout, and `train_control()` holds every training setting: epochs,
+batch size, learning rate, optimiser, schedule, early stopping and device. `train_control()` is the
+one place a training setting is defaulted. A run hands its control to every neural learner, and a
+training setting given to one learner overrides the run's control for that learner alone, on the
+settings it names.
+
+```{r control, eval = has_torch}
+train_control(epochs = 5L, device = "cpu")
+cnn(channels = c(8L, 16L), kernel = 3L, epochs = 10L)
+```
+
+The control marks the settings that were not named as `(default)`, and the learner lists under
+`training` the one setting it overrides. The run below trains both encoders at the weekly grain for
+a handful of epochs on the processor. The run's control sets five epochs and the convolutional
+encoder overrides it with ten. This keeps the example quick and leaves both networks undertrained.
+
+```{r encoders, eval = has_torch}
+nets <- timesift(targets, sim$readings, y = starts_with("v"), id = unit, time = time,
+                 learners = c(mlp(hidden = c(32L, 16L)),
+                              cnn(channels = c(8L, 16L), kernel = 3L, epochs = 10L)),
+                 sift = grains("week"), control = train_control(epochs = 5L, device = "cpu"),
+                 resampling = cv(v = 3), n_inner = NULL, ensemble = FALSE, verbose = FALSE)
+summary(nets)
+```
+
+After so few epochs both encoders score close to 0.5, as an undertrained network does. The
+`responses` column reads `joint`: one network covers all four responses, and each candidate is still
+reported once.
+
+A sequence learner pinned to a representation that gives one row of features is refused before the
+record is read:
+
+```{r refuse-sequence, error = TRUE, eval = has_torch}
+timesift(targets, sim$readings, y = starts_with("v"), id = unit, time = time,
+         learners = cnn(data = multigrain(c("week", "month"))), verbose = FALSE)
+```
+
+A fitted encoder holds its weights as plain arrays and the device as the setting it was given, so a
+fit saved with `saveRDS()` on a machine with a graphics card predicts after `readRDS()` on one
+without.
+
+## Tuning
+
+`tune()` wraps a learner so that, each time it is fitted, it cross-validates a grid of its own
+settings on the units it is handed and fits the setting that scored best. In a run each outer fold
+tunes on its own training units, so the setting a fold is scored with was never chosen on that
+fold's held-out units. A grid names settings the learner carries, and every combination is tried.
+
+```{r tune}
+tuned <- tune(forest(trees = 200L), list(mtry = c(2L, 8L), min_node = c(1L, 5L)), n_inner = 3L)
+tf <- fit_learner(tuned, week_train, sim$y[train, ])
+tf$model$chosen
+tf$model$table
+```
+
+The search chose `mtry = 8` and `min_node = 5`, the combination with the highest mean inner AUC.
+Under `timesift()`, the settings each tuned candidate chose on all targets are in the `settings`
+column of the candidate table.
+
+Given no `grid`, `tune()` searches the grid registered under the learner's name. Eight shipped
+learners carry the grids that biomod2's `BIOMOD_Tuning()` searches:
+
+```{r tunings}
+tunings()
+```
+
+`register_tuning()` adds a grid, as a named list or as a function of the learner and the array for a
+grid that depends on the data, such as one bounded by the number of columns. The elastic net has no
+grid registered; the one below searches its mixing.
+
+```{r register-tuning}
+register_tuning("elasticnet", list(alpha = c(0.25, 1)))
+te <- fit_learner(tune(elasticnet(), n_inner = 3L), month_train, sim$y[train, ])
+te$model$table
+```
+
+`alpha = 1`, the lasso, scored higher on the three inner folds, and the tuned learner was fitted
+with it. The registration lasts for the session, and replacing a grid already registered takes
+`overwrite = TRUE`.
+
+## A learner of one's own
+
+`learner()` takes a `fit` and a `predict` function, and `fit` is handed what it declares. A `fit`
+with an argument called `weights` receives the response head's case weights, one per cell of the
+response. One with `head` receives the head itself, whose `loss` says what to fit toward. One with
+`control` receives the resolved `train_control()`, and one with `group` receives the grouping the
+outer folds keep whole, so that a split drawn inside the fit keeps it too. A `fit` that declares
+none of these is fitted unweighted, with nothing but the array and the response.
+
+The learner below reduces every channel to its mean over the bins and fits one generalised linear
+model per response, in the family the head's loss names.
+
+```{r own}
+channel_means <- function(data = NULL) {
+  learner(
+    "channel_means",
+    fit = function(x, y, head, weights, ...) {
+      f <- data.frame(apply(unclass(x), c(1L, 3L), mean))
+      family <- switch(head$loss,
+                       binary_cross_entropy = stats::quasibinomial(),
+                       squared_error = stats::gaussian(),
+                       poisson_deviance = stats::quasipoisson())
+      lapply(seq_len(ncol(y)), function(j) {
+        stats::glm(y[, j] ~ ., data = f, weights = weights[, j], family = family)
+      })
+    },
+    predict = function(model, x) {
+      f <- data.frame(apply(unclass(x), c(1L, 3L), mean))
+      vapply(model, function(m) stats::predict(m, f, type = "response"), numeric(nrow(f)))
+    },
+    data = data
+  )
+}
+channel_means()
+```
+
+`register_learner()` makes the constructor available by name, beside the shipped learners, and a
+registered learner can then be given to `timesift()` or `fit_learner()` as its name alone. A fit made
+by a registered learner is saved as the learner's name and settings, so a session that reads the fit
+back with `readRDS()` registers the learner again before predicting from it.
+
+```{r register-learner}
+register_learner("channel_means", channel_means)
+"channel_means" %in% learners()
+own <- timesift(targets, sim$readings, y = starts_with("v"), id = unit, time = time,
+                learners = c(elasticnet(), channel_means()),
+                sift = grains("week", "month"),
+                resampling = cv(v = 5), n_inner = NULL, ensemble = FALSE, verbose = FALSE)
+summary(own)
+```
+
+`channel_means` scores 0.461 at both grains. The mean of a channel over the whole year is nearly
+the same number whichever bins it is averaged from, and in this simulation the responses read each
+unit's departure from its own level, which a yearly mean averages away. The weekly elastic net,
+which reads every bin, scores 0.701.
+
+## Other responses, and other metrics
+
+The response head says what the values are, how each learner fits them and which cells a score is
+defined on. Besides `"presence_absence"`, four heads ship:
+
+```{r responses}
+responses()
+```
+
+A count is fitted under the Poisson deviance. The counts below are drawn from each unit's mean
+reading, and the forest fits them with no change to the learner.
+
+```{r counts}
+week <- grain_matrix(sim$readings, unit, time, reading, grain = "week")
+rate <- exp(0.5 + 0.8 * as.numeric(scale(apply(week, 1L, mean))))
+counts <- matrix(rpois(150, rate), ncol = 1L, dimnames = list(rownames(sim$y), "count"))
+cf <- fit_learner(forest(), week_train, counts[train, , drop = FALSE], response = "count")
+round(head(predict(cf, week_test), 3), 2)
+```
+
+`maxent()`, `envelope()`, `discriminant()` and `hierarchical()` need a presence-absence response and
+refuse any other head:
+
+```{r counts-refuse, error = TRUE}
+fit_learner(maxent(), week_train, counts[train, , drop = FALSE], response = "count")
+```
+
+`register_response()` adds a head. Its specification names `prepare`, `activation`, `loss`,
+`metric` and `cells`, and optionally `weights`. The activation and the loss are each one of the
+three the learners know: `"sigmoid"`, `"identity"` or `"exp"`, and `"binary_cross_entropy"`,
+`"squared_error"` or `"poisson_deviance"`. The shipped presence-absence head weights each presence
+by the ratio of absences to presences among the fitting units, capped at 50 by default, through
+`positive_weights()`. The weight of a presence in each response of this record:
+
+```{r weights}
+w <- positive_weights(sim$y)
+apply(w, 2L, max)
+```
+
+A head with a different cap reaches every learner through one registration. With a cap of 2, the
+presences of `v01` and `v03` weigh 2 and those of `v02` and `v04` keep the weights above.
+
+```{r register-response}
+register_response("presence_absence_cap2", list(
+  prepare = function(y) {
+    y <- as.matrix(y)
+    storage.mode(y) <- "double"
+    if (!all(y %in% c(0, 1))) stop("a presence-absence response is 0/1.", call. = FALSE)
+    y
+  },
+  activation = "sigmoid",
+  loss = "binary_cross_entropy",
+  metric = "roc_auc",
+  cells = function(y, folds) scorable_cells(y, folds),
+  weights = function(y, fitting) positive_weights(y, cap = 2, fitting = fitting)
+))
+```
+
+A metric is a function of the observed values and the predictions of one held-out cell.
+`register_metric()` adds one by name, and `timesift(metric = )` then chooses and reports by it. The
+Brier score below has its sign reversed, so that a higher score is better, as the choice of a
+candidate assumes of every metric.
+
+```{r register-metric}
+register_metric("neg_brier", function(y, p) -mean((y - p)^2))
+capped <- timesift(targets, sim$readings, y = starts_with("v"), id = unit, time = time,
+                   learners = c(elasticnet(), forest()), sift = grains("month"),
+                   response = "presence_absence_cap2", metric = "neg_brier",
+                   resampling = cv(v = 5), n_inner = NULL, ensemble = FALSE, verbose = FALSE)
+summary(capped)
+```
+
+The run is chosen and reported by the Brier score under the capped weights. The elastic net, at
+-0.239, scored above the forest, at -0.259, and scored highest on all four responses.
+
+## Choosing learners
+
+The cost of a learner depends on how many columns its representation flattens to, and on how much
+of its fit is an inner search. The timings below fit each tabular learner once on all 150 units and
+four responses at the weekly grain, which flattens to 53 columns.
+
+```{r timings}
+timed <- list(elasticnet = elasticnet(), `elasticnet(tol = 1e-4)` = elasticnet(tol = 1e-4),
+              linear = linear(), tree = tree(), forest = forest(), boosting = boosting(),
+              xgboost = boosting(method = "xgboost"), maxent = maxent(),
+              envelope = envelope(), mars = mars(), discriminant = discriminant(),
+              perceptron = perceptron(), hierarchical = hierarchical())
+seconds <- vapply(timed, function(l) {
+  system.time(fit_learner(l, week, sim$y))[["elapsed"]]
+}, numeric(1))
+sort(round(seconds, 2), decreasing = TRUE)
+```
+
+`additive()` is not in that list, because at its default `k = 10` an additive model of 53 columns
+needs more coefficients than there are units:
+
+```{r additive-refuse, error = TRUE}
+fit_learner(additive(), week, sim$y)
+```
+
+At the monthly grain, 12 columns, it fits, and its cost depends on `k`:
+
+```{r additive-month}
+month <- grain_matrix(sim$readings, unit, time, reading, grain = "month")
+additive_seconds <- c(
+  `k = 10` = system.time(fit_learner(additive(), month, sim$y))[["elapsed"]],
+  `k = 5` = system.time(fit_learner(additive(k = 5L), month, sim$y))[["elapsed"]])
+round(additive_seconds, 2)
+```
+
+With `k = 10` the fit took `r round(additive_seconds[["k = 10"]], 1)` seconds, and with `k = 5` it
+took `r round(additive_seconds[["k = 5"]], 1)` seconds.
+
+The elastic net is the learner to start with. It reads every column without a selection step,
+chooses its penalty inside the units it is fitted on, and is the arm the package measures a network
+against. At its default tolerance it took `r round(seconds[["elasticnet"]], 1)` seconds here, and
+`tol = 1e-4` took `r round(seconds[["elasticnet(tol = 1e-4)"]], 1)`, at the same held-out AUC on the
+split above. `linear()` was the slowest at `r round(seconds[["linear"]], 1)` seconds: its two-way
+search refits the model for every term it could add or drop at every step, and the weekly grain
+offers it 106 terms, each column and its square. Pinned to a coarse grain, or searched forward under
+a bound as `linear(select = "forward", terms = "column", max_terms = 3)` does, the search has fewer
+steps to take. Every other tabular learner took at most
+`r round(max(seconds[!names(seconds) %in% c("linear", "elasticnet")]), 2)` seconds.
+
+What a learner can be fitted on depends on the number of units against the number of columns its
+representation flattens to:
+
+- The additive model holds one coefficient for the intercept and `k - 1` for each column, and
+  refuses a fit with more coefficients than units. On a small sample it needs a coarse grain or a
+  small `k`, and its cost grows with `k`, as the timings above show.
+- `linear(select = "none")` fits every term without selecting, and over more columns than units it
+  separates any response it is given. It is meant for a coarse grain such as
+  `data = grain("season")`.
+- The envelope keeps a unit inside only where every column agrees, so each added column leaves
+  fewer presences inside. It too is meant for a coarse grain.
+- The elastic net, the forest and boosting keep a wide block fittable on few units through the
+  penalty, the column draw and the shrinkage, which makes them the first learners to run at a fine
+  grain on a small sample.
+- `maxent()` builds a hinge per column per knot, so its design grows with the grain. A fit whose
+  design would pass `max_design` gigabytes is refused with the size it would have taken, and a
+  coarser grain or fewer classes brings it within the limit.
+- `perceptron()` reads the columns in their own units unless `standardise = TRUE`, and a record in
+  degrees saturates its hidden units sooner the wider its range.
+
+The encoders fit every response through one network, so a rarer response borrows from the common
+ones. That pooling is what they are for, and it needs many responses and enough units to train a
+network on. In the Schrankogel study, 894 plots and 101 species read hourly for three years, a fully
+connected network on the series was level with a penalised logistic model on 188 hand-built
+features, and the gain came from convolution reading the series at a coarse grain. A study with few
+units and few responses may gain little from the encoders over the elastic net, and pays for the
+training.
+
+A learner is the wrong choice where it cannot read the response or the representation. `maxent()`,
+`envelope()`, `discriminant()` and `hierarchical()` fit presence-absence alone. A tabular learner
+cannot read `native()`, and a sequence learner cannot read a `multigrain()` block or a
+representation of one bin. A learner can also be handed a reduction that has already discarded the
+signal: `channel_means` above was fitted correctly and scored below 0.5, because a yearly mean keeps
+nothing of a weekly departure. No learner recovers what the representation dropped, which is why
+`timesift()` compares learners across grains.

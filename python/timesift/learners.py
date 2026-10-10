@@ -121,6 +121,9 @@ class Fit:
 
     def _check_same_representation(self, x: TimesiftMatrix) -> None:
         head = "the representation predicted on has different channels or bins from the fitted one: "
+        period = (" A calendar grain is read by its bins' instants, so a fit predicts a record "
+                  "over the same period; a lookback reads a span relative to each target and "
+                  "predicts any period.")
         channels, bins = tuple(x.stats), tuple(x.bins)
         if channels != tuple(self.channels):
             raise ValueError(head + f"channels {', '.join(channels)} here and "
@@ -128,13 +131,11 @@ class Fit:
         if len(bins) != len(self.bins):
             raise ValueError(head + f"{len(bins)} bin{'s' if len(bins) != 1 else ''} here and "
                              f"{len(self.bins)} bin{'s' if len(self.bins) != 1 else ''} in the "
-                             "fit.")
+                             "fit." + period)
         for i, (here, fitted) in enumerate(zip(bins, self.bins)):
             if here != fitted:
-                raise ValueError(head + f"bin {i + 1} is {here} here and {fitted} in the fit. A "
-                                 "calendar grain is read by its bins' instants, so a fit "
-                                 "predicts a record over the same period; a lookback reads a "
-                                 "span relative to each target and predicts any period.")
+                raise ValueError(head + f"bin {i + 1} is {here} here and {fitted} in the fit."
+                                 + period)
 
 
 def fit_learner(learner, x: TimesiftMatrix, y, response: str = "presence_absence", control=None,

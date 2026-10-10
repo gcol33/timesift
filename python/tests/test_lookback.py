@@ -146,7 +146,7 @@ def test_a_cell_the_record_cannot_fill_names_the_target_and_the_interval():
     at = {"id": ["p1"], "at": np.asarray(["2021-09-20"], dtype="datetime64[s]")}
     with pytest.raises(ValueError) as raised:
         lookback_matrix(d, "id", "time", "value", at, "30 days", bins=3, stats="mean")
-    assert "1 (target, bin) cell hold no readings, first: target 1 over " in str(raised.value)
+    assert "1 (target, bin) cell holds no readings, first: target 1 over " in str(raised.value)
     assert "[2021-08-21T00:00:00, 2021-08-31T00:00:00)" in str(raised.value)
 
 

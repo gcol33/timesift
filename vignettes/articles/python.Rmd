@@ -4,7 +4,7 @@ resource_files:
   - python_files/figure-1.svg
 ---
 
-<!-- Written by tools/python_articles.py from python/articles/python.md (md5 aebb043a7f66d6f5cbfb26fc88d2f485). Do not edit. -->
+<!-- Written by tools/python_articles.py from python/articles/python.md (md5 4753ca2b01c9cecbbb3e16d52d9c9d1e). Do not edit. -->
 
 A sensor records every hour for years. Before any model sees it, the record is reduced: to monthly
 means, to growing-degree-days, to whatever the analyst settled on once. `timesift` makes that
@@ -346,8 +346,9 @@ one denominator and every paired difference runs on matched cells.
 ## Learners, and how they are trained
 
 `ts.elasticnet()` and `ts.linear()` read a block of features, `ts.forest()` grows a probability
-forest over one, and the `torch` encoders `ts.mlp()`, `ts.cnn()` and `ts.rescnn()` read a sequence
-with a joint multi-label head, so every response is predicted together from a shared embedding.
+forest over one, and the `torch` encoders predict every response together through a joint
+multi-label head from a shared embedding: `ts.cnn()` and `ts.rescnn()` convolve along the sequence
+of bins, and `ts.mlp()` reads the same bins flattened into one block.
 Pooling strength across responses is what makes the rarer ones learnable at these sample sizes.
 
 `ts.elasticnet()` is the arm a network is measured against, so it is fitted by the same compiled

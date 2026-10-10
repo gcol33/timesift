@@ -1,3 +1,32 @@
+# timesift (development version)
+
+## Documentation
+
+* Five articles on the package site: representing a record (grains, statistics, calendars, gaps,
+  partial bins, lookbacks), the learners, finding the grain on simulated records with a known
+  answer, ensembles, thresholds and maps, and troubleshooting.
+* Examples for `predict()`, `plot()` and `summary()` of a run, `build_representation()`, and the
+  plots of a response curve and of a change in range.
+* `mlp()` is described as what it is, a fully connected encoder reading the bins flattened into one
+  block; only `cnn()` and `rescnn()` read them as a sequence.
+* The lookback's edge rule is stated as the core applies it: a bin lying wholly past the record is
+  an error, and one the record reaches in part is summarised over the readings it holds.
+
+## Bug fixes
+
+* The map of `plot()` on a `range_change()` labels its classes lost, kept, absent and gained, and
+  colours a map holding only some of them by the class each cell is in.
+* Subsetting the `summary()` of a run, or an `occlusion()` result, returns a plain data frame where
+  it printed empty headers.
+* `plot()` on a response curve takes `legend`, its position or `NULL`, and lays more than four
+  responses out in columns.
+* A learner whose own inner cross-validation asks for more folds than a grouped or blocked split
+  leaves it groups, such as the default `elasticnet()` under `block_cv(v = 5)`, is told to lower
+  that learner's `n_inner`.
+* The refusals of a record name one empty cell or one non-finite reading in the singular, and a
+  prediction on a record with fewer bins than the fit says why a calendar grain needs the same
+  period.
+
 # timesift 0.6.0
 
 ## Breaking changes

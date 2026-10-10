@@ -13,13 +13,12 @@
 
 **Learn predictive representations of time-varying data, in R and Python over one C++ core.**
 
-Give `timesift` one row per thing to predict and a long table of time-stamped readings belonging
+Hand `timesift` one row per thing to predict and a long table of time-stamped readings belonging
 to those rows. It builds each candidate representation of the record, from the readings as recorded
 through a calendar week or month to a span anchored on each target, fits the learners you name on
-every one they can read, and scores them all on one set of held-out folds. Inside each training fold
-it chooses a candidate and fits the stack's weights on an inner split, so the score it reports for
-the chosen candidate and for the ensemble covers the choosing. What comes back says at what grain
-the prediction needed the record, and what the whole procedure scores on targets it did not see.
+every one they can read, and scores them all on one set of held-out folds. What comes back says at
+what grain the prediction needed the record, and what the whole procedure, choosing included,
+scores on targets it did not see.
 
 ## Installation
 
@@ -43,7 +42,7 @@ pip install "timesift[torch,contrasts,plot]"
 pip install git+https://github.com/gcol33/timesift
 ```
 
-## Quick Start
+## Quick start
 
 <table class="lang-split">
 <tr>
@@ -130,7 +129,7 @@ chosen candidate. `type = "binary"` cuts each species into presence and absence 
 learned from the fit's own out-of-fold predictions, and `type = "spread"` gives how far the
 ensemble's members disagree, which on the same cells is an uncertainty map.
 
-## Statement of Need
+## Statement of need
 
 A sensor records every hour for years. Before any model is fitted, that record is reduced: to
 monthly means, to growing-degree-days, to whatever the analyst decides, and the reduction is rarely
@@ -153,7 +152,7 @@ temperature:
 
 The package is what lets the same test run on other records and other responses.
 
-## Four Things, and One Contract
+## Targets, series, representations and learners
 
 **targets** is one row per thing to predict, carrying the response and optionally predictors that
 do not move in time. **series** is the long record: an identifier, an instant, and one or more
@@ -203,18 +202,18 @@ use outside the fitting layer.
 - **Species distribution classics**: `maxent()`, `envelope()`, `mars()`, `discriminant()`,
   `additive()`, `perceptron()`
 - **Bayesian**: `hierarchical()`, a logistic model with unit intercepts and a spatial field
-- **Neural encoders** (torch): `mlp()`, `cnn()`, `rescnn()`, reading a sequence through a joint
-  multi-label head
+- **Neural encoders** (torch): `cnn()` and `rescnn()` reading the sequence of bins, `mlp()` the
+  bins flattened, each through a joint multi-label head
 - **Your own**: `learner()` takes a fit and a predict pair, and `register_learner()` adds it to the
   registry; it then goes through the same folds, the same cells and the same scoring
 
 The learners run on timesift's own C++ cores, written from the published methods, and those cores
-give the numbers of the references a biomod2 user already fits: glmnet's elastic net, MASS's stepwise search, rpart's tree, earth's
-MARS, mda's flexible discriminant analysis, mgcv's GAM, nnet's network, maxnet's Maxent and
-biomod2's surface range envelope, each pinned against the reference's own output in the fixtures.
-Architecture belongs to the constructor and training belongs to
-`train_control()`, so `train_control(epochs = 200, device = "cuda")` reaches every neural learner of
-a run at once.
+give the numbers of the references a biomod2 user already fits: glmnet's elastic net, MASS's
+stepwise search, rpart's tree, earth's MARS, mda's flexible discriminant analysis, mgcv's GAM,
+nnet's network, maxnet's Maxent and biomod2's surface range envelope, each pinned against the
+reference's own output in the fixtures. Architecture belongs to the constructor and training
+belongs to `train_control()`, so `train_control(epochs = 200, device = "cuda")` reaches every neural
+learner of a run at once.
 
 ### Comparing grains
 
@@ -239,7 +238,7 @@ a run at once.
 
 The combiner is handed the predictions, the response, the fold map and the mask, and never a model.
 
-## Calendar Bins
+## Calendar bins
 
 A month is 28, 30 or 31 days, and a week starts on a Monday. `timesift` bins on the calendar, so a
 monthly mean over three years stays in its months rather than sliding through the seasons as
@@ -258,7 +257,7 @@ A calendar of your own is a function: pass one that returns each reading's bin s
 cut at the equinoxes bin like any named grain. A record that begins away from a bin boundary gives a
 bin the calendar does not fill; `bin_partial` marks those bins and `partial = "drop"` removes them.
 
-## Extreme Days and Extreme Readings
+## Extreme days and extreme readings
 
 `min` and `max` take the coldest and warmest single reading in a bin. `cold_day` and `warm_day`
 reduce each day to its own mean first, then take the extreme over days. `mean_daily_min` and
@@ -266,7 +265,7 @@ reduce each day to its own mean first, then take the extreme over days. `mean_da
 brought. One hour at -50 sets `min` to -50 outright and reaches the day-level statistics only
 through its twenty-fourth of that day's mean.
 
-## A Maximised TSS Is Optimistic
+## A maximised TSS is optimistic
 
 TSS is read at the threshold that maximises it, chosen on the same held-out units the score is read
 on. That inflates the level where presences are thin: on the Schrankogel design, by 0.110 on
@@ -276,7 +275,7 @@ on how a model's predictions are distributed, so two models of equal skill can c
 inflations and a paired TSS difference is not free of it. Runs are therefore scored by AUC by
 default, with TSS beside it.
 
-## R and Python Agree
+## R and Python agree
 
 `inst/spec/representation.md` is normative, and `inst/spec/fixtures/` holds a synthetic series with
 the digest of every grain-by-statistic combination, alongside the reference coefficients of every
@@ -285,7 +284,7 @@ same representation and the same baseline fits.
 [The contract](https://gillescolling.com/timesift/articles/contract.html) says what each language
 carries.
 
-## Reproducing the Study
+## Reproducing the study
 
 `inst/reproduce/schrankogel.R` runs the published grid from the Zenodo deposit it was built on, and
 asserts the plot count, the species count, the cell count and the bin count of every grain before
@@ -296,9 +295,17 @@ says how to run each stage, what it costs, and how every number compares with th
 
 - [Choosing how a record is read](https://gillescolling.com/timesift/articles/timesift.html) - Getting started in R
 - [Choosing how a record is read, in Python](https://gillescolling.com/timesift/articles/python.html) - Getting started in Python
+- [Representing a record](https://gillescolling.com/timesift/articles/representations.html) - Grains, statistics, calendars, lookbacks and the arrays they give
+- [Learners](https://gillescolling.com/timesift/articles/learners.html) - The shipped learners, training, tuning, and a learner of your own
+- [Finding the grain](https://gillescolling.com/timesift/articles/comparing-grains.html) - Ladders, paired contrasts and nested selection on a record with a known answer
+- [Ensembles, thresholds and maps](https://gillescolling.com/timesift/articles/prediction.html) - Folds, stacking, prediction, thresholds and projection onto rasters
 - [Coming from biomod2](https://gillescolling.com/timesift/articles/biomod2.html) - The biomod2 models and where they sit in timesift
+- [Troubleshooting](https://gillescolling.com/timesift/articles/troubleshooting.html) - The errors a run raises, what causes them, and the fix
 - [The representation contract](https://gillescolling.com/timesift/articles/contract.html) - What R and Python share, and what each carries
 - [R reference](https://gillescolling.com/timesift/reference/index.html) · [Python reference](https://gillescolling.com/timesift/articles/python-reference.html)
+
+Bug reports and questions go to the
+[issue tracker](https://github.com/gcol33/timesift/issues).
 
 ## Support
 

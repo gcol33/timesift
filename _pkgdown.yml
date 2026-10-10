@@ -29,6 +29,13 @@ figures:
   dev: svglite::svglite
   fig.ext: svg
   bg: '#F5F6F8'
+home:
+  title: 'timesift: Learn Predictive Representations of Time-Varying Data'
+  description: |
+    Builds each candidate representation of a time-stamped record, from the readings as recorded through a calendar week or month to a span anchored on each target, fits learners on every one, scores them on one set of held-out folds and stacks them. In R and Python over one C++ core.
+authors:
+  Gilles Colling:
+    href: https://github.com/gcol33
 navbar:
   structure:
     left:
@@ -58,8 +65,19 @@ navbar:
     articles:
       text: Articles
       menu:
+      - text: Representing a record
+        href: articles/representations.html
+      - text: Learners
+        href: articles/learners.html
+      - text: Finding the grain
+        href: articles/comparing-grains.html
+      - text: Ensembles, thresholds and maps
+        href: articles/prediction.html
+      - text: '---'
       - text: Coming from biomod2
         href: articles/biomod2.html
+      - text: Troubleshooting
+        href: articles/troubleshooting.html
       - text: The contract between R and Python
         href: articles/contract.html
 reference:
@@ -190,9 +208,18 @@ articles:
   contents:
   - timesift
   - articles/python
+- title: Using timesift
+  desc: |
+    One topic each, in R: how a record becomes an array, the learners, the comparison across grains, and the step from a scored run to predictions and maps.
+  contents:
+  - articles/representations
+  - articles/learners
+  - articles/comparing-grains
+  - articles/prediction
 - title: Articles
   contents:
   - articles/biomod2
+  - articles/troubleshooting
 - title: The contract
   desc: |
     What both implementations answer to, and what each language carries.

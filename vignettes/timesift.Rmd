@@ -211,8 +211,9 @@ one denominator and every paired difference runs on matched cells.
 ## Learners, and how they are trained
 
 `elasticnet()` and `linear()` read a block of features, `forest()` grows a probability forest over
-one, and the `torch` encoders `mlp()`, `cnn()` and `rescnn()` read a sequence with a joint
-multi-label head, so every response is predicted together from a shared embedding. Pooling
+one, and the `torch` encoders predict every response together through a joint multi-label head
+from a shared embedding: `cnn()` and `rescnn()` convolve along the sequence of bins, and `mlp()`
+reads the same bins flattened into one block. Pooling
 strength across responses is what makes the rarer ones learnable at these sample sizes.
 
 `elasticnet()` is the arm a network is measured against, so it is fitted by the same compiled
@@ -391,3 +392,18 @@ head(aggregate(weight ~ part, weight, mean), 4)
 
 Holding a channel back instead asks what each statistic of a grain carries, which is the question
 behind keeping a bin's extremes at all.
+
+## Where next
+
+Each part of this path has an article of its own on the package site:
+
+- [Representing a record](https://gillescolling.com/timesift/articles/representations.html): every
+  grain and statistic, calendars of one's own, partial bins, coverage and lookbacks.
+- [Learners](https://gillescolling.com/timesift/articles/learners.html): the shipped learners,
+  training the encoders, tuning, and registering a learner, a response or a metric.
+- [Finding the grain](https://gillescolling.com/timesift/articles/comparing-grains.html): the
+  ladder, the contrasts and the nested selection on a simulated record whose grain is known.
+- [Ensembles, thresholds and maps](https://gillescolling.com/timesift/articles/prediction.html):
+  spatial and environmental folds, the combiners, thresholds and projection onto rasters.
+- [Coming from biomod2](https://gillescolling.com/timesift/articles/biomod2.html) and
+  [Troubleshooting](https://gillescolling.com/timesift/articles/troubleshooting.html).

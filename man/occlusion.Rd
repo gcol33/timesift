@@ -45,7 +45,7 @@ occlusion(x, ...)
 
 \item{metric}{Name of the registered metric the rescoring is read by, or a function of
 \verb{(y, p)}. Left unset it is the one the fit was scored under, so a weight is a fall in the
-number \code{\link[=summary]{summary()}} reports rather than in a second one. \code{"roc_auc"} is usually the steadier
+number \link[=timesift_report]{summary()} reports rather than in a second one. \code{"roc_auc"} is usually the steadier
 reading over many rescorings: it responds to every reordering of the units, where a maximum
 over thresholds frequently does not move at all.}
 

@@ -162,7 +162,7 @@ test_that("a cell the record cannot fill names the target and the interval", {
   at <- data.frame(id = "p1", at = as.POSIXct("2021-09-20", tz = "UTC"),
                    stringsAsFactors = FALSE)
   expect_error(lookback_matrix(d, id, t, v, at = at, span = "30 days", bins = 3L, stats = "mean"),
-               "1 (target, bin) cell hold no readings, first: target 1 over ", fixed = TRUE)
+               "1 (target, bin) cell holds no readings, first: target 1 over ", fixed = TRUE)
   expect_error(lookback_matrix(d, id, t, v, at = at, span = "30 days", bins = 3L, stats = "mean"),
                "[2021-08-21T00:00:00, 2021-08-31T00:00:00)", fixed = TRUE)
 

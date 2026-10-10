@@ -97,7 +97,7 @@ fully connected encoder's first layer 1.4 times as far per step, and on the Schr
 that costs it 0.044 TSS (\code{inst/reproduce/README.md}).
 
 A fitted encoder holds its weights as plain arrays and rebuilds the network when it predicts, so
-a fit saved with \code{\link[=saveRDS]{saveRDS()}} predicts after \code{\link[=readRDS]{readRDS()}} in a fresh session.
+a fit saved with \code{\link[base:saveRDS]{base::saveRDS()}} predicts after \code{\link[base:readRDS]{base::readRDS()}} in a fresh session.
 }
 \examples{
 cnn(epochs = 5)

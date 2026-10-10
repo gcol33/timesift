@@ -315,8 +315,9 @@ def lookback_matrix(data=None, id=None, time=None, value=None, at=None, span=Non
     one row per target; a unit may carry any number of them. Bin ``b`` of a target anchored at
     ``a`` covers ``[a - lag - span + b * step, a - lag - span + (b + 1) * step)``, with ``step`` the
     span divided by ``bins`` and ``b`` counted from zero. Only the readings of the target's own
-    unit are read, and every ``(target, bin)`` cell must hold at least one: a lookback reaching past
-    the record is an error naming the target, never a padded row.
+    unit are read, and every ``(target, bin)`` cell must hold at least one: a bin lying wholly past
+    the record is an error naming the target, never a padded row, and one the record reaches only in
+    part is summarised over the readings it holds, with ``bin_n`` recording how many.
 
     ``span`` and ``lag`` are read from a count and a unit -- ``"30 days"``, ``"12 hours"``,
     ``"1 year"`` -- or from a bare number of seconds. A year is 365 days and a month is 30 days

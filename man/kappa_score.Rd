@@ -46,7 +46,7 @@ functions at \code{"youden"}.}
 Where a rule is named without a call to \code{decision_threshold()} it takes that default.}
 
 \item{candidate}{For a \code{\link[=timesift]{timesift()}} fit, the candidate whose cut is learned: \code{"ensemble"},
-\code{"selected"} or the name of one, as \code{\link[=predict]{predict()}} takes it.}
+\code{"selected"} or the name of one, as \link[=predict.timesift]{predict()} takes it.}
 
 \item{p_a, p_b}{Two models' predictions for the same units.}
 }

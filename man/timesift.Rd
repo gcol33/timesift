@@ -113,7 +113,7 @@ the stack.
 \item \code{candidates}, \code{scores} and \code{oof}: every candidate, its per-cell scores on the outer folds and
 its outer out-of-fold predictions.
 \item \code{choice}, \code{models}, \code{stack} and \code{weights}: the procedure applied to every target, which is
-what \code{\link[=predict]{predict()}} uses. Every candidate is refitted on all of them; \code{choice} is the candidate
+what \link[=predict.timesift]{predict()} uses. Every candidate is refitted on all of them; \code{choice} is the candidate
 \code{choose} takes on the outer scores, with the outer folds as the split it chooses on, and
 \code{stack} holds weights fitted on the outer out-of-fold predictions.
 \item \code{representations}, \code{fits}, \code{folds}, \code{cells}, \code{y}, and the \code{metric}, \code{response}, \code{spec} and

@@ -215,8 +215,9 @@ one denominator and every paired difference runs on matched cells.
 ## Learners, and how they are trained
 
 `ts.elasticnet()` and `ts.linear()` read a block of features, `ts.forest()` grows a probability
-forest over one, and the `torch` encoders `ts.mlp()`, `ts.cnn()` and `ts.rescnn()` read a sequence
-with a joint multi-label head, so every response is predicted together from a shared embedding.
+forest over one, and the `torch` encoders predict every response together through a joint
+multi-label head from a shared embedding: `ts.cnn()` and `ts.rescnn()` convolve along the sequence
+of bins, and `ts.mlp()` reads the same bins flattened into one block.
 Pooling strength across responses is what makes the rarer ones learnable at these sample sizes.
 
 `ts.elasticnet()` is the arm a network is measured against, so it is fitted by the same compiled
