@@ -289,7 +289,7 @@ fit = ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
                   learners=models, sift=ts.grains("week", "month"),
                   resampling=ts.cv(v=5), n_inner=3, verbose=False)
 round(time.perf_counter() - start)
-#> 17
+#> 15
 ```
 :::
 
@@ -972,16 +972,16 @@ def seconds_to_fit(learner, x=week):
 
 seconds = pd.Series({name: seconds_to_fit(l) for name, l in timed.items()})
 seconds.round(2).sort_values(ascending=False)
-#> linear                  2.58
-#> elasticnet              2.30
+#> linear                  2.64
+#> elasticnet              2.13
 #> forest                  0.32
-#> maxent                  0.27
+#> maxent                  0.24
 #> elasticnet(tol=1e-4)    0.10
 #> discriminant            0.09
 #> xgboost                 0.06
-#> perceptron              0.02
+#> tree                    0.02
 #> boosting                0.02
-#> tree                    0.01
+#> perceptron              0.02
 #> mars                    0.01
 #> envelope                0.00
 #> hierarchical            0.00
@@ -1018,8 +1018,8 @@ round(additive_seconds, 2)
 month = ts.grain_matrix(sim.readings, "unit", "time", "reading", grain="month")
 pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
            "k = 5": seconds_to_fit(ts.additive(k=5), month)}).round(2)
-#> k = 10    6.51
-#> k = 5     0.39
+#> k = 10    6.93
+#> k = 5     0.41
 #> dtype: float64
 ```
 :::

@@ -49,18 +49,12 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
+<li class="nav-item"><a class="nav-link" href="../articles/timesift.html">Get started</a></li>
 <li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-r" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">R</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-r">
-<li><a class="dropdown-item" href="../articles/timesift.html">Get started</a></li>
-    <li><a class="dropdown-item" href="../reference/index.html">Reference</a></li>
-  </ul>
-</li>
-<li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-python" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Python</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-python">
-<li><a class="dropdown-item" href="../articles/timesift.html?lang=python">Get started</a></li>
-    <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-reference" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Reference</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-reference">
+<li><a class="dropdown-item" href="../reference/index.html">R reference</a></li>
+    <li><a class="dropdown-item" href="../articles/python-reference.html">Python reference</a></li>
   </ul>
 </li>
 <li class="active nav-item dropdown">
@@ -524,7 +518,7 @@ under its learner’s <code>name</code>, which
 <span>                  resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, n_inner <span class="op">=</span> <span class="fl">3L</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">run_time</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 16.67</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 16.61</span></span></code></pre></div>
 <div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="im">import</span> time</span>
 <span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> replace</span>
 <span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
@@ -543,7 +537,7 @@ under its learner’s <code>name</code>, which
 <span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a>                  learners<span class="op">=</span>models, sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>),</span>
 <span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a>                  resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">5</span>), n_inner<span class="op">=</span><span class="dv">3</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
 <span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="bu">round</span>(time.perf_counter() <span class="op">-</span> start)</span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="co">#&gt; 17</span></span></code></pre></div>
+<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="co">#&gt; 15</span></span></code></pre></div>
 </div>
 <p>The run took 17 seconds for 15 candidates. With three inner folds in
 each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20
@@ -1294,14 +1288,14 @@ at the weekly grain, which flattens to 53 columns.</p>
 <span><span class="op">}</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">seconds</span>, <span class="fl">2</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                 linear             elasticnet                 forest </span></span>
-<span><span class="co">#&gt;                   5.20                   2.84                   0.30 </span></span>
-<span><span class="co">#&gt; elasticnet(tol = 1e-4)                 maxent           discriminant </span></span>
-<span><span class="co">#&gt;                   0.21                   0.20                   0.11 </span></span>
-<span><span class="co">#&gt;             perceptron                xgboost               boosting </span></span>
-<span><span class="co">#&gt;                   0.05                   0.04                   0.02 </span></span>
-<span><span class="co">#&gt;                   tree           hierarchical               envelope </span></span>
-<span><span class="co">#&gt;                   0.01                   0.01                   0.00 </span></span>
-<span><span class="co">#&gt;                   mars </span></span>
+<span><span class="co">#&gt;                   4.25                   2.30                   0.30 </span></span>
+<span><span class="co">#&gt;                 maxent elasticnet(tol = 1e-4)           discriminant </span></span>
+<span><span class="co">#&gt;                   0.20                   0.14                   0.09 </span></span>
+<span><span class="co">#&gt;                xgboost               boosting             perceptron </span></span>
+<span><span class="co">#&gt;                   0.04                   0.03                   0.03 </span></span>
+<span><span class="co">#&gt;                   tree               envelope                   mars </span></span>
+<span><span class="co">#&gt;                   0.02                   0.01                   0.01 </span></span>
+<span><span class="co">#&gt;           hierarchical </span></span>
 <span><span class="co">#&gt;                   0.00</span></span></code></pre></div>
 <div class="sourceCode" id="cb55"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" tabindex="-1"></a>timed <span class="op">=</span> {</span>
 <span id="cb55-2"><a href="#cb55-2" tabindex="-1"></a>    <span class="st">"elasticnet"</span>: ts.elasticnet(), <span class="st">"elasticnet(tol=1e-4)"</span>: ts.elasticnet(tol<span class="op">=</span><span class="fl">1e-4</span>),</span>
@@ -1318,16 +1312,16 @@ at the weekly grain, which flattens to 53 columns.</p>
 <span id="cb55-13"><a href="#cb55-13" tabindex="-1"></a></span>
 <span id="cb55-14"><a href="#cb55-14" tabindex="-1"></a>seconds <span class="op">=</span> pd.Series({name: seconds_to_fit(l) <span class="cf">for</span> name, l <span class="kw">in</span> timed.items()})</span>
 <span id="cb55-15"><a href="#cb55-15" tabindex="-1"></a>seconds.<span class="bu">round</span>(<span class="dv">2</span>).sort_values(ascending<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb55-16"><a href="#cb55-16" tabindex="-1"></a><span class="co">#&gt; linear                  2.58</span></span>
-<span id="cb55-17"><a href="#cb55-17" tabindex="-1"></a><span class="co">#&gt; elasticnet              2.30</span></span>
+<span id="cb55-16"><a href="#cb55-16" tabindex="-1"></a><span class="co">#&gt; linear                  2.64</span></span>
+<span id="cb55-17"><a href="#cb55-17" tabindex="-1"></a><span class="co">#&gt; elasticnet              2.13</span></span>
 <span id="cb55-18"><a href="#cb55-18" tabindex="-1"></a><span class="co">#&gt; forest                  0.32</span></span>
-<span id="cb55-19"><a href="#cb55-19" tabindex="-1"></a><span class="co">#&gt; maxent                  0.27</span></span>
+<span id="cb55-19"><a href="#cb55-19" tabindex="-1"></a><span class="co">#&gt; maxent                  0.24</span></span>
 <span id="cb55-20"><a href="#cb55-20" tabindex="-1"></a><span class="co">#&gt; elasticnet(tol=1e-4)    0.10</span></span>
 <span id="cb55-21"><a href="#cb55-21" tabindex="-1"></a><span class="co">#&gt; discriminant            0.09</span></span>
 <span id="cb55-22"><a href="#cb55-22" tabindex="-1"></a><span class="co">#&gt; xgboost                 0.06</span></span>
-<span id="cb55-23"><a href="#cb55-23" tabindex="-1"></a><span class="co">#&gt; perceptron              0.02</span></span>
+<span id="cb55-23"><a href="#cb55-23" tabindex="-1"></a><span class="co">#&gt; tree                    0.02</span></span>
 <span id="cb55-24"><a href="#cb55-24" tabindex="-1"></a><span class="co">#&gt; boosting                0.02</span></span>
-<span id="cb55-25"><a href="#cb55-25" tabindex="-1"></a><span class="co">#&gt; tree                    0.01</span></span>
+<span id="cb55-25"><a href="#cb55-25" tabindex="-1"></a><span class="co">#&gt; perceptron              0.02</span></span>
 <span id="cb55-26"><a href="#cb55-26" tabindex="-1"></a><span class="co">#&gt; mars                    0.01</span></span>
 <span id="cb55-27"><a href="#cb55-27" tabindex="-1"></a><span class="co">#&gt; envelope                0.00</span></span>
 <span id="cb55-28"><a href="#cb55-28" tabindex="-1"></a><span class="co">#&gt; hierarchical            0.00</span></span>
@@ -1354,21 +1348,21 @@ coefficients than there are units:</p>
 <span>  `k = 5` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="fu"><a href="../reference/fit_learner.html">fit_learner</a></span><span class="op">(</span><span class="fu"><a href="../reference/additive.html">additive</a></span><span class="op">(</span>k <span class="op">=</span> <span class="fl">5L</span><span class="op">)</span>, <span class="va">month</span>, <span class="va">sim</span><span class="op">$</span><span class="va">y</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">additive_seconds</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt; k = 10  k = 5 </span></span>
-<span><span class="co">#&gt;  13.30   0.34</span></span></code></pre></div>
+<span><span class="co">#&gt;  11.28   0.27</span></span></code></pre></div>
 <div class="sourceCode" id="cb59"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" tabindex="-1"></a>month <span class="op">=</span> ts.grain_matrix(sim.readings, <span class="st">"unit"</span>, <span class="st">"time"</span>, <span class="st">"reading"</span>, grain<span class="op">=</span><span class="st">"month"</span>)</span>
 <span id="cb59-2"><a href="#cb59-2" tabindex="-1"></a>pd.Series({<span class="st">"k = 10"</span>: seconds_to_fit(ts.additive(), month),</span>
 <span id="cb59-3"><a href="#cb59-3" tabindex="-1"></a>           <span class="st">"k = 5"</span>: seconds_to_fit(ts.additive(k<span class="op">=</span><span class="dv">5</span>), month)}).<span class="bu">round</span>(<span class="dv">2</span>)</span>
-<span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a><span class="co">#&gt; k = 10    6.51</span></span>
-<span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a><span class="co">#&gt; k = 5     0.39</span></span>
+<span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a><span class="co">#&gt; k = 10    6.93</span></span>
+<span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a><span class="co">#&gt; k = 5     0.41</span></span>
 <span id="cb59-6"><a href="#cb59-6" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
 </div>
-<p>With <code>k = 10</code> the fit took 13.3 seconds, and with
+<p>With <code>k = 10</code> the fit took 11.3 seconds, and with
 <code>k = 5</code> it took 0.3 seconds.</p>
 <p>The elastic net includes every predictor and uses a penalty to limit
 coefficient size. It chooses that penalty within the training data. At
-its default tolerance it took 2.8 seconds here; <code>tol = 1e-4</code>
-took 0.2 seconds and gave the same held-out AUC on the split above.
-<code><a href="../reference/linear.html">linear()</a></code> took 5.2 seconds. Its search refits the model for
+its default tolerance it took 2.3 seconds here; <code>tol = 1e-4</code>
+took 0.1 seconds and gave the same held-out AUC on the split above.
+<code><a href="../reference/linear.html">linear()</a></code> took 4.2 seconds. Its search refits the model for
 each term it could add or remove, with 106 possible terms at the weekly
 grain. A coarser grain or a bounded search, such as
 <code>linear(select = "forward", terms = "column", max_terms = 3)</code>,

@@ -35,8 +35,8 @@ redirects:
 navbar:
   structure:
     left:
-    - r
-    - python
+    - intro
+    - reference
     - articles
     - news
     right:
@@ -44,19 +44,15 @@ navbar:
     - github
     - lightswitch
   components:
-    r:
-      text: R
+    intro:
+      text: Get started
+      href: articles/timesift.html
+    reference:
+      text: Reference
       menu:
-      - text: Get started
-        href: articles/timesift.html
-      - text: Reference
+      - text: R reference
         href: reference/index.html
-    python:
-      text: Python
-      menu:
-      - text: Get started
-        href: articles/timesift.html?lang=python
-      - text: Reference
+      - text: Python reference
         href: articles/python-reference.html
     articles:
       text: Articles

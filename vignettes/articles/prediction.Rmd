@@ -861,7 +861,7 @@ import time
 start = time.perf_counter()
 now = ts.project(fit, series=grid, static=elev)
 round(time.perf_counter() - start, 2)
-#> 0.06
+#> 0.05
 dict(now.sizes)
 #> {'response': 4, 'y': 10, 'x': 12}
 bool(np.allclose(now.sel(response="sp1").values.ravel(), fit.predict(targets, series)[:, 0]))

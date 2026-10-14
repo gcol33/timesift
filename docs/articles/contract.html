@@ -49,18 +49,12 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
+<li class="nav-item"><a class="nav-link" href="../articles/timesift.html">Get started</a></li>
 <li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-r" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">R</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-r">
-<li><a class="dropdown-item" href="../articles/timesift.html">Get started</a></li>
-    <li><a class="dropdown-item" href="../reference/index.html">Reference</a></li>
-  </ul>
-</li>
-<li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-python" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Python</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-python">
-<li><a class="dropdown-item" href="../articles/timesift.html?lang=python">Get started</a></li>
-    <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-reference" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Reference</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-reference">
+<li><a class="dropdown-item" href="../reference/index.html">R reference</a></li>
+    <li><a class="dropdown-item" href="../articles/python-reference.html">Python reference</a></li>
   </ul>
 </li>
 <li class="active nav-item dropdown">
@@ -132,9 +126,10 @@
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
 <span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
 <span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
-<p>Normative for both implementations. R and Python must produce the
-same numbers from the same input; where this document and either
-implementation disagree, this document is right.</p>
+<p>This document defines how both the R and Python implementations
+should behave. Given the same input, both must produce identical
+results. If an implementation differs from this document, the
+implementation must be corrected.</p>
 </div>
 <div class="section level2">
 <h2 id="input">Input<a class="anchor" aria-label="anchor" href="#input"></a>

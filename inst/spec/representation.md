@@ -1,7 +1,8 @@
 # The representation contract
 
-Normative for both implementations. R and Python must produce the same numbers from the same
-input; where this document and either implementation disagree, this document is right.
+This document defines how both the R and Python implementations should behave. Given the same
+input, both must produce identical results. If an implementation differs from this document, the
+implementation must be corrected.
 
 ## Input
 
