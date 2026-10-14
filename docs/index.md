@@ -34,15 +34,14 @@ timesift lets you:
   boosting, Maxent, surface range envelopes, MARS, flexible discriminant
   analysis, GAMs and neural networks, or add your own model.
 - **Scores you can report.** Evaluate model selection and ensembles on
-  held-out data. Each training fold is used to choose the grain and
-  estimate ensemble weights; the corresponding test fold is used to
-  score the predictions.
-- **Thin presences.** With few presences, the TSS read at its best
-  threshold overstates skill.
+  held-out data: each training fold chooses the grain and estimates the
+  ensemble weights, and the matching test fold scores the predictions.
+  Selecting the TSS threshold on the same data used to evaluate it can
+  inflate reported skill.
   [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.html)
-  measures the overstatement for your design, and
+  estimates this bias for your design, while
   [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.html)
-  turns a reported TSS into the skill it is consistent with.
+  helps interpret the reported score.
 - **Python and R.** Run analyses in R or Python. Both interfaces use the
   same C++ code for data preparation and baseline models, giving
   matching arrays and model fits.
