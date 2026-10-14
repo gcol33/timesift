@@ -30,7 +30,7 @@ timesift supports:
   forest, boosting, Maxent, surface range envelope, MARS, flexible discriminant analysis, GAM and a
   one-layer network, plus convolutional and fully connected networks through torch, and any
   learner of your own.
-- **Scores you can report.** The grain and the ensemble weights are chosen inside each outer
+- **Evaluation scores.** The grain and the ensemble weights are chosen inside each outer
   training fold, so the held-out score covers the choosing too.
 - **Thin presences.** With few presences, the TSS read at its best threshold overstates skill.
   `tss_inflation()` measures the overstatement for your design, and `implied_skill()` turns a
