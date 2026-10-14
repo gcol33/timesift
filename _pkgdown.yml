@@ -30,6 +30,8 @@ home:
 authors:
   Gilles Colling:
     href: https://github.com/gcol33
+redirects:
+  - ["articles/python.html", "articles/timesift.html?lang=python"]
 navbar:
   structure:
     left:
@@ -53,7 +55,7 @@ navbar:
       text: Python
       menu:
       - text: Get started
-        href: articles/python.html
+        href: articles/timesift.html?lang=python
       - text: Reference
         href: articles/python-reference.html
     articles:
@@ -68,14 +70,15 @@ navbar:
       - text: Ensembles, thresholds and maps
         href: articles/prediction.html
       - text: '---'
+      - text: The contract between R and Python
+        href: articles/contract.html
       - text: Coming from biomod2
         href: articles/biomod2.html
+      - text: '---'
       - text: Installing torch
         href: articles/installation.html
       - text: Troubleshooting
         href: articles/troubleshooting.html
-      - text: The contract between R and Python
-        href: articles/contract.html
 reference:
 - title: The one call
   desc: |
@@ -203,8 +206,7 @@ articles:
     The whole path on a small simulated record, from two tables to a scored comparison and the prediction that follows from it.
   contents:
   - timesift
-  - articles/python
-- title: Using timesift
+- title: Workflows
   desc: |
     One topic each, in R: how a record becomes an array, the learners, the comparison across grains, and the step from a scored run to predictions and maps.
   contents:
@@ -212,15 +214,16 @@ articles:
   - articles/learners
   - articles/comparing-grains
   - articles/prediction
-- title: Articles
+- title: Background
+  desc: |
+    What both implementations answer to, and how the package maps onto biomod2.
   contents:
+  - articles/contract
   - articles/biomod2
+- title: Setup and help
+  contents:
   - articles/installation
   - articles/troubleshooting
-- title: The contract
-  desc: |
-    What both implementations answer to, and what each language carries.
-  contents: articles/contract
 - title: Python reference
   desc: |
     The Python package's functions, classes and values, under the sections of the R reference.
