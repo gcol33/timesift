@@ -11,6 +11,7 @@ Datta
 Dunnett's
 Ensembling
 Fuglstad
+GAMs
 Gini
 Guestrin
 Hastie
@@ -78,6 +79,7 @@ glmnet
 glmnet's
 int
 jss
+lang
 learn's
 libtorch
 lme
@@ -103,6 +105,7 @@ np
 numpy
 numpy's
 pruning's
+py
 pytest
 randomForest
 randomForest's
@@ -129,7 +132,6 @@ th
 tidyselect
 tidyselect's
 timesift's
-timesift’s
 tulpa
 tulpa's
 undertrained
