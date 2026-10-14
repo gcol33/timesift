@@ -40,8 +40,7 @@ timesift supports:
 
 Every learner core is timesift's own code, written from the published method and pinned in the
 test fixtures against the reference package a species modeller already uses: glmnet, MASS, rpart,
-earth, mda, mgcv, nnet, maxnet and biomod2. Both test suites assert the same 257 digests of the
-binned record, so a difference between the languages fails a check. A methods section cites the
+earth, mda, mgcv, nnet, maxnet and biomod2. Both test suites assert the same stored digests of the binned record, so a difference between the languages fails a check. A methods section cites the
 package version, which fixes every core and its defaults.
 
 ## Installation

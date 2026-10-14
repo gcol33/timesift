@@ -35,7 +35,7 @@ timesift lets you:
 - **Report evaluation scores.** Evaluate model selection and ensembles on held-out data: each training fold chooses the grain and estimates the ensemble weights, and the matching test fold scores the predictions. Selecting the TSS threshold on the same data used to evaluate it can inflate reported skill. [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.html) estimates this bias for your design, while [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.html) helps interpret the reported score.
 - **Python and R.** Run analyses in R or Python. Both interfaces use the same C++ code for data preparation and baseline models, giving matching arrays and model fits.
 
-The model implementations are based on published methods and tested against reference packages including glmnet, MASS, rpart, earth, mda, mgcv, nnet, maxnet and biomod2. R and Python also use the same 257 checksums to test that they produce identical binned arrays. Cite the timesift version to identify the implementations and defaults used in an analysis.
+The model implementations are based on published methods and tested against reference packages including glmnet, MASS, rpart, earth, mda, mgcv, nnet, maxnet and biomod2. R and Python are tested against the same stored results, so they produce identical binned arrays. Cite the timesift version to identify the implementations and defaults used in an analysis.
 
 ## Installation
 

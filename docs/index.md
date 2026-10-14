@@ -48,8 +48,7 @@ timesift lets you:
 
 The model implementations are based on published methods and tested
 against reference packages including glmnet, MASS, rpart, earth, mda,
-mgcv, nnet, maxnet and biomod2. R and Python also use the same 257
-checksums to test that they produce identical binned arrays. Cite the
+mgcv, nnet, maxnet and biomod2. R and Python are tested against the same stored results, so they produce identical binned arrays. Cite the
 timesift version to identify the implementations and defaults used in an
 analysis.
 
