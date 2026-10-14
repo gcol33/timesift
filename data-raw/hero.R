@@ -78,6 +78,8 @@ p <- ggplot() +
   geom_text(data = rows, aes(tss_x(tss) + 2, y, label = sprintf("%.3f", tss),
                              colour = colour, fontface = face),
             hjust = 0, size = 11.5) +
+  annotate("text", x = (x0 + x1) / 2, y = row_y(0) - 0.05, label = "soil temperature",
+           colour = grey, size = 9.5, vjust = 0.5) +
   annotate("text", x = tss_x(0.666), y = row_y(0) - 0.05, label = "TSS",
            colour = grey, size = 9.5, vjust = 0.5) +
   scale_colour_identity() +

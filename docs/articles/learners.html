@@ -63,7 +63,7 @@
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
-<li class="nav-item dropdown">
+<li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
@@ -415,8 +415,8 @@ short. The section on settings shows what the tolerance changes.</p>
 <span>                  resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, n_inner <span class="op">=</span> <span class="fl">3L</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">run_time</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 16.27</span></span></code></pre></div>
-<p>The run took 16 seconds for 15 candidates. With three inner folds in
+<span><span class="co">#&gt; [1] 20.97</span></span></code></pre></div>
+<p>The run took 21 seconds for 15 candidates. With three inner folds in
 each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20
 times, three inner fits and one outer fit in each outer fold, and once
 more on every target.</p>
@@ -891,13 +891,13 @@ at the weekly grain, which flattens to 53 columns.</p>
 <span><span class="op">}</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">seconds</span>, <span class="fl">2</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                 linear             elasticnet                 forest </span></span>
-<span><span class="co">#&gt;                   4.56                   2.33                   0.28 </span></span>
+<span><span class="co">#&gt;                   4.91                   2.63                   0.30 </span></span>
 <span><span class="co">#&gt;                 maxent elasticnet(tol = 1e-4)           discriminant </span></span>
-<span><span class="co">#&gt;                   0.21                   0.14                   0.09 </span></span>
+<span><span class="co">#&gt;                   0.20                   0.16                   0.09 </span></span>
 <span><span class="co">#&gt;                xgboost             perceptron                   tree </span></span>
-<span><span class="co">#&gt;                   0.04                   0.03                   0.01 </span></span>
-<span><span class="co">#&gt;               boosting               envelope                   mars </span></span>
-<span><span class="co">#&gt;                   0.01                   0.00                   0.00 </span></span>
+<span><span class="co">#&gt;                   0.05                   0.03                   0.02 </span></span>
+<span><span class="co">#&gt;               boosting                   mars               envelope </span></span>
+<span><span class="co">#&gt;                   0.02                   0.01                   0.00 </span></span>
 <span><span class="co">#&gt;           hierarchical </span></span>
 <span><span class="co">#&gt;                   0.00</span></span></code></pre></div>
 <p><code><a href="../reference/additive.html">additive()</a></code> is not in that list, because at its default
@@ -916,21 +916,21 @@ coefficients than there are units:</p>
 <span>  `k = 5` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="fu"><a href="../reference/fit_learner.html">fit_learner</a></span><span class="op">(</span><span class="fu"><a href="../reference/additive.html">additive</a></span><span class="op">(</span>k <span class="op">=</span> <span class="fl">5L</span><span class="op">)</span>, <span class="va">month</span>, <span class="va">sim</span><span class="op">$</span><span class="va">y</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">additive_seconds</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt; k = 10  k = 5 </span></span>
-<span><span class="co">#&gt;  11.78   0.27</span></span></code></pre></div>
-<p>With <code>k = 10</code> the fit took 11.8 seconds, and with
+<span><span class="co">#&gt;  14.39   0.31</span></span></code></pre></div>
+<p>With <code>k = 10</code> the fit took 14.4 seconds, and with
 <code>k = 5</code> it took 0.3 seconds.</p>
 <p>The elastic net is the learner to start with. It reads every column
 without a selection step, chooses its penalty inside the units it is
 fitted on, and is the arm the package measures a network against. At its
-default tolerance it took 2.3 seconds here, and <code>tol = 1e-4</code>
-took 0.1, at the same held-out AUC on the split above.
-<code><a href="../reference/linear.html">linear()</a></code> was the slowest at 4.6 seconds: its two-way search
+default tolerance it took 2.6 seconds here, and <code>tol = 1e-4</code>
+took 0.2, at the same held-out AUC on the split above.
+<code><a href="../reference/linear.html">linear()</a></code> was the slowest at 4.9 seconds: its two-way search
 refits the model for every term it could add or drop at every step, and
 the weekly grain offers it 106 terms, each column and its square. Pinned
 to a coarse grain, or searched forward under a bound as
 <code>linear(select = "forward", terms = "column", max_terms = 3)</code>
 does, the search has fewer steps to take. Every other tabular learner
-took at most 0.28 seconds.</p>
+took at most 0.3 seconds.</p>
 <p>What a learner can be fitted on depends on the number of units
 against the number of columns its representation flattens to:</p>
 <ul>

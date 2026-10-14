@@ -1,7 +1,7 @@
 # The package logo: one year of one plot's soil temperature, its daily range in grey, and a blue
-# line that coarsens from the hourly readings through the study's grains to the yearly mean and back,
-# over a sieve mesh drifting one cell per cycle. Readers who ask for reduced motion see the weekly
-# means. Writes man/figures/logo.svg.
+# line that coarsens from the hourly readings through the half day and the day to the weekly means
+# and back, over a sieve mesh drifting one cell per cycle. Readers who ask for reduced motion see
+# the weekly means. Writes man/figures/logo.svg.
 library(timesift)
 source("data-raw/deposit.R")
 
@@ -54,13 +54,13 @@ coarse <- function(g) {
   rep(v, each = 2L)
 }
 
-grains <- c("halfday", "day", "week", "month", "season", "year")
+grains <- c("halfday", "day", "week")
 frames <- c(list(hourly), lapply(grains, coarse))
 stopifnot(all(lengths(frames) == length(cell_x)))
 frame_d <- vapply(frames, function(v) {
   paste0("M", paste(sprintf("%.0f,%.0f", cell_x, py(v)), collapse = " L"))
 }, character(1))
-widths <- c(3, 4, 6, 9, 9, 9, 9)
+widths <- c(3, 4, 6, 9)
 
 # There and back, easing into each grain so the eye can rest on it.
 order <- c(seq_along(frames), rev(seq_along(frames))[-1L])
@@ -70,10 +70,10 @@ splines <- paste(rep("0.45 0 0.55 1", n - 1L), collapse = ";")
 morph <- c(
   sprintf('<path d="%s" fill="none" stroke="%s" stroke-width="%g" stroke-linejoin="miter">',
           frame_d[1L], blue, widths[1L]),
-  sprintf(paste0('<animate attributeName="d" dur="18s" repeatCount="indefinite" ',
+  sprintf(paste0('<animate attributeName="d" dur="12s" repeatCount="indefinite" ',
                  'calcMode="spline" keyTimes="%s" keySplines="%s" values="%s"/>'),
           key_times, splines, paste(frame_d[order], collapse = ";")),
-  sprintf(paste0('<animate attributeName="stroke-width" dur="18s" repeatCount="indefinite" ',
+  sprintf(paste0('<animate attributeName="stroke-width" dur="12s" repeatCount="indefinite" ',
                  'calcMode="spline" keyTimes="%s" keySplines="%s" values="%s"/>'),
           key_times, splines, paste(widths[order], collapse = ";")),
   "</path>"

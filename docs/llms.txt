@@ -8,50 +8,42 @@ true skill statistic a convolutional network reached on each over 101
 species: 0.658 hourly, rising to a peak of 0.706 at the weekly mean,
 falling to 0.626 yearly](reference/figures/timesift-hero.png)
 
-timesift finds the time scale at which a long sensor record best
-predicts something, such as whether a plant species grows at the plot
-where a soil temperature logger recorded every hour for three years.
+timesift compares time scales to find which gives the best predictions
+from a sensor record. For example, you can use three years of hourly
+soil temperature to predict which plant species grow at a plot, and
+compare models trained on daily, weekly or monthly summaries.
 
-Before a model is fitted, a record like that is usually reduced once, to
-monthly means or growing-degree-days, and the reduction is rarely
-revisited. timesift makes it an argument. Each time scale is a *grain*:
-the record is cut into calendar bins, a real week or a real month, and
-each bin is reduced to a statistic such as its mean. The package builds
-the record at every grain you name, fits each learner on every grain it
-can read, and scores every pairing on the same held-out folds and the
-same cells. You can then compare the grains cell by cell, choose one
-inside the training data, or combine them into an ensemble.
+A *grain* is the time interval used to summarise the readings, such as a
+day, week or month. timesift groups readings into these calendar
+intervals and calculates a summary, such as the mean, for each one. It
+fits each model at each compatible grain and evaluates them on the same
+held-out observations. You can compare their predictions, select a grain
+using the training data, or combine predictions from several models in
+an ensemble.
 
 timesift supports:
 
-- **Calendar grains and lookbacks.** From the readings as recorded
-  through half-days, days, weeks, months, seasons and years, with
-  day-level statistics such as the coldest and warmest day of each bin,
-  and
+- Summaries from half-days to years, including the coldest and warmest
+  day in each interval. You can also use the original readings or
   [`lookback()`](https://gillescolling.com/timesift/reference/native.html)
-  spans that end at each target’s own date.
-- **The learners species distribution modelling uses.** Elastic net,
-  stepwise GLM, CART, random forest, boosting, Maxent, surface range
-  envelope, MARS, flexible discriminant analysis, GAM and a one-layer
-  network, plus convolutional and fully connected networks through
-  torch, and any learner of your own.
-- **Scores you can report.** The grain and the ensemble weights are
-  chosen inside each outer training fold, so the held-out score covers
-  the choosing too.
-- **Thin presences.**
-  [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
-  estimates how far a true skill statistic read at its own best
-  threshold overstates skill for your design’s presence counts.
-- **R and Python.** Both languages call one C++ core, so they give the
-  same arrays and the same baseline fits.
+  to summarise a period ending at each target’s observation date.
+- Models commonly used to predict species distributions, including
+  regression, trees, random forests, boosting, Maxent and neural
+  networks. You can also supply your own model.
+- Model selection and ensemble weighting within each training fold,
+  followed by evaluation on held-out data.
+- [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
+  to estimate how choosing the best threshold can inflate the true skill
+  statistic (TSS) when a species has few recorded presences.
+- R and Python interfaces to a shared C++ core, with matching arrays and
+  baseline model fits.
 
-Every learner core is timesift’s own code, written from the published
-method and pinned in the test fixtures against the reference package a
-species modeller already uses: glmnet, MASS, rpart, earth, mda, mgcv,
-nnet, maxnet and biomod2. Both test suites assert the same 257 digests
-of the binned record, so a difference between the languages fails a
-check. A methods section cites the package version, which fixes every
-core and its defaults.
+The model implementations are based on published methods and tested
+against reference packages including glmnet, MASS, rpart, earth, mda,
+mgcv, nnet, maxnet and biomod2. R and Python also use the same 257
+checksums to test that they produce identical binned arrays. Cite the
+timesift version to identify the implementations and defaults used in an
+analysis.
 
 ## Installation
 
@@ -150,20 +142,22 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 ## Usage
 
-1.  Bring two tables: `targets`, one row per thing to predict with its
-    response, and `series`, the time-stamped readings belonging to those
-    rows.
+1.  Prepare two tables: `targets`, with one row per sampling unit and
+    its responses, and `series`, with the time-stamped readings for
+    those units.
 2.  Call
     [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
-    with the response columns, the identifier both tables carry, the
+    with the response columns, the identifier shared by both tables, the
     time column and the grains to compare.
-3.  Read the scores, then call
-    [`predict()`](https://rdrr.io/r/stats/predict.html) on new rows.
+3.  Inspect the scores, then call
+    [`predict()`](https://rdrr.io/r/stats/predict.html) for new sampling
+    units.
 
+This example uses
 [`simulate_records()`](https://gillescolling.com/timesift/reference/simulate_records.md)
-draws a record with a known answer to try this on: 150 sensors with a
-reading every three hours for a year, and four responses that depend on
-the record’s seasonal level.
+to generate a year of readings from 150 sensors, sampled every three
+hours. The four responses depend on seasonal values in the simulated
+record.
 
 ``` r
 
@@ -202,19 +196,22 @@ refused, and
 [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
 shows which unit and bin lack readings.
 
-A *candidate* is one grain paired with one learner;
-[`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
-is the learner when none is named. The candidate rows score each one on
-the outer folds, and the highest of them was picked out on the same
-folds it is scored on. The `selected` and `ensemble` rows are the
-numbers to report: the candidate and the ensemble weights were chosen
-inside each outer training fold and then scored once on the held-out
-fold.
+A *candidate* is a model fitted at one grain. The default model is
+[`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md).
+The candidate rows show how each pairing performed in cross-validation:
+each fold is held out in turn for evaluation. Selecting the highest
+score from these rows uses the evaluation data to choose a candidate.
 
-`predict(fit, new_targets, new_series)` rebuilds each member’s grain for
-the new rows and predicts through the ensemble fitted on every target.
-`type = "binary"` cuts each response into presence and absence at a
-threshold learned from the out-of-fold predictions.
+Use the `selected` and `ensemble` rows to report predictive performance.
+For these rows, candidate selection and ensemble weighting happen within
+each training fold. The held-out fold then evaluates the resulting
+predictions.
+
+`predict(fit, new_targets, new_series)` summarises the new readings at
+each required grain and predicts with the ensemble trained on all
+targets. Use `type = "binary"` to convert predicted probabilities to
+presence or absence. The threshold for each response is estimated from
+out-of-fold predictions.
 
 The same run in Python:
 
@@ -262,16 +259,14 @@ compares every number with the paper.
 two bins. A learner runs across the whole set, or at one grain when it
 is given one, as in `cnn(data = grain("week"))`.
 
-A month is 28 to 31 days and a week starts on a Monday, so a monthly
-mean over three years stays in its months. `year_start` moves the year
-boundary, for example to a hydrological year, and a function of the
-reading times can define a calendar of your own, such as seasons cut at
-the equinoxes.
+Bins follow the calendar: months have 28 to 31 days, and weeks start on
+Monday. `year_start` sets the start of the year, for example for a
+hydrological year. You can define a custom calendar with a function of
+the reading times, such as seasons beginning at the equinoxes.
 
-`min` and `max` are the coldest and warmest single reading in a bin.
-`cold_day` and `warm_day` first reduce each day to its mean, then take
-the coldest and warmest day. One hour at -50 sets `min` to -50 and moves
-`cold_day` by a twenty-fourth of that.
+`min` and `max` give the lowest and highest individual reading in each
+bin. `cold_day` and `warm_day` first calculate daily means, then return
+the lowest and highest daily mean within the bin.
 
 [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
 and
@@ -305,17 +300,21 @@ compares two projections. [Ensembles, thresholds and
 maps](https://gillescolling.com/timesift/articles/prediction.html) goes
 from a scored run to maps.
 
-## TSS read at its own best threshold
+## TSS and threshold selection
 
-The true skill statistic (TSS) is usually read at the threshold that
-maximises it, on the same held-out plots it scores. Where a species has
-few presences that overstates skill: on the Schrankogel design by 0.110
-on average when the true skill is 0.60.
+The true skill statistic (TSS) measures how well a model distinguishes
+presences from absences at a given prediction threshold. Choosing the
+threshold that maximises TSS on the evaluation data can inflate the
+score, especially for species with few presences. For the Schrankogel
+design, the estimated inflation is 0.110 on average when the true skill
+is 0.60.
+
 [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
-estimates the overstatement for your own presence counts and
+estimates this bias for your presence counts.
 [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.md)
-gives the true skill a score you read is consistent with. Runs are
-scored by AUC by default, with TSS beside it.
+estimates the underlying skill consistent with an observed score. By
+default, runs are scored by the area under the receiver operating
+characteristic curve (AUC), with TSS also reported.
 
 ## Documentation
 
