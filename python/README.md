@@ -32,8 +32,9 @@ timesift supports:
   learner of your own.
 - **Scores you can report.** The grain and the ensemble weights are chosen inside each outer
   training fold, so the held-out score covers the choosing too.
-- **Thin presences.** `tss_inflation()` estimates how far a true skill statistic read at its own
-  best threshold overstates skill for your design's presence counts.
+- **Thin presences.** With few presences, the TSS read at its best threshold overstates skill.
+  `tss_inflation()` measures the overstatement for your design, and `implied_skill()` turns a
+  reported TSS into the skill it is consistent with.
 - **Python and R.** This package and the [R package](https://gillescolling.com/timesift/) call one
   C++ core, so they give the same arrays and the same baseline fits.
 

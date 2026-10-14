@@ -1,10 +1,12 @@
 # How much a self-selected threshold inflates the reported level
 
-The true skill statistic is read at the threshold that maximises it,
-chosen on the same held-out units the score is then read on. That
-selection inflates the level, and by more the fewer presences a cell
-holds. Most code carries the inflation silently; this measures it for
-the presence counts of a given design.
+The true skill statistic (TSS) comes out too high when its best
+threshold is picked on the same held-out units the score is read from,
+and the more so the fewer presences a cell holds. This measures that
+excess for the presence counts of a given design;
+[`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.md)
+goes the other way, from a reported level to the skill it is consistent
+with.
 
 ## Usage
 
@@ -28,7 +30,7 @@ tss_inflation(y, folds, skill = c(0.6, 0.7, 0.9), replicates = 200L, seed = 1L)
 
 - skill:
 
-  Population skill values to plant.
+  Population skill values to simulate.
 
 - replicates:
 
@@ -40,23 +42,22 @@ tss_inflation(y, folds, skill = c(0.6, 0.7, 0.9), replicates = 200L, seed = 1L)
 
 ## Value
 
-A data frame with one row per planted value: the truth, the mean level
+A data frame with one row per `skill` value: the skill, the mean level
 read back, the inflation, and its interval across replicates.
 
 ## Details
 
-Predictions are simulated under a normal model in which the population
-skill is exactly `skill`, at the cell sizes and presence counts of the
-response and fold map supplied, and the level is read back exactly as
+Predictions are simulated for each value of `skill` as normal scores of
+equal variance, at the cell sizes and presence counts of the response
+and fold map supplied. The TSS is read at its best threshold exactly as
 [`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md)
-reports it. The gap between what comes back and the truth planted is the
-inflation.
+reports it, and the mean reading minus `skill` is the inflation.
 
 The inflation is an expectation. A level read on one design is
 optimistic on average, not a bound every reading sits above: a single
-level can fall below the population skill. The model planted here is one
-distribution of predictions, and another at the same skill inflates by a
-different amount, which is also why a paired difference
+level can fall below the population skill. Predictions distributed
+otherwise inflate by a different amount at the same skill, which is also
+why a paired difference
 [`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md)
 takes is not free of it.
 

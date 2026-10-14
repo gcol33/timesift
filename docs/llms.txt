@@ -37,10 +37,12 @@ timesift lets you:
   held-out data. Each training fold is used to choose the grain and
   estimate ensemble weights; the corresponding test fold is used to
   score the predictions.
-- **Thin presences.** Estimate how selecting the best prediction
-  threshold can inflate the true skill statistic (TSS), especially for
-  species with few presences, using
-  [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.html).
+- **Thin presences.** With few presences, the TSS read at its best
+  threshold overstates skill.
+  [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.html)
+  measures the overstatement for your design, and
+  [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.html)
+  turns a reported TSS into the skill it is consistent with.
 - **Python and R.** Run analyses in R or Python. Both interfaces use the
   same C++ code for data preparation and baseline models, giving
   matching arrays and model fits.

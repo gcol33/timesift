@@ -12,33 +12,32 @@ the row names or in a leading character or factor column.}
 
 \item{folds}{A fold map from \code{\link[=fold_map]{fold_map()}}, or any named integer vector of the same shape.}
 
-\item{skill}{Population skill values to plant.}
+\item{skill}{Population skill values to simulate.}
 
 \item{replicates}{Replicates per value.}
 
 \item{seed}{Random seed.}
 }
 \value{
-A data frame with one row per planted value: the truth, the mean level read back, the
+A data frame with one row per \code{skill} value: the skill, the mean level read back, the
 inflation, and its interval across replicates.
 }
 \description{
-The true skill statistic is read at the threshold that maximises it, chosen on the same held-out
-units the score is then read on. That selection inflates the level, and by more the fewer
-presences a cell holds. Most code carries the inflation silently; this measures it for the
-presence counts of a given design.
+The true skill statistic (TSS) comes out too high when its best threshold is picked on the same
+held-out units the score is read from, and the more so the fewer presences a cell holds. This
+measures that excess for the presence counts of a given design; \code{\link[=implied_skill]{implied_skill()}} goes the other
+way, from a reported level to the skill it is consistent with.
 }
 \details{
-Predictions are simulated under a normal model in which the population skill is exactly \code{skill},
-at the cell sizes and presence counts of the response and fold map supplied, and the level is
-read back exactly as \code{\link[=grain_ladder]{grain_ladder()}} reports it. The gap between what comes back and the truth
-planted is the inflation.
+Predictions are simulated for each value of \code{skill} as normal scores of equal variance, at the
+cell sizes and presence counts of the response and fold map supplied. The TSS is read at its best
+threshold exactly as \code{\link[=grain_ladder]{grain_ladder()}} reports it, and the mean reading minus \code{skill} is the
+inflation.
 
 The inflation is an expectation. A level read on one design is optimistic on average, not a
-bound every reading sits above: a single level can fall below the population skill. The model
-planted here is one distribution of predictions, and another at the same skill inflates by a
-different amount, which is also why a paired difference \code{\link[=paired_contrast]{paired_contrast()}} takes is not free of
-it.
+bound every reading sits above: a single level can fall below the population skill. Predictions
+distributed otherwise inflate by a different amount at the same skill, which is also why a paired
+difference \code{\link[=paired_contrast]{paired_contrast()}} takes is not free of it.
 }
 \examples{
 set.seed(1)

@@ -126,7 +126,7 @@
 <li>
 <strong>Scores you can report.</strong> Evaluate model selection and ensembles on held-out data. Each training fold is used to choose the grain and estimate ensemble weights; the corresponding test fold is used to score the predictions.</li>
 <li>
-<strong>Thin presences.</strong> Estimate how selecting the best prediction threshold can inflate the true skill statistic (TSS), especially for species with few presences, using <a href="https://gillescolling.com/timesift/reference/tss_inflation.html"><code>tss_inflation()</code></a>.</li>
+<strong>Thin presences.</strong> With few presences, the TSS read at its best threshold overstates skill. <a href="https://gillescolling.com/timesift/reference/tss_inflation.html"><code>tss_inflation()</code></a> measures the overstatement for your design, and <a href="https://gillescolling.com/timesift/reference/implied_skill.html"><code>implied_skill()</code></a> turns a reported TSS into the skill it is consistent with.</li>
 <li>
 <strong>Python and R.</strong> Run analyses in R or Python. Both interfaces use the same C++ code for data preparation and baseline models, giving matching arrays and model fits.</li>
 </ul>

@@ -382,14 +382,14 @@ difference from the reference <code>diff</code>, its interval
 <span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>)</span></code></pre></div>
 <p>How much a threshold chosen on the scored units inflates the level it
 reports.</p>
-<p>Predictions are simulated under a normal model whose population skill
-is exactly the value planted, at the cell sizes and presence counts of
-this design, and read back the way a ladder reports a level. The gap is
-the inflation. It is an expectation: a level is optimistic on average,
-not a bound every reading sits above. The model planted is one
-distribution of predictions, and another at the same skill inflates by a
-different amount, which is also why a paired difference is not free of
-it.</p>
+<p>Predictions are simulated for each skill value as normal scores of
+equal variance, at the cell sizes and presence counts of this design,
+and the TSS is read at its best threshold the way a ladder reports a
+level. The mean reading minus the skill is the inflation. It is an
+expectation: a level is optimistic on average, not a bound every reading
+sits above. Predictions distributed otherwise inflate by a different
+amount at the same skill, which is also why a paired difference is not
+free of it.</p>
 </div>
 <div class="section level2">
 <h2 id="implied_skill">
