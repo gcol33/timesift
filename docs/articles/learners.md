@@ -244,10 +244,10 @@ run_time <- system.time(
                   resampling = cv(v = 5), n_inner = 3L, verbose = FALSE)
 )
 run_time[["elapsed"]]
-#> [1] 30.54
+#> [1] 16.22
 ```
 
-The run took 31 seconds for 15 candidates. With three inner folds in
+The run took 16 seconds for 15 candidates. With three inner folds in
 each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20
 times, three inner fits and one outer fit in each outer fold, and once
 more on every target.
@@ -813,14 +813,14 @@ seconds <- vapply(timed, function(l) {
 }, numeric(1))
 sort(round(seconds, 2), decreasing = TRUE)
 #>                 linear             elasticnet                 forest 
-#>                  10.42                   3.96                   0.47 
+#>                   4.34                   2.40                   0.30 
 #>                 maxent elasticnet(tol = 1e-4)           discriminant 
-#>                   0.40                   0.31                   0.17 
-#>                xgboost             perceptron                   tree 
-#>                   0.08                   0.07                   0.03 
-#>               boosting                   mars           hierarchical 
-#>                   0.03                   0.02                   0.01 
-#>               envelope 
+#>                   0.20                   0.14                   0.09 
+#>                xgboost               boosting             perceptron 
+#>                   0.05                   0.03                   0.03 
+#>                   tree           hierarchical               envelope 
+#>                   0.02                   0.01                   0.00 
+#>                   mars 
 #>                   0.00
 ```
 
@@ -845,25 +845,25 @@ additive_seconds <- c(
   `k = 5` = system.time(fit_learner(additive(k = 5L), month, sim$y))[["elapsed"]])
 round(additive_seconds, 2)
 #> k = 10  k = 5 
-#>  21.94   0.55
+#>  11.42   0.28
 ```
 
-With `k = 10` the fit took 21.9 seconds, and with `k = 5` it took 0.5
+With `k = 10` the fit took 11.4 seconds, and with `k = 5` it took 0.3
 seconds.
 
 The elastic net is the learner to start with. It reads every column
 without a selection step, chooses its penalty inside the units it is
 fitted on, and is the arm the package measures a network against. At its
-default tolerance it took 4 seconds here, and `tol = 1e-4` took 0.3, at
-the same held-out AUC on the split above.
+default tolerance it took 2.4 seconds here, and `tol = 1e-4` took 0.1,
+at the same held-out AUC on the split above.
 [`linear()`](https://gillescolling.com/timesift/reference/linear.md) was
-the slowest at 10.4 seconds: its two-way search refits the model for
+the slowest at 4.3 seconds: its two-way search refits the model for
 every term it could add or drop at every step, and the weekly grain
 offers it 106 terms, each column and its square. Pinned to a coarse
 grain, or searched forward under a bound as
 `linear(select = "forward", terms = "column", max_terms = 3)` does, the
 search has fewer steps to take. Every other tabular learner took at most
-0.47 seconds.
+0.3 seconds.
 
 What a learner can be fitted on depends on the number of units against
 the number of columns its representation flattens to:

@@ -14,7 +14,7 @@ Colling, G. (2026). timesift: Learn Predictive Representations of
 Time-Varying Data. R package version 0.6.0.
 https://gillescolling.com/timesift/
 
-    @Manual{,
+    @Manual{colling2026timesift,
       title = {timesift: Learn Predictive Representations of Time-Varying Data},
       author = {Gilles Colling},
       year = {2026},

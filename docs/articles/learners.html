@@ -6,18 +6,17 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Learners • timesift</title>
+<!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+<link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<link rel="icon" sizes="any" href="../favicon.ico">
+<link rel="manifest" href="../site.webmanifest">
 <script src="../lightswitch.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
 <meta property="og:title" content="Learners">
-<style>
-.lang-split { table-layout: fixed; width: 100%; border: 0; }
-.lang-split > tbody > tr > td { border: 0; padding: 0 1rem 0 0; }
-.lang-split > tbody > tr > td:last-child { padding-right: 0; }
-.lang-split pre { overflow-x: auto; }
-</style>
 <script>
 (function () {
   var D = String.fromCharCode(36);
@@ -104,8 +103,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-
-      <h1>Learners</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Learners</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/gcol33/timesift/blob/HEAD/vignettes/articles/learners.Rmd" class="external-link"><code>vignettes/articles/learners.Rmd</code></a></small>
@@ -416,8 +414,8 @@ short. The section on settings shows what the tolerance changes.</p>
 <span>                  resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, n_inner <span class="op">=</span> <span class="fl">3L</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">run_time</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 30.54</span></span></code></pre></div>
-<p>The run took 31 seconds for 15 candidates. With three inner folds in
+<span><span class="co">#&gt; [1] 16.22</span></span></code></pre></div>
+<p>The run took 16 seconds for 15 candidates. With three inner folds in
 each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20
 times, three inner fits and one outer fit in each outer fold, and once
 more on every target.</p>
@@ -892,14 +890,14 @@ at the weekly grain, which flattens to 53 columns.</p>
 <span><span class="op">}</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">seconds</span>, <span class="fl">2</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                 linear             elasticnet                 forest </span></span>
-<span><span class="co">#&gt;                  10.42                   3.96                   0.47 </span></span>
+<span><span class="co">#&gt;                   4.34                   2.40                   0.30 </span></span>
 <span><span class="co">#&gt;                 maxent elasticnet(tol = 1e-4)           discriminant </span></span>
-<span><span class="co">#&gt;                   0.40                   0.31                   0.17 </span></span>
-<span><span class="co">#&gt;                xgboost             perceptron                   tree </span></span>
-<span><span class="co">#&gt;                   0.08                   0.07                   0.03 </span></span>
-<span><span class="co">#&gt;               boosting                   mars           hierarchical </span></span>
-<span><span class="co">#&gt;                   0.03                   0.02                   0.01 </span></span>
-<span><span class="co">#&gt;               envelope </span></span>
+<span><span class="co">#&gt;                   0.20                   0.14                   0.09 </span></span>
+<span><span class="co">#&gt;                xgboost               boosting             perceptron </span></span>
+<span><span class="co">#&gt;                   0.05                   0.03                   0.03 </span></span>
+<span><span class="co">#&gt;                   tree           hierarchical               envelope </span></span>
+<span><span class="co">#&gt;                   0.02                   0.01                   0.00 </span></span>
+<span><span class="co">#&gt;                   mars </span></span>
 <span><span class="co">#&gt;                   0.00</span></span></code></pre></div>
 <p><code><a href="../reference/additive.html">additive()</a></code> is not in that list, because at its default
 <code>k = 10</code> an additive model of 53 columns needs more
@@ -917,21 +915,21 @@ coefficients than there are units:</p>
 <span>  `k = 5` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="fu"><a href="../reference/fit_learner.html">fit_learner</a></span><span class="op">(</span><span class="fu"><a href="../reference/additive.html">additive</a></span><span class="op">(</span>k <span class="op">=</span> <span class="fl">5L</span><span class="op">)</span>, <span class="va">month</span>, <span class="va">sim</span><span class="op">$</span><span class="va">y</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">additive_seconds</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt; k = 10  k = 5 </span></span>
-<span><span class="co">#&gt;  21.94   0.55</span></span></code></pre></div>
-<p>With <code>k = 10</code> the fit took 21.9 seconds, and with
-<code>k = 5</code> it took 0.5 seconds.</p>
+<span><span class="co">#&gt;  11.42   0.28</span></span></code></pre></div>
+<p>With <code>k = 10</code> the fit took 11.4 seconds, and with
+<code>k = 5</code> it took 0.3 seconds.</p>
 <p>The elastic net is the learner to start with. It reads every column
 without a selection step, chooses its penalty inside the units it is
 fitted on, and is the arm the package measures a network against. At its
-default tolerance it took 4 seconds here, and <code>tol = 1e-4</code>
-took 0.3, at the same held-out AUC on the split above.
-<code><a href="../reference/linear.html">linear()</a></code> was the slowest at 10.4 seconds: its two-way
-search refits the model for every term it could add or drop at every
-step, and the weekly grain offers it 106 terms, each column and its
-square. Pinned to a coarse grain, or searched forward under a bound as
+default tolerance it took 2.4 seconds here, and <code>tol = 1e-4</code>
+took 0.1, at the same held-out AUC on the split above.
+<code><a href="../reference/linear.html">linear()</a></code> was the slowest at 4.3 seconds: its two-way search
+refits the model for every term it could add or drop at every step, and
+the weekly grain offers it 106 terms, each column and its square. Pinned
+to a coarse grain, or searched forward under a bound as
 <code>linear(select = "forward", terms = "column", max_terms = 3)</code>
 does, the search has fewer steps to take. Every other tabular learner
-took at most 0.47 seconds.</p>
+took at most 0.3 seconds.</p>
 <p>What a learner can be fitted on depends on the number of units
 against the number of columns its representation flattens to:</p>
 <ul>

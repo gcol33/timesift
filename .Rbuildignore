@@ -35,3 +35,4 @@
 ^src/.*\.so$
 ^src/.*\.dll$
 ^TODO\.md$
+^CITATION\.cff$

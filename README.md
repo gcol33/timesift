@@ -1,333 +1,347 @@
-# timesift
 
-*sifting a record for the grain that carries the signal*
+# timesift <img src="man/figures/logo.svg" align="right" height="139" alt="timesift logo" />
 
-[![CRAN status](https://www.r-pkg.org/badges/version/timesift)](https://CRAN.R-project.org/package=timesift)
-[![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/timesift)](https://cran.r-project.org/package=timesift)
-[![Monthly downloads](https://cranlogs.r-pkg.org/badges/timesift)](https://cran.r-project.org/package=timesift)
+*choosing the time scale of a sensor record*
+
+<!-- badges: start -->
+
+[![CRAN
+status](https://www.r-pkg.org/badges/version/timesift)](https://CRAN.R-project.org/package=timesift)
+[![CRAN
+downloads](https://cranlogs.r-pkg.org/badges/grand-total/timesift)](https://cran.r-project.org/package=timesift)
 [![PyPI](https://img.shields.io/pypi/v/timesift)](https://pypi.org/project/timesift/)
 [![R-CMD-check](https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml)
 [![pytest](https://github.com/gcol33/timesift/actions/workflows/pytest.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/pytest.yaml)
 [![contract](https://github.com/gcol33/timesift/actions/workflows/contract.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/contract.yaml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Codecov test
+coverage](https://codecov.io/gh/gcol33/timesift/graph/badge.svg)](https://app.codecov.io/gh/gcol33/timesift)
+[![License:
+MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<!-- badges: end -->
 
-**Learn predictive representations of time-varying data, in R and Python over one C++ core.**
+<p align="center">
 
-Hand `timesift` one row per thing to predict and a long table of time-stamped readings belonging
-to those rows. It builds each candidate representation of the record, from the readings as recorded
-through a calendar week or month to a span anchored on each target, fits the learners you name on
-every one they can read, and scores them all on one set of held-out folds. What comes back says at
-what grain the prediction needed the record, and what the whole procedure, choosing included,
-scores on targets it did not see.
+<img src="man/figures/timesift-hero.png" alt="Three years of hourly soil temperature from one alpine plot drawn at seven time scales, from hourly readings down to yearly means, beside the true skill statistic a convolutional network reached on each over 101 species: 0.658 hourly, rising to a peak of 0.706 at the weekly mean, falling to 0.626 yearly" width="100%">
+</p>
+
+timesift finds the time scale at which a long sensor record best
+predicts something, such as whether a plant species grows at the plot
+where a soil temperature logger recorded every hour for three years.
+
+Before a model is fitted, a record like that is usually reduced once, to
+monthly means or growing-degree-days, and the reduction is rarely
+revisited. timesift makes it an argument. Each time scale is a *grain*:
+the record is cut into calendar bins, a real week or a real month, and
+each bin is reduced to a statistic such as its mean. The package builds
+the record at every grain you name, fits each learner on every grain it
+can read, and scores every pairing on the same held-out folds and the
+same cells. You can then compare the grains cell by cell, choose one
+inside the training data, or combine them into an ensemble.
+
+timesift supports:
+
+- **Calendar grains and lookbacks.** From the readings as recorded
+  through half-days, days, weeks, months, seasons and years, with
+  day-level statistics such as the coldest and warmest day of each bin,
+  and
+  [`lookback()`](https://gillescolling.com/timesift/reference/native.html)
+  spans that end at each target’s own date.
+- **The learners species distribution modelling uses.** Elastic net,
+  stepwise GLM, CART, random forest, boosting, Maxent, surface range
+  envelope, MARS, flexible discriminant analysis, GAM and a one-layer
+  network, plus convolutional and fully connected networks through
+  torch, and any learner of your own.
+- **Scores you can report.** The grain and the ensemble weights are
+  chosen inside each outer training fold, so the held-out score covers
+  the choosing too.
+- **Thin presences.** `tss_inflation()` estimates how far a true skill
+  statistic read at its own best threshold overstates skill for your
+  design’s presence counts.
+- **R and Python.** Both languages call one C++ core, so they give the
+  same arrays and the same baseline fits.
+
+Every learner core is timesift’s own code, written from the published
+method and pinned in the test fixtures against the reference package a
+species modeller already uses: glmnet, MASS, rpart, earth, mda, mgcv,
+nnet, maxnet and biomod2. Both test suites assert the same 257 digests
+of the binned record, so a difference between the languages fails a
+check. A methods section cites the package version, which fixes every
+core and its defaults.
 
 ## Installation
 
-```r
-# Install from CRAN
-install.packages("timesift")
+The CRAN release installs from a binary on Windows and macOS and needs
+no build tools there:
 
-# Or install the development version from GitHub
+``` r
+install.packages("timesift")
+```
+
+The development version compiles C++ code, so it needs a compiler:
+
+| Operating system | Build tools |
+|----|----|
+| Windows | [Rtools](https://cran.r-project.org/bin/windows/Rtools/) matching your R version |
+| macOS | `xcode-select --install` |
+| Debian / Ubuntu | `r-base-dev` |
+
+Check that R finds them:
+
+``` r
+pkgbuild::has_build_tools(debug = TRUE)
+```
+
+Then install from GitHub:
+
+``` r
 # install.packages("pak")
 pak::pak("gcol33/timesift")
 ```
 
-```bash
-# Install from PyPI
+The C++ code needs no system library: it uses only the C++ standard
+library, including its threads, and [cpp11](https://cpp11.r-lib.org/)
+headers at build time. The neural learners need
+[torch](https://torch.mlverse.org/) (`install.packages("torch")`, then
+`torch::install_torch()`).
+
+The Python package has wheels for Linux, Windows and macOS and needs
+Python 3.11 or later:
+
+``` bash
 pip install timesift
 
-# with the torch encoders, the contrasts and the plots
+# with the torch encoders, the grain contrasts and the plots
 pip install "timesift[torch,contrasts,plot]"
-
-# Or install the development version from GitHub
-pip install git+https://github.com/gcol33/timesift
 ```
 
-## Quick start
+## Usage
 
-<table class="lang-split">
-<tr>
-<td width="50%" valign="top">
+1.  Bring two tables: `targets`, one row per thing to predict with its
+    response, and `series`, the time-stamped readings belonging to those
+    rows.
+2.  Call `timesift()` with the response columns, the identifier both
+    tables carry, the time column and the grains to compare.
+3.  Read the scores, then call `predict()` on new rows.
 
-### R
+`simulate_records()` draws a record with a known answer to try this on:
+150 sensors with a reading every three hours for a year, and four
+responses that depend on the record’s seasonal level.
 
-```r
+``` r
 library(timesift)
 
-fit <- timesift(
-  plots, logger,
-  y = starts_with("sp_"),
-  id = plot_id, time = datetime,
-  learners = c(elasticnet(), forest()),
-  sift = grains("day", "week", "month")
-)
+sim <- simulate_records(n = 150, mechanism = "season", variables = 4,
+                        prevalence = 0.3, auc = 0.9)
+targets <- data.frame(unit = rownames(sim$y), sim$y)
+
+fit <- timesift(targets, sim$readings, y = -unit, id = unit, time = time,
+                sift = grains("day", "week", "month", "season"))
+fit
+#> timesift  150 targets, 4 responses, 10-fold random CV, roc_auc
+#> 
+#> candidates, scored on the outer folds
+#> candidate                     mean    won  responses
+#> elasticnet / day             0.553      0  separate
+#> elasticnet / season          0.571      0  separate
+#> elasticnet / week            0.612      0  separate
+#> elasticnet / month           0.712      4  separate
+#> 
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                     0.712  se 0.077
+#> ensemble                     0.712  se 0.077
+#> selected elasticnet / month in 10 of 10 folds
+#> 
+#> choice on every target  elasticnet / month
+#> weights on every target  elasticnet / month 1.00
 ```
 
-</td>
-<td width="50%" valign="top">
+`targets` holds one 0/1 column per response and the identifier, here
+`unit`; `series` holds that identifier, a date-time column and the
+values, one row per reading. `y` takes tidyselect expressions such as
+`starts_with("sp_")`. A table with a missing reading in a bin is
+refused, and `coverage()` shows which unit and bin lack readings.
 
-### Python
+A *candidate* is one grain paired with one learner; `elasticnet()` is
+the learner when none is named. The candidate rows score each one on the
+outer folds, and the highest of them was picked out on the same folds it
+is scored on. The `selected` and `ensemble` rows are the numbers to
+report: the candidate and the ensemble weights were chosen inside each
+outer training fold and then scored once on the held-out fold.
 
-```python
+`predict(fit, new_targets, new_series)` rebuilds each member’s grain for
+the new rows and predicts through the ensemble fitted on every target.
+`type = "binary"` cuts each response into presence and absence at a
+threshold learned from the out-of-fold predictions.
+
+The same run in Python:
+
+``` python
 import timesift as ts
 
-fit = ts.timesift(
-    plots, logger,
-    y="sp_*",
-    id="plot_id", time="datetime",
-    learners=[ts.elasticnet(), ts.forest()],
-    sift=ts.grains("day", "week", "month"),
-)
+sim = ts.simulate_records(n=150, mechanism="season", variables=4,
+                          prevalence=0.3, auc=0.9)
+targets = {"unit": sim.y.units}
+targets.update(zip(sim.y.variables, sim.y.values.T))
+
+fit = ts.timesift(targets, sim.readings, y=list(sim.y.variables),
+                  id="unit", time="time",
+                  sift=ts.grains("day", "week", "month", "season"))
+print(fit)
 ```
 
-</td>
-</tr>
-<tr>
-<td valign="top">
+## The grain in an alpine study
 
-[Get started](https://gillescolling.com/timesift/articles/timesift.html) ·
-[Reference](https://gillescolling.com/timesift/reference/index.html)
+timesift was built for a study of 894 alpine plots on the Schrankogel,
+Austria, with 101 plant species and three years of hourly soil
+temperature per plot. The figure at the top shows that run:
 
-</td>
-<td valign="top">
+- The hourly record was the best input for none of three network
+  architectures. The convolutional network scored 0.048 TSS lower on it
+  than on its best grain.
+- Skill peaked at the weekly mean and fell from monthly on, 0.080 lower
+  at yearly.
+- The coldest and warmest day of a bin carried more than its mean, by
+  0.006 weekly up to 0.046 yearly.
+- A fully connected network on the same series scored level with a
+  penalised logistic model on 188 hand-built features (-0.002 TSS, p =
+  0.63).
 
-[Get started](https://gillescolling.com/timesift/articles/python.html) ·
-[Reference](https://gillescolling.com/timesift/articles/python-reference.html)
+`inst/reproduce/schrankogel.R` runs that grid from the [Zenodo
+deposit](https://doi.org/10.5281/zenodo.17047026) and checks the plot,
+species, cell and bin counts before fitting anything. [Its
+README](https://github.com/gcol33/timesift/blob/master/inst/reproduce/README.md)
+compares every number with the paper.
 
-</td>
-</tr>
-</table>
+## Reading a record at several grains
 
-`fit` prints every candidate it fitted and the score each reached on the held-out folds, then the
-held-out score of the procedure that chooses among them and of the stack, both chosen and weighted
-inside each training fold:
+`grains("day", "week", "month")` names a set of grains to compare, and
+`grains("auto")` takes every named grain that gives the record at least
+two bins. A learner runs across the whole set, or at one grain when it
+is given one, as in `cnn(data = grain("week"))`.
 
-```r
-fit
-#> timesift  80 targets, 4 responses, 10-fold random CV, roc_auc
-#>
-#> candidates, scored on the outer folds
-#> candidate                    mean    won  responses
-#> elasticnet / day            0.873      0  separate
-#> forest / month              0.904      1  separate
-#> forest / day                0.924      0  separate
-#> forest / week               0.929      1  separate
-#> elasticnet / week           0.930      1  separate
-#> elasticnet / month          0.938      1  separate
-#>
-#> procedure, chosen and weighted inside each outer training fold
-#> selected                    0.934  se 0.015
-#> ensemble                    0.919  se 0.020
-#> selected elasticnet / month in 8, forest / day in 2 of 10 folds
-#>
-#> choice on every target  elasticnet / month
-#> weights on every target  elasticnet / month 0.98   forest / month 0.02
-```
+A month is 28 to 31 days and a week starts on a Monday, so a monthly
+mean over three years stays in its months. `year_start` moves the year
+boundary, for example to a hydrological year, and a function of the
+reading times can define a calendar of your own, such as seasons cut at
+the equinoxes.
 
-`predict(fit, new_plots, new_logger)` rebuilds every member's representation for the new rows and
-predicts through the ensemble fitted on every target; `candidate = "selected"` predicts with the
-chosen candidate. `type = "binary"` cuts each species into presence and absence at a threshold
-learned from the fit's own out-of-fold predictions, and `type = "spread"` gives how far the
-ensemble's members disagree, which on the same cells is an uncertainty map.
+`min` and `max` are the coldest and warmest single reading in a bin.
+`cold_day` and `warm_day` first reduce each day to its mean, then take
+the coldest and warmest day. One hour at -50 sets `min` to -50 and moves
+`cold_day` by a twenty-fourth of that.
 
-## Statement of need
+`grain_matrix()` and `lookback_matrix()` return the binned arrays,
+`[unit, bin, channel]`, without fitting anything. [Representing a
+record](https://gillescolling.com/timesift/articles/representations.html)
+covers every grain and statistic.
 
-A sensor records every hour for years. Before any model is fitted, that record is reduced: to
-monthly means, to growing-degree-days, to whatever the analyst decides, and the reduction is rarely
-revisited. `timesift` makes it an explicit, testable choice, with every candidate scored on the
-same folds and the same cells so the comparison between them is paired.
+## Choosing a grain and combining candidates
 
-Species distribution modelling from microclimate loggers is the application the package was built
-for and the setting its defaults serve: presence-absence, a joint multi-label head, and AUC with the
-true skill statistic beside it. On 894 alpine plots, 101 species and three years of hourly soil
-temperature:
+`grain_ladder()` fits one learner at every grain and shows where skill
+levels off. `grain_contrasts()` compares every grain with a learner’s
+best one, and `paired_contrast()` compares two candidates on matched
+cells. `select_grain()` chooses the grain inside the training data and
+scores the whole procedure. [Finding the
+grain](https://gillescolling.com/timesift/articles/comparing-grains.html)
+runs them on a record with a known answer.
 
-- The full hourly series was the best input for none of three architectures. Reading every hour
-  cost the convolutional network 0.048 TSS against its own best grain.
-- Skill peaked at the weekly average and fell from monthly on, by 0.080 at yearly.
-- A window's coldest and warmest **day** carried more than its mean, and by more as the window
-  widened: 0.006 weekly to 0.046 yearly.
-- A fully connected network on the same series was level with a penalised logistic model on 188
-  hand-built features (-0.002 TSS, p = 0.63), which suggests the gain came from convolution reading
-  the series at a coarse grain.
+`ensemble()` stacks the candidates with non-negative weights summing to
+one, fitted on their out-of-fold predictions alone. `project()` maps a
+fit onto rasters and `range_change()` compares two projections.
+[Ensembles, thresholds and
+maps](https://gillescolling.com/timesift/articles/prediction.html) goes
+from a scored run to maps.
 
-The package is what lets the same test run on other records and other responses.
+## TSS read at its own best threshold
 
-## Targets, series, representations and learners
-
-**targets** is one row per thing to predict, carrying the response and optionally predictors that
-do not move in time. **series** is the long record: an identifier, an instant, and one or more
-value columns. A **representation** is how that record becomes the array a model reads. A
-**learner** is a fit and a predict pair that declares what it can be handed.
-
-A candidate is one representation paired with one learner, and every candidate emits an
-out-of-fold prediction for every scorable cell over the same folds. Comparison, ensembling and
-importance read those predictions and nothing else, which is what lets a penalised regression on
-monthly features and a convolution on the unreduced record be compared and then combined.
-
-The candidates' scores on the outer folds are the comparison, and the best of them was picked out on
-the folds it is scored on. The `selected` and `ensemble` rows are chosen and weighted inside each
-outer training fold, on an inner split of it, and scored on the outer fold once, so they are the
-numbers to report.
-
-## Features
-
-### Representations
-
-```r
-native()                        # the record as it was recorded
-grain("week")                   # one calendar grain
-multigrain(c("month", "year"))  # several grains side by side as one block of features
-lookback("30 days", bins = 3)   # a fixed span ending at each target's own instant
-```
-
-`grains("day", "week", "month")` and `lookbacks("30 days", "90 days")` are sets of them, and
-`grains("auto")` reads off the record every named grain it gives at least two bins. A learner runs
-across the whole set, or across one representation it is pinned to:
-
-```r
-cnn()                      # every representation of the run
-cnn(data = native())       # the record unreduced only
-cnn(data = grain("week"))  # weekly only
-```
-
-`lookback()` serves a unit carrying several targets through time: two targets a fortnight apart on
-one sensor read two different stretches of the same series, anchored by `target_time`.
-`grain_matrix()` and `lookback_matrix()` return the arrays themselves, `[unit, bin, channel]`, for
-use outside the fitting layer.
-
-### Learners
-
-- **Penalised and linear**: `elasticnet()`, `linear()` (stepwise GLM)
-- **Trees**: `tree()` (CART), `forest()`, `boosting()`
-- **Species distribution classics**: `maxent()`, `envelope()`, `mars()`, `discriminant()`,
-  `additive()`, `perceptron()`
-- **Bayesian**: `hierarchical()`, a logistic model with unit intercepts and a spatial field
-- **Neural encoders** (torch): `cnn()` and `rescnn()` reading the sequence of bins, `mlp()` the
-  bins flattened, each through a joint multi-label head
-- **Your own**: `learner()` takes a fit and a predict pair, and `register_learner()` adds it to the
-  registry; it then goes through the same folds, the same cells and the same scoring
-
-The learners run on timesift's own C++ cores, written from the published methods, and those cores
-give the numbers of the references a biomod2 user already fits: glmnet's elastic net, MASS's
-stepwise search, rpart's tree, earth's MARS, mda's flexible discriminant analysis, mgcv's GAM,
-nnet's network, maxnet's Maxent and biomod2's surface range envelope, each pinned against the
-reference's own output in the fixtures. Architecture belongs to the constructor and training
-belongs to `train_control()`, so `train_control(epochs = 200, device = "cuda")` reaches every neural
-learner of a run at once.
-
-### Comparing grains
-
-- **`grain_ladder()`**: fit at every grain and see where skill saturates
-- **`grain_contrasts()`**: compare every grain against a learner's best one
-- **`paired_contrast()`**: compare two arms cell by cell
-- **`select_grain()`**: choose the grain inside the training data, and score the whole procedure
-- **`occlusion()`**: which part of the record a fitted model reads
-- **`simulate_records()`**: sensor records whose response acts at a known temporal grain, to test
-  the procedure against a truth
-
-### Ensemble and prediction
-
-- **`ensemble()`**: stacking by non-negative weights summing to one, fitted on out-of-fold
-  predictions alone and minimising the response head's own loss; `"mean"`, `"median"`,
-  `"weighted"` and `"committee"` combine without fitting
-- **`ensemble_weights()`**: the weights fitted on every target, for prediction
-- **`project()`** and **`range_change()`**: a fit onto rasters, and how each response's range
-  changes between two projections
-- **`pseudo_absences()`**, **`block_cv()`**, **`env_cv()`**: background draws and spatial or
-  environmental folds
-
-The combiner is handed the predictions, the response, the fold map and the mask, and never a model.
-
-## Calendar bins
-
-A month is 28, 30 or 31 days, and a week starts on a Monday. `timesift` bins on the calendar, so a
-monthly mean over three years stays in its months rather than sliding through the seasons as
-730-hour blocks would, and it asserts every unit holds readings in every bin. A record that fails
-that assertion is refused rather than padded, and `coverage()` lays the same binning out as a count
-of readings per unit and bin, so the logger that stopped early or the month the whole record skipped
-shows as a row or a column of zeros.
-
-```r
-attr(grain_matrix(d, plot, t, temp, grain = "month"), "bin_n")[1, 1:3]
-#> 2021-09-01T00:00:00Z 2021-10-01T00:00:00Z 2021-11-01T00:00:00Z
-#>                  720                  744                  720
-```
-
-A calendar of your own is a function: pass one that returns each reading's bin start, and seasons
-cut at the equinoxes bin like any named grain. A record that begins away from a bin boundary gives a
-bin the calendar does not fill; `bin_partial` marks those bins and `partial = "drop"` removes them.
-
-## Extreme days and extreme readings
-
-`min` and `max` take the coldest and warmest single reading in a bin. `cold_day` and `warm_day`
-reduce each day to its own mean first, then take the extreme over days. `mean_daily_min` and
-`mean_daily_max` take the mean of the daily extremes, the exposure a typical day of the bin
-brought. One hour at -50 sets `min` to -50 outright and reaches the day-level statistics only
-through its twenty-fourth of that day's mean.
-
-## A maximised TSS is optimistic
-
-TSS is read at the threshold that maximises it, chosen on the same held-out units the score is read
-on. That inflates the level where presences are thin: on the Schrankogel design, by 0.110 on
-average when the truth is 0.60. `tss_inflation()` measures it for your design and `implied_skill()`
-says what population skill a level you read is consistent with. How large the inflation is depends
-on how a model's predictions are distributed, so two models of equal skill can carry different
-inflations and a paired TSS difference is not free of it. Runs are therefore scored by AUC by
-default, with TSS beside it.
-
-## R and Python agree
-
-`inst/spec/representation.md` is normative, and `inst/spec/fixtures/` holds a synthetic series with
-the digest of every grain-by-statistic combination, alongside the reference coefficients of every
-shared learner core. Both test suites assert against the same fixtures, so R and Python give the
-same representation and the same baseline fits.
-[The contract](https://gillescolling.com/timesift/articles/contract.html) says what each language
-carries.
-
-## Reproducing the study
-
-`inst/reproduce/schrankogel.R` runs the published grid from the Zenodo deposit it was built on, and
-asserts the plot count, the species count, the cell count and the bin count of every grain before
-fitting anything. [Its README](https://github.com/gcol33/timesift/blob/master/inst/reproduce/README.md)
-says how to run each stage, what it costs, and how every number compares with the paper.
+The true skill statistic (TSS) is usually read at the threshold that
+maximises it, on the same held-out plots it scores. Where a species has
+few presences that overstates skill: on the Schrankogel design by 0.110
+on average when the true skill is 0.60. `tss_inflation()` estimates the
+overstatement for your own presence counts and `implied_skill()` gives
+the true skill a score you read is consistent with. Runs are scored by
+AUC by default, with TSS beside it.
 
 ## Documentation
 
-- [Choosing how a record is read](https://gillescolling.com/timesift/articles/timesift.html) - Getting started in R
-- [Choosing how a record is read, in Python](https://gillescolling.com/timesift/articles/python.html) - Getting started in Python
-- [Representing a record](https://gillescolling.com/timesift/articles/representations.html) - Grains, statistics, calendars, lookbacks and the arrays they give
-- [Learners](https://gillescolling.com/timesift/articles/learners.html) - The shipped learners, training, tuning, and a learner of your own
-- [Finding the grain](https://gillescolling.com/timesift/articles/comparing-grains.html) - Ladders, paired contrasts and nested selection on a record with a known answer
-- [Ensembles, thresholds and maps](https://gillescolling.com/timesift/articles/prediction.html) - Folds, stacking, prediction, thresholds and projection onto rasters
-- [Coming from biomod2](https://gillescolling.com/timesift/articles/biomod2.html) - The biomod2 models and where they sit in timesift
-- [Troubleshooting](https://gillescolling.com/timesift/articles/troubleshooting.html) - The errors a run raises, what causes them, and the fix
-- [The representation contract](https://gillescolling.com/timesift/articles/contract.html) - What R and Python share, and what each carries
-- [R reference](https://gillescolling.com/timesift/reference/index.html) · [Python reference](https://gillescolling.com/timesift/articles/python-reference.html)
+Start with [Choosing how a record is
+read](https://gillescolling.com/timesift/articles/timesift.html): one
+path from two tables to a scored comparison and predictions. In Python,
+start with [Choosing how a record is read, in
+Python](https://gillescolling.com/timesift/articles/python.html).
 
-Bug reports and questions go to the
-[issue tracker](https://github.com/gcol33/timesift/issues).
+- [Representing a
+  record](https://gillescolling.com/timesift/articles/representations.html):
+  grains, statistics, calendars, lookbacks and the arrays they give.
+- [Learners](https://gillescolling.com/timesift/articles/learners.html):
+  the shipped learners, training settings, tuning and a learner of your
+  own.
+- [Finding the
+  grain](https://gillescolling.com/timesift/articles/comparing-grains.html):
+  ladders, paired contrasts and nested selection.
+- [Ensembles, thresholds and
+  maps](https://gillescolling.com/timesift/articles/prediction.html):
+  stacking, prediction, thresholds and projection onto rasters.
+- [Coming from
+  biomod2](https://gillescolling.com/timesift/articles/biomod2.html):
+  each biomod2 model and its timesift learner.
+- [Troubleshooting](https://gillescolling.com/timesift/articles/troubleshooting.html):
+  the errors a run raises and how to fix them.
+- [The representation
+  contract](https://gillescolling.com/timesift/articles/contract.html):
+  what R and Python share and what each carries.
+- [R reference](https://gillescolling.com/timesift/reference/index.html)
+  and [Python
+  reference](https://gillescolling.com/timesift/articles/python-reference.html):
+  every function, grouped by job.
+
+## Getting help
+
+Questions and bug reports go to the [issue
+tracker](https://github.com/gcol33/timesift/issues). With a bug report,
+include a small reproducible example made with
+[reprex](https://reprex.tidyverse.org/).
 
 ## Support
 
-> "Software is like sex: it's better when it's free." — Linus Torvalds
+> “Software is like sex: it’s better when it’s free.” — Linus Torvalds
 
-I'm a PhD student who builds R packages in my free time because I believe good tools should be free and open. I started these projects for my own work and figured others might find them useful too.
+I’m a PhD student who builds R packages in my free time because I
+believe good tools should be free and open. I started these projects for
+my own work and figured others might find them useful too.
 
-If this package saved you some time, buying me a coffee is a nice way to say thanks. It helps with my coffee addiction.
+If this package saved you some time, buying me a coffee is a nice way to
+say thanks. It helps with my coffee addiction.
 
-[![Buy Me A Coffee](https://img.shields.io/badge/-Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/gcol33)
-
-## Citation
-
-```bibtex
-@software{timesift,
-  author = {Colling, Gilles},
-  title  = {timesift: Learn Predictive Representations of Time-Varying Data},
-  year   = {2026},
-  url    = {https://gillescolling.com/timesift/}
-}
-```
+[![Buy Me A
+Coffee](https://img.shields.io/badge/-Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/gcol33)
 
 ## License
 
 MIT (see the LICENSE file)
+
+## Citation
+
+To cite timesift in publications use:
+
+``` text
+Colling G (2026). _timesift: Learn Predictive Representations of
+Time-Varying Data_. R package version 0.6.0,
+<https://gillescolling.com/timesift/>.
+```
+
+BibTeX:
+
+``` bibtex
+@Manual{colling2026timesift,
+  title = {timesift: Learn Predictive Representations of Time-Varying Data},
+  author = {Gilles Colling},
+  year = {2026},
+  note = {R package version 0.6.0},
+  url = {https://gillescolling.com/timesift/},
+}
+```
+
+Download the citation as
+[BibTeX](https://gillescolling.com/timesift/timesift.bib) or
+[RIS](https://gillescolling.com/timesift/timesift.ris).

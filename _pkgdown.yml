@@ -5,12 +5,6 @@ template:
   light-switch: yes
   includes:
     in_header: |
-      <style>
-      .lang-split { table-layout: fixed; width: 100%; border: 0; }
-      .lang-split > tbody > tr > td { border: 0; padding: 0 1rem 0 0; }
-      .lang-split > tbody > tr > td:last-child { padding-right: 0; }
-      .lang-split pre { overflow-x: auto; }
-      </style>
       <script>
       (function () {
         var D = String.fromCharCode(36);

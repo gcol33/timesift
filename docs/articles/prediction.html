@@ -6,18 +6,17 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Ensembles, thresholds and maps • timesift</title>
+<!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+<link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<link rel="icon" sizes="any" href="../favicon.ico">
+<link rel="manifest" href="../site.webmanifest">
 <script src="../lightswitch.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
 <meta property="og:title" content="Ensembles, thresholds and maps">
-<style>
-.lang-split { table-layout: fixed; width: 100%; border: 0; }
-.lang-split > tbody > tr > td { border: 0; padding: 0 1rem 0 0; }
-.lang-split > tbody > tr > td:last-child { padding-right: 0; }
-.lang-split pre { overflow-x: auto; }
-</style>
 <script>
 (function () {
   var D = String.fromCharCode(36);
@@ -104,8 +103,7 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-
-      <h1>Ensembles, thresholds and maps</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Ensembles, thresholds and maps</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/gcol33/timesift/blob/HEAD/vignettes/articles/prediction.Rmd" class="external-link"><code>vignettes/articles/prediction.Rmd</code></a></small>
@@ -1032,7 +1030,7 @@ cell is named by its number.</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">took</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="va">now</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/project.html">project</a></span><span class="op">(</span><span class="va">fit</span>, series <span class="op">=</span> <span class="va">grid</span>, static <span class="op">=</span> <span class="va">elev</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">took</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 0.28</span></span>
+<span><span class="co">#&gt; [1] 0.14</span></span>
 <span><span class="va">now</span></span>
 <span><span class="co">#&gt; class       : SpatRaster</span></span>
 <span><span class="co">#&gt; size        : 10, 12, 4  (nrow, ncol, nlyr)</span></span>
@@ -1784,7 +1782,7 @@ cell is named by its number.</p>
 </g>
 </g>
 </svg></div></p>
-<p>The projection of the ensemble onto the 120 cells took 0.28 seconds.
+<p>The projection of the ensemble onto the 120 cells took 0.14 seconds.
 It is the same prediction <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> gives for the same
 cells as targets, which <code><a href="https://rdrr.io/r/base/all.equal.html" class="external-link">all.equal()</a></code> confirms for
 <code>sp1</code>. A raster too large for memory is read
@@ -3129,7 +3127,7 @@ a logger and would otherwise be split across training and test. Under
 any blocked split the inner split keeps blocks whole too, which bounds
 <code>n_inner</code> and the elastic net’s own <code>n_inner</code>.</p>
 <p>A projection costs one prediction per cell. The ensemble of four
-members took 0.28 seconds for 120 cells with a year of daily readings,
+members took 0.14 seconds for 120 cells with a year of daily readings,
 and the time grows with the number of cells and the length of the
 record. A large raster is better projected once from a script, with
 <code>chunk</code> set to what memory allows. The two runs themselves
