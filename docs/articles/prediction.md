@@ -700,7 +700,7 @@ grid
 
 took <- system.time(now <- project(fit, series = grid, static = elev))
 took[["elapsed"]]
-#> [1] 0.14
+#> [1] 0.16
 now
 #> class       : SpatRaster
 #> size        : 10, 12, 4  (nrow, ncol, nlyr)
@@ -720,7 +720,7 @@ terra::plot(now)
 ![Four maps of the predicted probability of presence, one per
 species.](prediction_files/figure-html/project-1.svg)
 
-The projection of the ensemble onto the 120 cells took 0.14 seconds. It
+The projection of the ensemble onto the 120 cells took 0.16 seconds. It
 is the same prediction
 [`predict()`](https://rdrr.io/r/stats/predict.html) gives for the same
 cells as targets, which
@@ -919,7 +919,7 @@ keeps blocks whole too, which bounds `n_inner` and the elastic net’s own
 `n_inner`.
 
 A projection costs one prediction per cell. The ensemble of four members
-took 0.14 seconds for 120 cells with a year of daily readings, and the
+took 0.16 seconds for 120 cells with a year of daily readings, and the
 time grows with the number of cells and the length of the record. A
 large raster is better projected once from a script, with `chunk` set to
 what memory allows. The two runs themselves cost far more than the

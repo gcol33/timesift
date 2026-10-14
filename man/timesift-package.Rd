@@ -3,12 +3,17 @@
 \docType{package}
 \name{timesift-package}
 \alias{timesift-package}
-\title{timesift: Temporal Climate Resolution for Ecological Prediction}
+\title{timesift: Learn Predictive Representations of Time-Varying Data}
 \description{
-Builds model-ready representations of climate records at a chosen temporal grain and
-locates the grain at which predictive skill saturates. The representation layer is
-response-agnostic; the fitting and scoring layers default to presence-absence with a joint
-multi-label head scored by the true skill statistic.
+Finds the time scale at which a long time-stamped record best predicts a response. \code{\link[=timesift]{timesift()}}
+builds the record at each grain or lookback named in \code{sift}, fits every learner on every
+representation it can read, scores them all on the same held-out folds and cells, and chooses
+or stacks them inside each training fold. The arrays themselves come from \code{\link[=grain_matrix]{grain_matrix()}} and
+\code{\link[=lookback_matrix]{lookback_matrix()}} without the fitting layer. The shipped default is presence-absence with a
+joint multi-label head, scored by AUC with the true skill statistic beside it.
+}
+\details{
+Start with \code{vignette("timesift")}, or the articles at \url{https://gillescolling.com/timesift/}.
 }
 \seealso{
 Useful links:

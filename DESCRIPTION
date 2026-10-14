@@ -18,9 +18,10 @@ Description: Fits and compares representations of time-varying data against a
     an elastic net fitted by cyclic coordinate descent along a warm-started
     path, following Friedman, Hastie and Tibshirani (2010)
     <doi:10.18637/jss.v033.i01>. The shipped default is presence-absence with a
-    joint multi-label head scored by the true skill statistic of Allouche,
-    Tsoar and Kadmon (2006) <doi:10.1111/j.1365-2664.2006.01214.x>, the setting
-    used for species distribution modelling from microclimate loggers.
+    joint multi-label head, the setting used for species distribution modelling
+    from microclimate loggers, scored by the area under the ROC curve with the
+    true skill statistic of Allouche, Tsoar and Kadmon (2006)
+    <doi:10.1111/j.1365-2664.2006.01214.x> beside it.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Language: en-GB

@@ -63,7 +63,7 @@
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
@@ -72,6 +72,7 @@
     <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="../articles/installation.html">Installing torch</a></li>
     <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul>
@@ -649,8 +650,8 @@ inner search is skipped and the count drops to
 <span>                                   n_inner <span class="op">=</span> <span class="cn">NULL</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nested <span class="op">=</span> <span class="va">nested</span>, outer_only <span class="op">=</span> <span class="va">outer_only</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     nested outer_only </span></span>
-<span><span class="co">#&gt;       0.48       0.11</span></span></code></pre></div>
-<p>On this record the nested run took 0.48 seconds and the run on the
+<span><span class="co">#&gt;       0.47       0.11</span></span></code></pre></div>
+<p>On this record the nested run took 0.47 seconds and the run on the
 outer folds alone 0.11.</p>
 <p>Each fit in turn costs what its array costs. A calendar grain has as
 many columns as bins times statistics, and <code><a href="../reference/native.html">native()</a></code> has one

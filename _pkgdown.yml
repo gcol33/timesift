@@ -70,6 +70,8 @@ navbar:
       - text: '---'
       - text: Coming from biomod2
         href: articles/biomod2.html
+      - text: Installing torch
+        href: articles/installation.html
       - text: Troubleshooting
         href: articles/troubleshooting.html
       - text: The contract between R and Python
@@ -213,6 +215,7 @@ articles:
 - title: Articles
   contents:
   - articles/biomod2
+  - articles/installation
   - articles/troubleshooting
 - title: The contract
   desc: |

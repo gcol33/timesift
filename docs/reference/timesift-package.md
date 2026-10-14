@@ -1,10 +1,24 @@
-# timesift: Temporal Climate Resolution for Ecological Prediction
+# timesift: Learn Predictive Representations of Time-Varying Data
 
-Builds model-ready representations of climate records at a chosen
-temporal grain and locates the grain at which predictive skill
-saturates. The representation layer is response-agnostic; the fitting
-and scoring layers default to presence-absence with a joint multi-label
-head scored by the true skill statistic.
+Finds the time scale at which a long time-stamped record best predicts a
+response.
+[`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+builds the record at each grain or lookback named in `sift`, fits every
+learner on every representation it can read, scores them all on the same
+held-out folds and cells, and chooses or stacks them inside each
+training fold. The arrays themselves come from
+[`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
+and
+[`lookback_matrix()`](https://gillescolling.com/timesift/reference/lookback_matrix.md)
+without the fitting layer. The shipped default is presence-absence with
+a joint multi-label head, scored by AUC with the true skill statistic
+beside it.
+
+## Details
+
+Start with
+[`vignette("timesift")`](https://gillescolling.com/timesift/articles/timesift.md),
+or the articles at <https://gillescolling.com/timesift/>.
 
 ## See also
 

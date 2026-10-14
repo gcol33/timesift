@@ -55,8 +55,11 @@ core and its defaults.
 
 ## Installation
 
-The CRAN release installs from a binary on Windows and macOS and needs
-no build tools there:
+### R
+
+timesift needs [R](https://cran.r-project.org/) 4.1 or later. The CRAN
+release installs from a binary on Windows and macOS and needs no build
+tools there:
 
 ``` r
 
@@ -88,18 +91,61 @@ pak::pak("gcol33/timesift")
 
 The C++ code needs no system library: it uses only the C++ standard
 library, including its threads, and [cpp11](https://cpp11.r-lib.org/)
-headers at build time. The neural learners need
-[torch](https://torch.mlverse.org/) (`install.packages("torch")`, then
-[`torch::install_torch()`](https://torch.mlverse.org/docs/reference/install_torch.html)).
+headers at build time.
+
+### Neural learners in R
+
+[`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md),
+[`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
+and
+[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
+run on [torch](https://torch.mlverse.org/); every other learner runs
+without it. torch is an R package plus the LibTorch library, which it
+downloads once:
+
+``` r
+
+install.packages("torch")
+torch::install_torch(timeout = 600)
+```
+
+Check that it loads, and whether it found a graphics processor:
+
+``` r
+
+torch::torch_is_installed()
+torch::cuda_is_available()           # NVIDIA
+torch::backends_mps_is_available()   # Apple Silicon
+```
+
+This installs the processor build on Windows and Linux and the Apple
+Silicon build on macOS, where torch uses the graphics processor through
+MPS. An NVIDIA graphics processor needs the CUDA build, set up in
+[Installing
+torch](https://gillescolling.com/timesift/articles/installation.html).
+`train_control(device = "auto")`, the default, takes a graphics
+processor wherever torch finds one and the processor otherwise.
+
+### Python
 
 The Python package has wheels for Linux, Windows and macOS and needs
-Python 3.11 or later:
+[Python](https://www.python.org/downloads/) 3.11 or later:
 
 ``` bash
 pip install timesift
 
 # with the torch encoders, the grain contrasts and the plots
 pip install "timesift[torch,contrasts,plot]"
+```
+
+On Linux the torch this installs carries CUDA; on Windows it runs on the
+processor only, and the CUDA build comes from PyTorch’s own index, also
+in [Installing
+torch](https://gillescolling.com/timesift/articles/installation.html).
+Check it with:
+
+``` bash
+python -c "import torch; print(torch.cuda.is_available())"
 ```
 
 ## Usage
@@ -310,6 +356,12 @@ Questions and bug reports go to the [issue
 tracker](https://github.com/gcol33/timesift/issues). With a bug report,
 include a small reproducible example made with
 [reprex](https://reprex.tidyverse.org/).
+
+## Contributing
+
+Building from a checkout, the test suites and the rules for the shared
+fixtures are in
+[CONTRIBUTING.md](https://github.com/gcol33/timesift/blob/master/CONTRIBUTING.md).
 
 ## Support
 

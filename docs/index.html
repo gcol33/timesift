@@ -77,6 +77,7 @@
     <li><a class="dropdown-item" href="articles/prediction.html">Ensembles, thresholds and maps</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="articles/biomod2.html">Coming from biomod2</a></li>
+    <li><a class="dropdown-item" href="articles/installation.html">Installing torch</a></li>
     <li><a class="dropdown-item" href="articles/troubleshooting.html">Troubleshooting</a></li>
     <li><a class="dropdown-item" href="articles/contract.html">The contract between R and Python</a></li>
   </ul>
@@ -132,7 +133,10 @@
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>The CRAN release installs from a binary on Windows and macOS and needs no build tools there:</p>
+<div class="section level3">
+<h3 id="r">R<a class="anchor" aria-label="anchor" href="#r"></a>
+</h3>
+<p>timesift needs <a href="https://cran.r-project.org/" class="external-link">R</a> 4.1 or later. The CRAN release installs from a binary on Windows and macOS and needs no build tools there:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span></code></pre></div>
 <p>The development version compiles C++ code, so it needs a compiler:</p>
@@ -168,12 +172,33 @@
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/timesift"</span><span class="op">)</span></span></code></pre></div>
-<p>The C++ code needs no system library: it uses only the C++ standard library, including its threads, and <a href="https://cpp11.r-lib.org/" class="external-link">cpp11</a> headers at build time. The neural learners need <a href="https://torch.mlverse.org/" class="external-link">torch</a> (<code>install.packages("torch")</code>, then <code><a href="https://torch.mlverse.org/docs/reference/install_torch.html" class="external-link">torch::install_torch()</a></code>).</p>
-<p>The Python package has wheels for Linux, Windows and macOS and needs Python 3.11 or later:</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a></span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co"># with the torch encoders, the grain contrasts and the plots</span></span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span></code></pre></div>
+<p>The C++ code needs no system library: it uses only the C++ standard library, including its threads, and <a href="https://cpp11.r-lib.org/" class="external-link">cpp11</a> headers at build time.</p>
+</div>
+<div class="section level3">
+<h3 id="neural-learners-in-r">Neural learners in R<a class="anchor" aria-label="anchor" href="#neural-learners-in-r"></a>
+</h3>
+<p><code><a href="reference/torch_learners.html">cnn()</a></code>, <code><a href="reference/torch_learners.html">rescnn()</a></code> and <code><a href="reference/torch_learners.html">mlp()</a></code> run on <a href="https://torch.mlverse.org/" class="external-link">torch</a>; every other learner runs without it. torch is an R package plus the LibTorch library, which it downloads once:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"torch"</span><span class="op">)</span></span>
+<span><span class="fu">torch</span><span class="fu">::</span><span class="fu"><a href="https://torch.mlverse.org/docs/reference/install_torch.html" class="external-link">install_torch</a></span><span class="op">(</span>timeout <span class="op">=</span> <span class="fl">600</span><span class="op">)</span></span></code></pre></div>
+<p>Check that it loads, and whether it found a graphics processor:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">torch</span><span class="fu">::</span><span class="fu"><a href="https://torch.mlverse.org/docs/reference/torch_is_installed.html" class="external-link">torch_is_installed</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="fu">torch</span><span class="fu">::</span><span class="fu"><a href="https://torch.mlverse.org/docs/reference/cuda_is_available.html" class="external-link">cuda_is_available</a></span><span class="op">(</span><span class="op">)</span>           <span class="co"># NVIDIA</span></span>
+<span><span class="fu">torch</span><span class="fu">::</span><span class="fu"><a href="https://torch.mlverse.org/docs/reference/backends_mps_is_available.html" class="external-link">backends_mps_is_available</a></span><span class="op">(</span><span class="op">)</span>   <span class="co"># Apple Silicon</span></span></code></pre></div>
+<p>This installs the processor build on Windows and Linux and the Apple Silicon build on macOS, where torch uses the graphics processor through MPS. An NVIDIA graphics processor needs the CUDA build, set up in <a href="https://gillescolling.com/timesift/articles/installation.html">Installing torch</a>. <code>train_control(device = "auto")</code>, the default, takes a graphics processor wherever torch finds one and the processor otherwise.</p>
+</div>
+<div class="section level3">
+<h3 id="python">Python<a class="anchor" aria-label="anchor" href="#python"></a>
+</h3>
+<p>The Python package has wheels for Linux, Windows and macOS and needs <a href="https://www.python.org/downloads/" class="external-link">Python</a> 3.11 or later:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="ex">pip</span> install timesift</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co"># with the torch encoders, the grain contrasts and the plots</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"timesift[torch,contrasts,plot]"</span></span></code></pre></div>
+<p>On Linux the torch this installs carries CUDA; on Windows it runs on the processor only, and the CUDA build comes from PyTorch’s own index, also in <a href="https://gillescolling.com/timesift/articles/installation.html">Installing torch</a>. Check it with:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="ex">python</span> <span class="at">-c</span> <span class="st">"import torch; print(torch.cuda.is_available())"</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
@@ -184,7 +209,7 @@
 <li>Read the scores, then call <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> on new rows.</li>
 </ol>
 <p><code><a href="reference/simulate_records.html">simulate_records()</a></code> draws a record with a known answer to try this on: 150 sensors with a reading every three hours for a year, and four responses that depend on the record’s seasonal level.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://gillescolling.com/timesift/">timesift</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/simulate_records.html">simulate_records</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">150</span>, mechanism <span class="op">=</span> <span class="st">"season"</span>, variables <span class="op">=</span> <span class="fl">4</span>,</span>
@@ -214,17 +239,17 @@
 <p>A <em>candidate</em> is one grain paired with one learner; <code><a href="reference/elasticnet.html">elasticnet()</a></code> is the learner when none is named. The candidate rows score each one on the outer folds, and the highest of them was picked out on the same folds it is scored on. The <code>selected</code> and <code>ensemble</code> rows are the numbers to report: the candidate and the ensemble weights were chosen inside each outer training fold and then scored once on the held-out fold.</p>
 <p><code>predict(fit, new_targets, new_series)</code> rebuilds each member’s grain for the new rows and predicts through the ensemble fitted on every target. <code>type = "binary"</code> cuts each response into presence and absence at a threshold learned from the out-of-fold predictions.</p>
 <p>The same run in Python:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>sim <span class="op">=</span> ts.simulate_records(n<span class="op">=</span><span class="dv">150</span>, mechanism<span class="op">=</span><span class="st">"season"</span>, variables<span class="op">=</span><span class="dv">4</span>,</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>                          prevalence<span class="op">=</span><span class="fl">0.3</span>, auc<span class="op">=</span><span class="fl">0.9</span>)</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>targets <span class="op">=</span> {<span class="st">"unit"</span>: sim.y.units}</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>targets.update(<span class="bu">zip</span>(sim.y.variables, sim.y.values.T))</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(targets, sim.readings, y<span class="op">=</span><span class="bu">list</span>(sim.y.variables),</span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>                  <span class="bu">id</span><span class="op">=</span><span class="st">"unit"</span>, time<span class="op">=</span><span class="st">"time"</span>,</span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>                  sift<span class="op">=</span>ts.grains(<span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span>, <span class="st">"season"</span>))</span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="bu">print</span>(fit)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>sim <span class="op">=</span> ts.simulate_records(n<span class="op">=</span><span class="dv">150</span>, mechanism<span class="op">=</span><span class="st">"season"</span>, variables<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>                          prevalence<span class="op">=</span><span class="fl">0.3</span>, auc<span class="op">=</span><span class="fl">0.9</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>targets <span class="op">=</span> {<span class="st">"unit"</span>: sim.y.units}</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>targets.update(<span class="bu">zip</span>(sim.y.variables, sim.y.values.T))</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(targets, sim.readings, y<span class="op">=</span><span class="bu">list</span>(sim.y.variables),</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>                  <span class="bu">id</span><span class="op">=</span><span class="st">"unit"</span>, time<span class="op">=</span><span class="st">"time"</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>                  sift<span class="op">=</span>ts.grains(<span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span>, <span class="st">"season"</span>))</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="bu">print</span>(fit)</span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="the-grain-in-an-alpine-study">The grain in an alpine study<a class="anchor" aria-label="anchor" href="#the-grain-in-an-alpine-study"></a>
@@ -286,6 +311,11 @@
 <p>Questions and bug reports go to the <a href="https://github.com/gcol33/timesift/issues" class="external-link">issue tracker</a>. With a bug report, include a small reproducible example made with <a href="https://reprex.tidyverse.org/" class="external-link">reprex</a>.</p>
 </div>
 <div class="section level2">
+<h2 id="contributing">Contributing<a class="anchor" aria-label="anchor" href="#contributing"></a>
+</h2>
+<p>Building from a checkout, the test suites and the rules for the shared fixtures are in <a href="https://github.com/gcol33/timesift/blob/master/CONTRIBUTING.md" class="external-link">CONTRIBUTING.md</a>.</p>
+</div>
+<div class="section level2">
 <h2 id="support">Support<a class="anchor" aria-label="anchor" href="#support"></a>
 </h2>
 <blockquote>
@@ -308,13 +338,13 @@
 Time-Varying Data_. R package version 0.6.0,
 &lt;https://gillescolling.com/timesift/&gt;.</code></pre>
 <p>BibTeX:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode bibtex"><code class="sourceCode bibtex"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="va">@Manual</span>{<span class="ot">colling2026timesift</span>,</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="dt">title</span> = {timesift: Learn Predictive Representations of Time-Varying Data},</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="dt">author</span> = {Gilles Colling},</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="dt">year</span> = {2026},</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="dt">note</span> = {R package version 0.6.0},</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="dt">url</span> = {https://gillescolling.com/timesift/},</span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode bibtex"><code class="sourceCode bibtex"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="va">@Manual</span>{<span class="ot">colling2026timesift</span>,</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="dt">title</span> = {timesift: Learn Predictive Representations of Time-Varying Data},</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="dt">author</span> = {Gilles Colling},</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="dt">year</span> = {2026},</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="dt">note</span> = {R package version 0.6.0},</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="dt">url</span> = {https://gillescolling.com/timesift/},</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>}</span></code></pre></div>
 <p>Download the citation as <a href="https://gillescolling.com/timesift/timesift.bib">BibTeX</a> or <a href="https://gillescolling.com/timesift/timesift.ris">RIS</a>.</p>
 </div>
 </div>
@@ -336,6 +366,12 @@ Time-Varying Data_. R package version 0.6.0,
 </ul>
 </div>
 
+<div class="community">
+<h2 data-toc-skip>Community</h2>
+<ul class="list-unstyled">
+<li><a href="CONTRIBUTING.html">Contributing guide</a></li>
+</ul>
+</div>
 
 <div class="citation">
 <h2 data-toc-skip>Citation</h2>

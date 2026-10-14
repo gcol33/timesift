@@ -28,6 +28,8 @@ and maps.
 
 - [Coming from
   biomod2](https://gillescolling.com/timesift/articles/biomod2.md):
+- [Installing
+  torch](https://gillescolling.com/timesift/articles/installation.md):
 - [Troubleshooting](https://gillescolling.com/timesift/articles/troubleshooting.md):
 
 ### The contract

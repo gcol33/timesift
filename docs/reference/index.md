@@ -247,4 +247,4 @@ known answer.
 ## The package
 
 - [`timesift-package`](https://gillescolling.com/timesift/reference/timesift-package.md)
-  : timesift: Temporal Climate Resolution for Ecological Prediction
+  : timesift: Learn Predictive Representations of Time-Varying Data
