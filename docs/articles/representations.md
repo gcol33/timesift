@@ -1,20 +1,14 @@
 # Representing a record
 
-A learner never reads a sensor record as it was logged. It reads an
-array of numbers per unit, and between the record and that array sit
-three decisions: which stretch of time one number stands for, what that
-number summarises, and where the stretches begin. `timesift` names each
-of them as an argument, builds the array from them in one compiled core,
-and records on the array how it was built.
+Models use an array built from the sensor readings. Its contents depend
+on the time interval represented by each bin, the statistic calculated
+within that bin and the calendar boundaries. `timesift` exposes these
+choices as arguments and records them in the array’s attributes.
 
-This article follows a record from the long table it arrives in to the
-array a learner is handed. It covers the columns the package reads, the
-seven named grains and how they follow the calendar, the seven
-statistics and the difference between an extreme reading and an extreme
-day, calendars passed as functions, gaps and partial bins, the
-representation objects a run is configured with, lookbacks anchored on
-each target, calendar position channels, the tabular layout, and the
-digest that ties a representation to its specification.
+This article shows how to turn a table of readings into model inputs. It
+covers grains, summary statistics, calendars, missing readings and
+partial bins, followed by lookback windows, calendar channels and
+tabular arrays.
 
 ## Installation
 
@@ -41,11 +35,15 @@ pip install git+https://github.com/gcol33/timesift
 
 ## Two tables, and the columns read from them
 
-A run takes two tables. `series` holds the record in long form, one row
-per reading, and `targets` holds one row per thing to predict. They are
-joined by a column naming the unit, which both carry. The record here is
-thirty plots, each logged hourly for 400 days from 1 September 2021,
-with a seasonal cycle, a daily cycle, a level per plot and noise.
+A run takes two tables linked by a shared unit identifier. `series`
+contains one row per reading, and `targets` contains one row per
+prediction target. The example has thirty plots logged hourly for 400
+days from 1 September 2021. Each record includes seasonal and daily
+cycles, a plot-specific offset and noise.
+
+The Python block draws its own record, so the values it prints differ
+from the ones quoted in the text, which come from the R run. Counts,
+shapes and calendar boundaries do not depend on the draw and agree.
 
 ``` r
 
@@ -80,6 +78,41 @@ head(targets, 3)
 #> 3  p03      2525   0   1   0   1
 ```
 
+``` python
+import numpy as np
+import pandas as pd
+import timesift as ts
+
+rng = np.random.default_rng(1)
+hours = pd.date_range("2021-09-01", periods=24 * 400, freq="h")
+ids = [f"p{i:02d}" for i in range(1, 31)]
+warmth = rng.normal(size=30)
+doy = hours.dayofyear.to_numpy()
+hod = hours.hour.to_numpy()
+
+series = pd.DataFrame({
+    "plot": np.repeat(ids, len(hours)),
+    "t": np.tile(hours, 30),
+    "temp": np.concatenate([
+        w + 8 * np.sin(2 * np.pi * (doy - 110) / 365) + 3 * np.sin(2 * np.pi * (hod - 9) / 24)
+        + rng.normal(scale=1.5, size=len(hours)) for w in warmth]),
+})
+
+targets = pd.DataFrame({"plot": ids, "elevation": np.round(2400 - 150 * warmth)})
+for k, sign in enumerate([1, -1, 1, -1], start=1):
+    targets[f"sp{k}"] = rng.binomial(1, 1 / (1 + np.exp(-2 * sign * warmth)))
+series.dtypes
+#> plot               str
+#> t       datetime64[us]
+#> temp           float64
+#> dtype: object
+targets.head(3)
+#>   plot  elevation  sp1  sp2  sp3  sp4
+#> 0  p01     2348.0    1    0    1    1
+#> 1  p02     2277.0    1    0    1    0
+#> 2  p03     2350.0    1    1    0    0
+```
+
 [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
 reads three columns of `series`: the unit (`id`), the instant of each
 reading (`time`) and the reading itself (`value`). Each is given as a
@@ -99,6 +132,18 @@ dim(x)
 names(attributes(x))
 #>  [1] "dim"         "dimnames"    "grain"       "stats"       "year_start" 
 #>  [6] "bin_start"   "bin_end"     "bin_n"       "bin_partial" "class"
+```
+
+``` python
+x = ts.grain_matrix(series, "plot", "t", "temp", grain="month")
+x
+#> <timesift matrix> 30 units x 14 bins x 1 channels
+#> grain: month  stats: mean
+#> from  : 2021-09-01T00:00:00Z to 2022-10-01T00:00:00Z
+x.shape
+#> (30, 14, 1)
+list(x.__dataclass_fields__)
+#> ['values', 'units', 'bins', 'stats', 'grain', 'year_start', 'bin_start', 'bin_end', 'bin_n', 'bin_partial', 'span', 'lag', 'static', 'position', 'coords', 'unit_ids']
 ```
 
 The thirty plots became thirty rows, the 400 days fourteen monthly bins,
@@ -123,6 +168,13 @@ dimnames(grain_matrix(numeric_ids, plot, t, temp, grain = "month"))[[1]]
 #> [1] "100000" "7"
 ```
 
+``` python
+numeric_ids = series[series["plot"].isin(["p01", "p02"])].copy()
+numeric_ids["plot"] = np.where(numeric_ids["plot"] == "p01", 100000, 7)
+ts.grain_matrix(numeric_ids, "plot", "t", "temp", grain="month").units
+#> ('100000', '7')
+```
+
 A number that is not whole is refused as an identifier, as is a missing
 value in the unit or the time column. A unit holding two readings at the
 same instant is refused as well, with the first duplicate named, because
@@ -134,6 +186,11 @@ extreme it reaches.
 grain_matrix(rbind(series[1:5, ], series[3, ]), plot, t, temp, grain = "day")
 #> Error:
 #> ! 1 duplicated (unit, time) pair, first: p01 at 2021-09-01T02:00:00Z.
+```
+
+``` python
+ts.grain_matrix(pd.concat([series.iloc[:5], series.iloc[[2]]]), "plot", "t", "temp", grain="day")
+#> ValueError: 1 duplicated (unit, time) pair, first: p01 at 2021-09-01T02:00:00Z.
 ```
 
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
@@ -176,6 +233,21 @@ identical(as.numeric(grain_matrix(vienna, plot, t, temp, grain = "native")),
 #> [1] TRUE
 ```
 
+``` python
+spring = pd.date_range("2021-03-26", "2021-03-30 23:00", freq="h", tz="Europe/Vienna")
+vienna = pd.DataFrame({"plot": "a", "t": spring, "temp": np.arange(1, len(spring) + 1)})
+ts.grain_matrix(vienna, "plot", "t", "temp", grain="day").bin_n
+#> array([[24, 24, 23, 24, 24]], dtype=int32)
+
+fixed = vienna.assign(t=vienna["t"].dt.tz_convert("Etc/GMT-1"))
+ts.grain_matrix(fixed, "plot", "t", "temp", grain="day").bin_n
+#> array([[24, 24, 24, 24, 23]], dtype=int32)
+
+np.array_equal(ts.grain_matrix(vienna, "plot", "t", "temp", grain="native").values,
+               ts.grain_matrix(fixed, "plot", "t", "temp", grain="native").values)
+#> True
+```
+
 Carried in `"Europe/Vienna"`, 28 March 2021 holds 23 readings, and the
 bins after it start at 22:00 UTC because local midnight has moved an
 hour. The same instants carried in `"Etc/GMT-1"`, the fixed offset of
@@ -211,6 +283,20 @@ ladder
 #>   year               2 bins x 1 channels (mean)
 ```
 
+``` python
+ladder = ts.grain_matrix(series, "plot", "t", "temp",
+                         grain=("native", "halfday", "day", "week", "month", "season", "year"))
+ladder
+#> <timesift set> 7 grains over 30 units
+#>   native      9600 bins x 1 channels (mean)
+#>   halfday      800 bins x 1 channels (mean)
+#>   day          400 bins x 1 channels (mean)
+#>   week          58 bins x 1 channels (mean)
+#>   month         14 bins x 1 channels (mean)
+#>   season         6 bins x 1 channels (mean)
+#>   year           2 bins x 1 channels (mean)
+```
+
 `native` is the record unreduced: 9,600 bins of one reading each.
 `halfday` cuts each calendar day at noon into 800 bins, and `day` gives
 400. The four coarser grains follow the calendar and give 58 weeks, 14
@@ -234,6 +320,18 @@ attr(ladder[["month"]], "bin_n")[1, ]
 #>                  720                  744                  744 
 #> 2022-09-01T00:00:00Z 2022-10-01T00:00:00Z 
 #>                  720                  120
+```
+
+``` python
+week = ladder["week"]
+week.bin_start[:3]
+#> array(['2021-08-30T00:00:00', '2021-09-06T00:00:00',
+#>        '2021-09-13T00:00:00'], dtype='datetime64[s]')
+pd.Series(week.bin_start[:3]).dt.day_name().tolist()
+#> ['Monday', 'Monday', 'Monday']
+ladder["month"].bin_n[0]
+#> array([720, 744, 720, 744, 744, 672, 744, 720, 744, 720, 744, 744, 720,
+#>        120], dtype=int32)
 ```
 
 A week is an ISO week, Monday to Sunday, so the first weekly bin begins
@@ -262,6 +360,18 @@ attr(hydro[["year"]], "bin_n")[1, ]
 attr(ladder[["year"]], "bin_n")[1, ]
 #> 2021-01-01T00:00:00Z 2022-01-01T00:00:00Z 
 #>                 2928                 6672
+```
+
+``` python
+hydro = ts.grain_matrix(series, "plot", "t", "temp", grain=("season", "year"), year_start="09-01")
+hydro["season"].bin_start
+#> array(['2021-09-01T00:00:00', '2021-12-01T00:00:00',
+#>        '2022-03-01T00:00:00', '2022-06-01T00:00:00',
+#>        '2022-09-01T00:00:00'], dtype='datetime64[s]')
+hydro["year"].bin_n[0]
+#> array([8760,  840], dtype=int32)
+ladder["year"].bin_n[0]
+#> array([2928, 6672], dtype=int32)
 ```
 
 On the September boundary the record is five seasons and two years, of
@@ -296,6 +406,20 @@ round(m["p01", 1:3, ], 2)
 #> 2021-11-01T00:00:00Z           0.57  2.88
 ```
 
+``` python
+stats7 = ("min", "mean_daily_min", "cold_day", "mean", "warm_day", "mean_daily_max", "max")
+m = ts.grain_matrix(series, "plot", "t", "temp", grain="month", stats=stats7)
+pd.DataFrame(m.values[0, :3, :].T, index=m.stats, columns=[b[:10] for b in m.bins[:3]]).round(2)
+#>                 2021-09-01  2021-10-01  2021-11-01
+#> min                  -4.33       -6.47      -10.47
+#> mean_daily_min       -0.13       -4.15       -7.87
+#> cold_day              2.81       -1.69       -5.31
+#> mean                  4.63        0.78       -3.13
+#> warm_day              6.27        2.92       -0.78
+#> mean_daily_max        9.33        5.72        1.66
+#> max                  11.65       10.85        4.64
+```
+
 Within every bin the two families order themselves around the mean:
 `min` sits below `mean_daily_min`, which sits below `mean`, and `min`
 sits below `cold_day` likewise. In September 2021 plot `p01` read a
@@ -321,6 +445,24 @@ legend("top", legend = shown, lty = 1, lwd = c(1, 2, 2, 2, 1), ncol = 3, bty = "
 over 400 days, the day-level pair lying inside the reading-level
 pair.](representations_files/figure-html/weekly-figure-1.svg)
 
+``` python
+import matplotlib.pyplot as plt
+
+wk7 = ts.grain_matrix(series, "plot", "t", "temp", grain="week", stats=stats7)
+start = wk7.bin_start.astype("datetime64[D]")
+shown = ["min", "cold_day", "mean", "warm_day", "max"]
+fig, ax = plt.subplots(figsize=(6.5, 4.5))
+for stat, lw in zip(shown, [1, 2, 2, 2, 1]):
+    ax.plot(start, wk7.values[0, :, wk7.stats.index(stat)], lw=lw, label=stat)
+ax.set_ylabel("temperature");
+ax.set_ylim(top=ax.get_ylim()[1] + 9);
+ax.legend(loc="upper center", ncol=3, frameon=False);
+```
+
+![Weekly minimum, coldest day, mean, warmest day and maximum of one plot
+over 400 days, the day-level pair lying inside the reading-level
+pair.](representations_files/py-figure-1.svg)
+
 ### An extreme hour and an extreme day
 
 `min` is set by a single reading, and a single reading can be a sensor
@@ -344,6 +486,25 @@ round(grain_matrix(both, plot, t, temp, grain = "month", stats = stats7)[, 1, ],
 #>                   max
 #> as recorded     11.47
 #> one hour colder 11.47
+```
+
+``` python
+one = series[(series["plot"] == "p01") & (series["t"] < "2021-10-01")]
+spiked = one.copy()
+cold = spiked["temp"].idxmin()
+spiked.loc[cold, "temp"] -= 20
+
+both = pd.concat([one.assign(plot="as recorded"), spiked.assign(plot="one hour colder")])
+sp = ts.grain_matrix(both, "plot", "t", "temp", grain="month", stats=stats7)
+pd.DataFrame(sp.values[:, 0, :].T, index=sp.stats, columns=sp.units).round(2)
+#>                 as recorded  one hour colder
+#> min                   -4.33           -24.33
+#> mean_daily_min        -0.13            -0.79
+#> cold_day               2.81             2.01
+#> mean                   4.63             4.60
+#> warm_day               6.27             6.27
+#> mean_daily_max         9.33             9.33
+#> max                   11.65            11.65
 ```
 
 `min` follows the hour all the way, from -4.61 to -24.61. `cold_day`
@@ -371,6 +532,11 @@ grain_matrix(series, plot, t, temp, grain = "halfday", stats = "cold_day")
 #> ! `halfday` bins are shorter than a day, so cold_day is not defined there. Use a grain of `day` or coarser.
 ```
 
+``` python
+ts.grain_matrix(series, "plot", "t", "temp", grain="halfday", stats="cold_day")
+#> ValueError: `halfday` bins are shorter than a day, so cold_day is not defined there. Use a grain of `day` or coarser.
+```
+
 ``` r
 
 d <- grain_matrix(series, plot, t, temp, grain = "day",
@@ -381,14 +547,21 @@ round(d["p01", 1:2, ], 2)
 #> 2021-09-02T00:00:00Z 5.52     5.52 0.64           0.64
 ```
 
+``` python
+d = ts.grain_matrix(series, "plot", "t", "temp", grain="day",
+                    stats=("mean", "cold_day", "min", "mean_daily_min"))
+pd.DataFrame(d.values[0, :2, :], index=d.bins[:2], columns=d.stats).round(2)
+#>                       mean  cold_day   min  mean_daily_min
+#> 2021-09-01T00:00:00Z  6.27      6.27  2.01            2.01
+#> 2021-09-02T00:00:00Z  5.99      5.99  1.41            1.41
+```
+
 ## A calendar passed as a function
 
-A calendar the package does not carry is passed as `grain`, as a
-function of the reading instants that returns the start of each
-reading’s bin. Seasons cut at the solstices and equinoxes rather than on
-the first of a month are the usual case. The function below cuts on 21
-March, 21 June, 23 September and 21 December, which are fixed dates
-close to the astronomical ones.
+To define a custom calendar, pass `grain` a function that returns the
+start of the bin containing each reading. The example uses fixed dates
+close to the solstices and equinoxes: 21 March, 21 June, 23 September
+and 21 December.
 
 ``` r
 
@@ -414,6 +587,27 @@ attr(s, "bin_partial")
 #> [1]  TRUE FALSE FALSE FALSE FALSE FALSE
 ```
 
+``` python
+def solstice_seasons(when):
+    when = pd.DatetimeIndex(when)
+    md = when.strftime("%m-%d").to_numpy()
+    k = (md >= "03-21").astype(int) + (md >= "06-21") + (md >= "09-23") + (md >= "12-21")
+    start = np.array(["12-21", "03-21", "06-21", "09-23", "12-21"])[k]
+    year = np.where(k == 0, when.year - 1, when.year)
+    return pd.to_datetime([f"{y}-{s}" for y, s in zip(year, start)])
+
+s = ts.grain_matrix(series, "plot", "t", "temp", grain=solstice_seasons,
+                    stats=("cold_day", "mean", "warm_day"))
+s
+#> <timesift matrix> 30 units x 6 bins x 3 channels
+#> grain: custom  stats: cold_day, mean, warm_day
+#> from  : 2021-06-21T00:00:00Z to 2022-09-23T00:00:00Z
+s.bin_n[0]
+#> array([ 528, 2136, 2160, 2208, 2256,  312], dtype=int32)
+s.bin_partial
+#> array([ True, False, False, False, False, False])
+```
+
 The array is the same shape as any other and is reported under the grain
 `custom`. The first bin opens on 21 June 2021 and holds the 528 readings
 from the record’s start to 23 September, so it is marked partial. The
@@ -429,12 +623,10 @@ way.
 
 ## Gaps
 
-Every unit must hold at least one reading in every bin. A logger that
-lost a week leaves a cell with nothing to summarise, and
+Every unit must have at least one reading in every bin.
 [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
-refuses the record rather than pad it, because a padded value would
-reach the model as if it had been measured. Plot `p07` below loses the
-calendar week starting Monday 7 February 2022.
+raises an error for an empty bin. In this example, plot `p07` is missing
+the calendar week starting Monday 7 February 2022.
 
 ``` r
 
@@ -447,11 +639,17 @@ grain_matrix(gappy, plot, t, temp, grain = "week")
 #> ! 1 (unit, bin) cell holds no readings, first: unit p07 at 2022-02-07T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.
 ```
 
+``` python
+lost = ((series["plot"] == "p07") & (series["t"] >= "2022-02-07") & (series["t"] < "2022-02-14"))
+gappy = series[~lost]
+ts.grain_matrix(gappy, "plot", "t", "temp", grain="week")
+#> ValueError: 1 (unit, bin) cell holds no readings, first: unit p07 at 2022-02-07T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.
+```
+
 [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
-lays the same binning out as a count of readings per unit and bin, which
-is where the gaps of a refused record are read off. It takes the unit
-and time columns and a grain, and no value column, since it counts and
-does not summarise.
+counts readings for each unit and bin, so you can locate gaps before
+building a representation. Supply the unit and time columns and the
+grain; the function only needs timestamps to count readings.
 
 ``` r
 
@@ -469,6 +667,24 @@ coverage(gappy, plot, t, grain = "month")
 #> every unit reaches every bin
 ```
 
+``` python
+cv_week = ts.coverage(gappy, "plot", "t", grain="week")
+cv_week
+#> <timesift coverage> 30 units x 58 bins at the week grain
+#> 1 empty (unit, bin) cells in 1 units: p07
+p07 = cv_week.units.index("p07")
+pd.Series(cv_week.count[p07, 21:26], index=cv_week.bins[21:26])
+#> 2022-01-24T00:00:00Z    168
+#> 2022-01-31T00:00:00Z    168
+#> 2022-02-07T00:00:00Z      0
+#> 2022-02-14T00:00:00Z    168
+#> 2022-02-21T00:00:00Z    168
+#> dtype: int32
+ts.coverage(gappy, "plot", "t", grain="month")
+#> <timesift coverage> 30 units x 14 bins at the month grain
+#> every unit reaches every bin
+```
+
 At the weekly grain the table holds one empty cell, in the week of 7
 February. At the monthly grain every unit reaches every bin, because the
 lost week sits inside February and February still holds three weeks of
@@ -482,13 +698,21 @@ attr(grain_matrix(gappy, plot, t, temp, grain = "month"), "bin_n")[c("p06", "p07
 #> p07                  744                  504                  744
 ```
 
-Plot `p07`‘s February mean is taken over 504 readings where its
-neighbours’ is over 672. That is one of the three ways out of a gap:
-move to a grain the gap does not reach, drop the units that do not span
-the record, or cut the record to the span every unit covers. Which one
-is the analyst’s decision, and
+``` python
+gm = ts.grain_matrix(gappy, "plot", "t", "temp", grain="month")
+pd.DataFrame(gm.bin_n, index=gm.units, columns=gm.bins).loc[["p06", "p07"]].iloc[:, 4:7]
+#>      2022-01-01T00:00:00Z  2022-02-01T00:00:00Z  2022-03-01T00:00:00Z
+#> p06                   744                   672                   744
+#> p07                   744                   504                   744
+```
+
+Plot `p07`’s February mean uses 504 readings; the other plots use 672.
+You can handle a gap by choosing a coarser grain with readings in every
+bin, excluding incomplete units, or restricting the analysis period to
+the dates all units cover. Use
 [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
-is the table it is made on; nothing in the package fills a cell.
+to assess these options. Imputation, if appropriate for the analysis,
+must be done before calling timesift.
 
 A bin that no unit reaches is caught by a second rule: consecutive bins
 must be one bin apart on the grain’s own calendar. A month missing from
@@ -514,6 +738,18 @@ which(attr(ladder[["season"]], "bin_partial"))
 dropped <- grain_matrix(series, plot, t, temp, grain = "month", partial = "drop")
 dim(dropped)
 #> [1] 30 13  1
+```
+
+``` python
+ladder["week"].bin_partial[[0, 1, 56, 57]]
+#> array([ True, False, False,  True])
+np.flatnonzero(ladder["month"].bin_partial)
+#> array([13])
+np.flatnonzero(ladder["season"].bin_partial)
+#> array([0, 5])
+dropped = ts.grain_matrix(series, "plot", "t", "temp", grain="month", partial="drop")
+dropped.shape
+#> (30, 13, 1)
 ```
 
 The record starts on a Wednesday, so the first and last weeks are
@@ -566,6 +802,34 @@ lookback("28 days", bins = 4)
 lookback("90 days", lag = "30 days")
 #> <timesift representation> 90 days lag 30 days 
 #> kind    : lookback (a block of features) 
+#> span    : 90 days in 1 bin ending 30 days before the target
+#> stats   : mean
+```
+
+``` python
+ts.native()
+#> <timesift representation> native
+#> kind    : grain (a sequence)
+#> grain   : native
+#> stats   : mean
+ts.grain("week", stats=("cold_day", "mean", "warm_day"))
+#> <timesift representation> week
+#> kind    : grain (a sequence)
+#> grain   : week
+#> stats   : cold_day, mean, warm_day
+ts.multigrain(("month", "season"), stats=("min", "mean", "max"))
+#> <timesift representation> multigrain(month+season)
+#> kind    : multigrain (a block of features)
+#> grains  : month, season
+#> stats   : min, mean, max
+ts.lookback("28 days", bins=4)
+#> <timesift representation> 28 days x4
+#> kind    : lookback (a sequence)
+#> span    : 28 days in 4 bins ending 0 days before the target
+#> stats   : mean
+ts.lookback("90 days", lag="30 days")
+#> <timesift representation> 90 days lag 30 days
+#> kind    : lookback (a block of features)
 #> span    : 90 days in 1 bin ending 30 days before the target
 #> stats   : mean
 ```
@@ -628,6 +892,29 @@ c(grain("week"), multigrain(c("month", "season")))
 #>   multigrain     multigrain  mean
 ```
 
+``` python
+ts.grains("day", "week", "month")
+#> <timesift sift> 3 representations
+#>   day            grain
+#>   week           grain
+#>   month          grain
+ts.grains(("month", "year"), stats=("cold_day", "mean", "warm_day"))
+#> <timesift sift> 2 representations
+#>   month          grain
+#>   year           grain
+ts.grains("auto")
+#> <timesift sift> 1 representations
+#>   auto           auto
+ts.lookbacks("28 days", "84 days", bins=4)
+#> <timesift sift> 2 representations
+#>   28 days x4     lookback
+#>   84 days x4     lookback
+ts.as_sift([ts.grain("week"), ts.multigrain(("month", "season"))])
+#> <timesift sift> 2 representations
+#>   week           grain
+#>   multigrain(month+season) multigrain
+```
+
 A set is labelled by each member’s own label, and two members that would
 share a label are refused unless the list is named. `grains("auto")`
 stands for every named grain the record gives at least two bins, in
@@ -646,7 +933,11 @@ each target needs the record leading up to its own instant.
 [`lookback_matrix()`](https://gillescolling.com/timesift/reference/lookback_matrix.md)
 reads, for every target, a fixed span ending a fixed lag before that
 target’s instant. `at` is a data frame with an `id` column naming the
-unit and an `at` column of instants, and its row names name the targets.
+unit and an `at` column of instants.
+
+Its row names name the targets.
+
+The targets are named by their position in `at`, counted from 1.
 
 ``` r
 
@@ -665,6 +956,24 @@ round(lb[, , "mean"], 2)
 #> p01-may    -2.43    -1.66    -0.67    0.42
 #> p01-jul     5.36     5.60     6.13    6.65
 #> p02-jul     6.08     6.47     7.19    7.82
+```
+
+``` python
+visits = pd.DataFrame({"id": ["p01", "p01", "p02"],
+                       "at": pd.to_datetime(["2022-05-01", "2022-07-01", "2022-07-01"])})
+lb = ts.lookback_matrix(series, "plot", "t", "temp", at=visits, span="28 days", bins=4,
+                        stats=("cold_day", "mean", "warm_day"))
+lb
+#> <timesift matrix> 3 targets x 4 bins x 3 channels
+#> grain: lookback  stats: cold_day, mean, warm_day
+#> from  : -28 days to -7 days
+lb.bins
+#> ('-28 days', '-21 days', '-14 days', '-7 days')
+pd.DataFrame(lb.channel("mean"), index=lb.units, columns=lb.bins).round(2)
+#>    -28 days  -21 days  -14 days  -7 days
+#> 1     -1.45     -0.69      0.50     1.45
+#> 2      6.16      6.70      7.19     7.76
+#> 3      6.76      7.17      7.71     8.04
 ```
 
 The rows are the three targets in `at`’s own order, two of them on plot
@@ -692,6 +1001,12 @@ early <- data.frame(id = "p01", at = as.POSIXct("2021-09-15", tz = "UTC"))
 lookback_matrix(series, plot, t, temp, at = early, span = "28 days", bins = 4)
 #> Error:
 #> ! 2 (target, bin) cells hold no readings, first: target 1 over [2021-08-18T00:00:00, 2021-08-25T00:00:00). A lookback reaching past the record is not padded.
+```
+
+``` python
+early = pd.DataFrame({"id": ["p01"], "at": pd.to_datetime(["2021-09-15"])})
+ts.lookback_matrix(series, "plot", "t", "temp", at=early, span="28 days", bins=4)
+#> ValueError: 2 (target, bin) cells hold no readings, first: target 1 over [2021-08-18T00:00:00, 2021-08-25T00:00:00). A lookback reaching past the record is not padded.
 ```
 
 The target on 15 September asks for four weeks from 18 August, and the
@@ -728,6 +1043,23 @@ attr(both_wk, "position")
 #> [1] "year_sin" "year_cos"
 ```
 
+``` python
+wk = ts.grain_matrix(series, "plot", "t", "temp", grain="week",
+                     stats=("cold_day", "mean", "warm_day"))
+pos = ts.calendar_channels(wk)
+pd.DataFrame(pos.values[0, :4, :], index=pos.bins[:4], columns=pos.stats).round(3)
+#>                       year_sin  year_cos
+#> 2021-08-30T00:00:00Z    -0.876    -0.483
+#> 2021-09-06T00:00:00Z    -0.927    -0.374
+#> 2021-09-13T00:00:00Z    -0.966    -0.260
+#> 2021-09-20T00:00:00Z    -0.990    -0.142
+both_wk = ts.bind_channels(wk, pos)
+both_wk.stats
+#> ('cold_day', 'mean', 'warm_day', 'year_sin', 'year_cos')
+both_wk.position
+#> ('year_sin', 'year_cos')
+```
+
 The two channels are identical across units and are a time index, not a
 summary of the readings, so whatever a model does with them it could
 have done with a calendar. The sine and cosine pair is continuous across
@@ -750,6 +1082,17 @@ round(calendar_channels(hd, cycles = c("year", "day"))["p01", 1:4, ], 3)
 #> 2021-09-02T12:00:00Z   -0.878   -0.479  -0.991  -0.131
 ```
 
+``` python
+hd = ladder["halfday"]
+cc = ts.calendar_channels(hd, cycles=("year", "day"))
+pd.DataFrame(cc.values[0, :4, :], index=cc.bins[:4], columns=cc.stats).round(3)
+#>                       year_sin  year_cos  day_sin  day_cos
+#> 2021-09-01T00:00:00Z    -0.865    -0.502    0.991    0.131
+#> 2021-09-01T12:00:00Z    -0.869    -0.494   -0.991   -0.131
+#> 2021-09-02T00:00:00Z    -0.874    -0.487    0.991    0.131
+#> 2021-09-02T12:00:00Z    -0.878    -0.479   -0.991   -0.131
+```
+
 The two halves of each day alternate in sign on the daily pair, since
 the readings of one are centred on 05:30 and those of the other on
 17:30. A lookback has no place in the calendar, its bins being placed
@@ -760,6 +1103,11 @@ relative to each target, and is refused.
 calendar_channels(lb)
 #> Error:
 #> ! a lookback's bins are placed relative to a target rather than on the calendar, so they have no position in the year. `calendar_channels()` reads a grain_matrix().
+```
+
+``` python
+ts.calendar_channels(lb)
+#> ValueError: a lookback's bins are placed relative to a target rather than on the calendar, so they have no position in the year. calendar_channels() reads a grain_matrix().
 ```
 
 [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md)
@@ -791,12 +1139,26 @@ colnames(tab)
 #> [11] "max@2022-07-01T00:00:00Z" "max@2022-10-01T00:00:00Z"
 ```
 
-Two statistics over six seasons give twelve columns, each named
-`channel@bin`. A channel that holds the same number in every bin, as a
-`static` predictor such as elevation does inside a run, becomes one
-column named by the channel alone, so a penalised fit sees it once
-rather than once per bin. This is the function to call inside a learner
-of one’s own that reads a block.
+``` python
+tab = ts.flatten(ts.grain_matrix(series, "plot", "t", "temp", grain="season", stats=("min", "max")))
+tab.shape
+#> (30, 12)
+```
+
+Two statistics over six seasons give twelve columns.
+
+Each is named `channel@bin`.
+
+`ts.flatten()` is the Python counterpart of
+[`as.matrix()`](https://rdrr.io/r/base/matrix.html) and returns the
+array without column names, in the same order.
+
+A channel that holds the same number in every bin, as a `static`
+predictor such as elevation does inside a run, becomes a single column,
+so a penalised fit sees it once rather than once per bin. This is the
+function to call inside a learner of one’s own that reads a block.
+
+That column is named by the channel alone.
 
 [`feature_matrix()`](https://gillescolling.com/timesift/reference/feature_matrix.md)
 goes the other way: it turns a table already reduced elsewhere, such as
@@ -816,6 +1178,21 @@ head(as.matrix(fm), 3)
 #> p01         834                 43
 #> p02         871                 37
 #> p03         859                 37
+```
+
+``` python
+bio = pd.DataFrame({"plot": ids, "gdd": np.round(rng.normal(900, 80, 30)),
+                    "frost_days": rng.poisson(40, 30)})
+fm = ts.feature_matrix(bio[["gdd", "frost_days"]], units=bio["plot"],
+                       features=["gdd", "frost_days"], label="bioclim")
+fm
+#> <timesift matrix> 30 units x 2 bins x 1 channels
+#> grain: bioclim  stats: bioclim
+#> from  : gdd to frost_days
+ts.flatten(fm)[:3]
+#> array([[895.,  47.],
+#>        [962.,  49.],
+#>        [759.,  41.]])
 ```
 
 Each feature is a bin of the one channel, which is why the printout
@@ -849,6 +1226,19 @@ set[c("week", "bioclim")]
 #>   bioclim            2 bins x 1 channels (bioclim)
 ```
 
+``` python
+members = ts.timesift_set({"week": wk, "season": s, "bioclim": fm})
+members
+#> <timesift set> 3 grains over 30 units
+#>   week          58 bins x 3 channels (cold_day, mean, warm_day)
+#>   season         6 bins x 3 channels (cold_day, mean, warm_day)
+#>   bioclim        2 bins x 1 channels (bioclim)
+ts.timesift_set({k: members[k] for k in ("week", "bioclim")})
+#> <timesift set> 2 grains over 30 units
+#>   week          58 bins x 3 channels (cold_day, mean, warm_day)
+#>   bioclim        2 bins x 1 channels (bioclim)
+```
+
 Every member must cover the same targets in the same order, which is
 checked on the row names. The lookback above covers three targets where
 the weekly array covers thirty plots, so the two cannot share a set.
@@ -858,6 +1248,11 @@ the weekly array covers thirty plots, so the two cannot share a set.
 timesift_set(list(week = wk, visits = lb))
 #> Error:
 #> ! every representation in a set must cover the same targets; visits does not.
+```
+
+``` python
+ts.timesift_set({"week": wk, "visits": lb})
+#> ValueError: every grain in a set must cover the same units; visits does not
 ```
 
 ## Digests and the artifacts that cross languages
@@ -878,6 +1273,13 @@ digest_array(ladder[["month"]])
 #> [1] "f6710ec0e068018be42166fde3ddc80e"
 digest_array(grain_matrix(series, plot, t, temp, grain = "month"))
 #> [1] "f6710ec0e068018be42166fde3ddc80e"
+```
+
+``` python
+ts.digest_array(ladder["month"])
+#> 7cd8b7dd8e20b58b4f4b6ea682c1c459
+ts.digest_array(ts.grain_matrix(series, "plot", "t", "temp", grain="month"))
+#> 7cd8b7dd8e20b58b4f4b6ea682c1c459
 ```
 
 The month built as part of the seven-grain set and the month built on
@@ -909,6 +1311,22 @@ back <- read_folds(path, names(f))
 identical(as.integer(back), as.integer(f)) && identical(names(back), names(f))
 #> [1] TRUE
 unlink(path)
+```
+
+``` python
+import tempfile
+from pathlib import Path
+
+y = ts.as_response({"id": ids, **{f"sp{k}": targets[f"sp{k}"] for k in range(1, 5)}})
+f = ts.fold_map(y, v=3)
+path = Path(tempfile.mkdtemp()) / "folds.csv"
+ts.write_folds(f, path);
+path.read_text().splitlines()[:4]
+#> ['id,fold', 'p01,1', 'p02,2', 'p03,1']
+back = ts.read_folds(path, f.units)
+bool((back.fold == f.fold).all() and back.units == f.units)
+#> True
+path.unlink()
 ```
 
 [`read_folds()`](https://gillescolling.com/timesift/reference/artifacts.md)
@@ -947,6 +1365,25 @@ fit$candidates[c("candidate", "representation", "bins", "channels", "status")]
 #> 8  pinned / multigrain     multigrain   20        1         fitted
 ```
 
+``` python
+fit = ts.timesift(targets, series, y="sp*", id="plot", time="t",
+                  learners=[ts.elasticnet(), ts.elasticnet(data=ts.multigrain(("month", "season")))],
+                  sift=ts.grains("auto"), resampling=ts.cv(v=3), n_inner=None,
+                  ensemble=False, verbose=False)
+cand = pd.DataFrame(fit.candidates)
+cand["status"] = np.where(cand["reason"] == "", "fitted", "not applicable")
+print(cand[["candidate", "representation", "bins", "channels", "status"]].to_string())
+#>                                candidate            representation  bins  channels          status
+#> 0                    elasticnet / native                    native     0         0  not applicable
+#> 1                   elasticnet / halfday                   halfday   800         1          fitted
+#> 2                       elasticnet / day                       day   400         1          fitted
+#> 3                      elasticnet / week                      week    58         1          fitted
+#> 4                     elasticnet / month                     month    14         1          fitted
+#> 5                    elasticnet / season                    season     6         1          fitted
+#> 6                      elasticnet / year                      year     2         1          fitted
+#> 7  elasticnet / multigrain(month+season)  multigrain(month+season)     1        20          fitted
+```
+
 `grains("auto")` resolved to all seven named grains, since this record
 gives each of them at least two bins. The elastic net reads a block of
 features, so the pair with `native` was skipped and listed as not
@@ -977,6 +1414,22 @@ lfit$candidates[c("candidate", "representation", "bins", "channels", "status")]
 #> 2 elasticnet / 84 days x4     84 days x4    4        1 fitted
 ```
 
+``` python
+anchored = pd.DataFrame({"plot": np.repeat(ids, 2),
+                         "when": np.tile(pd.to_datetime(["2022-05-01", "2022-08-01"]), 30)})
+anchored["sp1"] = rng.binomial(1, 1 / (1 + np.exp(-2 * np.repeat(warmth, 2))))
+lfit = ts.timesift(anchored, series, y="sp1", id="plot", time="t", target_time="when",
+                   sift=ts.lookbacks("28 days", "84 days", bins=4),
+                   learners=[ts.elasticnet()], resampling=ts.grouped_cv("plot", v=3),
+                   n_inner=None, ensemble=False, verbose=False)
+cand = pd.DataFrame(lfit.candidates)
+cand["status"] = np.where(cand["reason"] == "", "fitted", "not applicable")
+print(cand[["candidate", "representation", "bins", "channels", "status"]].to_string())
+#>                  candidate representation  bins  channels  status
+#> 0  elasticnet / 28 days x4     28 days x4     4         1  fitted
+#> 1  elasticnet / 84 days x4     84 days x4     4         1  fitted
+```
+
 ## Practical guidance
 
 ### Which grains a record supports
@@ -1003,6 +1456,21 @@ rbind(`120 days` = span_bins(120), `1 year` = span_bins(365),
 #> 120 days   2880     240  120   18     4      2    1
 #> 1 year     8760     730  365   53    12      5    2
 #> 3 years   26304    2192 1096  157    36     12    3
+```
+
+``` python
+def span_bins(days, start="2021-09-01", year_start="01-01"):
+    t = pd.date_range(start, periods=24 * days, freq="h")
+    one = pd.DataFrame({"plot": "a", "t": t})
+    return {g: ts.coverage(one, "plot", "t", grain=g, year_start=year_start).count.shape[1]
+            for g in ("native", "halfday", "day", "week", "month", "season", "year")}
+
+pd.DataFrame({"120 days": span_bins(120), "1 year": span_bins(365),
+              "3 years": span_bins(1096, year_start="09-01")}).T
+#>           native  halfday   day  week  month  season  year
+#> 120 days    2880      240   120    18      4       2     1
+#> 1 year      8760      730   365    53     12       5     2
+#> 3 years    26304     2192  1096   157     36      12     3
 ```
 
 A record of 120 days gives one year bin, so `grains("auto")` leaves
@@ -1035,6 +1503,18 @@ c(native = plots * 26304 * 1, week_three_channels = plots * 157 * 3) * 8 / 2^20
 c(native = 26304, week_three_channels = 157 * 3)
 #>              native week_three_channels 
 #>               26304                 471
+```
+
+``` python
+plots = 894
+pd.Series({"native": plots * 26304 * 1, "week_three_channels": plots * 157 * 3}) * 8 / 2**20
+#> native                 179.411133
+#> week_three_channels      3.212540
+#> dtype: float64
+pd.Series({"native": 26304, "week_three_channels": 157 * 3})
+#> native                 26304
+#> week_three_channels      471
+#> dtype: int64
 ```
 
 One channel at `native` is 179 MB for the array alone, before a learner

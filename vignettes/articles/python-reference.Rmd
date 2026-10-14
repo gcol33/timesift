@@ -4,7 +4,7 @@ title: "Python reference"
 
 <!-- Written by tools/python_reference.py from the Python sources. Do not edit. -->
 
-The Python package's functions, classes and values, under the sections of [the R reference](../reference/index.html) and in its order. [Get started](python.html) runs them on a simulated record.
+The Python package's functions, classes and values, under the sections of [the R reference](../reference/index.html) and in its order. [Get started](timesift.html?lang=python) runs them on a simulated record.
 
 ## Installation
 

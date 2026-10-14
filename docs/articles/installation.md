@@ -1,14 +1,13 @@
 # Installing torch
 
-The neural learners,
+The neural learners
 [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md),
 [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
 and
-[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md),
-run on torch. Every other learner runs on timesift’s own C++ code and
-needs nothing from this article. The README covers the default install;
-this article covers a graphics processor, a slow or blocked download,
-and the checks that say what torch found.
+[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
+require torch. This article covers GPU setup, download problems and
+installation checks. The README describes the default installation. The
+other learners use timesift’s C++ code.
 
 torch for R is an R package plus two libraries it downloads after
 installation, LibTorch and LibLantern. torch for Python is one wheel

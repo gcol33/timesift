@@ -33,6 +33,10 @@ pip install "timesift[torch,contrasts,plot]"
 pip install git+https://github.com/gcol33/timesift
 ```
 
+The Python block draws its own record, so the values it prints differ
+from the ones quoted in the text, which come from the R run. Counts,
+shapes and calendar boundaries do not depend on the draw and agree.
+
 ``` r
 
 hours <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 60)
@@ -54,6 +58,32 @@ colSums(targets[c("sp1", "sp2")])
 #>  14  10
 ```
 
+``` python
+import numpy as np
+import pandas as pd
+import timesift as ts
+
+rng = np.random.default_rng(1)
+hours = pd.date_range("2021-09-01", periods=24 * 60, freq="h")
+ids = [f"p{i:02d}" for i in range(1, 25)]
+warmth = rng.normal(size=24)
+
+series = pd.DataFrame({
+    "plot": np.repeat(ids, len(hours)),
+    "t": np.tile(hours, 24),
+    "temp": np.concatenate([
+        w + 5 * np.sin(np.arange(1, len(hours) + 1) / 200) + rng.normal(scale=3, size=len(hours))
+        for w in warmth]),
+})
+targets = pd.DataFrame({"plot": ids,
+                        "sp1": rng.binomial(1, 1 / (1 + np.exp(-2 * warmth))),
+                        "sp2": rng.binomial(1, 1 / (1 + np.exp(2 * warmth)))})
+targets[["sp1", "sp2"]].sum()
+#> sp1    13
+#> sp2    15
+#> dtype: int64
+```
+
 ## A unit has no readings in a bin
 
 A logger that was stolen for a week, or one that started late, leaves a
@@ -72,12 +102,20 @@ grain_matrix(gappy, plot, t, temp, grain = "week")
 #> ! 1 (unit, bin) cell holds no readings, first: unit p03 at 2021-09-13T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.
 ```
 
-Every unit must reach every bin of the representation. A cell with no
-reading has no mean, and filling it, with an interpolation or the mean
-of the other plots, would put a number in front of the model that no
-logger recorded.
+``` python
+lost = ((series["plot"] == "p03") & (series["t"] >= "2021-09-13")
+        & (series["t"] < "2021-09-20"))
+gappy = series[~lost]
+
+ts.grain_matrix(gappy, "plot", "t", "temp", grain="week")
+#> ValueError: 1 (unit, bin) cell holds no readings, first: unit p03 at 2021-09-13T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.
+```
+
+Every unit needs at least one reading in every bin. An empty bin has no
+summary value, so
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
-raises the same error, because it builds its arrays the same way.
+raises an error when building the arrays. Any interpolation or
+imputation must be chosen and applied before fitting.
 
 [`coverage()`](https://gillescolling.com/timesift/reference/coverage.md)
 lays out the same binning as a count of readings per unit and bin, so
@@ -98,10 +136,28 @@ cov["p03", ]
 #>                  168                  168                  144
 ```
 
-There are three ways forward, and the choice belongs to the analysis:
-drop the units that do not span the record, cut the record to the span
-every unit covers, or move to a grain the gap does not reach. Here a
-month is coarse enough, since `p03` still has readings in September.
+``` python
+cov = ts.coverage(gappy, "plot", "t", grain="week")
+cov
+#> <timesift coverage> 24 units x 9 bins at the week grain
+#> 1 empty (unit, bin) cells in 1 units: p03
+pd.Series(cov.count[cov.units.index("p03")], index=cov.bins)
+#> 2021-08-30T00:00:00Z    120
+#> 2021-09-06T00:00:00Z    168
+#> 2021-09-13T00:00:00Z      0
+#> 2021-09-20T00:00:00Z    168
+#> 2021-09-27T00:00:00Z    168
+#> 2021-10-04T00:00:00Z    168
+#> 2021-10-11T00:00:00Z    168
+#> 2021-10-18T00:00:00Z    168
+#> 2021-10-25T00:00:00Z    144
+#> dtype: int32
+```
+
+You can exclude units with incomplete records, restrict the period to
+dates covered by every unit, or choose a coarser grain with readings in
+every bin. Here monthly bins work because `p03` still has readings in
+September.
 
 ``` r
 
@@ -109,6 +165,13 @@ dim(grain_matrix(gappy[gappy$plot != "p03", ], plot, t, temp, grain = "week"))
 #> [1] 23  9  1
 dim(grain_matrix(gappy, plot, t, temp, grain = "month"))
 #> [1] 24  2  1
+```
+
+``` python
+ts.grain_matrix(gappy[gappy["plot"] != "p03"], "plot", "t", "temp", grain="week").shape
+#> (23, 9, 1)
+ts.grain_matrix(gappy, "plot", "t", "temp", grain="month").shape
+#> (24, 2, 1)
 ```
 
 A week missing from every unit at once is refused under a different
@@ -122,6 +185,12 @@ everyone <- series$t >= as.POSIXct("2021-09-13", tz = "UTC") &
 grain_matrix(series[!everyone, ], plot, t, temp, grain = "week")
 #> Error:
 #> ! the week bins are not contiguous: nothing falls in the one beginning 2021-09-13T00:00:00, between 2021-09-06T00:00:00 and 2021-09-20T00:00:00. Bins must tile the record; a gap is not closed up.
+```
+
+``` python
+everyone = (series["t"] >= "2021-09-13") & (series["t"] < "2021-09-20")
+ts.grain_matrix(series[~everyone], "plot", "t", "temp", grain="week")
+#> ValueError: the week bins are not contiguous: nothing falls in the one beginning 2021-09-13T00:00:00, between 2021-09-06T00:00:00 and 2021-09-20T00:00:00. Bins must tile the record; a gap is not closed up.
 ```
 
 ## The first and last bins are partial
@@ -148,6 +217,16 @@ attr(x, "bin_n")[1, ]
 #>                  168                  168                  144
 ```
 
+``` python
+x = ts.grain_matrix(series, "plot", "t", "temp", grain="week")
+x.bins
+#> ('2021-08-30T00:00:00Z', '2021-09-06T00:00:00Z', '2021-09-13T00:00:00Z', '2021-09-20T00:00:00Z', '2021-09-27T00:00:00Z', '2021-10-04T00:00:00Z', '2021-10-11T00:00:00Z', '2021-10-18T00:00:00Z', '2021-10-25T00:00:00Z')
+x.bin_partial
+#> array([ True, False, False, False, False, False, False, False,  True])
+x.bin_n[0]
+#> array([120, 168, 168, 168, 168, 168, 168, 168, 144], dtype=int32)
+```
+
 Nothing is wrong: the calendar tiles the record, and a record that does
 not start on a Monday has a partial week at its start. `bin_partial`
 marks those bins and `bin_n` counts the readings each bin was reduced
@@ -164,6 +243,11 @@ dim(grain_matrix(series, plot, t, temp, grain = "week", partial = "drop"))
 #> [1] 24  7  1
 ```
 
+``` python
+ts.grain_matrix(series, "plot", "t", "temp", grain="week", partial="drop").shape
+#> (24, 7, 1)
+```
+
 On a grain coarser than the record, dropping can leave nothing, and that
 is an error.
 
@@ -172,6 +256,11 @@ is an error.
 grain_matrix(series, plot, t, temp, grain = "season", partial = "drop")
 #> Error:
 #> ! dropping the partial bins leaves no bin: the record covers no whole season. Use `partial = "keep"` or a finer grain.
+```
+
+``` python
+ts.grain_matrix(series, "plot", "t", "temp", grain="season", partial="drop")
+#> ValueError: dropping the partial bins leaves no bin: the record covers no whole season. Use partial='keep' or a finer grain.
 ```
 
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
@@ -186,6 +275,12 @@ whole <- series[series$t >= as.POSIXct("2021-09-06", tz = "UTC") &
                   series$t < as.POSIXct("2021-10-25", tz = "UTC"), ]
 attr(grain_matrix(whole, plot, t, temp, grain = "week"), "bin_partial")
 #> [1] FALSE FALSE FALSE FALSE FALSE FALSE FALSE
+```
+
+``` python
+whole = series[(series["t"] >= "2021-09-06") & (series["t"] < "2021-10-25")]
+ts.grain_matrix(whole, "plot", "t", "temp", grain="week").bin_partial
+#> array([False, False, False, False, False, False, False])
 ```
 
 ## The time column is not POSIXct, or sits in an unexpected zone
@@ -221,10 +316,18 @@ grain_matrix(odd, plot, t, temp, grain = "day")
 #> ! `t` is carried in the time zone "CET+1", which the zone database does not know. Name one of `OlsonNames()`.
 ```
 
+``` python
+ts.grain_matrix(series, "plot", "t", "temp", grain="day", tz="CET+1")
+#> ZoneInfoNotFoundError: 'No time zone found with key CET+1'
+```
+
 The surprise that raises no error is the zone itself. Bins follow the
 calendar of the `tzone` attribute, so the same instants carried in
 `"Europe/Vienna"` are cut into days at Vienna’s midnight, which in
 September is 22:00 UTC.
+
+In Python the calendar is named by `tz`, or by the zone a time column
+carries.
 
 ``` r
 
@@ -238,6 +341,16 @@ attr(xv, "bin_partial")[1:2]
 attr(xv, "bin_n")[1, 1:2]
 #> 2021-08-31T22:00:00Z 2021-09-01T22:00:00Z 
 #>                   22                   24
+```
+
+``` python
+xv = ts.grain_matrix(series, "plot", "t", "temp", grain="day", tz="Europe/Vienna")
+xv.bins[:2]
+#> ('2021-08-31T22:00:00Z', '2021-09-01T22:00:00Z')
+xv.bin_partial[:2]
+#> array([ True, False])
+xv.bin_n[0, :2]
+#> array([22, 24], dtype=int32)
 ```
 
 The first Vienna day began two hours before the first reading, so it is
@@ -254,6 +367,11 @@ fixed <- series
 attr(fixed$t, "tzone") <- "Etc/GMT-1"
 dimnames(grain_matrix(fixed, plot, t, temp, grain = "day"))[[2]][1:2]
 #> [1] "2021-08-31T23:00:00Z" "2021-09-01T23:00:00Z"
+```
+
+``` python
+ts.grain_matrix(series, "plot", "t", "temp", grain="day", tz="Etc/GMT-1").bins[:2]
+#> ('2021-08-31T23:00:00Z', '2021-09-01T23:00:00Z')
 ```
 
 On that offset every day begins at 23:00 UTC, in summer and in winter
@@ -277,6 +395,18 @@ grain_matrix(rbind(series, series[1, ]), plot, t, temp, grain = "day")
 #> ! 1 duplicated (unit, time) pair, first: p01 at 2021-09-01T00:00:00Z.
 ```
 
+``` python
+holed = series.copy()
+holed.loc[4, "temp"] = np.nan
+ts.grain_matrix(holed, "plot", "t", "temp", grain="day")
+#> ValueError: 1 reading is not a finite number, first: unit p01 at 2021-09-01T04:00:00. Fill or drop it before building a representation.
+```
+
+``` python
+ts.grain_matrix(pd.concat([series, series.iloc[[0]]]), "plot", "t", "temp", grain="day")
+#> ValueError: 1 duplicated (unit, time) pair, first: p01 at 2021-09-01T00:00:00Z.
+```
+
 A logger that wrote the same hour twice usually did so around a download
 or a clock change. Removing the repeated rows, or keeping one per
 instant on a rule that suits the logger, comes before any
@@ -295,8 +425,15 @@ timesift(extra, series, y = starts_with("sp"), id = plot, time = t, verbose = FA
 #> ! 2 targets name a unit `series` does not carry: p98, p99.
 ```
 
-The other direction is not an error. A unit in `series` that no target
-names is read by nobody, so it does not enter the fit.
+``` python
+extra = pd.concat([targets, pd.DataFrame({"plot": ["p98", "p99"], "sp1": 1, "sp2": 0})],
+                  ignore_index=True)
+ts.timesift(extra, series, y="sp*", id="plot", time="t", verbose=False)
+#> ValueError: 2 targets name a unit the series does not carry, first: p98.
+```
+
+`series` may contain additional units. Only units identified in
+`targets` enter the fit.
 
 ``` r
 
@@ -306,6 +443,15 @@ fit_fewer <- timesift(fewer, series, y = starts_with("sp"), id = plot, time = t,
                       ensemble = FALSE, verbose = FALSE)
 dim(fit_fewer$y)
 #> [1] 22  2
+```
+
+``` python
+fewer = targets.iloc[2:]
+fit_fewer = ts.timesift(fewer, series, y="sp*", id="plot", time="t",
+                        sift=ts.grains("week"), resampling=ts.cv(v=3), n_inner=None,
+                        ensemble=False, verbose=False)
+fit_fewer.y.values.shape
+#> (22, 2)
 ```
 
 The fit holds 22 targets, although the series carries 24 plots. When a
@@ -324,6 +470,12 @@ timesift(rbind(targets, targets[1, ]), series, y = starts_with("sp"), id = plot,
 #> ! `targets` holds more than one row for 1 identifier: p01. Give `target_time` to say where in time each row sits.
 ```
 
+``` python
+ts.timesift(pd.concat([targets, targets.iloc[[0]]]), series, y="sp*", id="plot", time="t",
+            verbose=False)
+#> ValueError: 1 id appears in more than one row of `targets`: p01. Give `target_time` to anchor repeated targets in time.
+```
+
 ## A learner cannot read the representation
 
 A learner declares what it reads: a tabular block of features, or a
@@ -340,6 +492,12 @@ timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
          learners = elasticnet(data = native()), verbose = FALSE)
 #> Error:
 #> ! `elasticnet()` reads a tabular representation; `native()` gives it one column per reading. Use `grain()`, `multigrain()` or `lookback()`.
+```
+
+``` python
+ts.timesift(targets, series, y="sp*", id="plot", time="t",
+            learners=ts.elasticnet(data=ts.native()), verbose=False)
+#> ValueError: elasticnet() reads a tabular representation; native gives it one column per reading. Use grain(), multigrain() or lookback().
 ```
 
 When the same pair arises from a `sift` expansion, the run goes ahead
@@ -364,6 +522,22 @@ fit_skip$candidates[c("candidate", "status", "note")]
 #> 2                                                                                                                                      <NA>
 ```
 
+``` python
+fit_skip = ts.timesift(targets, series, y="sp*", id="plot", time="t",
+                       sift=[ts.native(), ts.grain("week")], resampling=ts.cv(v=3),
+                       n_inner=None, ensemble=False)
+#> building the week representation
+#> not applicable: elasticnet() reads a tabular representation; native gives it one column per reading. Use grain(), multigrain() or lookback().
+#> fold 1 of 3
+#> fold 2 of 3
+#> fold 3 of 3
+#> refitting every candidate on all 24 targets
+pd.DataFrame(fit_skip.candidates)[["candidate", "reason"]]
+#>              candidate                                             reason
+#> 0  elasticnet / native  elasticnet() reads a tabular representation; n...
+#> 1    elasticnet / week
+```
+
 If no pair in the run can be fitted, the run stops and lists every
 reason.
 
@@ -374,6 +548,12 @@ timesift(targets, series, y = starts_with("sp"), id = plot, time = t, sift = nat
 #> Error:
 #> ! no learner can read any representation in the sift:
 #>   `elasticnet()` reads a tabular representation; `native()` gives it one column per reading. Use `grain()`, `multigrain()` or `lookback()`.
+```
+
+``` python
+ts.timesift(targets, series, y="sp*", id="plot", time="t", sift=ts.native(), verbose=False)
+#> ValueError: no learner can read any of the representations:
+#>   elasticnet() reads a tabular representation; native gives it one column per reading. Use grain(), multigrain() or lookback().
 ```
 
 The sequence learners,
@@ -400,6 +580,20 @@ timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
 #> ! `cnn()` reads a sequence; `grain("year")` gives one row of features.
 ```
 
+``` python
+ts.timesift(targets, series, y="sp*", id="plot", time="t",
+            learners=ts.cnn(data=ts.multigrain(("week", "month"))), verbose=False)
+#> ValueError: no learner can read any of the representations:
+#>   cnn() reads a sequence; multigrain(week+month) gives one row of 11 features
+```
+
+``` python
+ts.timesift(targets, series, y="sp*", id="plot", time="t",
+            learners=ts.cnn(data=ts.grain("year")), verbose=False)
+#> ValueError: no learner can read any of the representations:
+#>   cnn() reads a sequence; year gives one row of 1 features
+```
+
 ## A learner’s `data =` names a representation outside the sift
 
 A learner given `data =` is fitted on that representation alone, and the
@@ -418,6 +612,17 @@ fit_pin$candidates[c("candidate", "representation", "bins")]
 #> 2    forest / month          month    2
 ```
 
+``` python
+fit_pin = ts.timesift(targets, series, y="sp*", id="plot", time="t",
+                      learners=[ts.elasticnet(), ts.forest(data=ts.grain("month"))],
+                      sift=ts.grains("week"), resampling=ts.cv(v=3), n_inner=None,
+                      ensemble=False, verbose=False)
+pd.DataFrame(fit_pin.candidates)[["candidate", "representation", "bins"]]
+#>            candidate representation  bins
+#> 0  elasticnet / week           week     9
+#> 1     forest / month          month     2
+```
+
 The error comes when the pinned representation and one in the sift would
 be reported under the same name but differ in their settings, such as
 the weekly mean in the sift and the weekly extremes for the forest.
@@ -432,8 +637,16 @@ timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
 #> ! two representations are reported under the name "week": the one the forest learner is pinned to and the one in the sift. Name the sift to tell them apart.
 ```
 
-Naming the sift gives its representation a name of its own, and the two
-are then reported apart.
+``` python
+ts.timesift(targets, series, y="sp*", id="plot", time="t",
+            learners=[ts.elasticnet(),
+                      ts.forest(data=ts.grain("week", stats=("cold_day", "warm_day")))],
+            sift=ts.grains("week"), verbose=False)
+#> ValueError: two representations are reported under the name "week": the one the forest learner is pinned to and the one in the sift. Name the sift to tell them apart.
+```
+
+Give the representation in `sift` a distinct name so that the two
+candidates can be identified separately.
 
 ``` r
 
@@ -448,6 +661,18 @@ fit_named$candidates[c("candidate", "channels")]
 #> 2          forest / week        2
 ```
 
+``` python
+fit_named = ts.timesift(targets, series, y="sp*", id="plot", time="t",
+                        learners=[ts.elasticnet(),
+                                  ts.forest(data=ts.grain("week", stats=("cold_day", "warm_day")))],
+                        sift={"week_mean": ts.grain("week")}, resampling=ts.cv(v=3),
+                        n_inner=None, ensemble=False, verbose=False)
+pd.DataFrame(fit_named.candidates)[["candidate", "channels"]]
+#>                 candidate  channels
+#> 0  elasticnet / week_mean         1
+#> 1           forest / week         2
+```
+
 ## Day-level statistics at a sub-daily grain
 
 `cold_day`, `warm_day`, `mean_daily_min` and `mean_daily_max` first
@@ -459,6 +684,11 @@ refusal comes from the constructor, before any data are read.
 grain("halfday", stats = c("mean", "cold_day"))
 #> Error:
 #> ! `halfday` bins are shorter than a day, so cold_day is not defined there. Use a grain of `day` or coarser.
+```
+
+``` python
+ts.grain("halfday", stats=("mean", "cold_day"))
+#> ValueError: `halfday` bins are shorter than a day, so cold_day is not defined there. Use a grain of `day` or coarser.
 ```
 
 The coldest single reading of a half-day bin is `min`, and the coldest
@@ -475,6 +705,19 @@ grain("week", stats = c("cold_day", "mean", "warm_day"))
 #> <timesift representation> week 
 #> kind    : grain (a sequence) 
 #> grain   : week 
+#> stats   : cold_day, mean, warm_day
+```
+
+``` python
+ts.grain("halfday", stats=("mean", "min"))
+#> <timesift representation> halfday
+#> kind    : grain (a sequence)
+#> grain   : halfday
+#> stats   : mean, min
+ts.grain("week", stats=("cold_day", "mean", "warm_day"))
+#> <timesift representation> week
+#> kind    : grain (a sequence)
+#> grain   : week
 #> stats   : cold_day, mean, warm_day
 ```
 
@@ -506,12 +749,37 @@ cells[cells$variable == "sp3", ]
 #> 12      sp3    4     2          2        16         0        6    FALSE
 ```
 
+``` python
+rare = targets.assign(sp3=[1, 1] + [0] * 22, sp4=0)
+fit_rare = ts.timesift(rare, series, y="sp*", id="plot", time="t",
+                       sift=ts.grains("week"), resampling=ts.cv(v=4), n_inner=None,
+                       ensemble=False, verbose=False)
+from dataclasses import asdict
+
+fit_rare.cells
+#> <timesift cells> 16 cells over 4 variables
+#> scorable: 8 (50.0%); variables with at least one scorable fold: 2 of 4
+cells = pd.DataFrame(asdict(fit_rare.cells))
+cells[cells["variable"] == "sp3"]
+#>    variable  fold  n_occ  pres_train  abs_train  pres_test  abs_test  scorable
+#> 8       sp3     1      2           2         16          0         6     False
+#> 9       sp3     2      2           2         16          0         6     False
+#> 10      sp3     3      2           2         16          0         6     False
+#> 11      sp3     4      2           0         18          2         4     False
+```
+
 In folds 1, 2 and 4 both presences of `sp3` sit on the training side,
 leaving no presence to score, and in fold 3 both are held out, leaving
-none to fit on. The run does not stop for this. `fit$cells` is the mask,
-computed from the response and the fold map alone, and every candidate
-is scored on the same scorable cells, so `sp3` and `sp4` contribute
-nothing to any mean.
+none to fit on.
+
+In folds 1, 2 and 3 both presences of `sp3` sit on the training side,
+leaving no presence to score, and in fold 4 both are held out, leaving
+none to fit on.
+
+The run does not stop for this. `fit$cells` is the mask, computed from
+the response and the fold map alone, and every candidate is scored on
+the same scorable cells, so `sp3` and `sp4` contribute nothing to any
+mean.
 [`scorable_cells()`](https://gillescolling.com/timesift/reference/scorable_cells.md)
 gives the same table before a fit, from a response matrix and a fold
 map.
@@ -525,6 +793,29 @@ scorable_cells(y, fold_map(y, v = 4))
 #> scorable: 8 (50.0%); variables with at least one scorable fold: 2 of 4
 ```
 
+``` python
+y = ts.Response(rare[["sp1", "sp2", "sp3", "sp4"]].to_numpy(dtype=float), tuple(rare["plot"]),
+                ("sp1", "sp2", "sp3", "sp4"))
+pd.DataFrame(asdict(ts.scorable_cells(y, ts.fold_map(y, v=4))))
+#>    variable  fold  n_occ  pres_train  abs_train  pres_test  abs_test  scorable
+#> 0       sp1     1     13          10          8          3         3      True
+#> 1       sp1     2     13           8         10          5         1      True
+#> 2       sp1     3     13           9          9          4         2      True
+#> 3       sp1     4     13          12          6          1         5      True
+#> 4       sp2     1     15          11          7          4         2      True
+#> 5       sp2     2     15          12          6          3         3      True
+#> 6       sp2     3     15          12          6          3         3      True
+#> 7       sp2     4     15          10          8          5         1      True
+#> 8       sp3     1      2           2         16          0         6     False
+#> 9       sp3     2      2           2         16          0         6     False
+#> 10      sp3     3      2           2         16          0         6     False
+#> 11      sp3     4      2           0         18          2         4     False
+#> 12      sp4     1      0           0         18          0         6     False
+#> 13      sp4     2      0           0         18          0         6     False
+#> 14      sp4     3      0           0         18          0         6     False
+#> 15      sp4     4      0           0         18          0         6     False
+```
+
 Fewer folds give a rare response more chance of landing on both sides of
 each split. Only when no cell at all is scorable does the run stop, as
 it does for a response absent everywhere.
@@ -535,6 +826,12 @@ absent <- data.frame(plot = ids, sp0 = 0)
 timesift(absent, series, y = sp0, id = plot, time = t, verbose = FALSE)
 #> Error:
 #> ! no (response, fold) cell is scorable under this fold map, so no candidate can be scored: every cell needs both classes on each side of its split. See scorable_cells() for the counts; a rarer response needs fewer folds, or a response present somewhere.
+```
+
+``` python
+absent = pd.DataFrame({"plot": ids, "sp0": 0})
+ts.timesift(absent, series, y="sp0", id="plot", time="t", verbose=False)
+#> ValueError: no candidate scored inside the training data of fold 1. Widen the inner folds or drop the variables that cannot be scored.
 ```
 
 The response itself must be 0 and 1, with no missing value.
@@ -552,6 +849,20 @@ unknown$sp1[1] <- NA
 timesift(unknown, series, y = starts_with("sp"), id = plot, time = t, verbose = FALSE)
 #> Error:
 #> ! the response holds missing values. Fill or drop them before fitting.
+```
+
+``` python
+counted = targets.copy()
+counted.loc[0, "sp1"] = 2
+ts.timesift(counted, series, y="sp*", id="plot", time="t", verbose=False)
+#> ValueError: a presence-absence response must be 0/1 or logical
+```
+
+``` python
+unknown = targets.astype({"sp1": float})
+unknown.loc[0, "sp1"] = np.nan
+ts.timesift(unknown, series, y="sp*", id="plot", time="t", verbose=False)
+#> ValueError: the response holds missing values
 ```
 
 ## A torch learner without torch
@@ -584,6 +895,11 @@ fit <- timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
                 sift = grains("week", "month"), resampling = cv(v = 3), verbose = FALSE)
 ```
 
+``` python
+fit = ts.timesift(targets, series, y="sp*", id="plot", time="t",
+                  sift=ts.grains("week", "month"), resampling=ts.cv(v=3), verbose=False)
+```
+
 ``` r
 
 shorter <- series[series$t < as.POSIXct("2021-10-15", tz = "UTC"), ]
@@ -601,6 +917,23 @@ predict(fit, targets, gappy)
 #> ! 1 (unit, bin) cell holds no readings, first: unit p03 at 2021-09-13T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.
 ```
 
+``` python
+shorter = series[series["t"] < "2021-10-15"]
+fit.predict(targets, shorter)
+#> ValueError: the representation predicted on has different channels or bins from the fitted one: 7 bins here and 9 bins in the fit. A calendar grain is read by its bins' instants, so a fit predicts a record over the same period; a lookback reads a span relative to each target and predicts any period.
+```
+
+``` python
+next_year = series.assign(t=series["t"] + pd.Timedelta(days=365))
+fit.predict(targets, next_year)
+#> ValueError: the representation predicted on has different channels or bins from the fitted one: bin 1 is 2022-08-29T00:00:00Z here and 2021-08-30T00:00:00Z in the fit. A calendar grain is read by its bins' instants, so a fit predicts a record over the same period; a lookback reads a span relative to each target and predicts any period.
+```
+
+``` python
+fit.predict(targets, gappy)
+#> ValueError: 1 (unit, bin) cell holds no readings, first: unit p03 at 2021-09-13T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.
+```
+
 The first two are the same mismatch: the bins of the new record are not
 those the fit was made on. The third is the coverage refusal again,
 raised while building the new array. A record over the same period
@@ -613,6 +946,13 @@ predict(fit, targets[1:3, ], series[series$plot %in% ids[1:3], ])
 #> p01 0.1745044 0.6128003
 #> p02 0.5458671 0.4945805
 #> p03 0.1465358 0.6298695
+```
+
+``` python
+fit.predict(targets.iloc[:3], series[series["plot"].isin(ids[:3])]).round(3)
+#> array([[0.523, 0.624],
+#>        [0.631, 0.622],
+#>        [0.565, 0.624]])
 ```
 
 To predict another period, the representation has to be anchored on each
@@ -633,6 +973,19 @@ predict(fit_lb, later[1:3, ], next_year[next_year$plot %in% ids[1:3], ])
 #> 1 0.1886727 0.6033119
 #> 2 0.5668084 0.4835910
 #> 3 0.1495701 0.6241430
+```
+
+``` python
+anchored = targets.assign(at=pd.Timestamp("2021-10-30"))
+fit_lb = ts.timesift(anchored, series, y="sp*", id="plot", time="t",
+                     target_time="at", sift=ts.lookbacks("28 days", "56 days"),
+                     resampling=ts.cv(v=3), verbose=False)
+
+later = anchored.assign(at=anchored["at"] + pd.Timedelta(days=365))
+fit_lb.predict(later.iloc[:3], next_year[next_year["plot"].isin(ids[:3])]).round(3)
+#> array([[0.582, 0.613],
+#>        [0.656, 0.591],
+#>        [0.585, 0.613]])
 ```
 
 ## Runs take longer than expected
@@ -662,11 +1015,33 @@ outer_only <- system.time(timesift(targets, series, y = starts_with("sp"), id = 
                                    n_inner = NULL, verbose = FALSE))[["elapsed"]]
 c(nested = nested, outer_only = outer_only)
 #>     nested outer_only 
-#>       0.67       0.15
+#>       0.46       0.12
 ```
 
-On this record the nested run took 0.67 seconds and the run on the outer
-folds alone 0.15.
+``` python
+import time
+
+v_outer = 3
+candidates = 2
+{"nested": v_outer * (5 + 1) * candidates + candidates,
+ "outer_only": v_outer * candidates + candidates}
+#> {'nested': 38, 'outer_only': 8}
+
+start = time.perf_counter()
+ts.timesift(targets, series, y="sp*", id="plot", time="t",
+            sift=ts.grains("week", "month"), resampling=ts.cv(v=3), verbose=False);
+nested = time.perf_counter() - start
+start = time.perf_counter()
+ts.timesift(targets, series, y="sp*", id="plot", time="t",
+            sift=ts.grains("week", "month"), resampling=ts.cv(v=3), n_inner=None,
+            verbose=False);
+outer_only = time.perf_counter() - start
+nested > outer_only
+#> True
+```
+
+On this record the nested run took 0.46 seconds and the run on the outer
+folds alone 0.12.
 
 Each fit in turn costs what its array costs. A calendar grain has as
 many columns as bins times statistics, and
@@ -684,6 +1059,18 @@ format(object.size(xn), units = "MB")
 # Three years of hourly readings on 894 plots, one channel, in megabytes
 894 * (3 * 365 + 1) * 24 * 8 / 2^20
 #> [1] 179.4111
+```
+
+``` python
+xn = ts.grain_matrix(series, "plot", "t", "temp", grain="native")
+xn.values.shape
+#> (24, 1440, 1)
+f"{xn.values.nbytes / 2**20:.1f} MB"
+#> 0.3 MB
+
+# Three years of hourly readings on 894 plots, one channel, in megabytes
+894 * (3 * 365 + 1) * 24 * 8 / 2**20
+#> 179.4111328125
 ```
 
 The weekly grain of the same record holds 9 bins against the 1440 of the
@@ -724,6 +1111,21 @@ identical(a$scores, c2$scores)
 #> [1] FALSE
 ```
 
+``` python
+def run(seed):
+    return ts.timesift(targets, series, y="sp*", id="plot", time="t",
+                       sift=ts.grains("week", "month"), resampling=ts.cv(v=3, seed=seed),
+                       n_inner=None, ensemble=False, verbose=False)
+
+a = run(1)
+b = run(1)
+c2 = run(2)
+pd.DataFrame(a.scores).equals(pd.DataFrame(b.scores))
+#> True
+pd.DataFrame(a.scores).equals(pd.DataFrame(c2.scores))
+#> False
+```
+
 The fold map draws under its own seed and puts the session’s random
 number stream back as it found it, so a call does not shift the draws
 that follow it.
@@ -748,6 +1150,14 @@ digest_array(grain_matrix(series, plot, t, temp, grain = "week"))
 #> [1] "61296ebef3384a8fde101fc1540d2ae8"
 digest_array(grain_matrix(series[sample(nrow(series)), ], plot, t, temp, grain = "week"))
 #> [1] "61296ebef3384a8fde101fc1540d2ae8"
+```
+
+``` python
+ts.digest_array(ts.grain_matrix(series, "plot", "t", "temp", grain="week"))
+#> 9337f31e937aea21c9a0f1901fe0875f
+shuffled = series.sample(frac=1, random_state=1)
+ts.digest_array(ts.grain_matrix(shuffled, "plot", "t", "temp", grain="week"))
+#> 9337f31e937aea21c9a0f1901fe0875f
 ```
 
 The two digests agree because the rows of a representation are sorted by

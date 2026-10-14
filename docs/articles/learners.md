@@ -1,18 +1,15 @@
 # Learners
 
-A learner is the model half of a candidate: a representation says how
-the record is reduced, and a learner says what is fitted to the
-reduction. `timesift` ships fifteen learners, from a penalised logistic
-regression to a residual convolutional network. Every one of them goes
-through the same pair of functions, the same folds and the same scoring
-as a learner written for a single study, so adding a model never means
-changing the code that fits or scores.
+A candidate pairs a representation with a learner: the representation
+defines the model inputs, and the learner fits the model. `timesift`
+includes fifteen learners, from penalised logistic regression to
+residual convolutional networks. Built-in and custom learners use the
+same fitting, prediction and scoring interface.
 
-This article lists what ships, what each learner can be handed, how the
-main ones are set, how the neural encoders are trained and tuned, and
-how a learner, a response type or a metric of one’s own is added. It
-ends with what each learner costs on a small record and where each is
-the wrong choice.
+This article covers the available learners, compatible inputs, model
+settings, neural-network training and tuning. It also shows how to add a
+custom learner, response type or metric, and compares fitting times on a
+small example.
 
 The examples use one simulated record throughout: 150 units read every
 six hours for a year, and four presence-absence responses that depend on
@@ -44,6 +41,10 @@ pip install "timesift[torch,contrasts,plot]"
 pip install git+https://github.com/gcol33/timesift
 ```
 
+The Python block draws its own record, so the values it prints differ
+from the ones quoted in the text, which come from the R run. Counts,
+shapes and calendar boundaries do not depend on the draw and agree.
+
 ``` r
 
 sim <- simulate_records(n = 150L, mechanism = "lag", variables = 4L, days = 365L,
@@ -54,13 +55,36 @@ colSums(sim$y)
 #>  46  55  40  51
 ```
 
+``` python
+import numpy as np
+import pandas as pd
+import timesift as ts
+
+sim = ts.simulate_records(n=150, mechanism="lag", variables=4, days=365, step_hours=6,
+                          prevalence=0.3, auc=0.85, seed=4)
+y = sim.y
+targets = pd.DataFrame({"unit": y.units, **dict(zip(y.variables, y.values.T.astype(int)))})
+targets.drop(columns="unit").sum()
+#> v01    48
+#> v02    50
+#> v03    44
+#> v04    48
+#> dtype: int64
+```
+
 ## One interface
 
-A learner is a list carrying a `fit` function, a `predict` function and
-three declarations: what it reads, whether it covers the responses
-jointly or one at a time, and which packages it needs. Printing one
-shows the declarations and the settings it carries, with `NULL` where a
-setting takes its default at the fit.
+A learner is a list containing `fit` and `predict` functions, its
+supported input types, whether it models responses jointly or
+separately, and its package requirements. Printing it shows these
+declarations and its settings. A setting shown as `NULL` takes its
+default when the model is fitted.
+
+A learner is an object holding `fit` and `predict` functions, its
+supported input types, whether it models responses jointly or
+separately, and its package requirements. Printing it shows these
+declarations and its settings. A setting shown as `None` takes its
+default when the model is fitted.
 
 ``` r
 
@@ -76,12 +100,30 @@ forest(balance = TRUE)
 #> settings: trees = NULL, mtry = NULL, min_node = NULL, balance = TRUE, preset = default, seed = 1, threads = 1
 ```
 
+``` python
+ts.elasticnet()
+#> <timesift learner> elasticnet
+#> reads   : tabular ; one model per response: yes, separate
+#> data    : every representation of the run
+#> settings: alpha = 0.5, n_inner = 10, squares = True, s = lambda.1se, n_lambda = 100, tol = 1e-08, threads = 1, seed = 1
+ts.forest(balance=True)
+#> <timesift learner> forest
+#> reads   : tabular ; one model per response: yes, separate
+#> data    : every representation of the run
+#> settings: trees = None, mtry = None, min_node = None, balance = True, preset = default, seed = 1, threads = 1
+```
+
 `fit` is handed a `[unit, bin, channel]` array and the response matrix
 of the same units, and `predict` returns one column per response. A
 learner that fits one model per response is still handed the whole
 response matrix, so nothing above the learner layer needs to know which
-kind it was. [`c()`](https://rdrr.io/r/base/c.html) binds learners into
-a set, which
+kind it was.
+
+[`c()`](https://rdrr.io/r/base/c.html) binds learners into a set, which
+[`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
+takes as `learners`.
+
+A list binds learners into a set, which
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
 takes as `learners`.
 
@@ -92,6 +134,25 @@ c(elasticnet(), forest(), cnn())
 #>   elasticnet     reads tabular, separate
 #>   forest         reads tabular, separate
 #>   cnn            reads sequence, joint
+```
+
+``` python
+print(*[ts.elasticnet(), ts.forest(), ts.cnn()], sep="\n\n")
+#> <timesift learner> elasticnet
+#> reads   : tabular ; one model per response: yes, separate
+#> data    : every representation of the run
+#> settings: alpha = 0.5, n_inner = 10, squares = True, s = lambda.1se, n_lambda = 100, tol = 1e-08, threads = 1, seed = 1
+#>
+#> <timesift learner> forest
+#> reads   : tabular ; one model per response: yes, separate
+#> data    : every representation of the run
+#> settings: trees = None, mtry = None, min_node = None, balance = False, preset = default, seed = 1, threads = 1
+#>
+#> <timesift learner> cnn
+#> reads   : sequence ; one model per response: no, joint
+#> data    : every representation of the run
+#> settings: channels = 16/32/64/128, kernel = 7, dropout = 0.3
+#> needs   : torch
 ```
 
 ## The learners that ship
@@ -123,6 +184,30 @@ data.frame(learner = shipped,
 #> 13   perceptron  tabular separate      
 #> 14       rescnn sequence    joint torch
 #> 15         tree  tabular separate
+```
+
+``` python
+built = [ts.get_learner(name) for name in ts.learners()]
+pd.DataFrame({"learner": ts.learners(),
+              "reads": [l.reads for l in built],
+              "multi": [l.multi for l in built],
+              "needs": [", ".join(l.needs) for l in built]})
+#>          learner     reads     multi  needs
+#> 0       additive   tabular  separate
+#> 1       boosting   tabular  separate
+#> 2            cnn  sequence     joint  torch
+#> 3   discriminant   tabular  separate
+#> 4     elasticnet   tabular  separate
+#> 5       envelope   tabular  separate
+#> 6         forest   tabular  separate
+#> 7   hierarchical   tabular  separate
+#> 8         linear   tabular  separate
+#> 9           mars   tabular  separate
+#> 10        maxent   tabular  separate
+#> 11           mlp   tabular     joint  torch
+#> 12    perceptron   tabular  separate
+#> 13        rescnn  sequence     joint  torch
+#> 14          tree   tabular  separate
 ```
 
 Twelve learners read a tabular block and fit one model per response.
@@ -191,6 +276,12 @@ timesift(targets, sim$readings, y = starts_with("v"), id = unit, time = time,
 #> ! `forest()` reads a tabular representation; `native()` gives it one column per reading. Use `grain()`, `multigrain()` or `lookback()`.
 ```
 
+``` python
+ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
+            learners=ts.forest(data=ts.native()), verbose=False)
+#> ValueError: forest() reads a tabular representation; native gives it one column per reading. Use grain(), multigrain() or lookback().
+```
+
 Inside a `sift` the same pair is skipped and the run goes on. The
 candidate table keeps the skipped pair, with the reason in `note`.
 
@@ -226,6 +317,9 @@ pinned to the monthly grain here, and the elastic net is given a looser
 stopping tolerance, both to keep the run short. The section on settings
 shows what the tolerance changes.
 
+In Python `learners` takes a list, and a candidate reports under its
+learner’s `name`, which `dataclasses.replace(learner, name="...")` sets.
+
 ``` r
 
 models <- list(
@@ -244,10 +338,32 @@ run_time <- system.time(
                   resampling = cv(v = 5), n_inner = 3L, verbose = FALSE)
 )
 run_time[["elapsed"]]
-#> [1] 20.97
+#> [1] 17.36
 ```
 
-The run took 21 seconds for 15 candidates. With three inner folds in
+``` python
+import time
+from dataclasses import replace
+
+models = [
+    ts.elasticnet(tol=1e-4),
+    ts.linear(data=ts.grain("month")),
+    ts.tree(),
+    ts.forest(),
+    replace(ts.forest(balance=True), name="forest_balanced"),
+    replace(ts.boosting(), name="gbm"),
+    replace(ts.boosting(method="xgboost"), name="xgboost"),
+    ts.maxent(),
+]
+start = time.perf_counter()
+fit = ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
+                  learners=models, sift=ts.grains("week", "month"),
+                  resampling=ts.cv(v=5), n_inner=3, verbose=False)
+round(time.perf_counter() - start)
+#> 16
+```
+
+The run took 17 seconds for 15 candidates. With three inner folds in
 each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20
 times, three inner fits and one outer fit in each outer fold, and once
 more on every target.
@@ -289,6 +405,37 @@ summary(fit)
 #> weights on every target  maxent / week 0.80   gbm / week 0.10   linear / month 0.09   elasticnet / week 0.02
 ```
 
+``` python
+print(ts.summary(fit))
+#> timesift  150 targets, 4 responses, 5-fold random CV, roc_auc
+#>
+#> candidates, scored on the outer folds
+#> candidate                         mean    won  responses
+#> tree / month                     0.513      0  separate
+#> xgboost / month                  0.549      0  separate
+#> forest_balanced / month          0.560      0  separate
+#> forest / month                   0.561      0  separate
+#> elasticnet / month               0.583      0  separate
+#> gbm / month                      0.589      0  separate
+#> linear / month                   0.603      0  separate
+#> tree / week                      0.623      0  separate
+#> maxent / month                   0.624      0  separate
+#> forest_balanced / week           0.638      0  separate
+#> forest / week                    0.649      0  separate
+#> gbm / week                       0.677      0  separate
+#> xgboost / week                   0.697      0  separate
+#> maxent / week                    0.779      2  separate
+#> elasticnet / week                0.791      2  separate
+#>
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                         0.777  se 0.030
+#> ensemble                         0.775  se 0.027
+#> selected maxent / week in 4, elasticnet / week in 1 of 5 folds
+#>
+#> choice on every target  elasticnet / week
+#> weights on every target  maxent / week 0.87   xgboost / week 0.05   elasticnet / week 0.04   linear / month 0.03   xgboost / month 0.01
+```
+
 Each learner run at both grains scores higher at the weekly one, which
 is the grain the simulation acts at. At the monthly grain the tree, both
 forests and gbm score below 0.5, so they find nothing there.
@@ -311,6 +458,15 @@ head(fit$candidates[c("candidate", "learner", "grain", "bins", "status")], 4)
 #> 2 elasticnet / month elasticnet month   12 fitted
 #> 3     linear / month     linear month   12 fitted
 #> 4        tree / week       tree  week   53 fitted
+```
+
+``` python
+pd.DataFrame(fit.candidates)[["candidate", "learner", "grain", "bins"]].head(4)
+#>             candidate     learner  grain  bins
+#> 0   elasticnet / week  elasticnet   week    53
+#> 1  elasticnet / month  elasticnet  month    12
+#> 2      linear / month      linear  month    12
+#> 3         tree / week        tree   week    53
 ```
 
 ## One learner on one array
@@ -344,11 +500,29 @@ f$model[c("unfitted", "stopped")]
 #> character(0)
 ```
 
-`unfitted` names any response with too few presences to choose a penalty
-on, which is then predicted its share among the fitting units, and
-`stopped` names any response whose penalty path ended early. Neither
-applies here. The fit carries the bins it was made on, and an array with
-other bins is refused:
+``` python
+train, test = y.take_units(np.arange(75)), y.take_units(np.arange(75, 150))
+in_train = np.isin(sim.readings["unit"], train.units)
+
+def rows(mask):
+    return {k: v[mask] for k, v in sim.readings.items()}
+
+week_train = ts.grain_matrix(rows(in_train), "unit", "time", "reading", grain="week")
+week_test = ts.grain_matrix(rows(~in_train), "unit", "time", "reading", grain="week")
+f = ts.fit_learner(ts.elasticnet(), week_train, train)
+f.learner
+#> <timesift learner> elasticnet
+#> reads   : tabular ; one model per response: yes, separate
+#> data    : every representation of the run
+#> settings: alpha = 0.5, n_inner = 10, squares = True, s = lambda.1se, n_lambda = 100, tol = 1e-08, threads = 1, seed = 1
+{k: f.model[k] for k in ("unfitted", "stopped")}
+#> {'unfitted': [], 'stopped': []}
+```
+
+`unfitted` lists responses with too few presences for penalty selection;
+their predictions use the prevalence in the training data. `stopped`
+lists responses whose penalty path ended early. Neither occurs here.
+Prediction requires the same bins used during fitting:
 
 ``` r
 
@@ -357,6 +531,13 @@ month_test <- grain_matrix(sim$readings[!in_train, ], unit, time, reading, grain
 predict(f, month_test)
 #> Error:
 #> ! the representation predicted on has different channels or bins from the fitted one: 12 bins here and 53 bins in the fit. A calendar grain is read by its bins' instants, so a fit predicts a record over the same period; a lookback reads a span relative to each target and predicts any period.
+```
+
+``` python
+month_train = ts.grain_matrix(rows(in_train), "unit", "time", "reading", grain="month")
+month_test = ts.grain_matrix(rows(~in_train), "unit", "time", "reading", grain="month")
+f.predict(month_test)
+#> ValueError: the representation predicted on has different channels or bins from the fitted one: 12 bins here and 53 bins in the fit. A calendar grain is read by its bins' instants, so a fit predicts a record over the same period; a lookback reads a span relative to each target and predicts any period.
 ```
 
 ## Settings of the main learners
@@ -425,6 +606,37 @@ round(vapply(variants, held_out_auc, numeric(1)), 3)
 #>                        0.665                        0.693
 ```
 
+``` python
+def held_out_auc(learner):
+    p = ts.fit_learner(learner, week_train, train).predict(week_test)
+    return np.mean([ts.roc_auc(test.values[:, j], p[:, j]) for j in range(p.shape[1])])
+
+variants = {
+    "elasticnet()": ts.elasticnet(),
+    'elasticnet(s="lambda.min")': ts.elasticnet(s="lambda.min"),
+    "elasticnet(alpha=1)": ts.elasticnet(alpha=1),
+    "elasticnet(tol=1e-4)": ts.elasticnet(tol=1e-4),
+    "forest()": ts.forest(),
+    "forest(balance=True)": ts.forest(balance=True),
+    "boosting()": ts.boosting(),
+    'boosting(method="xgboost")': ts.boosting(method="xgboost"),
+    "maxent()": ts.maxent(),
+    'maxent(classes="lq")': ts.maxent(classes="lq"),
+}
+pd.Series({name: held_out_auc(l) for name, l in variants.items()}).round(3)
+#> elasticnet()                  0.729
+#> elasticnet(s="lambda.min")    0.726
+#> elasticnet(alpha=1)           0.727
+#> elasticnet(tol=1e-4)          0.727
+#> forest()                      0.626
+#> forest(balance=True)          0.605
+#> boosting()                    0.615
+#> boosting(method="xgboost")    0.638
+#> maxent()                      0.710
+#> maxent(classes="lq")          0.736
+#> dtype: float64
+```
+
 On this split the elastic net read at `"lambda.min"` scores 0.680
 against 0.631 at the default `"lambda.1se"`, and the lasso scores 0.608.
 The looser tolerance gives the same AUC as the default to three
@@ -483,6 +695,34 @@ cnn(channels = c(8L, 16L), kernel = 3L, epochs = 10L)
 #> needs   : torch
 ```
 
+``` python
+ts.train_control(epochs=5, device="cpu")
+#> <timesift control>
+#>   epochs           5
+#>   batch_size       64   (default)
+#>   learning_rate    0.001   (default)
+#>   weight_decay     0.0001   (default)
+#>   optimizer        adamw   (default)
+#>   penalty          0.0   (default)
+#>   alpha            0.5   (default)
+#>   schedule         cosine   (default)
+#>   plateau_factor   0.1   (default)
+#>   plateau_patience 10   (default)
+#>   early_stopping   inf   (default)
+#>   val_frac         0.0   (default)
+#>   device           cpu
+#>   seed             1   (default)
+#>   swa              False   (default)
+#>   swa_start        0.7   (default)
+ts.cnn(channels=(8, 16), kernel=3, epochs=10)
+#> <timesift learner> cnn
+#> reads   : sequence ; one model per response: no, joint
+#> data    : every representation of the run
+#> settings: channels = 8/16, kernel = 3, dropout = 0.3
+#> training: epochs = 10
+#> needs   : torch
+```
+
 The control marks the settings that were not named as `(default)`, and
 the learner lists under `training` the one setting it overrides. The run
 below trains both encoders at the weekly grain for a handful of epochs
@@ -508,6 +748,22 @@ summary(nets)
 #> choice on every target  cnn / week
 ```
 
+``` python
+nets = ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
+                   learners=[ts.mlp(hidden=(32, 16)), ts.cnn(channels=(8, 16), kernel=3, epochs=10)],
+                   sift=ts.grains("week"), control=ts.train_control(epochs=5, device="cpu"),
+                   resampling=ts.cv(v=3), n_inner=None, ensemble=False, verbose=False)
+print(ts.summary(nets))
+#> timesift  150 targets, 4 responses, 3-fold random CV, roc_auc
+#>
+#> candidates, scored on the outer folds
+#> candidate            mean    won  responses
+#> cnn / week          0.446      1  joint
+#> mlp / week          0.463      3  joint
+#>
+#> choice on every target  mlp / week
+```
+
 After so few epochs both encoders score close to 0.5, as an undertrained
 network does. The `responses` column reads `joint`: one network covers
 all four responses, and each candidate is still reported once.
@@ -521,6 +777,13 @@ timesift(targets, sim$readings, y = starts_with("v"), id = unit, time = time,
          learners = cnn(data = multigrain(c("week", "month"))), verbose = FALSE)
 #> Error:
 #> ! `cnn()` reads a sequence; `multigrain()` gives one row of features.
+```
+
+``` python
+ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
+            learners=ts.cnn(data=ts.multigrain(("week", "month"))), verbose=False)
+#> ValueError: no learner can read any of the representations:
+#>   cnn() reads a sequence; multigrain(week+month) gives one row of 65 features
 ```
 
 A fitted encoder holds its weights as plain arrays and the device as the
@@ -557,6 +820,19 @@ tf$model$table
 #> 4 mtry = 8, min_node = 5 0.5666238
 ```
 
+``` python
+tuned = ts.tune(ts.forest(trees=200), {"mtry": (2, 8), "min_node": (1, 5)}, n_inner=3)
+tf = ts.fit_learner(tuned, week_train, train)
+tf.model.chosen
+#> {'mtry': 8, 'min_node': 5}
+pd.DataFrame(tf.model.table)
+#>                  settings     score
+#> 0  mtry = 2, min_node = 1  0.530352
+#> 1  mtry = 8, min_node = 1  0.553803
+#> 2  mtry = 2, min_node = 5  0.520598
+#> 3  mtry = 8, min_node = 5  0.566769
+```
+
 The search chose `mtry = 8` and `min_node = 5`, the combination with the
 highest mean inner AUC. Under
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md),
@@ -575,6 +851,11 @@ tunings()
 #> [6] "maxent"       "mlp"          "perceptron"
 ```
 
+``` python
+ts.tunings()
+#> ['boosting', 'discriminant', 'envelope', 'forest', 'mars', 'maxent', 'mlp', 'perceptron']
+```
+
 [`register_tuning()`](https://gillescolling.com/timesift/reference/register_tuning.md)
 adds a grid, as a named list or as a function of the learner and the
 array for a grid that depends on the data, such as one bounded by the
@@ -589,6 +870,15 @@ te$model$table
 #>       settings     score
 #> 1 alpha = 0.25 0.5088889
 #> 2    alpha = 1 0.5158333
+```
+
+``` python
+ts.register_tuning("elasticnet", {"alpha": (0.25, 1)});
+te = ts.fit_learner(ts.tune(ts.elasticnet(), n_inner=3), month_train, train)
+pd.DataFrame(te.model.table)
+#>        settings     score
+#> 0  alpha = 0.25  0.578892
+#> 1     alpha = 1  0.598877
 ```
 
 `alpha = 1`, the lasso, scored higher on the three inner folds, and the
@@ -642,6 +932,45 @@ channel_means()
 #> data    : every representation of the run
 ```
 
+``` python
+families = {
+    "binary_cross_entropy": (lambda eta: 1 / (1 + np.exp(-eta)), lambda mu: mu * (1 - mu)),
+    "squared_error": (lambda eta: eta, np.ones_like),
+    "poisson_deviance": (np.exp, lambda mu: mu),
+}
+
+def glm(design, y, w, loss):
+    inverse, variance = families[loss]
+    beta = np.zeros(design.shape[1])
+    for _ in range(50):
+        mu = inverse(design @ beta)
+        step = np.linalg.solve(design.T @ ((w * variance(mu))[:, None] * design),
+                               design.T @ (w * (y - mu)))
+        beta += step
+        if np.abs(step).max() < 1e-8:
+            break
+    return beta
+
+def channel_means(data=None):
+    def design(x):
+        return np.column_stack([np.ones(x.values.shape[0]), x.values.mean(axis=1)])
+
+    def fit(x, y, head, weights, **_):
+        return [glm(design(x), y[:, j], weights[:, j], head["loss"]) for j in range(y.shape[1])], head
+
+    def predict(model, x):
+        betas, head = model
+        inverse = families[head["loss"]][0]
+        return np.column_stack([inverse(design(x) @ b) for b in betas])
+
+    return ts.Learner("channel_means", fit=fit, predict=predict, data=data)
+
+channel_means()
+#> <timesift learner> channel_means
+#> reads   : tabular ; one model per response: yes, separate
+#> data    : every representation of the run
+```
+
 [`register_learner()`](https://gillescolling.com/timesift/reference/register_learner.md)
 makes the constructor available by name, beside the shipped learners,
 and a registered learner can then be given to
@@ -675,6 +1004,27 @@ summary(own)
 #> choice on every target  elasticnet / week
 ```
 
+``` python
+ts.register_learner("channel_means", channel_means);
+"channel_means" in ts.learners()
+#> True
+own = ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
+                  learners=[ts.elasticnet(), channel_means()],
+                  sift=ts.grains("week", "month"),
+                  resampling=ts.cv(v=5), n_inner=None, ensemble=False, verbose=False)
+print(ts.summary(own))
+#> timesift  150 targets, 4 responses, 5-fold random CV, roc_auc
+#>
+#> candidates, scored on the outer folds
+#> candidate                       mean    won  responses
+#> channel_means / month          0.470      0  separate
+#> channel_means / week           0.472      0  separate
+#> elasticnet / month             0.571      0  separate
+#> elasticnet / week              0.789      4  separate
+#>
+#> choice on every target  elasticnet / week
+```
+
 `channel_means` scores 0.461 at both grains. The mean of a channel over
 the whole year is nearly the same number whichever bins it is averaged
 from, and in this simulation the responses read each unit’s departure
@@ -683,15 +1033,20 @@ elastic net, which reads every bin, scores 0.701.
 
 ## Other responses, and other metrics
 
-The response head says what the values are, how each learner fits them
-and which cells a score is defined on. Besides `"presence_absence"`,
-four heads ship:
+A response head defines the response type, fitting loss and conditions
+under which a cell can be scored. In addition to `"presence_absence"`,
+four response heads are available:
 
 ``` r
 
 responses()
 #> [1] "abundance"        "continuous"       "count"            "ordinal"         
 #> [5] "presence_absence"
+```
+
+``` python
+ts.responses()
+#> ['abundance', 'continuous', 'count', 'ordinal', 'presence_absence']
 ```
 
 A count is fitted under the Poisson deviance. The counts below are drawn
@@ -711,6 +1066,20 @@ round(head(predict(cf, week_test), 3), 2)
 #> d001u00078  1.29
 ```
 
+``` python
+week = ts.grain_matrix(sim.readings, "unit", "time", "reading", grain="week")
+level = week.values.mean(axis=(1, 2))
+rate = np.exp(0.5 + 0.8 * (level - level.mean()) / level.std(ddof=1))
+rng = np.random.default_rng(1)
+counts = ts.Response(rng.poisson(rate).reshape(-1, 1).astype(float), y.units, ("count",))
+counts_train = counts.take_units(np.arange(75))
+cf = ts.fit_learner(ts.forest(), week_train, counts_train, response="count")
+cf.predict(week_test)[:3].round(2)
+#> array([[0.65],
+#>        [2.66],
+#>        [1.43]])
+```
+
 [`maxent()`](https://gillescolling.com/timesift/reference/maxent.md),
 [`envelope()`](https://gillescolling.com/timesift/reference/envelope.md),
 [`discriminant()`](https://gillescolling.com/timesift/reference/discriminant.md)
@@ -723,6 +1092,11 @@ need a presence-absence response and refuse any other head:
 fit_learner(maxent(), week_train, counts[train, , drop = FALSE], response = "count")
 #> Error:
 #> ! maxnet fits a presence-absence response, under a head whose loss is the binary cross-entropy; this head's loss is poisson_deviance.
+```
+
+``` python
+ts.fit_learner(ts.maxent(), week_train, counts_train, response="count")
+#> ValueError: maxnet fits a presence-absence response, under a head whose loss is the binary cross-entropy; this head's loss is 'poisson_deviance'.
 ```
 
 [`register_response()`](https://gillescolling.com/timesift/reference/register_response.md)
@@ -744,6 +1118,12 @@ apply(w, 2L, max)
 #> 2.260870 1.727273 2.750000 1.941176
 ```
 
+``` python
+w = ts.positive_weights(y)
+w.max(axis=0)
+#> array([2.125     , 2.        , 2.40909091, 2.125     ])
+```
+
 A head with a different cap reaches every learner through one
 registration. With a cap of 2, the presences of `v01` and `v03` weigh 2
 and those of `v02` and `v04` keep the weights above.
@@ -763,6 +1143,17 @@ register_response("presence_absence_cap2", list(
   cells = function(y, folds) scorable_cells(y, folds),
   weights = function(y, fitting) positive_weights(y, cap = 2, fitting = fitting)
 ))
+```
+
+``` python
+ts.register_response("presence_absence_cap2", {
+    "prepare": lambda y: ts.as_response(y).check_presence_absence(),
+    "activation": "sigmoid",
+    "loss": "binary_cross_entropy",
+    "metric": "roc_auc",
+    "cells": lambda y, folds: ts.scorable_cells(y, folds),
+    "weights": lambda y, fitting: ts.positive_weights(y, cap=2, fitting=fitting),
+});
 ```
 
 A metric is a function of the observed values and the predictions of one
@@ -790,6 +1181,23 @@ summary(capped)
 #> choice on every target  elasticnet / month
 ```
 
+``` python
+ts.register_metric("neg_brier", lambda y, p: -np.mean((y - p) ** 2));
+capped = ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
+                     learners=[ts.elasticnet(), ts.forest()], sift=ts.grains("month"),
+                     response="presence_absence_cap2", metric="neg_brier",
+                     resampling=ts.cv(v=5), n_inner=None, ensemble=False, verbose=False)
+print(ts.summary(capped))
+#> timesift  150 targets, 4 responses, 5-fold random CV, neg_brier
+#>
+#> candidates, scored on the outer folds
+#> candidate                    mean    won  responses
+#> forest / month             -0.240      2  separate
+#> elasticnet / month         -0.238      2  separate
+#>
+#> choice on every target  elasticnet / month
+```
+
 The run is chosen and reported by the Brier score under the capped
 weights. The elastic net, at -0.239, scored above the forest, at -0.259,
 and scored highest on all four responses.
@@ -813,15 +1221,47 @@ seconds <- vapply(timed, function(l) {
 }, numeric(1))
 sort(round(seconds, 2), decreasing = TRUE)
 #>                 linear             elasticnet                 forest 
-#>                   4.91                   2.63                   0.30 
+#>                   4.64                   2.63                   0.29 
 #>                 maxent elasticnet(tol = 1e-4)           discriminant 
-#>                   0.20                   0.16                   0.09 
-#>                xgboost             perceptron                   tree 
-#>                   0.05                   0.03                   0.02 
-#>               boosting                   mars               envelope 
-#>                   0.02                   0.01                   0.00 
+#>                   0.21                   0.16                   0.09 
+#>                xgboost                   tree             perceptron 
+#>                   0.06                   0.02                   0.02 
+#>               boosting               envelope                   mars 
+#>                   0.01                   0.00                   0.00 
 #>           hierarchical 
 #>                   0.00
+```
+
+``` python
+timed = {
+    "elasticnet": ts.elasticnet(), "elasticnet(tol=1e-4)": ts.elasticnet(tol=1e-4),
+    "linear": ts.linear(), "tree": ts.tree(), "forest": ts.forest(), "boosting": ts.boosting(),
+    "xgboost": ts.boosting(method="xgboost"), "maxent": ts.maxent(),
+    "envelope": ts.envelope(), "mars": ts.mars(), "discriminant": ts.discriminant(),
+    "perceptron": ts.perceptron(), "hierarchical": ts.hierarchical(),
+}
+
+def seconds_to_fit(learner, x=week):
+    start = time.perf_counter()
+    ts.fit_learner(learner, x, y)
+    return time.perf_counter() - start
+
+seconds = pd.Series({name: seconds_to_fit(l) for name, l in timed.items()})
+seconds.round(2).sort_values(ascending=False)
+#> linear                  2.54
+#> elasticnet              2.22
+#> forest                  0.32
+#> maxent                  0.25
+#> elasticnet(tol=1e-4)    0.10
+#> discriminant            0.09
+#> xgboost                 0.06
+#> tree                    0.02
+#> boosting                0.02
+#> perceptron              0.02
+#> mars                    0.01
+#> envelope                0.00
+#> hierarchical            0.00
+#> dtype: float64
 ```
 
 [`additive()`](https://gillescolling.com/timesift/reference/additive.md)
@@ -835,6 +1275,11 @@ fit_learner(additive(), week, sim$y)
 #> ! an additive model of 478 coefficients has more than the 150 units it is fitted to; fewer columns or a smaller `k` fit.
 ```
 
+``` python
+ts.fit_learner(ts.additive(), week, y)
+#> ValueError: an additive model of 478 coefficients has more than the 150 units it is fitted to; fewer columns or a smaller `k` fit.
+```
+
 At the monthly grain, 12 columns, it fits, and its cost depends on `k`:
 
 ``` r
@@ -845,10 +1290,19 @@ additive_seconds <- c(
   `k = 5` = system.time(fit_learner(additive(k = 5L), month, sim$y))[["elapsed"]])
 round(additive_seconds, 2)
 #> k = 10  k = 5 
-#>  14.39   0.31
+#>  11.42   0.29
 ```
 
-With `k = 10` the fit took 14.4 seconds, and with `k = 5` it took 0.3
+``` python
+month = ts.grain_matrix(sim.readings, "unit", "time", "reading", grain="month")
+pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
+           "k = 5": seconds_to_fit(ts.additive(k=5), month)}).round(2)
+#> k = 10    6.43
+#> k = 5     0.39
+#> dtype: float64
+```
+
+With `k = 10` the fit took 11.4 seconds, and with `k = 5` it took 0.3
 seconds.
 
 The elastic net is the learner to start with. It reads every column
@@ -857,13 +1311,13 @@ fitted on, and is the arm the package measures a network against. At its
 default tolerance it took 2.6 seconds here, and `tol = 1e-4` took 0.2,
 at the same held-out AUC on the split above.
 [`linear()`](https://gillescolling.com/timesift/reference/linear.md) was
-the slowest at 4.9 seconds: its two-way search refits the model for
+the slowest at 4.6 seconds: its two-way search refits the model for
 every term it could add or drop at every step, and the weekly grain
 offers it 106 terms, each column and its square. Pinned to a coarse
 grain, or searched forward under a bound as
 `linear(select = "forward", terms = "column", max_terms = 3)` does, the
 search has fewer steps to take. Every other tabular learner took at most
-0.3 seconds.
+0.29 seconds.
 
 What a learner can be fitted on depends on the number of units against
 the number of columns its representation flattens to:

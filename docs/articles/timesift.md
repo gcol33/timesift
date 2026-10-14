@@ -1,13 +1,12 @@
 # Choosing how a record is read
 
-A sensor records every hour for years. Before any model sees it, the
-record is reduced: to monthly means, to growing-degree-days, to whatever
-the analyst settled on once. `timesift` makes that reduction an
-argument, fits at each setting of it, and shows how much of the record
-the prediction actually needed.
+A sensor record can be summarised at several time scales, such as daily,
+weekly or monthly means. `timesift` fits models at each scale and
+compares their predictive performance on held-out data. Each time scale
+is called a *grain*.
 
-This vignette runs the whole path on a small simulated record, from two
-tables to a scored comparison and the prediction that follows from it.
+This vignette uses a small simulated dataset to show how to prepare the
+two input tables, compare grains and predict new observations.
 
 ## Installation
 
@@ -34,9 +33,14 @@ pip install git+https://github.com/gcol33/timesift
 
 ## Two tables
 
-`targets` is one row per thing to predict. `series` is the long,
-time-stamped record belonging to those rows, and the two are linked by
-an identifier both carry.
+`targets` contains one row per sampling unit and its responses. `series`
+contains the time-stamped readings for those units. A shared identifier
+links the two tables.
+
+In Python either table can be a mapping of column names to arrays,
+including a pandas or polars data frame. The Python block draws its own
+record, so the values it prints differ from the ones quoted in the text,
+which come from the R run.
 
 ``` r
 
@@ -63,8 +67,38 @@ str(targets[1:4], give.attr = FALSE)
 #>  $ sp2      : int  1 0 1 0 1 1 0 0 0 0 ...
 ```
 
-Each plot has a level of its own, and that level is buried in
-hour-to-hour noise an order of magnitude larger.
+``` python
+import numpy as np
+import pandas as pd
+import timesift as ts
+
+rng = np.random.default_rng(1)
+hours = pd.date_range("2021-09-01", periods=24 * 120, freq="h")
+ids = [f"p{i:03d}" for i in range(1, 61)]
+warmth = rng.normal(size=60)
+season = 6 * np.sin(np.arange(1, len(hours) + 1) / (24 * 40))
+
+series = pd.DataFrame({
+    "plot": np.repeat(ids, len(hours)),
+    "t": np.tile(hours, 60),
+    "temp": np.concatenate([1.5 * w + season + rng.normal(scale=12, size=len(hours))
+                            for w in warmth]),
+})
+
+targets = pd.DataFrame({"plot": ids, "elevation": 2000 + 300 * rng.normal(size=60)})
+for k, sign in enumerate([1, -1, 1, -1, 1, -1], start=1):
+    targets[f"sp{k}"] = rng.binomial(1, 1 / (1 + np.exp(-3 * sign * warmth)))
+targets.iloc[:, :4].head()
+#>    plot    elevation  sp1  sp2
+#> 0  p001  2159.960722    1    0
+#> 1  p002  1516.179723    1    0
+#> 2  p003  1818.289129    1    0
+#> 3  p004  2233.373010    0    1
+#> 4  p005  1779.544877    1    0
+```
+
+Each plot has its own temperature offset. The hourly noise is an order
+of magnitude larger than the differences between these offsets.
 
 ## One call
 
@@ -98,25 +132,53 @@ fit
 #> weights on every target  elasticnet / month 1.00
 ```
 
+``` python
+fit = ts.timesift(
+    targets, series,
+    y="sp*",
+    id="plot",
+    time="t",
+    static="elevation",
+    sift=ts.grains("day", "week", "month"),
+    resampling=ts.cv(v=5),
+    verbose=False,
+)
+fit
+#> timesift  60 targets, 6 responses, 5-fold random CV, roc_auc
+#>
+#> candidates, scored on the outer folds
+#> candidate                    mean    won  responses
+#> elasticnet / day            0.870      0  separate
+#> elasticnet / week           0.899      3  separate
+#> elasticnet / month          0.911      3  separate
+#>
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                    0.911  se 0.011
+#> ensemble                    0.907  se 0.012
+#> selected elasticnet / month in 5 of 5 folds
+#>
+#> choice on every target  elasticnet / month
+#> weights on every target  elasticnet / month 0.96   elasticnet / week 0.04
+```
+
 Every representation named in `sift` was built, and `learners`
 defaulting to
 [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md),
 a penalised logistic regression was fitted on each of them over the same
 five folds. The report has two parts.
 
-The candidates are the comparison. Each is scored on the five outer
-folds, on the same cells, so their means can be read against each other
-across grains. `won` is how many responses a candidate scored highest
-on, and `responses` says whether one fitted model covered them all or
-one was fitted per response. The highest of those means was picked out
-on the folds it is scored on, so it is not the number to report.
+Each candidate is a model fitted at one grain. The candidate rows
+compare their scores on the same five outer folds and the same
+response-fold pairs, called *cells*. `won` counts the responses on which
+a candidate scored highest. `responses` indicates whether the model fits
+responses jointly or separately. Choosing the highest candidate mean
+uses these evaluation scores for model selection.
 
-The procedure rows are. Inside each outer training fold the candidates
-were cross-validated again on five inner folds, one was chosen on its
-inner score and the stack’s weights were fitted on the inner out-of-fold
-predictions; the choice and the weights then predicted the outer test
-fold once. `selected` and `ensemble` are those held-out scores, choosing
-and weighting included.
+Use the `selected` and `ensemble` rows to report predictive performance.
+Within each outer training fold, five inner folds are used to select a
+candidate and estimate the ensemble weights. The selected candidate and
+ensemble then predict the outer test fold. These scores evaluate the
+full selection and weighting procedure.
 
 ``` r
 
@@ -185,13 +247,79 @@ fit$selected[c("fold", "candidate", "inner_score")]
 #> 5    5 elasticnet / month   0.9144762
 ```
 
-The interval is across the six responses of this dataset, all fitted and
-scored on the same plots and folds, so it does not carry the error those
-share.
+``` python
+pd.DataFrame(fit.estimate)[["arm", "metric", "score", "se", "lower", "upper"]]
+#>          arm                metric      score        se      lower      upper
+#> 0   selected              accuracy   0.902778  0.011719   0.872652   0.932904
+#> 1   selected     average_precision   0.908116  0.023171   0.848552   0.967679
+#> 2   selected                  bias   1.032778  0.038854   0.932901   1.132654
+#> 3   selected                 boyce   0.701781  0.015503   0.661930   0.741633
+#> 4   selected                   csi   0.819987  0.026700   0.751353   0.888621
+#> 5   selected                   ets   0.678483  0.034219   0.590519   0.766447
+#> 6   selected                   far   0.102672  0.026525   0.034488   0.170856
+#> 7   selected                 kappa   0.660423  0.024039   0.598629   0.722217
+#> 8   selected          kappa_youden   0.796165  0.023657   0.735353   0.856978
+#> 9   selected               neg_mae  -0.371196  0.013208  -0.405149  -0.337243
+#> 10  selected         neg_max_error  -0.635774  0.007559  -0.655206  -0.616342
+#> 11  selected               neg_mse  -0.162203  0.006823  -0.179742  -0.144664
+#> 12  selected  neg_poisson_deviance  -0.513075  0.018045  -0.559461  -0.466689
+#> 13  selected              neg_rmse  -0.401536  0.008560  -0.423540  -0.379532
+#> 14  selected                    or  22.750000  1.030776  19.469609  26.030391
+#> 15  selected      ordinal_accuracy   0.808333  0.009379   0.784224   0.832442
+#> 16  selected            ordinal_f1   0.814673  0.010448   0.787816   0.841529
+#> 17  selected     ordinal_precision   0.807500  0.009108   0.784086   0.830914
+#> 18  selected        ordinal_recall   0.822665  0.012320   0.790995   0.854336
+#> 19  selected                  orss   0.986042  0.005010   0.973164   0.998920
+#> 20  selected               pearson   0.675293  0.014535   0.637930   0.712656
+#> 21  selected                   pod   0.910992  0.015011   0.872405   0.949579
+#> 22  selected                  pofd   0.093545  0.019192   0.044211   0.142879
+#> 23  selected             r_squared   0.285434  0.029940   0.208471   0.362397
+#> 24  selected               roc_auc   0.910976  0.011209   0.882161   0.939790
+#> 25  selected                    sr   0.897328  0.026525   0.829144   0.965512
+#> 26  selected                   tss   0.817447  0.019358   0.767686   0.867208
+#> 27  ensemble              accuracy   0.897222  0.012485   0.865130   0.929315
+#> 28  ensemble     average_precision   0.905069  0.021508   0.849781   0.960356
+#> 29  ensemble                  bias   1.013267  0.045904   0.895268   1.131267
+#> 30  ensemble                 boyce   0.692614  0.027483   0.621968   0.763260
+#> 31  ensemble                   csi   0.810000  0.026807   0.741092   0.878908
+#> 32  ensemble                   ets   0.665135  0.036505   0.571295   0.758975
+#> 33  ensemble                   far   0.099101  0.028427   0.026027   0.172174
+#> 34  ensemble                 kappa   0.663810  0.029921   0.586894   0.740725
+#> 35  ensemble          kappa_youden   0.785917  0.025575   0.720174   0.851659
+#> 36  ensemble               neg_mae  -0.370921  0.013551  -0.405754  -0.336088
+#> 37  ensemble         neg_max_error  -0.647332  0.004716  -0.659455  -0.635209
+#> 38  ensemble               neg_mse  -0.163398  0.007436  -0.182512  -0.144283
+#> 39  ensemble  neg_poisson_deviance  -0.516055  0.018174  -0.562774  -0.469336
+#> 40  ensemble              neg_rmse  -0.403008  0.009305  -0.426928  -0.379088
+#> 41  ensemble                    or  23.125000  0.875000  20.340359  25.909641
+#> 42  ensemble      ordinal_accuracy   0.811111  0.015316   0.771741   0.850481
+#> 43  ensemble            ordinal_f1   0.817597  0.016364   0.775531   0.859662
+#> 44  ensemble     ordinal_precision   0.810853  0.015969   0.769804   0.851902
+#> 45  ensemble        ordinal_recall   0.825112  0.017178   0.780955   0.869270
+#> 46  ensemble                  orss   0.983375  0.006059   0.967800   0.998951
+#> 47  ensemble               pearson   0.672901  0.015095   0.634098   0.711704
+#> 48  ensemble                   pod   0.896243  0.019159   0.846994   0.945492
+#> 49  ensemble                  pofd   0.086878  0.020548   0.034058   0.139699
+#> 50  ensemble             r_squared   0.281085  0.030892   0.201674   0.360497
+#> 51  ensemble               roc_auc   0.906884  0.011914   0.876257   0.937510
+#> 52  ensemble                    sr   0.900899  0.028427   0.827826   0.973973
+#> 53  ensemble                   tss   0.809365  0.022716   0.750971   0.867759
+pd.DataFrame(fit.selected)[["fold", "candidate", "inner_score"]]
+#>    fold           candidate  inner_score
+#> 0     1  elasticnet / month     0.883939
+#> 1     2  elasticnet / month     0.899061
+#> 2     3  elasticnet / month     0.897351
+#> 3     4  elasticnet / month     0.908608
+#> 4     5  elasticnet / month     0.896122
+```
 
-A column of `targets` reaches the model only where `static` names it:
-`elevation` is a predictor here because it was asked for, and a column
-of notes sitting beside it would not be.
+The interval describes variation across the six responses. All responses
+use the same plots and folds, so the interval excludes uncertainty
+shared through that sampling design.
+
+Use `static` to name columns of `targets` that should enter the model as
+predictors. Here it selects `elevation`; additional columns, such as
+notes, are ignored.
 
 ``` r
 
@@ -200,6 +328,14 @@ fit$candidates[c("candidate", "representation", "bins", "channels", "status")]
 #> 1   elasticnet / day            day  120        2 fitted
 #> 2  elasticnet / week           week   18        2 fitted
 #> 3 elasticnet / month          month    4        2 fitted
+```
+
+``` python
+pd.DataFrame(fit.candidates)[["candidate", "representation", "bins", "channels"]]
+#>             candidate representation  bins  channels
+#> 0    elasticnet / day            day   120         2
+#> 1   elasticnet / week           week    18         2
+#> 2  elasticnet / month          month     4         2
 ```
 
 Two channels at every grain: the binned temperature, and elevation held
@@ -212,6 +348,13 @@ plot(fit)
 
 ![Mean AUC against representation, with the level the combination
 reached drawn across it.](timesift_files/figure-html/plot-run-1.svg)
+
+``` python
+ts.plot(fit);
+```
+
+![Mean AUC against representation, with the level the combination
+reached drawn across it.](timesift_files/py-figure-1.svg)
 
 [`predict()`](https://rdrr.io/r/stats/predict.html) rebuilds each
 member’s representation for new rows from the settings its own arm was
@@ -227,6 +370,14 @@ round(p[1:3, 1:4], 3)
 #> p001 0.290 0.803 0.396 0.741
 #> p002 0.583 0.534 0.576 0.548
 #> p003 0.170 0.841 0.334 0.774
+```
+
+``` python
+p = fit.predict(targets, series)
+p[:3, :4].round(3)
+#> array([[0.535, 0.429, 0.629, 0.337],
+#>        [0.644, 0.213, 0.772, 0.221],
+#>        [0.588, 0.312, 0.63 , 0.381]])
 ```
 
 `type = "binary"` cuts each response into presence and absence. The cut
@@ -251,14 +402,29 @@ predict(fit, targets, series, type = "binary", rule = "prevalence")[1:3, 1:4]
 #> p003   0   1   0   1
 ```
 
+``` python
+pd.Series(ts.decision_threshold(fit, rule="prevalence"))
+#> sp1    0.520268
+#> sp2    0.502498
+#> sp3    0.523192
+#> sp4    0.485687
+#> sp5    0.513939
+#> sp6    0.507207
+#> dtype: float64
+fit.predict(targets, series, type="binary", rule="prevalence")[:3, :4]
+#> array([[1., 0., 1., 0.],
+#>        [1., 0., 1., 0.],
+#>        [1., 0., 1., 0.]])
+```
+
 A binary map is this prediction with one target per map cell, each
 carrying a series of its own at the grain the fit reads.
 
 ## Representations
 
-A representation carries the settings and nothing else, so the same
-object describes an arm before any record has been read and rebuilds
-itself for new targets afterwards.
+A representation stores the settings used to summarise a record. The
+same settings are used to build model inputs during fitting and
+prediction.
 
 ``` r
 
@@ -284,6 +450,29 @@ lookback("30 days", bins = 3)
 #> stats   : mean
 ```
 
+``` python
+ts.native()
+#> <timesift representation> native
+#> kind    : grain (a sequence)
+#> grain   : native
+#> stats   : mean
+ts.grain("week", stats=("cold_day", "mean", "warm_day"))
+#> <timesift representation> week
+#> kind    : grain (a sequence)
+#> grain   : week
+#> stats   : cold_day, mean, warm_day
+ts.multigrain(("week", "month"))
+#> <timesift representation> multigrain(week+month)
+#> kind    : multigrain (a block of features)
+#> grains  : week, month
+#> stats   : mean
+ts.lookback("30 days", bins=3)
+#> <timesift representation> 30 days x3
+#> kind    : lookback (a sequence)
+#> span    : 30 days in 3 bins ending 0 days before the target
+#> stats   : mean
+```
+
 [`grains()`](https://gillescolling.com/timesift/reference/grains.md) and
 [`lookbacks()`](https://gillescolling.com/timesift/reference/grains.md)
 are sets of them, and `grains("auto")` reads off the record every named
@@ -295,8 +484,8 @@ is a fixed span ending at each target’s own instant, which is what a
 plot carrying several targets through time needs, given as
 `target_time`.
 
-A learner runs across the whole set, or at one representation it is
-pinned to:
+By default, each learner runs on all compatible representations in the
+set. Use `data` to assign a specific representation:
 
 ``` r
 
@@ -307,16 +496,21 @@ elasticnet(data = grain("month"))
 #> settings: alpha = 0.5, n_inner = 10, squares = TRUE, s = lambda.1se, n_lambda = 100, tol = 1e-08, threads = 1, seed = 1
 ```
 
-## What a learner may be handed
+``` python
+ts.elasticnet(data=ts.grain("month"))
+#> <timesift learner> elasticnet
+#> reads   : tabular ; one model per response: yes, separate
+#> data    : month
+#> settings: alpha = 0.5, n_inner = 10, squares = True, s = lambda.1se, n_lambda = 100, tol = 1e-08, threads = 1, seed = 1
+```
 
-A learner declares whether the bins reach it as a block of predictors or
-as a sequence whose order in time is what it reads. A tabular learner
-given
-[`native()`](https://gillescolling.com/timesift/reference/native.md) is
-refused before any record is touched, since building the array it would
-have been handed is the expensive half of the call; a sequence learner
-is refused a representation that turns out to hold one bin, once the
-array says how many it has.
+## Compatible model inputs
+
+Learners accept either a table of predictors or a sequence of time bins.
+Tabular learners reject
+[`native()`](https://gillescolling.com/timesift/reference/native.md)
+before the array is built. Sequence learners require more than one bin;
+this is checked after building the array.
 
 ``` r
 
@@ -327,10 +521,17 @@ timesift(targets, series, y = starts_with("sp"), id = plot, time = t,
 #>   `elasticnet()` reads a tabular representation; `native()` gives it one column per reading. Use `grain()`, `multigrain()` or `lookback()`.
 ```
 
-Inside a set such a pair is skipped and listed as `not applicable` by
-[`summary()`](https://rdrr.io/r/base/summary.html); named through a
-learner’s own `data =` it is an error, because a representation named by
-hand is a decision.
+``` python
+ts.timesift(targets, series, y="sp*", id="plot", time="t",
+            learners=[ts.elasticnet()], sift=ts.native(), verbose=False)
+#> ValueError: no learner can read any of the representations:
+#>   elasticnet() reads a tabular representation; native gives it one column per reading. Use grain(), multigrain() or lookback().
+```
+
+In a set of representations, incompatible learner-representation pairs
+are skipped and reported as `not applicable`. An incompatible
+representation assigned explicitly through a learner’s `data` argument
+raises an error.
 
 ## The split, and the cells a score is defined on
 
@@ -353,10 +554,16 @@ fit$folds
 #> 12 12 12 12 12
 ```
 
-A per-response score needs both classes among the held-out units, and a
-per-response model needs both classes among the units it was fitted on.
-The mask says which cells those are, from the response and the fold map
-alone.
+``` python
+fit.folds
+#> <timesift folds> 60 units in 5 folds
+#> 1: 12  2: 12  3: 12  4: 12  5: 12
+```
+
+For a response to be scored in a fold, both presences and absences must
+occur in the held-out data. A model fitted separately for that response
+also needs both classes in its training data. The scorable-cell mask
+identifies the response-fold pairs that meet these conditions.
 
 ``` r
 
@@ -365,9 +572,15 @@ fit$cells
 #> scorable: 30 (100.0%); variables with at least one scorable fold: 6 of 6
 ```
 
-Because it involves no model, every candidate is restricted to the same
-cells: their means share one denominator and every paired difference
-runs on matched cells.
+``` python
+fit.cells
+#> <timesift cells> 30 cells over 6 variables
+#> scorable: 30 (100.0%); variables with at least one scorable fold: 6 of 6
+```
+
+The mask is calculated from the responses and folds before fitting. All
+candidates are evaluated on the same cells, so mean scores and paired
+differences use matching observations.
 
 ## Learners, and how they are trained
 
@@ -388,19 +601,19 @@ responses is what makes the rarer ones learnable at these sample sizes.
 
 [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
 is the arm a network is measured against, so it is fitted by the same
-compiled core the Python package calls rather than by a fitter on either
-side: the penalty path, the standardisation and the cross-validated
-choice of penalty are one implementation, and the two languages return
-the same coefficients for the same design. `s` reads that fit at
-`"lambda.1se"`, glmnet’s default, at `"lambda.min"`, or at a penalty of
-your own, and `tol` trades how close the descent settles to the optimum
-against what it costs.
+compiled core both packages call rather than by a fitter on either side:
+the penalty path, the standardisation and the cross-validated choice of
+penalty are one implementation, and the two languages return the same
+coefficients for the same design. `s` reads that fit at `"lambda.1se"`,
+glmnet’s default, at `"lambda.min"`, or at a penalty of your own, and
+`tol` trades how close the descent settles to the optimum against what
+it costs.
 
-Architecture belongs to the constructor and training belongs to
-[`train_control()`](https://gillescolling.com/timesift/reference/train_control.md),
-which every neural learner of a run reads. A learner given a control of
-its own overrides the run’s on the settings it names and takes the rest
-from it.
+Set the network architecture in the learner constructor and shared
+training settings in
+[`train_control()`](https://gillescolling.com/timesift/reference/train_control.md).
+Settings supplied to an individual learner override the corresponding
+run-level settings.
 
 ``` r
 
@@ -431,13 +644,41 @@ cnn(channels = c(16L, 32L), epochs = 300L)
 #> needs   : torch
 ```
 
+``` python
+ts.train_control(epochs=200, device="cpu")
+#> <timesift control>
+#>   epochs           200
+#>   batch_size       64   (default)
+#>   learning_rate    0.001   (default)
+#>   weight_decay     0.0001   (default)
+#>   optimizer        adamw   (default)
+#>   penalty          0.0   (default)
+#>   alpha            0.5   (default)
+#>   schedule         cosine   (default)
+#>   plateau_factor   0.1   (default)
+#>   plateau_patience 10   (default)
+#>   early_stopping   inf   (default)
+#>   val_frac         0.0   (default)
+#>   device           cpu
+#>   seed             1   (default)
+#>   swa              False   (default)
+#>   swa_start        0.7   (default)
+ts.cnn(channels=(16, 32), epochs=300)
+#> <timesift learner> cnn
+#> reads   : sequence ; one model per response: no, joint
+#> data    : every representation of the run
+#> settings: channels = 16/32, kernel = 7, dropout = 0.3
+#> training: epochs = 300
+#> needs   : torch
+```
+
 A learner of your own is a fit and a predict pair, and it goes through
 the same folds, the same cells and the same scoring as the ones that
-ship. [`as.matrix()`](https://rdrr.io/r/base/matrix.html) lays a
-representation out as the block of predictors the tabular learners read,
-one column per bin of each channel. A fit that declares a `weights`
-argument is handed the case weights every shipped learner fits under,
-which weight a presence by how rare it is.
+ship. [`as.matrix()`](https://rdrr.io/r/base/matrix.html)`flatten()`
+lays a representation out as the block of predictors the tabular
+learners read, one column per bin of each channel. A fit that declares a
+`weights` argument is handed the case weights every shipped learner fits
+under, which weight a presence by how rare it is.
 
 ``` r
 
@@ -490,19 +731,78 @@ summary(both)
 #> weights on every target  weighted_glm / month 0.66   elasticnet / month 0.30   1nn / month 0.04
 ```
 
+``` python
+def nn_fit(x, y, **_):
+    return {"x": ts.flatten(x), "y": y}
+
+def nn_predict(model, x):
+    m = ts.flatten(x)
+    d = ((m[:, None, :] - model["x"][None, :, :]) ** 2).sum(axis=2)
+    return model["y"][d.argmin(axis=1)].astype(float)
+
+nearest_neighbour = ts.Learner("1nn", fit=nn_fit, predict=nn_predict, multi="joint")
+
+
+def irls(design, y, w):
+    beta = np.zeros(design.shape[1])
+    for _ in range(100):
+        p = 1 / (1 + np.exp(-design @ beta))
+        step = np.linalg.solve(design.T @ ((w * p * (1 - p))[:, None] * design),
+                               design.T @ (w * (y - p)))
+        beta += step
+        if np.abs(step).max() < 1e-8:
+            break
+    return beta
+
+def logistic_fit(x, y, weights, **_):
+    m = ts.flatten(x)
+    centre, scale = m.mean(axis=0), m.std(axis=0)
+    design = np.column_stack([np.ones(len(m)), (m - centre) / scale])
+    betas = np.column_stack([irls(design, y[:, j], weights[:, j]) for j in range(y.shape[1])])
+    return {"centre": centre, "scale": scale, "betas": betas}
+
+def logistic_predict(model, x):
+    m = (ts.flatten(x) - model["centre"]) / model["scale"]
+    design = np.column_stack([np.ones(len(m)), m])
+    return 1 / (1 + np.exp(-design @ model["betas"]))
+
+weighted_logistic = ts.Learner("weighted_logistic", fit=logistic_fit,
+                               predict=logistic_predict, data=ts.grain("month"))
+
+both = ts.timesift(targets, series, y="sp*", id="plot", time="t",
+                   learners=[ts.elasticnet(), nearest_neighbour, weighted_logistic],
+                   sift=ts.grains("week", "month"), resampling=ts.cv(v=5), verbose=False)
+print(ts.summary(both))
+#> timesift  60 targets, 6 responses, 5-fold random CV, roc_auc
+#>
+#> candidates, scored on the outer folds
+#> candidate                           mean    won  responses
+#> 1nn / week                         0.744      0  joint
+#> 1nn / month                        0.757      0  joint
+#> elasticnet / week                  0.899      3  separate
+#> weighted_logistic / month          0.900      0  separate
+#> elasticnet / month                 0.912      3  separate
+#>
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                           0.912  se 0.011
+#> ensemble                           0.901  se 0.009
+#> selected elasticnet / month in 5 of 5 folds
+#>
+#> choice on every target  elasticnet / month
+#> weights on every target  weighted_logistic / month 0.71   elasticnet / week 0.24   1nn / week 0.05
+```
+
 ## The combination
 
-The combiner is handed out-of-fold predictions, the response, the mask
-and the fold map, and never a model. `"stack"` fits non-negative weights
-summing to one by minimising the response head’s own loss over the
-scorable cells; `"mean"`, `"median"` and `"weighted"` combine without
-fitting anything, and `"committee"` is the share of members voting
-presence, each at the cut its own out-of-fold predictions give. The
-weights below are fitted on the outer out-of-fold predictions of every
-target and are what [`predict()`](https://rdrr.io/r/stats/predict.html)
-uses. The ensemble’s score is not read with them, because they were
-fitted to the responses it would be scored against; each outer fold’s
-weights are in `fit$fold_weights`.
+The combiner uses out-of-fold predictions, observed responses, the
+scorable-cell mask and the fold map. `"stack"` estimates non-negative
+weights summing to one by minimising the response-specific loss. The
+other methods combine predictions by their mean, median, score-based
+weights or thresholded votes (`"committee"`). The weights below use the
+outer out-of-fold predictions from all targets and are used by
+[`predict()`](https://rdrr.io/r/stats/predict.html). The reported
+ensemble score uses weights estimated separately within each outer
+training fold, stored in `fit$fold_weights``fit.fold_weights`.
 
 ``` r
 
@@ -511,19 +811,26 @@ ensemble_weights(fit)
 #>      3.375410e-139       2.476064e-23       1.000000e+00
 ```
 
-The weights say how much of the combination each candidate carries, and
-a weight at zero is one the combination reached past. Where the ensemble
-line of the plot above sits over every curve the candidates are carrying
-different parts of the signal, and where it sits on the best curve they
-are not.
+``` python
+pd.Series(ts.ensemble_weights(fit))
+#> elasticnet / day      5.967019e-269
+#> elasticnet / week      3.517667e-02
+#> elasticnet / month     9.648233e-01
+#> dtype: float64
+```
 
-## Reading a level honestly
+The weights determine each candidate’s contribution to the ensemble
+prediction. A candidate with zero weight contributes nothing. Compare
+the ensemble score with the individual candidate scores to see whether
+combining their predictions improved performance in this run.
 
-The true skill statistic is read at the threshold that maximises it,
-chosen on the same units the score is then read on. That inflates the
-level, and by more the fewer presences a cell holds.
+## TSS and threshold selection
+
+The true skill statistic (TSS) is evaluated at the threshold that
+maximises it on the evaluation data. Selecting that threshold can
+inflate the score, especially when there are few presences.
 [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
-measures the inflation for the presence counts of the design in hand.
+estimates the bias for the presence counts in your response-fold cells.
 
 ``` r
 
@@ -533,15 +840,22 @@ tss_inflation(fit$y, fit$folds, skill = c(0.6, 0.9), replicates = 100)
 #> 2   0.9 0.9664636 0.06646362 0.9361726 0.9855159        100
 ```
 
-The inflation is an average over the planted model’s predictions: a
-level is optimistic in expectation, and
+``` python
+pd.DataFrame(ts.tss_inflation(fit.y, fit.folds, skill=(0.6, 0.9), replicates=100))
+#>    skill  reported  inflation     lower     upper  replicates
+#> 0    0.6  0.769709   0.169709  0.718532  0.835235         100
+#> 1    0.9  0.966596   0.066596  0.942541  0.987280         100
+```
+
+[`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
+averages the bias over simulated predictions, and
 [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.md)
-inverts the map to say which population skills a level read is
-consistent with. Its size depends on how a model’s predictions are
-distributed as well as on the presence counts, so two candidates of
-equal skill scored on the same cells can be inflated by different
-amounts, and a paired difference in TSS is not free of it. That is why a
-run is scored by AUC unless told otherwise.
+estimates the population skill consistent with an observed score under
+that simulation. The bias depends on the distribution of predictions as
+well as the presence counts. It can therefore differ between equally
+skilled candidates evaluated on the same cells and affect their paired
+TSS difference. The default scoring metric is area under the receiver
+operating characteristic curve (AUC).
 
 ## The arrays on their own
 
@@ -559,9 +873,17 @@ x
 #> from  : 2021-08-30 to 2021-12-27
 ```
 
-Bins follow the calendar. A month is 28, 30 or 31 days, and a week
-starts on a Monday, so a bin is a real month or a real week and not a
-drifting block of 730 or 168 hours.
+``` python
+x = ts.grain_matrix(series, "plot", "t", "temp", grain="week",
+                    stats=("cold_day", "mean", "warm_day"))
+x
+#> <timesift matrix> 60 units x 18 bins x 3 channels
+#> grain: week  stats: cold_day, mean, warm_day
+#> from  : 2021-08-30T00:00:00Z to 2021-12-27T00:00:00Z
+```
+
+Bins follow the calendar: months have 28 to 31 days, and weeks begin on
+Monday.
 
 ``` r
 
@@ -572,15 +894,17 @@ attr(grain_matrix(series, plot, t, temp, grain = "month"), "bin_n")[1, ]
 #>                  696
 ```
 
-### An extreme day is not an extreme reading
+``` python
+ts.grain_matrix(series, "plot", "t", "temp", grain="month").bin_n[0]
+#> array([720, 744, 720, 696], dtype=int32)
+```
 
-`min` and `max` take the coldest and warmest single reading of a bin.
-`cold_day` and `warm_day` reduce each day to its own mean first and then
-take the extreme over days. `mean_daily_min` and `mean_daily_max` take
-the mean of the daily extremes, which is the exposure a typical day of
-the bin brought. One hour at -50 sets `min` to -50 outright; it reaches
-the day-level statistics only through its twenty-fourth of that day’s
-mean.
+### Daily and individual extremes
+
+`min` and `max` return the lowest and highest individual reading in each
+bin. `cold_day` and `warm_day` return the lowest and highest daily mean.
+`mean_daily_min` and `mean_daily_max` average the daily minima and
+maxima within the bin.
 
 ``` r
 
@@ -594,14 +918,36 @@ round(week[1, 1, ], 2)
 #>          24.02          27.89
 ```
 
-An encoder that ends in global pooling discards when a thermal event
-happened, so the position of a bin in the year is given to it as input.
+``` python
+week = ts.grain_matrix(series, "plot", "t", "temp", grain="week",
+                       stats=("min", "mean_daily_min", "cold_day", "mean",
+                              "warm_day", "mean_daily_max", "max"))
+pd.Series(week.values[0, 0], index=week.stats).round(2)
+#> min              -28.68
+#> mean_daily_min   -22.30
+#> cold_day          -1.73
+#> mean              -0.13
+#> warm_day           0.94
+#> mean_daily_max    21.54
+#> max               31.50
+#> dtype: float64
+```
+
+Calendar channels provide the position of each bin in the year as model
+inputs. They allow an encoder with global pooling to use the timing of
+temperature events.
 
 ``` r
 
 week_mean <- grain_matrix(series, plot, t, temp, grain = "week")
 dimnames(bind_channels(week_mean, calendar_channels(week_mean)))[[3]]
 #> [1] "mean"     "year_sin" "year_cos"
+```
+
+``` python
+week_mean = ts.grain_matrix(series, "plot", "t", "temp", grain="week")
+ts.bind_channels(week_mean, ts.calendar_channels(week_mean)).stats
+#> ('mean', 'year_sin', 'year_cos')
 ```
 
 ## One grain at a time
@@ -622,11 +968,22 @@ summary(lad)
 #> 3 elasticnet month 0.9074901          6  TRUE
 ```
 
-A claim about one step of that curve rests on the paired contrast. The
-difference is taken inside each cell both arms scored, averaged within a
-response, and summarised across the responses, which are the independent
-replicates. Six responses is few, so the interval is wide and the rank
-test behind `p_value` has few values to work with.
+``` python
+grain_set = ts.grain_matrix(series, "plot", "t", "temp", grain=("day", "week", "month"))
+lad = ts.grain_ladder(grain_set, fit.y, [ts.elasticnet()], folds=fit.folds, verbose=False)
+pd.DataFrame(lad.summary())
+#>       learner  grain     score  n_variable   best
+#> 0  elasticnet    day  0.869715           6  False
+#> 1  elasticnet   week  0.899052           6  False
+#> 2  elasticnet  month  0.912017           6   True
+```
+
+[`paired_contrast()`](https://gillescolling.com/timesift/reference/paired_contrast.md)
+calculates the score difference between two candidates in each shared
+cell, averages across folds within each response, and summarises those
+response-level differences. The interval and rank test use responses as
+replicates. With six responses, the interval is wide and the test has
+limited p-value resolution.
 
 ``` r
 
@@ -637,10 +994,28 @@ paired_contrast(lad, "month|elasticnet", "day|elasticnet")
 #> 1          6     30        5 0.09375    exact variables
 ```
 
+``` python
+pd.Series(ts.paired_contrast(lad, "month|elasticnet", "day|elasticnet"))
+#> a             month|elasticnet
+#> b               day|elasticnet
+#> diff                  0.042303
+#> center                0.042303
+#> lower                 0.003589
+#> upper                 0.081016
+#> n_variable                   6
+#> n_cell                      30
+#> n_favour                     6
+#> p_value                0.03125
+#> p_method                 exact
+#> interval             variables
+#> dtype: object
+```
+
 Where the whole curve is the question rather than one step of it,
 [`grain_contrasts()`](https://gillescolling.com/timesift/reference/grain_contrasts.md)
 fits a mixed model on the per-cell scores and compares every grain
-against the best one, correcting for the comparisons made and no others.
+against the best one, correcting for the comparisons made and no
+others.It needs scipy, the `contrasts` extra of the wheel.
 
 ``` r
 
@@ -650,7 +1025,14 @@ grain_contrasts(lad)
 #> 2 elasticnet  week     month -0.01040123 -0.05711826 0.036315794 0.83437774
 ```
 
-## What was read
+``` python
+pd.DataFrame(ts.grain_contrasts(lad))
+#>       learner grain reference      diff     lower     upper   p_value
+#> 0  elasticnet   day     month -0.042303 -0.088449  0.003844  0.076834
+#> 1  elasticnet  week     month -0.012965 -0.059111  0.033181  0.752021
+```
+
+## Identifying influential bins
 
 With the per-fold fits kept,
 [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md)
@@ -671,8 +1053,22 @@ head(aggregate(weight ~ part, weight, mean), 4)
 #> 4 2021-12-01T00:00:00Z 0.01739462
 ```
 
-Holding a channel back instead asks what each statistic of a grain
-carries, which is the question behind keeping a bin’s extremes at all.
+``` python
+kept = ts.timesift(targets, series, y="sp*", id="plot", time="t",
+                   sift=ts.grains("month"), resampling=ts.cv(v=5), ensemble=False,
+                   keep_fits=True, verbose=False)
+profile = ts.occlusion(kept, "elasticnet / month", permutations=5)
+weight = pd.DataFrame(profile["weight"], index=profile["part"], columns=profile["variable"])
+weight.mean(axis=1).head(4)
+#> 2021-09-01T00:00:00Z    0.092622
+#> 2021-10-01T00:00:00Z    0.078312
+#> 2021-11-01T00:00:00Z    0.022786
+#> 2021-12-01T00:00:00Z    0.032392
+#> dtype: float64
+```
+
+Occluding a whole channel measures how predictions depend on a
+particular statistic, such as the mean or the coldest day.
 
 ## Where next
 

@@ -1,6 +1,14 @@
 ---
 title: "Finding the grain"
+resource_files:
+  - comparing-grains_files/py-figure-1.svg
+  - comparing-grains_files/py-figure-2.svg
+  - comparing-grains_files/py-figure-3.svg
+  - comparing-grains_files/py-figure-4.svg
+  - comparing-grains_files/py-figure-5.svg
 ---
+
+<!-- Python blocks run by tools/python_twins.py (md5 34ceb4401a16cc1bfa4ab54db4aaca8b). -->
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5, fig.height = 4.5,
@@ -9,20 +17,13 @@ set.seed(1)
 library(timesift)
 ```
 
-The question `timesift` is built around is at what temporal grain a record should be read for a
-given prediction. On field data the answer is unknown, so a method that claims to find it is hard
-to check there. `simulate_records()` draws a record whose response depends on it at one named grain,
-which turns the comparison into a test: the answer is fixed before anything is fitted, and each tool
-of the package can be read against it.
+`timesift` compares time scales to find which gives the best predictions from a record. Simulated data provide a way to check this comparison: `simulate_records()` generates responses that depend on the record at a specified grain.
 
-This article plants a response at the weekly grain, runs the comparison over four grains, and reads
-the result with the ladder, the paired contrast, the mixed-model contrast, the nested selection and
-the occlusion profile. Two further records, planted at the season and at the day, show the ladder
-moving with the truth, and a record with no signal at all shows what the same tools report when
-there is nothing to find.
+This article starts with responses generated from weekly summaries and compares four grains using `grain_ladder()`, paired and mixed-model contrasts, nested selection and occlusion. Further examples use seasonal, daily and signal-free responses to examine how the results depend on the simulated mechanism.
 
 ## Installation
 
+::: {.lang-pair}
 ```{r, eval = FALSE}
 # Install from CRAN
 install.packages("timesift")
@@ -42,6 +43,7 @@ pip install "timesift[torch,contrasts,plot]"
 # Or install the development version from GitHub
 pip install git+https://github.com/gcol33/timesift
 ```
+:::
 
 ## A record with a known answer
 
@@ -52,12 +54,33 @@ over a short stretch of the year, and the shape of the weights sets the grain. U
 `mechanism = "lag"` the weights decay geometrically over four consecutive weeks from an anchor week,
 one anchor per variable, so the driver is an exact linear combination of weekly means.
 
+::: {.lang-py-only}
+The Python block draws its own record, so the values it prints differ from the ones quoted in the text, which come from the R run. Counts, shapes and calendar boundaries do not depend on the draw and agree.
+:::
+
+::: {.lang-pair}
 ```{r simulate}
 sim <- simulate_records(n = 200L, mechanism = "lag", variables = 8L, days = 365L,
                         step_hours = 6, prevalence = 0.3, auc = 0.9, seed = 2L)
 sim
 sim$design$anchor
 ```
+
+```python
+import numpy as np
+import pandas as pd
+import timesift as ts
+
+sim = ts.simulate_records(n=200, mechanism="lag", variables=8, days=365, step_hours=6,
+                          prevalence=0.3, auc=0.9, seed=2)
+sim
+#> <timesift simulation> lag over 200 units x 1460 readings
+#> true grain: week (53 bins), stat mean
+#> 8 variables at prevalence 0.300 (drawn 0.304), population AUC 0.90
+sim.anchor + 1
+#> array([ 2,  9, 15, 22, 29, 36, 42, 49])
+```
+:::
 
 The true grain of a mechanism is defined as the coarsest grain at which the driver is still an exact
 linear function of the binned record. Day bins nest inside weeks, so a daily representation also
@@ -71,18 +94,46 @@ estimated from 200 units. The prevalence is shared by every variable.
 
 The first variable reads four weeks starting at its anchor:
 
+::: {.lang-pair}
 ```{r weights}
 when <- unique(sim$readings$time)
 range(when[sim$weights[, 1] > 0])
 ```
 
+```python
+when = np.unique(sim.readings["time"])
+when[sim.weights[:, 0] > 0][[0, -1]]
+#> array(['2021-09-06T00:00:00', '2021-10-03T18:00:00'],
+#>       dtype='datetime64[s]')
+```
+:::
+
 `targets` carries one row per unit with the eight responses, and `sim$readings` is the long table of
 readings that belongs to them.
 
+::: {.lang-pair}
 ```{r targets}
 targets <- data.frame(unit = rownames(sim$y), sim$y)
 str(sim$readings)
 ```
+
+```python
+targets = pd.DataFrame(sim.y.values, columns=sim.y.variables)
+targets.insert(0, "unit", sim.y.units)
+series = pd.DataFrame(sim.readings)
+series.info()
+#> <class 'pandas.DataFrame'>
+#> RangeIndex: 292000 entries, 0 to 291999
+#> Data columns (total 3 columns):
+#>  #   Column   Non-Null Count   Dtype
+#> ---  ------   --------------   -----
+#>  0   unit     292000 non-null  str
+#>  1   time     292000 non-null  datetime64[s]
+#>  2   reading  292000 non-null  float64
+#> dtypes: datetime64[s](1), float64(1), str(1)
+#> memory usage: 9.5 MB
+```
+:::
 
 ## One run over four grains
 
@@ -92,6 +143,7 @@ a looser stopping tolerance than its defaults, to keep this article quick to bui
 matches the boundary the simulation located its bins with, which matters for the seasonal grain.
 `keep_fits = TRUE` keeps the per-fold models, which the occlusion profile later reads.
 
+::: {.lang-pair}
 ```{r fit}
 en <- elasticnet(n_inner = 5L, n_lambda = 50L, tol = 1e-6)
 
@@ -108,6 +160,39 @@ fit <- timesift(
 fit
 ```
 
+```python
+en = ts.elasticnet(n_inner=5, n_lambda=50, tol=1e-6)
+
+fit = ts.timesift(
+    targets, series,
+    y="v*", id="unit", time="time",
+    learners=en,
+    sift=ts.grains("day", "week", "month", "season", year_start="09-01"),
+    resampling=ts.cv(v=5),
+    n_inner=3,
+    keep_fits=True,
+    verbose=False,
+)
+fit
+#> timesift  200 targets, 8 responses, 5-fold random CV, roc_auc
+#>
+#> candidates, scored on the outer folds
+#> candidate                     mean    won  responses
+#> elasticnet / season          0.532      0  separate
+#> elasticnet / month           0.660      0  separate
+#> elasticnet / day             0.806      1  separate
+#> elasticnet / week            0.836      7  separate
+#>
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                     0.836  se 0.010
+#> ensemble                     0.836  se 0.010
+#> selected elasticnet / week in 5 of 5 folds
+#>
+#> choice on every target  elasticnet / week
+#> weights on every target  elasticnet / week 1.00
+```
+:::
+
 The weekly candidate has the highest mean AUC, 0.838, and scored highest on all eight responses. The
 daily candidate, which holds the same information over 365 columns, sits at 0.784; the monthly and
 seasonal candidates fall further, to 0.704 and 0.550, the last close to what a model with no
@@ -121,18 +206,39 @@ and the stack put all its weight on it, so the procedure's estimate equals the w
 outer mean here. That equality is a property of this run, where the choice never wavered; on a
 flatter profile the two numbers separate, as the record with no signal below shows.
 
+::: {.lang-pair}
 ```{r plot-fit, fig.alt = "Mean AUC of the elastic net at the day, week, month and season grains, peaking at week, with the ensemble level drawn across."}
 plot(fit)
 ```
 
+```{.python fig-alt="Mean AUC of the elastic net at the day, week, month and season grains, peaking at week, with the ensemble level drawn across."}
+ts.plot(fit);
+```
+
+<img src="comparing-grains_files/py-figure-1.svg" alt="Mean AUC of the elastic net at the day, week, month and season grains, peaking at week, with the ensemble level drawn across." />
+:::
+
 The estimate is reported under every registered metric. Four of them are the ones a presence-absence
 study usually reads:
 
+::: {.lang-pair}
 ```{r estimate}
 est <- fit$estimate
 est[est$arm == "selected" & est$metric %in% c("roc_auc", "tss", "average_precision", "boyce"),
     c("metric", "score", "lower", "upper", "n_variable")]
 ```
+
+```python
+est = pd.DataFrame(fit.estimate)
+keep = est.metric.isin(["roc_auc", "tss", "average_precision", "boyce"])
+est[(est.arm == "selected") & keep][["metric", "score", "lower", "upper", "n_variable"]]
+#>                metric     score     lower     upper  n_variable
+#> 1   average_precision  0.728144  0.685357  0.770931           8
+#> 3               boyce  0.779482  0.740412  0.818552           8
+#> 24            roc_auc  0.835511  0.811616  0.859406           8
+#> 26                tss  0.613320  0.561018  0.665622           8
+```
+:::
 
 The interval is across the eight responses, which are fitted and scored on the same units and the
 same folds, so it carries the spread between responses and not the error they share.
@@ -142,21 +248,34 @@ the number of responses present at a unit, because one fold map serves all eight
 The mask of scorable cells is computed from the responses and that map alone, before any model is
 fitted.
 
+::: {.lang-pair}
 ```{r folds}
 table(fit$folds)
 fit$cells
 ```
+
+```python
+pd.Series(fit.folds).value_counts().sort_index()
+#> 1    40
+#> 2    40
+#> 3    40
+#> 4    40
+#> 5    40
+#> Name: count, dtype: int64
+fit.cells
+#> <timesift cells> 40 cells over 8 variables
+#> scorable: 40 (100.0%); variables with at least one scorable fold: 8 of 8
+```
+:::
 
 All 40 cells are scorable: at a prevalence near 0.3 every fold holds both presences and absences of
 every response. Rarer responses change that, as the last section shows.
 
 ## The ladder on prebuilt arrays
 
-Where the arrays already exist, `grain_ladder()` runs the same comparison without the run around
-it: every learner at every grain, on one fold map and one mask of scorable cells. `grain_matrix()`
-builds the four arrays from the readings, and passing the run's own folds makes the ladder
-reproduce the run's candidate scores.
+`grain_ladder()` compares learners and grains using arrays you have already built. It uses one fold map and one set of scorable cells. Here `grain_matrix()` builds the four arrays, and the run's fold map makes the ladder reproduce its candidate scores.
 
+::: {.lang-pair}
 ```{r ladder}
 x <- grain_matrix(sim$readings, unit, time, reading,
                   grain = c("day", "week", "month", "season"), year_start = "09-01")
@@ -166,15 +285,40 @@ lad <- grain_ladder(x, sim$y, en, folds = fit$folds, verbose = FALSE)
 lad
 ```
 
+```python
+x = ts.grain_matrix(series, "unit", "time", "reading",
+                    grain=("day", "week", "month", "season"), year_start="09-01")
+{g: m.values.shape[1] for g, m in x.items()}
+#> {'day': 365, 'week': 53, 'month': 12, 'season': 4}
+
+lad = ts.grain_ladder(x, sim.y, en, folds=fit.folds, verbose=False)
+lad
+#> <timesift ladder> 4 grains x 1 learners
+#> metric: roc_auc on 160 scorable cells
+#>   elasticnet day        0.8056
+#>   elasticnet week       0.8355  <- best
+#>   elasticnet month      0.6601
+#>   elasticnet season     0.5317
+```
+:::
+
 The 160 scorable cells are eight responses in five folds at four grains. The means match the
 candidate table above to every printed digit, because the arrays, the learner, the folds and the
 mask are the same.
 
 The plot draws each grain's mean with a 95% interval across responses and circles the best grain.
 
+::: {.lang-pair}
 ```{r plot-ladder, fig.alt = "Ladder of mean AUC across day, week, month and season, with intervals across responses and an open circle at week."}
 plot(lad)
 ```
+
+```{.python fig-alt="Ladder of mean AUC across day, week, month and season, with intervals across responses and an open circle at week."}
+ts.plot(lad);
+```
+
+<img src="comparing-grains_files/py-figure-2.svg" alt="Ladder of mean AUC across day, week, month and season, with intervals across responses and an open circle at week." />
+:::
 
 The curve rises from day to week and falls from week on. The rise is the cost of variance: the
 daily array holds the driver exactly, but the penalised fit has to find it among 365 columns with
@@ -183,15 +327,24 @@ driver reads.
 
 ## Two arms on matched cells
 
-A step of the ladder is read with `paired_contrast()`. It takes the difference between two arms
-inside each cell both scored, averages it within a response over the folds, and summarises the
-per-response means. The responses are the replicates: the interval is a Student's t interval across
-them, and `p_value` is a Wilcoxon signed-rank test of the per-response differences against zero.
+`paired_contrast()` compares two candidates on the cells scored by both. It calculates their score difference in each cell, averages across folds within each response, then summarises those response-level differences. The interval is a Student's t interval across responses. `p_value` comes from a Wilcoxon signed-rank test of those differences against zero.
 
+::: {.lang-pair}
 ```{r contrast}
 rbind(paired_contrast(lad, "week|elasticnet", "month|elasticnet"),
       paired_contrast(lad, "week|elasticnet", "day|elasticnet"))
 ```
+
+```python
+pd.DataFrame([ts.paired_contrast(lad, "week|elasticnet", "month|elasticnet"),
+              ts.paired_contrast(lad, "week|elasticnet", "day|elasticnet")])
+#>                  a                 b      diff  ...   p_value  p_method   interval
+#> 0  week|elasticnet  month|elasticnet  0.175458  ...  0.007812     exact  variables
+#> 1  week|elasticnet    day|elasticnet  0.029934  ...  0.023438     exact  variables
+#>
+#> [2 rows x 12 columns]
+```
+:::
 
 Week leads month by 0.134 and day by 0.054 in AUC, and both intervals exclude zero. Each contrast
 rests on 40 paired cells, and every one of the eight responses favours the weekly arm (`n_favour`).
@@ -199,26 +352,62 @@ Both p-values are 0.0078, and they are equal because with eight responses all on
 exact signed-rank test has reached the smallest value it can give. That floor depends only on the
 number of responses:
 
+::: {.lang-pair}
 ```{r p-floor}
 n_responses <- 3:10
 data.frame(n_responses, smallest_p = 2 / 2^n_responses)
 ```
 
+```python
+n_responses = np.arange(3, 11)
+pd.DataFrame({"n_responses": n_responses, "smallest_p": 2 / 2.0**n_responses})
+#>    n_responses  smallest_p
+#> 0            3    0.250000
+#> 1            4    0.125000
+#> 2            5    0.062500
+#> 3            6    0.031250
+#> 4            7    0.015625
+#> 5            8    0.007812
+#> 6            9    0.003906
+#> 7           10    0.001953
+```
+:::
+
 With five responses or fewer, no contrast can reach 0.05 however large the difference. The interval
 behaves the same way. The same contrast on three of the eight responses, from a ladder at two
 grains:
 
+::: {.lang-pair}
 ```{r contrast-three}
 lad3 <- grain_ladder(x[c("week", "month")], sim$y[, 1:3], en, folds = fit$folds,
                      verbose = FALSE)
 paired_contrast(lad3, "week|elasticnet", "month|elasticnet")
 ```
 
+```python
+lad3 = ts.grain_ladder({g: x[g] for g in ("week", "month")}, sim.y.take_variables([0, 1, 2]), en,
+                       folds=fit.folds, verbose=False)
+pd.Series(ts.paired_contrast(lad3, "week|elasticnet", "month|elasticnet"))
+#> a              week|elasticnet
+#> b             month|elasticnet
+#> diff                  0.190662
+#> center                0.190662
+#> lower                 0.005788
+#> upper                 0.375537
+#> n_variable                   3
+#> n_cell                      15
+#> n_favour                     3
+#> p_value                   0.25
+#> p_method                 exact
+#> interval             variables
+#> dtype: object
+```
+:::
+
 The difference is of the same sign, but the interval is several times wider, because a t interval on
 two degrees of freedom has a large multiplier, and the p-value cannot fall below 0.25.
 
-An arm is named whole, as `"grain|learner"`. A learner named alone would have to take its best
-grain, chosen on the held-out scores the contrast is read off, and `paired_contrast()` refuses it.
+Name each candidate as `"grain|learner"`. `paired_contrast()` requires both parts. A learner name alone would require choosing its best grain using the evaluation scores that also enter the contrast.
 
 ## The whole curve at once
 
@@ -227,12 +416,26 @@ grain, chosen on the held-out scores the contrast is read off, and `paired_contr
 Dunnett's many-to-one procedure. The random effects absorb the differences in level between
 responses and between folds, so each comparison is made within a response and within a fold.
 
+::: {.lang-pair}
 ```{r grain-contrasts, eval = all(vapply(c("lme4", "lmerTest", "emmeans"), requireNamespace, logical(1), quietly = TRUE))}
 grain_contrasts(lad)
 ```
 
+```python
+pd.DataFrame(ts.grain_contrasts(lad))
+#>       learner   grain reference      diff     lower     upper   p_value
+#> 0  elasticnet     day      week -0.029934 -0.068114  0.008246  0.158714
+#> 1  elasticnet   month      week -0.175458 -0.213638 -0.137278  0.000000
+#> 2  elasticnet  season      week -0.303850 -0.342030 -0.265670  0.000000
+```
+:::
+
+::: {.lang-r-only}
 The singular-fit message from lme4 means that one of the two variance components was estimated at
-zero; the fixed-effect contrasts are still read in the usual way. Every grain falls below week, and
+zero; the fixed-effect contrasts are still read in the usual way.
+:::
+
+Every grain falls below week, and
 the day contrast, the closest, has an adjusted interval that excludes zero. The three intervals have
 the same width, about 0.09, because the model estimates one residual variance from all the cells and
 the design is balanced. The paired intervals each carry their own spread across responses instead:
@@ -242,17 +445,29 @@ read beside the paired contrasts, which single out no grain.
 
 ## Choosing inside the training data
 
-The best grain on the ladder was chosen on the same held-out folds its score is read from.
-`select_grain()` moves the choice inside the training data. In each outer fold the training units
-are split again, every candidate is fitted and scored on the inner folds, the best one is refitted
-on the whole outer training set, and the outer test fold is predicted once. The estimate that comes
-back is of the procedure, choice included.
+`select_grain()` evaluates grain selection using nested cross-validation. Within each outer training set, it fits and scores candidates on inner folds, selects the best one and refits it on the full outer training set. It then predicts the held-out outer fold. The returned estimate measures the performance of this selection procedure.
 
+::: {.lang-pair}
 ```{r select}
 sel <- select_grain(x, sim$y, en, folds = fit$folds, n_inner = 3L, verbose = FALSE)
 sel
 sel$selected[c("fold", "grain", "inner_score", "inner_se")]
 ```
+
+```python
+sel = ts.select_grain(x, sim.y, en, folds=fit.folds, n_inner=3, verbose=False)
+pd.DataFrame(sel.estimate).query("metric == 'roc_auc'")[["metric", "score", "lower", "upper"]]
+#>      metric     score     lower     upper
+#> 24  roc_auc  0.835511  0.811616  0.859406
+pd.DataFrame(sel.selected)[["fold", "grain", "inner_score", "inner_se"]]
+#>    fold grain  inner_score  inner_se
+#> 0     1  week     0.825691  0.005974
+#> 1     2  week     0.822040  0.001189
+#> 2     3  week     0.802607  0.010073
+#> 3     4  week     0.805170  0.008538
+#> 4     5  week     0.809012  0.004680
+```
+:::
 
 All five outer folds chose week, and the procedure scores 0.838, the same as the run's estimate,
 which made the same choice on the same folds. The inner scores, between 0.767 and 0.817, are lower
@@ -262,18 +477,26 @@ only to rank the candidates within a fold.
 The plot draws every candidate's inner score in every outer fold, one line per fold, and circles
 the candidate each fold chose.
 
+::: {.lang-pair}
 ```{r plot-select, fig.height = 6, fig.alt = "Inner AUC of the four candidates in each of five outer folds, every fold circling the weekly candidate."}
 plot(sel, ylab = "inner AUC")
 ```
 
-The five lines have the same shape and every circle sits on the weekly candidate. A selection whose
-circles wander between candidates is one whose grid is flat enough for the choice to be arbitrary.
+```{.python fig-alt="Inner AUC of the four candidates in each of five outer folds, every fold circling the weekly candidate."}
+ts.plot(sel, ylabel="inner AUC");
+```
+
+<img src="comparing-grains_files/py-figure-3.svg" alt="Inner AUC of the four candidates in each of five outer folds, every fold circling the weekly candidate." />
+:::
+
+All five folds select the weekly candidate. When folds select different candidates, inspect their inner scores to see how clearly the candidates are separated.
 
 ## A record with nothing to find
 
 Under `mechanism = "none"` the driver is drawn independently of the record, so no grain carries
 information and every AUC should sit near 0.5.
 
+::: {.lang-pair}
 ```{r null}
 null <- simulate_records(n = 200L, mechanism = "none", variables = 8L, days = 365L,
                          step_hours = 6, prevalence = 0.3, auc = 0.9, seed = 2L)
@@ -283,13 +506,44 @@ folds_null <- fold_map(null$y, v = 5)
 summary(grain_ladder(x_null, null$y, en, folds = folds_null, verbose = FALSE))
 ```
 
+```python
+null = ts.simulate_records(n=200, mechanism="none", variables=8, days=365, step_hours=6,
+                          prevalence=0.3, auc=0.9, seed=2)
+x_null = ts.grain_matrix(null.readings, "unit", "time", "reading",
+                         grain=("day", "week", "month", "season"), year_start="09-01")
+folds_null = ts.fold_map(null.y, v=5)
+pd.DataFrame(ts.grain_ladder(x_null, null.y, en, folds=folds_null, verbose=False).summary())
+#>       learner   grain     score  n_variable   best
+#> 0  elasticnet     day  0.476731           8  False
+#> 1  elasticnet    week  0.491963           8  False
+#> 2  elasticnet   month  0.489988           8  False
+#> 3  elasticnet  season  0.498661           8   True
+```
+:::
+
 The ladder has a best grain all the same, the daily one at 0.524. The highest of four means read on
 the folds it was chosen on is the number most open to chance, and a reader who took it as the level
 would report skill that is not there.
 
+::: {.lang-pair}
 ```{r null-select}
 select_grain(x_null, null$y, en, folds = folds_null, n_inner = 3L, verbose = FALSE)
 ```
+
+```python
+null_sel = ts.select_grain(x_null, null.y, en, folds=folds_null, n_inner=3, verbose=False)
+pd.DataFrame(null_sel.estimate).query("metric == 'roc_auc'")[["metric", "score", "lower", "upper"]]
+#>      metric     score     lower     upper
+#> 24  roc_auc  0.485783  0.463086  0.508481
+pd.DataFrame(null_sel.selected)[["fold", "grain", "inner_score"]]
+#>    fold   grain  inner_score
+#> 0     1  season     0.515159
+#> 1     2    week     0.514769
+#> 2     3     day     0.508139
+#> 3     4    week     0.503433
+#> 4     5     day     0.507563
+```
+:::
 
 The procedure scores 0.520 with an interval from 0.480 to 0.560, which contains 0.5. The folds chose
 day four times and month once, and the inner scores of all four candidates lie between 0.498 and
@@ -300,11 +554,25 @@ with the number of candidates searched and with how much they differ by chance.
 standard error of it. On a flat profile that is the least storage the record can be kept at without
 a measured loss inside the training data:
 
+::: {.lang-pair}
 ```{r null-coarsest}
 coarse <- select_grain(x_null, null$y, en, folds = folds_null, n_inner = 3L,
                        choose = "coarsest_adequate", verbose = FALSE)
 coarse$selected[c("fold", "grain", "inner_score", "inner_best", "inner_se")]
 ```
+
+```python
+coarse = ts.select_grain(x_null, null.y, en, folds=folds_null, n_inner=3,
+                         choose="coarsest_adequate", verbose=False)
+pd.DataFrame(coarse.selected)[["fold", "grain", "inner_score", "inner_best", "inner_se"]]
+#>    fold   grain  inner_score  inner_best  inner_se
+#> 0     1  season     0.515159    0.515159  0.007119
+#> 1     2    week     0.514769    0.514769  0.005785
+#> 2     3    week     0.498305    0.508139  0.010445
+#> 3     4  season     0.498745    0.503433  0.012748
+#> 4     5  season     0.505402    0.507563  0.009261
+```
+:::
 
 The five folds chose all four grains between them. In folds 2 and 5 the coarsest adequate candidate
 was the best one itself; in the others a coarser grain lay within one standard error of the best.
@@ -318,6 +586,7 @@ uniform over one season bin, so the true grain is the season and every finer gra
 Under `"event"` they are uniform over three consecutive days, so the true grain is the day, and a
 week mixes the three days with four others.
 
+::: {.lang-pair}
 ```{r mechanisms}
 ladder_for <- function(mechanism) {
   s <- simulate_records(n = 200L, mechanism = mechanism, variables = 8L, days = 365L,
@@ -332,14 +601,47 @@ summary(lad_season)[c("grain", "score", "best")]
 summary(lad_event)[c("grain", "score", "best")]
 ```
 
+```python
+def ladder_for(mechanism):
+    s = ts.simulate_records(n=200, mechanism=mechanism, variables=8, days=365, step_hours=6,
+                            prevalence=0.3, auc=0.9, seed=2)
+    arrays = ts.grain_matrix(s.readings, "unit", "time", "reading",
+                             grain=("day", "week", "month", "season"), year_start="09-01")
+    return ts.grain_ladder(arrays, s.y, en, folds=ts.fold_map(s.y, v=5), verbose=False)
+
+lad_season = ladder_for("season")
+lad_event = ladder_for("event")
+pd.DataFrame(lad_season.summary())[["grain", "score", "best"]]
+#>     grain     score   best
+#> 0     day  0.507631  False
+#> 1    week  0.606611  False
+#> 2   month  0.773282  False
+#> 3  season  0.798892   True
+pd.DataFrame(lad_event.summary())[["grain", "score", "best"]]
+#>     grain     score   best
+#> 0     day  0.864449   True
+#> 1    week  0.763523  False
+#> 2   month  0.555004  False
+#> 3  season  0.515129  False
+```
+:::
+
 Each ladder peaks at its planted grain: the seasonal record at season, 0.835, and the event record
 at day, 0.864. The seasonal ladder falls gently from season to month, 0.809, where the month array
 holds the driver exactly over three times as many columns, and steeply below that. The event ladder
 drops by 0.083 from day to week, the information the weekly mean averages away.
 
+::: {.lang-pair}
 ```{r plot-event, fig.alt = "Ladder of mean AUC for the event record, highest at day and falling through week, month and season."}
 plot(lad_event)
 ```
+
+```{.python fig-alt="Ladder of mean AUC for the event record, highest at day and falling through week, month and season."}
+ts.plot(lad_event);
+```
+
+<img src="comparing-grains_files/py-figure-4.svg" alt="Ladder of mean AUC for the event record, highest at day and falling through week, month and season." />
+:::
 
 ## What the weekly model read
 
@@ -347,15 +649,30 @@ plot(lad_event)
 held-out units, and records the fall in score as that bin's weight. Nothing is refitted. Here each
 weekly bin is permuted across the held-out units five times.
 
+::: {.lang-pair}
 ```{r occlusion}
 weight <- occlusion(fit, "elasticnet / week", permutations = 5)
 weight
 ```
 
+```python
+occ = ts.occlusion(fit, "elasticnet / week", permutations=5)
+weight = pd.DataFrame(occ["weight"], index=occ["part"], columns=occ["variable"])
+weight.round(3).head()
+#>                         v01    v02    v03    v04    v05    v06    v07    v08
+#> 2021-08-30T00:00:00Z -0.000  0.000  0.000 -0.005 -0.000  0.000  0.022  0.026
+#> 2021-09-06T00:00:00Z  0.304  0.000 -0.002  0.000 -0.000 -0.005  0.002  0.005
+#> 2021-09-13T00:00:00Z  0.028  0.000 -0.001  0.000 -0.004  0.000  0.001  0.002
+#> 2021-09-20T00:00:00Z -0.000 -0.005  0.000  0.001 -0.006 -0.004 -0.000 -0.000
+#> 2021-09-27T00:00:00Z  0.048  0.000  0.000  0.000 -0.000 -0.001  0.000  0.000
+```
+:::
+
 The planted weights are known, so the profile can be checked response by response. The first
 variable's anchor is the second weekly bin, the week of 6 September 2021; the second variable's is
 the ninth, the week of 25 October.
 
+::: {.lang-pair}
 ```{r occlusion-check}
 anchors <- dimnames(x$week)[[2L]][sim$design$anchor[1:2]]
 anchors
@@ -368,6 +685,26 @@ heaviest("v01")
 heaviest("v02")
 ```
 
+```python
+anchors = np.asarray(x["week"].bins)[sim.anchor[:2]]
+anchors
+#> array(['2021-09-06T00:00:00Z', '2021-10-25T00:00:00Z'], dtype='<U20')
+
+weight["v01"].nlargest(4)
+#> 2021-09-06T00:00:00Z    0.304319
+#> 2021-09-27T00:00:00Z    0.048082
+#> 2021-11-08T00:00:00Z    0.031494
+#> 2021-09-13T00:00:00Z    0.027522
+#> Name: v01, dtype: float64
+weight["v02"].nlargest(4)
+#> 2021-10-25T00:00:00Z    0.294951
+#> 2021-11-01T00:00:00Z    0.126659
+#> 2022-02-14T00:00:00Z    0.045561
+#> 2022-01-17T00:00:00Z    0.042654
+#> Name: v02, dtype: float64
+```
+:::
+
 For both variables the heaviest bin is the anchor week, with a fall in AUC of 0.287 and 0.247. The
 planted weights decay by a factor of e from one week to the next, and for the first variable the
 following week is also among the heaviest. Bins outside the planted stretch carry smaller weights,
@@ -377,6 +714,7 @@ some structure the mechanism does not contain when it has 160 units to fit 53 co
 `over = "channel"` holds back a whole statistic instead. The simulated response reads the weekly
 mean, so a run that also offers each week's coldest and warmest day should lean on the mean.
 
+::: {.lang-pair}
 ```{r occlusion-channel}
 fit_ch <- timesift(targets, sim$readings, y = starts_with("v"), id = unit, time = time,
                    learners = en,
@@ -388,6 +726,22 @@ by_channel <- occlusion(fit_ch, "elasticnet / week", over = "channel", permutati
 aggregate(weight ~ part, by_channel, mean)
 ```
 
+```python
+fit_ch = ts.timesift(targets, series, y="v*", id="unit", time="time",
+                     learners=en,
+                     sift=ts.grain("week", stats=("cold_day", "mean", "warm_day"),
+                                   year_start="09-01"),
+                     resampling=ts.cv(v=5), n_inner=None, ensemble=False,
+                     keep_fits=True, verbose=False)
+by_channel = ts.occlusion(fit_ch, "elasticnet / week", over="channel", permutations=5)
+pd.DataFrame(by_channel["weight"], index=by_channel["part"]).mean(axis=1)
+#> cold_day    0.075573
+#> mean        0.149820
+#> warm_day    0.072888
+#> dtype: float64
+```
+:::
+
 The mean carries the largest fall, 0.157, about twice the coldest day's. The extreme days are not
 independent of the mean, which is why they carry some weight too.
 
@@ -397,11 +751,30 @@ independent of the mean, which is why they carry some weight too.
 mean, and reads the prediction off the model fitted on all targets. A predictor here is one cell of
 the representation: the weekly mean in the first variable's anchor week.
 
+::: {.lang-pair}
 ```{r response-curve, fig.alt = "Predicted probability against the mean reading in the week of 6 September 2021, rising steeply for v01 and nearly flat for the other responses."}
 rc <- response_curve(fit, "elasticnet / week", list(bin = anchors[1], channel = "mean"), n = 20)
 plot(rc, col = c("black", rep("grey70", 7)), legend = "topleft")
 tapply(rc$prediction, rc$variable, function(p) round(diff(range(p)), 3))
 ```
+
+```{.python fig-alt="Predicted probability against the mean reading in the week of 6 September 2021, rising steeply for v01 and nearly flat for the other responses."}
+rc = ts.response_curve(fit, "elasticnet / week", {"bin": anchors[0], "channel": "mean"}, n=20)
+ts.plot(rc);
+pd.Series(np.ptp(rc.prediction, axis=0).round(3), index=rc.variable)
+#> v01    0.981
+#> v02    0.000
+#> v03    0.097
+#> v04    0.000
+#> v05    0.000
+#> v06    0.139
+#> v07    0.019
+#> v08    0.059
+#> dtype: float64
+```
+
+<img src="comparing-grains_files/py-figure-5.svg" alt="Predicted probability against the mean reading in the week of 6 September 2021, rising steeply for v01 and nearly flat for the other responses." />
+:::
 
 The first variable's prediction rises with that week's mean, as the positive sign of its planted
 driver says it should, and spans 0.926 of the probability scale. The other variables read different
@@ -417,6 +790,7 @@ inflates the level, by more the fewer presences a cell holds. `score_predictions
 of held-out predictions on the scorable cells, here the weekly candidate's out-of-fold predictions
 under four metrics:
 
+::: {.lang-pair}
 ```{r score}
 p_week <- fit$oof[["elasticnet / week"]]
 per_metric <- vapply(c("roc_auc", "tss", "average_precision", "boyce"), function(m) {
@@ -426,23 +800,55 @@ per_metric <- vapply(c("roc_auc", "tss", "average_precision", "boyce"), function
 round(per_metric, 3)
 ```
 
+```python
+p_week = fit.oof["elasticnet / week"]
+per_metric = {}
+for m in ["roc_auc", "tss", "average_precision", "boyce"]:
+    s = pd.DataFrame(ts.score_predictions(sim.y, p_week, fit.folds, metric=m))
+    per_metric[m] = s.groupby("variable").score.mean().mean()
+pd.Series(per_metric).round(3)
+#> roc_auc              0.836
+#> tss                  0.613
+#> average_precision    0.728
+#> boyce                0.779
+#> dtype: float64
+```
+:::
+
 Each metric reads the predictions differently. `average_precision()` has the prevalence as its
 floor, here about 0.3, where AUC has 0.5. `boyce_index()` uses no absences and correlates the ratio
 of presences to all units with the prediction across its range. `tss()` is the one with a cut to
 choose. `tss_inflation()` plants predictions of known skill at this design's cell sizes and reads
 them back the way a ladder does:
 
+::: {.lang-pair}
 ```{r inflation}
 tss_inflation(sim$y, fit$folds, skill = c(0.6, 0.9), replicates = 50)
 ```
+
+```python
+pd.DataFrame(ts.tss_inflation(sim.y, fit.folds, skill=(0.6, 0.9), replicates=50))
+#>    skill  reported  inflation     lower     upper  replicates
+#> 0    0.6  0.694101   0.094101  0.661214  0.717694          50
+#> 1    0.9  0.947449   0.047449  0.932442  0.963985          50
+```
+:::
 
 At a true skill of 0.6, the level read back is about 0.1 higher; at 0.9 the inflation is smaller,
 0.046, nearer the upper bound of 1. `implied_skill()` inverts the map: given the TSS the weekly
 candidate reached, it returns the population skill whose expected reported level that is.
 
+::: {.lang-pair}
 ```{r implied}
 implied_skill(sim$y, fit$folds, observed = per_metric[["tss"]], replicates = 50)
 ```
+
+```python
+pd.DataFrame(ts.implied_skill(sim.y, fit.folds, observed=per_metric["tss"], replicates=50))
+#>    observed     skill  within_grid
+#> 0   0.61332  0.508748         True
+```
+:::
 
 A TSS of 0.625 on this design is consistent with a population skill near 0.51. The inversion holds
 under the distribution of predictions `tss_inflation()` plants, and two models of equal skill whose
@@ -456,6 +862,7 @@ A score needs both classes among the held-out units of a cell. With rare respons
 no presence, and the mask, computed from the response and the fold map alone, leaves them out for
 every arm alike.
 
+::: {.lang-pair}
 ```{r rare}
 rare <- simulate_records(n = 200L, mechanism = "lag", variables = 8L, days = 365L,
                          step_hours = 6, prevalence = 0.03, auc = 0.9, seed = 2L)
@@ -464,6 +871,22 @@ folds_rare <- fold_map(rare$y, v = 5)
 scorable_cells(rare$y, folds_rare)
 tss_inflation(rare$y, folds_rare, skill = c(0.6, 0.9), replicates = 50)
 ```
+
+```python
+rare = ts.simulate_records(n=200, mechanism="lag", variables=8, days=365, step_hours=6,
+                          prevalence=0.03, auc=0.9, seed=2)
+rare.y.values.sum(axis=0)
+#> array([ 8.,  6.,  8.,  3.,  3.,  4.,  5., 11.])
+folds_rare = ts.fold_map(rare.y, v=5)
+ts.scorable_cells(rare.y, folds_rare)
+#> <timesift cells> 40 cells over 8 variables
+#> scorable: 28 (70.0%); variables with at least one scorable fold: 8 of 8
+pd.DataFrame(ts.tss_inflation(rare.y, folds_rare, skill=(0.6, 0.9), replicates=50))
+#>    skill  reported  inflation     lower     upper  replicates
+#> 0    0.6  0.841685   0.241685  0.797155  0.886818          50
+#> 1    0.9  0.984536   0.084536  0.965115  0.998109          50
+```
+:::
 
 At a prevalence of 0.03 the eight responses hold between 4 and 11 presences in 200 units, eight of
 the forty cells are unscorable, and the inflation of TSS at a true skill of 0.6 rises to 0.235. A

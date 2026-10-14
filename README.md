@@ -28,13 +28,13 @@ timesift compares time scales to find which gives the best predictions from a se
 
 A *grain* is the time interval used to summarise the readings, such as a day, week or month. timesift groups readings into these calendar intervals and calculates a summary, such as the mean, for each one. It fits each model at each compatible grain and evaluates them on the same held-out observations. You can compare their predictions, select a grain using the training data, or combine predictions from several models in an ensemble.
 
-timesift supports:
+timesift lets you:
 
-- Summaries from half-days to years, including the coldest and warmest day in each interval. You can also use the original readings or [`lookback()`](https://gillescolling.com/timesift/reference/native.html) to summarise a period ending at each target's observation date.
-- Models commonly used to predict species distributions, including regression, trees, random forests, boosting, Maxent and neural networks. You can also supply your own model.
-- Model selection and ensemble weighting within each training fold, followed by evaluation on held-out data.
-- `tss_inflation()` to estimate how choosing the best threshold can inflate the true skill statistic (TSS) when a species has few recorded presences.
-- R and Python interfaces to a shared C++ core, with matching arrays and baseline model fits.
+- **Calendar grains and lookbacks.** Summarise sensor readings by half-day, day, week, month, season or year, using statistics such as the mean or the coldest and warmest daily mean. You can also use the original readings or [`lookback()`](https://gillescolling.com/timesift/reference/native.html) to summarise a period ending at each observation date.
+- **Species distribution learners.** Predict species distributions with elastic net, stepwise GLMs, classification trees, random forests, boosting, Maxent, surface range envelopes, MARS, flexible discriminant analysis, GAMs and neural networks, or add your own model.
+- **Scores you can report.** Evaluate model selection and ensembles on held-out data. Each training fold is used to choose the grain and estimate ensemble weights; the corresponding test fold is used to score the predictions.
+- **Thin presences.** Estimate how selecting the best prediction threshold can inflate the true skill statistic (TSS), especially for species with few presences, using [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.html).
+- **Python and R.** Run analyses in R or Python. Both interfaces use the same C++ code for data preparation and baseline models, giving matching arrays and model fits.
 
 The model implementations are based on published methods and tested against reference packages including glmnet, MASS, rpart, earth, mda, mgcv, nnet, maxnet and biomod2. R and Python also use the same 257 checksums to test that they produce identical binned arrays. Cite the timesift version to identify the implementations and defaults used in an analysis.
 
@@ -255,9 +255,9 @@ The true skill statistic (TSS) measures how well a model distinguishes presences
 
 Start with [Choosing how a record is
 read](https://gillescolling.com/timesift/articles/timesift.html): one
-path from two tables to a scored comparison and predictions. In Python,
-start with [Choosing how a record is read, in
-Python](https://gillescolling.com/timesift/articles/python.html).
+path from two tables to a scored comparison and predictions. Every code block
+has an R and a Python version; the page opens in Python through
+[this link](https://gillescolling.com/timesift/articles/timesift.html?lang=python).
 
 - [Representing a
   record](https://gillescolling.com/timesift/articles/representations.html):

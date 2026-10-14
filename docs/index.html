@@ -16,7 +16,7 @@
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><link href="extra.css" rel="stylesheet">
-<meta property="og:title" content="timesift: Learn Predictive Representations of Time-Varying Data">
+<script src="extra.js"></script><meta property="og:title" content="timesift: Learn Predictive Representations of Time-Varying Data">
 <meta name="description" content="Builds each candidate representation of a time-stamped record, from the readings as recorded through a calendar week or month to a span anchored on each target, fits learners on every one, scores them on one set of held-out folds and stacks them. In R and Python over one C++ core.
 ">
 <meta property="og:description" content="Builds each candidate representation of a time-stamped record, from the readings as recorded through a calendar week or month to a span anchored on each target, fits learners on every one, scores them on one set of held-out folds and stacks them. In R and Python over one C++ core.
@@ -64,7 +64,7 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-python" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Python</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-python">
-<li><a class="dropdown-item" href="articles/python.html">Get started</a></li>
+<li><a class="dropdown-item" href="articles/timesift.html?lang=python">Get started</a></li>
     <li><a class="dropdown-item" href="articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
@@ -76,10 +76,11 @@
     <li><a class="dropdown-item" href="articles/comparing-grains.html">Finding the grain</a></li>
     <li><a class="dropdown-item" href="articles/prediction.html">Ensembles, thresholds and maps</a></li>
     <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="articles/contract.html">The contract between R and Python</a></li>
     <li><a class="dropdown-item" href="articles/biomod2.html">Coming from biomod2</a></li>
+    <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="articles/installation.html">Installing torch</a></li>
     <li><a class="dropdown-item" href="articles/troubleshooting.html">Troubleshooting</a></li>
-    <li><a class="dropdown-item" href="articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
@@ -116,14 +117,18 @@
 <img src="reference/figures/timesift-hero.png" alt="Three years of hourly soil temperature from one alpine plot drawn at seven time scales, from hourly readings down to yearly means, beside the true skill statistic a convolutional network reached on each over 101 species: 0.658 hourly, rising to a peak of 0.706 at the weekly mean, falling to 0.626 yearly" width="100%"></p>
 <p>timesift compares time scales to find which gives the best predictions from a sensor record. For example, you can use three years of hourly soil temperature to predict which plant species grow at a plot, and compare models trained on daily, weekly or monthly summaries.</p>
 <p>A <em>grain</em> is the time interval used to summarise the readings, such as a day, week or month. timesift groups readings into these calendar intervals and calculates a summary, such as the mean, for each one. It fits each model at each compatible grain and evaluates them on the same held-out observations. You can compare their predictions, select a grain using the training data, or combine predictions from several models in an ensemble.</p>
-<p>timesift supports:</p>
+<p>timesift lets you:</p>
 <ul>
-<li>Summaries from half-days to years, including the coldest and warmest day in each interval. You can also use the original readings or <a href="https://gillescolling.com/timesift/reference/native.html"><code>lookback()</code></a> to summarise a period ending at each target’s observation date.</li>
-<li>Models commonly used to predict species distributions, including regression, trees, random forests, boosting, Maxent and neural networks. You can also supply your own model.</li>
-<li>Model selection and ensemble weighting within each training fold, followed by evaluation on held-out data.</li>
 <li>
-<code><a href="reference/tss_inflation.html">tss_inflation()</a></code> to estimate how choosing the best threshold can inflate the true skill statistic (TSS) when a species has few recorded presences.</li>
-<li>R and Python interfaces to a shared C++ core, with matching arrays and baseline model fits.</li>
+<strong>Calendar grains and lookbacks.</strong> Summarise sensor readings by half-day, day, week, month, season or year, using statistics such as the mean or the coldest and warmest daily mean. You can also use the original readings or <a href="https://gillescolling.com/timesift/reference/native.html"><code>lookback()</code></a> to summarise a period ending at each observation date.</li>
+<li>
+<strong>Species distribution learners.</strong> Predict species distributions with elastic net, stepwise GLMs, classification trees, random forests, boosting, Maxent, surface range envelopes, MARS, flexible discriminant analysis, GAMs and neural networks, or add your own model.</li>
+<li>
+<strong>Scores you can report.</strong> Evaluate model selection and ensembles on held-out data. Each training fold is used to choose the grain and estimate ensemble weights; the corresponding test fold is used to score the predictions.</li>
+<li>
+<strong>Thin presences.</strong> Estimate how selecting the best prediction threshold can inflate the true skill statistic (TSS), especially for species with few presences, using <a href="https://gillescolling.com/timesift/reference/tss_inflation.html"><code>tss_inflation()</code></a>.</li>
+<li>
+<strong>Python and R.</strong> Run analyses in R or Python. Both interfaces use the same C++ code for data preparation and baseline models, giving matching arrays and model fits.</li>
 </ul>
 <p>The model implementations are based on published methods and tested against reference packages including glmnet, MASS, rpart, earth, mda, mgcv, nnet, maxnet and biomod2. R and Python also use the same 257 checksums to test that they produce identical binned arrays. Cite the timesift version to identify the implementations and defaults used in an analysis.</p>
 <div class="section level2">
@@ -283,7 +288,7 @@
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
 </h2>
-<p>Start with <a href="https://gillescolling.com/timesift/articles/timesift.html">Choosing how a record is read</a>: one path from two tables to a scored comparison and predictions. In Python, start with <a href="https://gillescolling.com/timesift/articles/python.html">Choosing how a record is read, in Python</a>.</p>
+<p>Start with <a href="https://gillescolling.com/timesift/articles/timesift.html">Choosing how a record is read</a>: one path from two tables to a scored comparison and predictions. Every code block has an R and a Python version; the page opens in Python through <a href="https://gillescolling.com/timesift/articles/timesift.html?lang=python">this link</a>.</p>
 <ul>
 <li>
 <a href="https://gillescolling.com/timesift/articles/representations.html">Representing a record</a>: grains, statistics, calendars, lookbacks and the arrays they give.</li>

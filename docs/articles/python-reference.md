@@ -4,8 +4,8 @@ The Python package’s functions, classes and values, under the sections
 of [the R
 reference](https://gillescolling.com/timesift/reference/index.md) and in
 its order. [Get
-started](https://gillescolling.com/timesift/articles/python.md) runs
-them on a simulated record.
+started](https://gillescolling.com/timesift/articles/timesift.html?lang=python)
+runs them on a simulated record.
 
 ## Installation
 

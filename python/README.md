@@ -128,7 +128,7 @@ lists what each language carries.
 
 ## Documentation
 
-Start with [Choosing how a record is read, in Python](https://gillescolling.com/timesift/articles/python.html):
+Start with [Choosing how a record is read](https://gillescolling.com/timesift/articles/timesift.html?lang=python):
 one path from two tables to a scored comparison and predictions.
 
 - [Python reference](https://gillescolling.com/timesift/articles/python-reference.html): every function, grouped by job.

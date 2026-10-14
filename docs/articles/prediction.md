@@ -1,13 +1,10 @@
 # Ensembles, thresholds and maps
 
-A scored run is a comparison: every candidate fitted on the same folds
-and read on the same cells. This article follows what comes after it. It
-starts with the split, because every number downstream is read off it,
-then turns to how the candidates are combined, how a combined prediction
-becomes presence and absence, and how a fit is carried onto a map for
-the present and for a warmer record. The last section collects what the
-numbers below say about when each choice pays. Everything runs on one
-small simulated grid.
+This article shows how to choose cross-validation folds, combine
+candidate predictions, set presence-absence thresholds and project
+predictions onto rasters. The examples use a small simulated grid and
+compare maps from the original temperature record with maps from a
+warmer version.
 
 ## Installation
 
@@ -43,6 +40,10 @@ February goes, deeper towards the north. The first two species follow
 warmth in opposite directions, the third follows the depth of the snap,
 and the fourth both.
 
+The Python block draws its own record, so the values it prints differ
+from the ones quoted in the text, which come from the R run. Counts,
+shapes and calendar boundaries do not depend on the draw and agree.
+
 ``` r
 
 nx <- 12L
@@ -75,6 +76,47 @@ colSums(targets[paste0("sp", 1:4)])
 #>  52  59  51  47
 ```
 
+``` python
+import numpy as np
+import pandas as pd
+import timesift as ts
+
+rng = np.random.default_rng(1)
+nx, ny = 12, 10
+cell = np.arange(1, nx * ny + 1)
+gx = (cell - 1) % nx + 0.5
+gy = ny - (cell - 1) // nx - 0.5
+
+
+def scale(v):
+    return (v - v.mean()) / v.std(ddof=1)
+
+
+warmth = scale(0.35 * gx + 0.2 * gy + rng.normal(scale=0.6, size=cell.size))
+frost = scale(-0.3 * gy + rng.normal(scale=0.8, size=cell.size))
+
+days = pd.date_range("2021-01-01", periods=365, freq="D")
+doy = np.arange(1, 366)
+snap = np.exp(-(((doy - 40) / 5) ** 2))
+temp = (6 + 1.5 * warmth[:, None] - 10 * np.cos(2 * np.pi * doy / 365)
+        - 6 * (1 + frost[:, None]) * snap + rng.normal(scale=3, size=(cell.size, 365)))
+
+series = pd.DataFrame({"cell": np.repeat(cell, 365), "day": np.tile(days, cell.size),
+                       "temp": temp.ravel()})
+targets = pd.DataFrame({"cell": cell, "x": gx, "y": gy,
+                        "elevation": np.round(2200 - 150 * warmth + rng.normal(scale=40, size=cell.size))})
+signal = np.column_stack([2.2 * warmth, -2.2 * warmth, 2.2 * frost, 1.5 * warmth - 1.5 * frost])
+for j in range(4):
+    targets[f"sp{j + 1}"] = rng.binomial(1, 1 / (1 + np.exp(-(signal[:, j] - 0.5))))
+targets["transect"] = [f"t{int(ny - np.floor(v))}" for v in gy]
+targets.filter(like="sp").sum()
+#> sp1    50
+#> sp2    52
+#> sp3    48
+#> sp4    54
+#> dtype: int64
+```
+
 Cells are numbered row by row from the top left, which is the order
 `terra` numbers the cells of a raster in. The `temp` matrix, one row per
 cell and one column per day, is therefore also the content of a raster
@@ -83,12 +125,10 @@ with 365 layers, and the maps at the end are built from it directly.
 
 ## The split, drawn once
 
-A run reads one fold map. Every candidate is fitted and scored on it,
-the combiner is fitted on the predictions it produces, and the
-thresholds are learned from those predictions, so the split decides what
-every later number means. Four constructors describe how it is drawn,
-and each returns a specification that the run turns into a map once it
-has the targets in hand.
+Every candidate in a run uses the same fold map. Its out-of-fold
+predictions are used to fit the ensemble and estimate thresholds. The
+four constructors below specify how to divide targets into folds; the
+run builds the fold map from the targets.
 
 ``` r
 
@@ -104,6 +144,17 @@ block_cv(c("x", "y"), v = 5)
 env_cv("elevation", v = 5)
 #> <timesift resampling> env_cv in 5 folds 
 #> cut on    : elevation
+```
+
+``` python
+ts.cv(v=5)
+#> Resampling(kind='cv', v=5, seed=1, strata=5, group=None, folds=None, by=None, scale=False, repeats=1)
+ts.grouped_cv("transect", v=5)
+#> Resampling(kind='grouped_cv', v=5, seed=1, strata=1, group='transect', folds=None, by=None, scale=False, repeats=1)
+ts.block_cv(["x", "y"], v=5)
+#> Resampling(kind='block_cv', v=5, seed=0, strata=1, group=None, folds=None, by=['x', 'y'], scale=False, repeats=1)
+ts.env_cv("elevation", v=5)
+#> Resampling(kind='env_cv', v=5, seed=0, strata=1, group=None, folds=None, by='elevation', scale=True, repeats=1)
 ```
 
 [`cv()`](https://gillescolling.com/timesift/reference/cv.md) deals units
@@ -149,6 +200,26 @@ table(transect = targets$transect, fold = by_transect)[1:4, ]
 #>      t3   0  0  0  0 12
 ```
 
+``` python
+resp = ts.as_response({"id": cell, **{f"sp{j}": targets[f"sp{j}"] for j in range(1, 5)}})
+random = ts.fold_map(resp, v=5)
+pd.Series(random.fold).value_counts().sort_index()
+#> 1    24
+#> 2    24
+#> 3    24
+#> 4    24
+#> 5    24
+#> Name: count, dtype: int64
+by_transect = ts.fold_map(resp, v=5, group=targets["transect"])
+pd.crosstab(targets["transect"], by_transect.fold).head(4)
+#> col_0      1   2  3  4   5
+#> transect
+#> t1         0   0  0  0  12
+#> t10        0  12  0  0   0
+#> t2         0   0  0  0  12
+#> t3        12   0  0  0   0
+```
+
 The plain map puts 24 cells in each fold. The grouped one puts each
 transect of twelve cells in a single fold, so two transects make one
 fold of 24.
@@ -172,6 +243,19 @@ head(as.data.frame(cells), 4)
 #> 2      sp1    2    52         39        57        13       11     TRUE
 #> 3      sp1    3    52         40        56        12       12     TRUE
 #> 4      sp1    4    52         43        53         9       15     TRUE
+```
+
+``` python
+cells = ts.scorable_cells(resp, random)
+cells
+#> <timesift cells> 20 cells over 4 variables
+#> scorable: 20 (100.0%); variables with at least one scorable fold: 4 of 4
+pd.DataFrame({k: getattr(cells, k) for k in ("variable", "fold", "scorable")}).head(4)
+#>   variable  fold  scorable
+#> 0      sp1     1      True
+#> 1      sp1     2      True
+#> 2      sp1     3      True
+#> 3      sp1     4      True
 ```
 
 Every one of the 20 cells is scorable here, because each species is
@@ -209,6 +293,29 @@ fit
 #> 
 #> choice on every target  elasticnet / month
 #> weights on every target  forest / week 0.52   elasticnet / month 0.26   forest / month 0.22
+```
+
+``` python
+fit = ts.timesift(targets, series, y="sp*", id="cell", time="day", x="temp",
+                  static="elevation", learners=[ts.elasticnet(), ts.forest()],
+                  sift=ts.grains("week", "month"), resampling=ts.cv(v=5), verbose=False)
+fit
+#> timesift  120 targets, 4 responses, 5-fold random CV, roc_auc
+#>
+#> candidates, scored on the outer folds
+#> candidate                    mean    won  responses
+#> forest / month              0.795      0  separate
+#> forest / week               0.813      0  separate
+#> elasticnet / week           0.832      1  separate
+#> elasticnet / month          0.845      3  separate
+#>
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                    0.832  se 0.007
+#> ensemble                    0.820  se 0.010
+#> selected elasticnet / week in 3, elasticnet / month in 2 of 5 folds
+#>
+#> choice on every target  elasticnet / month
+#> weights on every target  forest / week 0.41   elasticnet / month 0.32   forest / month 0.27
 ```
 
 The candidate rows are the comparison on the outer folds, and the two
@@ -253,6 +360,30 @@ blocked
 #> weights on every target  forest / week 0.62   elasticnet / month 0.38
 ```
 
+``` python
+blocked = ts.timesift(targets, series, y="sp*", id="cell", time="day", x="temp",
+                      static="elevation", learners=[ts.elasticnet(n_inner=3), ts.forest()],
+                      sift=ts.grains("week", "month"), resampling=ts.block_cv(["x", "y"], v=5),
+                      n_inner=4, verbose=False)
+blocked
+#> timesift  120 targets, 4 responses, 5-fold grouped CV, roc_auc
+#>
+#> candidates, scored on the outer folds
+#> candidate                    mean    won  responses
+#> forest / month              0.699      0  separate
+#> forest / week               0.705      0  separate
+#> elasticnet / week           0.765      2  separate
+#> elasticnet / month          0.782      2  separate
+#>
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                    0.776  se 0.042
+#> ensemble                    0.758  se 0.040
+#> selected elasticnet / month in 4, elasticnet / week in 1 of 5 folds
+#>
+#> choice on every target  elasticnet / month
+#> weights on every target  forest / month 0.36   forest / week 0.34   elasticnet / month 0.31
+```
+
 Each run keeps the map it read in `$folds`. Drawn on the grid, the
 random map scatters every fold over the grid and the block map gives
 each fold one compact region.
@@ -278,6 +409,22 @@ block_cv().](prediction_files/figure-html/fold-maps-1.svg)
 par(op)
 ```
 
+``` python
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 2, figsize=(7, 3.2))
+for ax, run, title in zip(axes, (fit, blocked), ("cv(v = 5)", 'block_cv(["x", "y"], v = 5)')):
+    by_cell = run.folds.as_dict()
+    ax.imshow(np.array([by_cell[str(c)] for c in cell]).reshape(ny, nx),
+              cmap=plt.get_cmap("Set2", 5));
+    ax.set_title(title);
+    ax.axis("off");
+```
+
+![Two maps of the 12 by 10 grid coloured by fold: scattered under cv(),
+five compact regions under
+block_cv().](prediction_files/py-figure-1.svg)
+
 ``` r
 
 est <- function(run) run$estimate[run$estimate$metric == "roc_auc", c("arm", "score", "se")]
@@ -287,6 +434,20 @@ rbind(random = est(fit), block = est(blocked))
 #> random.52 ensemble 0.8611598 0.01913396
 #> block.25  selected 0.7835526 0.02274001
 #> block.52  ensemble 0.7911384 0.02979666
+```
+
+``` python
+def est(run):
+    d = pd.DataFrame(run.estimate)
+    return d[d["metric"] == "roc_auc"][["arm", "score", "se"]].reset_index(drop=True)
+
+
+pd.concat({"random": est(fit), "block": est(blocked)})
+#>                arm     score        se
+#> random 0  selected  0.832447  0.007001
+#>        1  ensemble  0.819756  0.009880
+#> block  0  selected  0.776500  0.041876
+#>        1  ensemble  0.757886  0.039561
 ```
 
 Under blocks the selected candidate falls by 0.082, to 0.784, and the
@@ -302,11 +463,11 @@ month, against 0.870 to 0.784.
 
 ## The combination
 
-The combiner is handed the out-of-fold predictions, the response, the
-mask and the fold map, and never a model. The default,
-`ensemble("stack")`, fits non-negative weights summing to one that
-minimise the binomial deviance over the scorable cells, one weight
-vector across all responses.
+The combiner uses out-of-fold predictions, observed responses, the
+scorable-cell mask and the fold map. The default, `ensemble("stack")`,
+estimates non-negative weights that sum to one and minimise binomial
+deviance over the scorable cells. One weight vector is used across all
+responses.
 
 ``` r
 
@@ -329,6 +490,25 @@ fit$selected[c("fold", "candidate", "inner_score")]
 #> 3    3 elasticnet / month   0.8704109
 #> 4    4  elasticnet / week   0.8867160
 #> 5    5 elasticnet / month   0.8935208
+```
+
+``` python
+{k: round(v, 3) for k, v in ts.ensemble_weights(fit).items()}
+#> {'elasticnet / week': 0.0, 'elasticnet / month': 0.324, 'forest / week': 0.41, 'forest / month': 0.266}
+pd.DataFrame(fit.fold_weights).round(3)
+#>    fold  elasticnet / week  elasticnet / month  forest / week  forest / month
+#> 0     1              0.541               0.000          0.279           0.180
+#> 1     2              0.286               0.000          0.356           0.358
+#> 2     3              0.000               0.344          0.163           0.494
+#> 3     4              0.196               0.091          0.381           0.332
+#> 4     5              0.000               0.324          0.124           0.552
+pd.DataFrame(fit.selected)[["fold", "candidate", "inner_score"]]
+#>    fold           candidate  inner_score
+#> 0     1   elasticnet / week     0.847644
+#> 1     2   elasticnet / week     0.864787
+#> 2     3  elasticnet / month     0.852545
+#> 3     4   elasticnet / week     0.854386
+#> 4     5  elasticnet / month     0.819974
 ```
 
 [`ensemble_weights()`](https://gillescolling.com/timesift/reference/ensemble_weights.md)
@@ -382,6 +562,22 @@ round(stacks$committee$thresholds, 3)
 #> forest / month     0.522 0.550 0.444 0.660
 ```
 
+``` python
+methods = ["stack", "mean", "median", "weighted", "committee"]
+stacks = {m: ts.ensemble_fit(fit.oof, fit.y, fit.cells, fit.folds, ts.ensemble(m),
+                             scores=fit.scores) for m in methods}
+stacks["stack"]
+#> <timesift stack> stack over 4 candidates
+#> forest / week 0.410  elasticnet / month 0.324  forest / month 0.266  elasticnet / week 0.000
+committee = stacks["committee"]
+pd.DataFrame(committee.thresholds, index=committee.members, columns=committee.variables).round(3)
+#>                       sp1    sp2    sp3    sp4
+#> elasticnet / week   0.522  0.595  0.478  0.547
+#> elasticnet / month  0.561  0.530  0.441  0.505
+#> forest / week       0.472  0.506  0.496  0.562
+#> forest / month      0.664  0.578  0.456  0.506
+```
+
 The stack refitted here carries the same weights as
 `ensemble_weights(fit)`, because it was fitted on the same predictions.
 The committee holds one cut per member and response, learned by the
@@ -404,6 +600,22 @@ auc <- vapply(stacks, function(st) {
 round(auc, 3)
 #>     stack      mean    median  weighted committee 
 #>     0.868     0.870     0.868     0.870     0.834
+```
+
+``` python
+def mean_auc(st):
+    s = ts.score_predictions(fit.y, ts.ensemble_combine(st, fit.oof), fit.folds, fit.cells)
+    d = pd.DataFrame({k: s[k] for k in ("variable", "score", "scorable")})
+    return d[d["scorable"]].groupby("variable")["score"].mean().mean()
+
+
+pd.Series({m: mean_auc(st) for m, st in stacks.items()}).round(3)
+#> stack        0.826
+#> mean         0.831
+#> median       0.833
+#> weighted     0.830
+#> committee    0.818
+#> dtype: float64
 ```
 
 The plain mean of the four candidates scores 0.870, level with the best
@@ -429,14 +641,24 @@ round(sp[1:4, "sp3", ], 3)
 #> 101 0.524 0.052 0.099 0.442 0.606
 ```
 
+``` python
+sp = ts.ensemble_spread(stacks["mean"], fit.oof)
+pd.DataFrame(sp[:4, 2, :], columns=ts.SPREAD_STATISTICS).round(3)
+#>     mean     sd     cv  lower  upper
+#> 0  0.414  0.061  0.147  0.317  0.511
+#> 1  0.208  0.067  0.323  0.101  0.315
+#> 2  0.204  0.095  0.467  0.053  0.356
+#> 3  0.323  0.103  0.319  0.159  0.487
+```
+
 ## What the report carries
 
-Printing a run prints its
-[`summary()`](https://rdrr.io/r/base/summary.html), documented under the
-topic timesift_report. The summary is a data frame with one row per
-candidate and one per procedure arm, so it can be filtered and joined
-like any other table; the weights fitted on every target and the
-candidate chosen on every target travel as attributes.
+Printing a run displays its
+[`summary()`](https://rdrr.io/r/base/summary.html), documented under
+`timesift_report`. The summary is a data frame with one row per
+candidate and one per procedure, so you can filter and join it.
+Attributes store the ensemble weights and selected candidate from the
+fit using all targets.
 
 ``` r
 
@@ -453,6 +675,17 @@ attr(summary(fit), "choice")
 #> [1] "elasticnet / month"
 ```
 
+``` python
+pd.DataFrame(ts.candidate_table(fit))
+#>             candidate responses  won      mean
+#> 0      forest / month  separate    0  0.794861
+#> 1       forest / week  separate    0  0.813303
+#> 2   elasticnet / week  separate    1  0.831971
+#> 3  elasticnet / month  separate    3  0.845478
+fit.choice
+#> elasticnet / month
+```
+
 `won` counts the responses a candidate scored highest on: the monthly
 elastic net wins three, the weekly one wins the fourth, and the weekly
 forest, which carries the largest weight in the stack, wins none. A
@@ -464,10 +697,9 @@ the same cells, so it does not include the error those share.
 ## Predicting new targets
 
 [`predict()`](https://rdrr.io/r/stats/predict.html) rebuilds each
-member’s representation for new targets from the settings its own arm
-was built with and predicts with the models refitted on every target.
-New targets need the identifier and the static columns the fit was
-given, and the series needs readings for each of them.
+candidate’s representation for the new targets and uses models refitted
+on all training targets. Supply the identifier and any static predictor
+columns in the new target table, plus a time series for each target.
 
 ``` r
 
@@ -499,6 +731,44 @@ round(predict(fit, new, new_series, candidate = "forest / week"), 3)
 #> 6 0.222 0.176 0.132 0.262
 ```
 
+``` python
+new = targets.iloc[:6][["cell", "elevation"]]
+new_series = series[series["cell"].isin(new["cell"])]
+
+
+def show(p):
+    return pd.DataFrame(p, index=new["cell"], columns=fit.y.variables).round(3)
+
+
+show(fit.predict(new, new_series))
+#>         sp1    sp2    sp3    sp4
+#> cell
+#> 1     0.212  0.388  0.279  0.234
+#> 2     0.286  0.688  0.101  0.803
+#> 3     0.298  0.245  0.089  0.837
+#> 4     0.231  0.412  0.176  0.256
+#> 5     0.400  0.189  0.811  0.277
+#> 6     0.799  0.115  0.117  0.863
+show(fit.predict(new, new_series, candidate="selected"))
+#>         sp1    sp2    sp3    sp4
+#> cell
+#> 1     0.370  0.641  0.388  0.447
+#> 2     0.438  0.482  0.131  0.621
+#> 3     0.484  0.427  0.081  0.710
+#> 4     0.405  0.608  0.375  0.470
+#> 5     0.626  0.316  0.614  0.492
+#> 6     0.615  0.216  0.096  0.734
+show(fit.predict(new, new_series, candidate="forest / week"))
+#>         sp1    sp2    sp3    sp4
+#> cell
+#> 1     0.138  0.276  0.268  0.116
+#> 2     0.220  0.798  0.120  0.866
+#> 3     0.202  0.148  0.068  0.872
+#> 4     0.136  0.318  0.060  0.158
+#> 5     0.288  0.090  0.900  0.202
+#> 6     0.868  0.086  0.118  0.922
+```
+
 `candidate = "ensemble"` is the default and combines the members under
 the refitted stack; `"selected"` is the candidate the rule chose on
 every target, here `elasticnet / month`; any candidate’s name predicts
@@ -525,6 +795,16 @@ round(sapply(rules, function(r) decision_threshold(fit, rule = r)), 3)
 #> sp2  0.576 0.576      0.585 0.297
 #> sp3  0.401 0.401      0.508 0.368
 #> sp4  0.467 0.640      0.518 0.218
+```
+
+``` python
+rules = ["youden", "kappa", "prevalence", "mpa"]
+pd.DataFrame({r: ts.decision_threshold(fit, rule=r) for r in rules}).round(3)
+#>      youden  kappa  prevalence    mpa
+#> sp1   0.455  0.614       0.513  0.320
+#> sp2   0.536  0.536       0.444  0.242
+#> sp3   0.448  0.448       0.505  0.303
+#> sp4   0.464  0.464       0.494  0.332
 ```
 
 `"youden"` maximises sensitivity plus specificity, the cut TSS is read
@@ -556,6 +836,27 @@ predict(fit, new, new_series, type = "binary", rule = "prevalence")
 #> 6   0   0   0   0
 ```
 
+``` python
+called = pd.DataFrame({r: fit.predict(targets, series, type="binary", rule=r).sum(axis=0)
+                       for r in rules}, index=fit.y.variables)
+called.insert(0, "observed", resp.values.sum(axis=0).astype(int))
+called
+#>      observed  youden  kappa  prevalence   mpa
+#> sp1        50    51.0   49.0        51.0  65.0
+#> sp2        52    52.0   52.0        54.0  69.0
+#> sp3        48    52.0   52.0        49.0  62.0
+#> sp4        54    54.0   54.0        54.0  61.0
+show(fit.predict(new, new_series, type="binary", rule="prevalence"))
+#>       sp1  sp2  sp3  sp4
+#> cell
+#> 1     0.0  0.0  0.0  0.0
+#> 2     0.0  1.0  0.0  1.0
+#> 3     0.0  0.0  0.0  1.0
+#> 4     0.0  0.0  0.0  0.0
+#> 5     0.0  0.0  1.0  0.0
+#> 6     1.0  0.0  0.0  1.0
+```
+
 The prevalence rule reproduces the observed counts to within one cell,
 as it is built to. Youden and kappa land within two cells of them on
 this grid, and mpa calls between 53 and 74 cells present against 47 to
@@ -581,6 +882,19 @@ round(s[, "sp1", ], 3)
 #> 4 0.387 0.179 0.462 0.034 0.741
 #> 5 0.798 0.142 0.178 0.518 1.000
 #> 6 0.297 0.133 0.448 0.035 0.560
+```
+
+``` python
+s = fit.predict(new, new_series, type="spread")
+pd.DataFrame(s[:, 0, :], index=new["cell"], columns=ts.SPREAD_STATISTICS).round(3)
+#>        mean     sd     cv  lower  upper
+#> cell
+#> 1     0.212  0.135  0.640  0.000  0.464
+#> 2     0.286  0.130  0.453  0.044  0.528
+#> 3     0.298  0.160  0.536  0.000  0.595
+#> 4     0.231  0.149  0.646  0.000  0.509
+#> 5     0.400  0.192  0.480  0.041  0.759
+#> 6     0.799  0.160  0.200  0.501  1.000
 ```
 
 The interval is held inside zero and one, since the predictions are
@@ -627,12 +941,48 @@ pseudo_absences(pool, presences, n = 10, strategy = "sre", id = "cell", env = "e
 #> 6   74  1.5 3.5      2453   1   TRUE
 ```
 
+``` python
+presences = targets[targets["sp3"] == 1][["cell", "x", "y", "elevation"]]
+pool = targets[["cell", "x", "y", "elevation"]].to_dict("list")
+presence_rows = presences.to_dict("list")
+pd.DataFrame(ts.pseudo_absences(pool, presence_rows, n=10, strategy="disk", id="cell",
+                                coords=["x", "y"], dist_min=1.5))
+#>    cell    x    y  elevation  set  pseudo
+#> 0     1  0.5  9.5     2283.0    1    True
+#> 1     2  1.5  9.5     2263.0    1    True
+#> 2     3  2.5  9.5     2199.0    1    True
+#> 3     7  6.5  9.5     2131.0    1    True
+#> 4     8  7.5  9.5     2048.0    1    True
+#> 5     9  8.5  9.5     1992.0    1    True
+#> 6    13  0.5  8.5     2381.0    1    True
+#> 7    15  2.5  8.5     2196.0    1    True
+#> 8    20  7.5  8.5     2037.0    1    True
+#> 9    21  8.5  8.5     2110.0    1    True
+pd.DataFrame(ts.pseudo_absences(pool, presence_rows, n=10, strategy="sre", id="cell",
+                                env=["elevation"], quantile=0.1))
+#>    cell     x    y  elevation  set  pseudo
+#> 0     9   8.5  9.5     1992.0    1    True
+#> 1    10   9.5  9.5     1957.0    1    True
+#> 2    11  10.5  9.5     2019.0    1    True
+#> 3    24  11.5  8.5     1903.0    1    True
+#> 4    26   1.5  7.5     2460.0    1    True
+#> 5    34   9.5  7.5     1880.0    1    True
+#> 6    35  10.5  7.5     1947.0    1    True
+#> 7    48  11.5  6.5     2003.0    1    True
+#> 8    63   2.5  4.5     2492.0    1    True
+#> 9    71  10.5  4.5     2001.0    1    True
+```
+
 The header says how many units of the pool a strategy admits. On this
 grid the disk strategy admits 18 cells at least 1.5 cells from any
 presence, and the envelope strategy 15 cells outside the band holding
 the middle 80% of the presences’ elevations; asking either for more than
 it admits is an error that names both counts. `repeats` makes several
 independent draws, numbered in `set`.
+
+In Python the draw is a mapping of columns with no header; asking for
+more units than a strategy admits raises the same error naming both
+counts.
 
 ``` r
 
@@ -656,6 +1006,30 @@ po_fit
 #> choice on every target  elasticnet / week
 ```
 
+``` python
+drawn = pd.DataFrame(ts.pseudo_absences(pool, presence_rows, n=40, strategy="random", id="cell",
+                                       repeats=3))
+drawn["set"].value_counts().sort_index()
+#> set
+#> 1    40
+#> 2    40
+#> 3    40
+#> Name: count, dtype: int64
+one = drawn[drawn["set"] == 1][["cell", "x", "y", "elevation"]]
+po = pd.concat([presences.assign(sp3=1), one.assign(sp3=0)])
+po_fit = ts.timesift(po, series[series["cell"].isin(po["cell"])], y="sp3", id="cell", time="day",
+                     x="temp", learners=[ts.elasticnet()], sift=ts.grains("week"),
+                     ensemble=False, n_inner=None, resampling=ts.cv(v=5), verbose=False)
+po_fit
+#> timesift  88 targets, 1 response, 5-fold random CV, roc_auc
+#>
+#> candidates, scored on the outer folds
+#> candidate                   mean    won  responses
+#> elasticnet / week          0.854      1  separate
+#>
+#> choice on every target  elasticnet / week
+```
+
 The drawn units are ordinary rows once bound to the presences with a
 response of zero, and the fit does not mark them. Its AUC of 0.772
 separates presences from background cells, some of which hold the
@@ -673,6 +1047,11 @@ cell, and returns a raster with one layer per response. The record is a
 and the static predictors are a raster whose layers are named as the
 fit’s `static` columns. The fit must have been made with `id`, because a
 cell is named by its number.
+
+In Python the record is an `xarray.DataArray` with a `time` dimension
+and two spatial ones, and the static predictors are an `xarray.Dataset`
+whose variables are named as the fit’s `static` columns. The result is
+an `xarray.DataArray` with a `response` dimension.
 
 ``` r
 
@@ -694,6 +1073,18 @@ grid
 #> min values  : -12.110636, -14.466712, -12.721483, -13.719059, -13.856304, -13.491216, ...
 #> max values  :    4.73181,    3.38011,   3.467108,   3.979679,   2.536751,   5.488145, ...
 #> time        : 2021-01-01 00:00:00zUTC to 2021-12-31 00:00:00zUTC (365 steps)
+```
+
+``` python
+import xarray as xr
+
+coords = {"y": gy[::nx], "x": gx[:nx]}
+grid = xr.DataArray(temp.T.reshape(365, ny, nx), dims=("time", "y", "x"),
+                    coords={"time": days.to_numpy(), **coords})
+elev = xr.Dataset({"elevation": (("y", "x"), targets["elevation"].to_numpy().reshape(ny, nx))},
+                  coords=coords)
+dict(grid.sizes)
+#> {'time': 365, 'y': 10, 'x': 12}
 ```
 
 ``` r
@@ -719,6 +1110,28 @@ terra::plot(now)
 
 ![Four maps of the predicted probability of presence, one per
 species.](prediction_files/figure-html/project-1.svg)
+
+``` python
+import time
+
+start = time.perf_counter()
+now = ts.project(fit, series=grid, static=elev)
+round(time.perf_counter() - start, 2)
+#> 0.06
+dict(now.sizes)
+#> {'response': 4, 'y': 10, 'x': 12}
+bool(np.allclose(now.sel(response="sp1").values.ravel(), fit.predict(targets, series)[:, 0]))
+#> True
+fig, axes = plt.subplots(2, 2, figsize=(7, 5))
+for ax, r in zip(axes.flat, now["response"].values):
+    im = ax.imshow(now.sel(response=r).values, vmin=0, vmax=1)
+    ax.set_title(r);
+    ax.axis("off");
+fig.colorbar(im, ax=axes);
+```
+
+![Four maps of the predicted probability of presence, one per
+species.](prediction_files/py-figure-2.svg)
 
 The projection of the ensemble onto the 120 cells took 0.15 seconds. It
 is the same prediction
@@ -764,6 +1177,28 @@ plot(change, "sp1")
 ![Map of the cells sp1 loses, keeps, gains, or is absent from in both
 periods.](prediction_files/figure-html/range-1.svg)
 
+``` python
+warmer = grid + 1.5
+now_bin = ts.project(fit, series=grid, static=elev, type="binary")
+later_bin = ts.project(fit, series=warmer, static=elev, type="binary")
+change = ts.range_change(now_bin, later_bin)
+pd.DataFrame(change.table).drop(columns=["current", "later"]).round(1)
+#>   variable  lost  kept  gained  absent  percent_loss  percent_gain  change
+#> 0      sp1     0    51      45      24           0.0          88.2    88.2
+#> 1      sp2    36    16       2      66          69.2           3.8   -65.4
+#> 2      sp3    12    40       9      59          23.1          17.3    -5.8
+#> 3      sp4     4    50      38      28           7.4          70.4    63.0
+from matplotlib.colors import ListedColormap
+
+fig, ax = plt.subplots()
+ax.imshow(change.map.sel(response="sp1").values, vmin=-2.5, vmax=1.5,
+          cmap=ListedColormap(["tab:red", "tab:gray", "whitesmoke", "tab:green"]));
+ax.axis("off");
+```
+
+![Map of the cells sp1 loses, keeps, gains, or is absent from in both
+periods.](prediction_files/py-figure-3.svg)
+
 The warm-favoured `sp1` and `sp4` gain 30 and 38 cells, the
 cold-favoured `sp2` loses 42 of its 58, and `sp3`, which the simulation
 ties to the depth of the snap alone, loses and gains 14 cells each and
@@ -778,6 +1213,10 @@ takes `threshold`, one cut per response.
 `type = "spread"` projects the disagreement among the members, one layer
 per response and statistic, named `response.statistic`.
 
+In Python the spread map keeps `response` and `statistic` as two
+dimensions of one array, with the statistics `mean`, `sd`, `cv`, `lower`
+and `upper`.
+
 ``` r
 
 unc <- project(fit, series = grid, static = elev, type = "spread")
@@ -788,6 +1227,21 @@ terra::plot(unc[["sp3.sd"]])
 
 ![Map of the standard deviation of the ensemble members' predictions for
 sp3.](prediction_files/figure-html/spread-map-1.svg)
+
+``` python
+unc = ts.project(fit, series=grid, static=elev, type="spread")
+unc.dims
+#> ('response', 'statistic', 'y', 'x')
+unc["statistic"].values.tolist()
+#> ['mean', 'sd', 'cv', 'lower', 'upper']
+fig, ax = plt.subplots()
+im = ax.imshow(unc.sel(response="sp3", statistic="sd").values)
+ax.axis("off");
+fig.colorbar(im);
+```
+
+![Map of the standard deviation of the ensemble members' predictions for
+sp3.](prediction_files/py-figure-4.svg)
 
 ## Response curves
 
@@ -822,6 +1276,29 @@ plot(rc, ylim = c(0, 1.3), legend = "top")
 temperature moved in every week at
 once.](prediction_files/figure-html/curve-1.svg)
 
+``` python
+list(fit.representations)
+#> ['week', 'month']
+fit.representations["week"].stats
+#> ('mean', 'elevation')
+rc = ts.response_curve(fit, "ensemble", "mean")
+pd.DataFrame(rc.prediction, index=rc.value.round(2), columns=rc.variable).round(3).iloc[::7]
+#>           sp1    sp2    sp3    sp4
+#> -19.01  0.035  0.866  0.746  0.159
+#> -13.29  0.036  0.866  0.744  0.165
+#> -7.57   0.042  0.862  0.712  0.195
+#> -1.85   0.209  0.746  0.338  0.528
+#>  3.86   0.348  0.647  0.280  0.665
+#>  9.58   0.590  0.439  0.344  0.728
+#>  15.30  0.810  0.189  0.483  0.823
+#>  21.02  0.836  0.162  0.617  0.877
+ts.plot(rc, ylim=(0, 1.3));
+```
+
+![Ensemble prediction of each species against the weekly mean
+temperature moved in every week at
+once.](prediction_files/py-figure-5.svg)
+
 Moved in every week at once, the mean runs from the coldest weekly mean
 any cell has to the warmest, so the curve sweeps a whole year from deep
 winter to high summer. `sp1` rises and `sp2` falls along it, as the
@@ -848,6 +1325,19 @@ plot(rc_bin, ylim = c(0, 1.3))
 temperature of the week of the cold
 snap.](prediction_files/figure-html/curve-bin-1.svg)
 
+``` python
+week = fit.representations["week"]
+cold_week = week.bins[int(np.argmin(week.values[:, :, week.stats.index("mean")].mean(axis=0)))]
+cold_week
+#> 2021-02-08T00:00:00Z
+rc_bin = ts.response_curve(fit, "elasticnet / week", {"bin": cold_week, "channel": "mean"})
+ts.plot(rc_bin, ylim=(0, 1.3));
+```
+
+![Prediction of sp3 by the weekly elastic net against the mean
+temperature of the week of the cold
+snap.](prediction_files/py-figure-6.svg)
+
 Moving that one week, `sp3` falls as the week warms, so the deeper the
 snap the more likely the species, which is how the simulation made it.
 `sp1` and `sp2` do not move: one week shifts the level of the year too
@@ -855,6 +1345,8 @@ little for the model of either.
 
 Given a second predictor in `with`, the curve becomes a surface over the
 grid of the two, drawn as an image for one response.
+
+In Python the argument is `with_`, because `with` is a reserved word.
 
 ``` r
 
@@ -864,6 +1356,14 @@ plot(rc2, "sp1")
 
 ![Prediction of sp1 by the weekly elastic net over the grid of the
 weekly mean and elevation.](prediction_files/figure-html/curve-2d-1.svg)
+
+``` python
+rc2 = ts.response_curve(fit, "elasticnet / week", "mean", with_="elevation", n=25)
+ts.plot(rc2, variable="sp1");
+```
+
+![Prediction of sp1 by the weekly elastic net over the grid of the
+weekly mean and elevation.](prediction_files/py-figure-7.svg)
 
 The prediction for `sp1` changes along the weekly mean and hardly along
 elevation, darker colours being higher.

@@ -304,7 +304,7 @@ def render_index(sections, found: dict) -> str:
     out = ["---", 'title: "Python reference"', "---", "", BANNER, "",
            "The Python package's functions, classes and values, under the sections of "
            "[the R reference](../reference/index.html) and in its order. "
-           "[Get started](python.html) runs them on a simulated record.", "", INSTALL]
+           "[Get started](timesift.html?lang=python) runs them on a simulated record.", "", INSTALL]
     for title, desc, slug, names in sections:
         out += ["## [{}]({}.html)".format(title, slug), "", desc, ""]
         for name in names:

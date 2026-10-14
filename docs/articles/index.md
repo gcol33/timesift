@@ -7,10 +7,8 @@ comparison and the prediction that follows from it.
 
 - [Choosing how a record is
   read](https://gillescolling.com/timesift/articles/timesift.md):
-- [Choosing how a record is read, in
-  Python](https://gillescolling.com/timesift/articles/python.md):
 
-### Using timesift
+### Workflows
 
 One topic each, in R: how a record becomes an array, the learners, the
 comparison across grains, and the step from a scored run to predictions
@@ -24,20 +22,21 @@ and maps.
 - [Ensembles, thresholds and
   maps](https://gillescolling.com/timesift/articles/prediction.md):
 
-### Articles
+### Background
 
-- [Coming from
-  biomod2](https://gillescolling.com/timesift/articles/biomod2.md):
-- [Installing
-  torch](https://gillescolling.com/timesift/articles/installation.md):
-- [Troubleshooting](https://gillescolling.com/timesift/articles/troubleshooting.md):
-
-### The contract
-
-What both implementations answer to, and what each language carries.
+What both implementations answer to, and how the package maps onto
+biomod2.
 
 - [The representation
   contract](https://gillescolling.com/timesift/articles/contract.md):
+- [Coming from
+  biomod2](https://gillescolling.com/timesift/articles/biomod2.md):
+
+### Setup and help
+
+- [Installing
+  torch](https://gillescolling.com/timesift/articles/installation.md):
+- [Troubleshooting](https://gillescolling.com/timesift/articles/troubleshooting.md):
 
 ### Python reference
 

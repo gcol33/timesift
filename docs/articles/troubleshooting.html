@@ -16,7 +16,7 @@
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
-<meta property="og:title" content="Troubleshooting">
+<script src="../extra.js"></script><meta property="og:title" content="Troubleshooting">
 <script>
 (function () {
   var D = String.fromCharCode(36);
@@ -59,7 +59,7 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-python" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Python</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-python">
-<li><a class="dropdown-item" href="../articles/python.html">Get started</a></li>
+<li><a class="dropdown-item" href="../articles/timesift.html?lang=python">Get started</a></li>
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
@@ -71,10 +71,11 @@
     <li><a class="dropdown-item" href="../articles/comparing-grains.html">Finding the grain</a></li>
     <li><a class="dropdown-item" href="../articles/prediction.html">Ensembles, thresholds and maps</a></li>
     <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
     <li><a class="dropdown-item" href="../articles/biomod2.html">Coming from biomod2</a></li>
+    <li><hr class="dropdown-divider"></li>
     <li><a class="dropdown-item" href="../articles/installation.html">Installing torch</a></li>
     <li><a class="dropdown-item" href="../articles/troubleshooting.html">Troubleshooting</a></li>
-    <li><a class="dropdown-item" href="../articles/contract.html">The contract between R and Python</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -113,6 +114,7 @@
 
     
     
+<!-- Python blocks run by tools/python_twins.py (md5 b524448c6802ddcead5d167cd90cd12a). -->
 <p><code>timesift</code> refuses a record it cannot represent
 faithfully, and says why. This article collects the refusals and
 surprises met most often, each reproduced on a small simulated record:
@@ -125,6 +127,7 @@ warmth.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
+<div class="lang-pair">
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"timesift"</span><span class="op">)</span></span>
@@ -140,6 +143,13 @@ warmth.</p>
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
 <span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
 <span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
+</div>
+<div class="lang-py-only">
+<p>The Python block draws its own record, so the values it prints differ
+from the ones quoted in the text, which come from the R run. Counts,
+shapes and calendar boundaries do not depend on the draw and agree.</p>
+</div>
+<div class="lang-pair">
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">hours</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="st">"2021-09-01"</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span>, by <span class="op">=</span> <span class="st">"hour"</span>, length.out <span class="op">=</span> <span class="fl">24</span> <span class="op">*</span> <span class="fl">60</span><span class="op">)</span></span>
 <span><span class="va">ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"p%02d"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">24</span><span class="op">)</span></span>
@@ -158,6 +168,30 @@ warmth.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">colSums</a></span><span class="op">(</span><span class="va">targets</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sp1"</span>, <span class="st">"sp2"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt; sp1 sp2 </span></span>
 <span><span class="co">#&gt;  14  10</span></span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="im">import</span> timesift <span class="im">as</span> ts</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">1</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>hours <span class="op">=</span> pd.date_range(<span class="st">"2021-09-01"</span>, periods<span class="op">=</span><span class="dv">24</span> <span class="op">*</span> <span class="dv">60</span>, freq<span class="op">=</span><span class="st">"h"</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>ids <span class="op">=</span> [<span class="ss">f"p</span><span class="sc">{</span>i<span class="sc">:02d}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">25</span>)]</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>warmth <span class="op">=</span> rng.normal(size<span class="op">=</span><span class="dv">24</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>series <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>    <span class="st">"plot"</span>: np.repeat(ids, <span class="bu">len</span>(hours)),</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>    <span class="st">"t"</span>: np.tile(hours, <span class="dv">24</span>),</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>    <span class="st">"temp"</span>: np.concatenate([</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>        w <span class="op">+</span> <span class="dv">5</span> <span class="op">*</span> np.sin(np.arange(<span class="dv">1</span>, <span class="bu">len</span>(hours) <span class="op">+</span> <span class="dv">1</span>) <span class="op">/</span> <span class="dv">200</span>) <span class="op">+</span> rng.normal(scale<span class="op">=</span><span class="dv">3</span>, size<span class="op">=</span><span class="bu">len</span>(hours))</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>        <span class="cf">for</span> w <span class="kw">in</span> warmth]),</span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>})</span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>targets <span class="op">=</span> pd.DataFrame({<span class="st">"plot"</span>: ids,</span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>                        <span class="st">"sp1"</span>: rng.binomial(<span class="dv">1</span>, <span class="dv">1</span> <span class="op">/</span> (<span class="dv">1</span> <span class="op">+</span> np.exp(<span class="op">-</span><span class="dv">2</span> <span class="op">*</span> warmth))),</span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>                        <span class="st">"sp2"</span>: rng.binomial(<span class="dv">1</span>, <span class="dv">1</span> <span class="op">/</span> (<span class="dv">1</span> <span class="op">+</span> np.exp(<span class="dv">2</span> <span class="op">*</span> warmth)))})</span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>targets[[<span class="st">"sp1"</span>, <span class="st">"sp2"</span>]].<span class="bu">sum</span>()</span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="co">#&gt; sp1    13</span></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="co">#&gt; sp2    15</span></span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="co">#&gt; dtype: int64</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="a-unit-has-no-readings-in-a-bin">A unit has no readings in a bin<a class="anchor" aria-label="anchor" href="#a-unit-has-no-readings-in-a-bin"></a>
@@ -165,7 +199,8 @@ warmth.</p>
 <p>A logger that was stolen for a week, or one that started late, leaves
 a hole in the record. Here plot <code>p03</code> loses the calendar week
 beginning Monday 13 September.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lost</span> <span class="op">&lt;-</span> <span class="va">series</span><span class="op">$</span><span class="va">plot</span> <span class="op">==</span> <span class="st">"p03"</span> <span class="op">&amp;</span></span>
 <span>  <span class="va">series</span><span class="op">$</span><span class="va">t</span> <span class="op">&gt;=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="st">"2021-09-13"</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span> <span class="op">&amp;</span></span>
 <span>  <span class="va">series</span><span class="op">$</span><span class="va">t</span> <span class="op">&lt;</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="st">"2021-09-20"</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span></span>
@@ -174,15 +209,22 @@ beginning Monday 13 September.</p>
 <span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">gappy</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> 1 (unit, bin) cell holds no readings, first: unit p03 at 2021-09-13T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.</span></span></code></pre></div>
-<p>Every unit must reach every bin of the representation. A cell with no
-reading has no mean, and filling it, with an interpolation or the mean
-of the other plots, would put a number in front of the model that no
-logger recorded. <code><a href="../reference/timesift.html">timesift()</a></code> raises the same error, because
-it builds its arrays the same way.</p>
+<div class="sourceCode" id="cb6" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>lost <span class="op">=</span> ((series[<span class="st">"plot"</span>] <span class="op">==</span> <span class="st">"p03"</span>) <span class="op">&amp;</span> (series[<span class="st">"t"</span>] <span class="op">&gt;=</span> <span class="st">"2021-09-13"</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>        <span class="op">&amp;</span> (series[<span class="st">"t"</span>] <span class="op">&lt;</span> <span class="st">"2021-09-20"</span>))</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>gappy <span class="op">=</span> series[<span class="op">~</span>lost]</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>ts.grain_matrix(gappy, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co">#&gt; ValueError: 1 (unit, bin) cell holds no readings, first: unit p03 at 2021-09-13T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.</span></span></code></pre></div>
+</div>
+<p>Every unit needs at least one reading in every bin. An empty bin has
+no summary value, so <code><a href="../reference/timesift.html">timesift()</a></code> raises an error when
+building the arrays. Any interpolation or imputation must be chosen and
+applied before fitting.</p>
 <p><code><a href="../reference/coverage.html">coverage()</a></code> lays out the same binning as a count of
 readings per unit and bin, so the gaps can be found before deciding what
 to do about them.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">cov</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/coverage.html">coverage</a></span><span class="op">(</span><span class="va">gappy</span>, <span class="va">plot</span>, <span class="va">t</span>, grain <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span></span>
 <span><span class="va">cov</span></span>
 <span><span class="co">#&gt; &lt;timesift coverage&gt; 24 units x 9 bins at the week grain</span></span>
@@ -194,26 +236,52 @@ to do about them.</p>
 <span><span class="co">#&gt;                  168                  168                  168 </span></span>
 <span><span class="co">#&gt; 2021-10-11T00:00:00Z 2021-10-18T00:00:00Z 2021-10-25T00:00:00Z </span></span>
 <span><span class="co">#&gt;                  168                  168                  144</span></span></code></pre></div>
-<p>There are three ways forward, and the choice belongs to the analysis:
-drop the units that do not span the record, cut the record to the span
-every unit covers, or move to a grain the gap does not reach. Here a
-month is coarse enough, since <code>p03</code> still has readings in
-September.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>cov <span class="op">=</span> ts.coverage(gappy, <span class="st">"plot"</span>, <span class="st">"t"</span>, grain<span class="op">=</span><span class="st">"week"</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>cov</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">#&gt; &lt;timesift coverage&gt; 24 units x 9 bins at the week grain</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">#&gt; 1 empty (unit, bin) cells in 1 units: p03</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>pd.Series(cov.count[cov.units.index(<span class="st">"p03"</span>)], index<span class="op">=</span>cov.bins)</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co">#&gt; 2021-08-30T00:00:00Z    120</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="co">#&gt; 2021-09-06T00:00:00Z    168</span></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co">#&gt; 2021-09-13T00:00:00Z      0</span></span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="co">#&gt; 2021-09-20T00:00:00Z    168</span></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co">#&gt; 2021-09-27T00:00:00Z    168</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co">#&gt; 2021-10-04T00:00:00Z    168</span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="co">#&gt; 2021-10-11T00:00:00Z    168</span></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="co">#&gt; 2021-10-18T00:00:00Z    168</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a><span class="co">#&gt; 2021-10-25T00:00:00Z    144</span></span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a><span class="co">#&gt; dtype: int32</span></span></code></pre></div>
+</div>
+<p>You can exclude units with incomplete records, restrict the period to
+dates covered by every unit, or choose a coarser grain with readings in
+every bin. Here monthly bins work because <code>p03</code> still has
+readings in September.</p>
+<div class="lang-pair">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">gappy</span><span class="op">[</span><span class="va">gappy</span><span class="op">$</span><span class="va">plot</span> <span class="op">!=</span> <span class="st">"p03"</span>, <span class="op">]</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 23  9  1</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">gappy</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 24  2  1</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>ts.grain_matrix(gappy[gappy[<span class="st">"plot"</span>] <span class="op">!=</span> <span class="st">"p03"</span>], <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>).shape</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="co">#&gt; (23, 9, 1)</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>ts.grain_matrix(gappy, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"month"</span>).shape</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt; (24, 2, 1)</span></span></code></pre></div>
+</div>
 <p>A week missing from every unit at once is refused under a different
 message, because the gap is then a bin that no unit reaches. Dropping
 that bin silently would make the weeks either side of it look
 adjacent.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">everyone</span> <span class="op">&lt;-</span> <span class="va">series</span><span class="op">$</span><span class="va">t</span> <span class="op">&gt;=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="st">"2021-09-13"</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span> <span class="op">&amp;</span></span>
 <span>  <span class="va">series</span><span class="op">$</span><span class="va">t</span> <span class="op">&lt;</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="st">"2021-09-20"</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span><span class="op">[</span><span class="op">!</span><span class="va">everyone</span>, <span class="op">]</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> the week bins are not contiguous: nothing falls in the one beginning 2021-09-13T00:00:00, between 2021-09-06T00:00:00 and 2021-09-20T00:00:00. Bins must tile the record; a gap is not closed up.</span></span></code></pre></div>
+<div class="sourceCode" id="cb12" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>everyone <span class="op">=</span> (series[<span class="st">"t"</span>] <span class="op">&gt;=</span> <span class="st">"2021-09-13"</span>) <span class="op">&amp;</span> (series[<span class="st">"t"</span>] <span class="op">&lt;</span> <span class="st">"2021-09-20"</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>ts.grain_matrix(series[<span class="op">~</span>everyone], <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co">#&gt; ValueError: the week bins are not contiguous: nothing falls in the one beginning 2021-09-13T00:00:00, between 2021-09-06T00:00:00 and 2021-09-20T00:00:00. Bins must tile the record; a gap is not closed up.</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="the-first-and-last-bins-are-partial">The first and last bins are partial<a class="anchor" aria-label="anchor" href="#the-first-and-last-bins-are-partial"></a>
@@ -221,7 +289,8 @@ adjacent.</p>
 <p>1 September 2021 was a Wednesday, so the first weekly bin begins on
 Monday 30 August, two days before the record does, and the last week
 runs past its end.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dimnames.html" class="external-link">dimnames</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span></span>
 <span><span class="co">#&gt; [1] "2021-08-30T00:00:00Z" "2021-09-06T00:00:00Z" "2021-09-13T00:00:00Z"</span></span>
@@ -236,6 +305,14 @@ runs past its end.</p>
 <span><span class="co">#&gt;                  168                  168                  168 </span></span>
 <span><span class="co">#&gt; 2021-10-11T00:00:00Z 2021-10-18T00:00:00Z 2021-10-25T00:00:00Z </span></span>
 <span><span class="co">#&gt;                  168                  168                  144</span></span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>x <span class="op">=</span> ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>x.bins</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="co">#&gt; ('2021-08-30T00:00:00Z', '2021-09-06T00:00:00Z', '2021-09-13T00:00:00Z', '2021-09-20T00:00:00Z', '2021-09-27T00:00:00Z', '2021-10-04T00:00:00Z', '2021-10-11T00:00:00Z', '2021-10-18T00:00:00Z', '2021-10-25T00:00:00Z')</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>x.bin_partial</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a><span class="co">#&gt; array([ True, False, False, False, False, False, False, False,  True])</span></span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>x.bin_n[<span class="dv">0</span>]</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="co">#&gt; array([120, 168, 168, 168, 168, 168, 168, 168, 144], dtype=int32)</span></span></code></pre></div>
+</div>
 <p>Nothing is wrong: the calendar tiles the record, and a record that
 does not start on a Monday has a partial week at its start.
 <code>bin_partial</code> marks those bins and <code>bin_n</code> counts
@@ -244,32 +321,45 @@ the readings each bin was reduced from, 120 in the first week against
 and its <code>cold_day</code> and <code>warm_day</code> are drawn from
 fewer days, so they sit closer to the mean than a full bin’s would.</p>
 <p><code>partial = "drop"</code> removes them.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span>, partial <span class="op">=</span> <span class="st">"drop"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 24  7  1</span></span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>, partial<span class="op">=</span><span class="st">"drop"</span>).shape</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="co">#&gt; (24, 7, 1)</span></span></code></pre></div>
+</div>
 <p>On a grain coarser than the record, dropping can leave nothing, and
 that is an error.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"season"</span>, partial <span class="op">=</span> <span class="st">"drop"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> dropping the partial bins leaves no bin: the record covers no whole season. Use `partial = "keep"` or a finer grain.</span></span></code></pre></div>
+<div class="sourceCode" id="cb18" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"season"</span>, partial<span class="op">=</span><span class="st">"drop"</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="co">#&gt; ValueError: dropping the partial bins leaves no bin: the record covers no whole season. Use partial='keep' or a finer grain.</span></span></code></pre></div>
+</div>
 <p><code><a href="../reference/timesift.html">timesift()</a></code> keeps partial bins, because dropping them
 throws away the ends of the record: on a seasonal grain that can be
 three months at each end. To fit on whole bins alone, cut the series to
 the bin boundaries before the call. Monday 6 September to Sunday 24
 October is seven whole weeks.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">whole</span> <span class="op">&lt;-</span> <span class="va">series</span><span class="op">[</span><span class="va">series</span><span class="op">$</span><span class="va">t</span> <span class="op">&gt;=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="st">"2021-09-06"</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span> <span class="op">&amp;</span></span>
 <span>                  <span class="va">series</span><span class="op">$</span><span class="va">t</span> <span class="op">&lt;</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="st">"2021-10-25"</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span>, <span class="op">]</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">whole</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span>, <span class="st">"bin_partial"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] FALSE FALSE FALSE FALSE FALSE FALSE FALSE</span></span></code></pre></div>
+<div class="sourceCode" id="cb20"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>whole <span class="op">=</span> series[(series[<span class="st">"t"</span>] <span class="op">&gt;=</span> <span class="st">"2021-09-06"</span>) <span class="op">&amp;</span> (series[<span class="st">"t"</span>] <span class="op">&lt;</span> <span class="st">"2021-10-25"</span>)]</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>ts.grain_matrix(whole, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>).bin_partial</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="co">#&gt; array([False, False, False, False, False, False, False])</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="the-time-column-is-not-posixct-or-sits-in-an-unexpected-zone">The time column is not POSIXct, or sits in an unexpected zone<a class="anchor" aria-label="anchor" href="#the-time-column-is-not-posixct-or-sits-in-an-unexpected-zone"></a>
 </h2>
 <p>A time column read from a CSV file arrives as text, and one built
 with <code><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date()</a></code> has lost its hours. Both are refused.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">as_text</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/transform.html" class="external-link">transform</a></span><span class="op">(</span><span class="va">series</span>, t <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">t</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">as_text</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"day"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
@@ -283,17 +373,26 @@ with <code><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">a
 <code>as.POSIXct(x, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")</code>. A
 zone name the zone database does not know is refused too, since reading
 a clock in it would fall back to UTC with only a warning.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">odd</span> <span class="op">&lt;-</span> <span class="va">series</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">odd</span><span class="op">$</span><span class="va">t</span>, <span class="st">"tzone"</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="st">"CET+1"</span></span>
 <span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">odd</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"day"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> `t` is carried in the time zone "CET+1", which the zone database does not know. Name one of `OlsonNames()`.</span></span></code></pre></div>
+<div class="sourceCode" id="cb23" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"day"</span>, tz<span class="op">=</span><span class="st">"CET+1"</span>)</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="co">#&gt; ZoneInfoNotFoundError: 'No time zone found with key CET+1'</span></span></code></pre></div>
+</div>
 <p>The surprise that raises no error is the zone itself. Bins follow the
 calendar of the <code>tzone</code> attribute, so the same instants
 carried in <code>"Europe/Vienna"</code> are cut into days at Vienna’s
 midnight, which in September is 22:00 UTC.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="lang-py-only">
+<p>In Python the calendar is named by <code>tz</code>, or by the zone a
+time column carries.</p>
+</div>
+<div class="lang-pair">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">vienna</span> <span class="op">&lt;-</span> <span class="va">series</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">vienna</span><span class="op">$</span><span class="va">t</span>, <span class="st">"tzone"</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="st">"Europe/Vienna"</span></span>
 <span><span class="va">xv</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">vienna</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"day"</span><span class="op">)</span></span>
@@ -304,6 +403,14 @@ midnight, which in September is 22:00 UTC.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">xv</span>, <span class="st">"bin_n"</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span></span>
 <span><span class="co">#&gt; 2021-08-31T22:00:00Z 2021-09-01T22:00:00Z </span></span>
 <span><span class="co">#&gt;                   22                   24</span></span></code></pre></div>
+<div class="sourceCode" id="cb25"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a>xv <span class="op">=</span> ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"day"</span>, tz<span class="op">=</span><span class="st">"Europe/Vienna"</span>)</span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>xv.bins[:<span class="dv">2</span>]</span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a><span class="co">#&gt; ('2021-08-31T22:00:00Z', '2021-09-01T22:00:00Z')</span></span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>xv.bin_partial[:<span class="dv">2</span>]</span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a><span class="co">#&gt; array([ True, False])</span></span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>xv.bin_n[<span class="dv">0</span>, :<span class="dv">2</span>]</span>
+<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a><span class="co">#&gt; array([22, 24], dtype=int32)</span></span></code></pre></div>
+</div>
 <p>The first Vienna day began two hours before the first reading, so it
 is partial and holds 22 readings. In a zone that keeps daylight saving
 time the day the clock goes forward holds 23 hours and the day it goes
@@ -312,11 +419,15 @@ its <code>tzone</code> names that offset, such as
 <code>"Etc/GMT-1"</code> for Central European standard time. The zone is
 a decision about what a day means for the question, and it is worth
 setting explicitly.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fixed</span> <span class="op">&lt;-</span> <span class="va">series</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">fixed</span><span class="op">$</span><span class="va">t</span>, <span class="st">"tzone"</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="st">"Etc/GMT-1"</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dimnames.html" class="external-link">dimnames</a></span><span class="op">(</span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">fixed</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"day"</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span></span>
 <span><span class="co">#&gt; [1] "2021-08-31T23:00:00Z" "2021-09-01T23:00:00Z"</span></span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"day"</span>, tz<span class="op">=</span><span class="st">"Etc/GMT-1"</span>).bins[:<span class="dv">2</span>]</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a><span class="co">#&gt; ('2021-08-31T23:00:00Z', '2021-09-01T23:00:00Z')</span></span></code></pre></div>
+</div>
 <p>On that offset every day begins at 23:00 UTC, in summer and in winter
 alike.</p>
 </div>
@@ -325,7 +436,8 @@ alike.</p>
 </h2>
 <p>A reading that is <code>NA</code> and an instant recorded twice for
 the same unit are both refused where the record is read.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">holed</span> <span class="op">&lt;-</span> <span class="va">series</span></span>
 <span><span class="va">holed</span><span class="op">$</span><span class="va">temp</span><span class="op">[</span><span class="fl">5</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span>
 <span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">holed</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"day"</span><span class="op">)</span></span>
@@ -335,6 +447,13 @@ the same unit are both refused where the record is read.</p>
 <span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">series</span><span class="op">[</span><span class="fl">1</span>, <span class="op">]</span><span class="op">)</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"day"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> 1 duplicated (unit, time) pair, first: p01 at 2021-09-01T00:00:00Z.</span></span></code></pre></div>
+<div class="sourceCode" id="cb29" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a>holed <span class="op">=</span> series.copy()</span>
+<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>holed.loc[<span class="dv">4</span>, <span class="st">"temp"</span>] <span class="op">=</span> np.nan</span>
+<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>ts.grain_matrix(holed, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"day"</span>)</span>
+<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a><span class="co">#&gt; ValueError: 1 reading is not a finite number, first: unit p01 at 2021-09-01T04:00:00. Fill or drop it before building a representation.</span></span></code></pre></div>
+<div class="sourceCode" id="cb30" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a>ts.grain_matrix(pd.concat([series, series.iloc[[<span class="dv">0</span>]]]), <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"day"</span>)</span>
+<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a><span class="co">#&gt; ValueError: 1 duplicated (unit, time) pair, first: p01 at 2021-09-01T00:00:00Z.</span></span></code></pre></div>
+</div>
 <p>A logger that wrote the same hour twice usually did so around a
 download or a clock change. Removing the repeated rows, or keeping one
 per instant on a rule that suits the logger, comes before any
@@ -346,32 +465,50 @@ representation.</p>
 <p><code>targets</code> and <code>series</code> are linked by the column
 <code>id</code> names. A target whose unit has no record is refused,
 naming the units.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">extra</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="va">targets</span>, <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>plot <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"p98"</span>, <span class="st">"p99"</span><span class="op">)</span>, sp1 <span class="op">=</span> <span class="fl">1</span>, sp2 <span class="op">=</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">extra</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> 2 targets name a unit `series` does not carry: p98, p99.</span></span></code></pre></div>
-<p>The other direction is not an error. A unit in <code>series</code>
-that no target names is read by nobody, so it does not enter the
-fit.</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb32" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" tabindex="-1"></a>extra <span class="op">=</span> pd.concat([targets, pd.DataFrame({<span class="st">"plot"</span>: [<span class="st">"p98"</span>, <span class="st">"p99"</span>], <span class="st">"sp1"</span>: <span class="dv">1</span>, <span class="st">"sp2"</span>: <span class="dv">0</span>})],</span>
+<span id="cb32-2"><a href="#cb32-2" tabindex="-1"></a>                  ignore_index<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb32-3"><a href="#cb32-3" tabindex="-1"></a>ts.timesift(extra, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb32-4"><a href="#cb32-4" tabindex="-1"></a><span class="co">#&gt; ValueError: 2 targets name a unit the series does not carry, first: p98.</span></span></code></pre></div>
+</div>
+<p><code>series</code> may contain additional units. Only units
+identified in <code>targets</code> enter the fit.</p>
+<div class="lang-pair">
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fewer</span> <span class="op">&lt;-</span> <span class="va">targets</span><span class="op">[</span><span class="op">-</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span>, <span class="op">]</span></span>
 <span><span class="va">fit_fewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">fewer</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>                      sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"week"</span><span class="op">)</span>, resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>, n_inner <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>                      ensemble <span class="op">=</span> <span class="cn">FALSE</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">fit_fewer</span><span class="op">$</span><span class="va">y</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 22  2</span></span></code></pre></div>
+<div class="sourceCode" id="cb34"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a>fewer <span class="op">=</span> targets.iloc[<span class="dv">2</span>:]</span>
+<span id="cb34-2"><a href="#cb34-2" tabindex="-1"></a>fit_fewer <span class="op">=</span> ts.timesift(fewer, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb34-3"><a href="#cb34-3" tabindex="-1"></a>                        sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>), resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">3</span>), n_inner<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb34-4"><a href="#cb34-4" tabindex="-1"></a>                        ensemble<span class="op">=</span><span class="va">False</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb34-5"><a href="#cb34-5" tabindex="-1"></a>fit_fewer.y.values.shape</span>
+<span id="cb34-6"><a href="#cb34-6" tabindex="-1"></a><span class="co">#&gt; (22, 2)</span></span></code></pre></div>
+</div>
 <p>The fit holds 22 targets, although the series carries 24 plots. When
 a plot seems to be missing from the results,
 <code>rownames(fit$y)</code> lists the targets that were fitted.</p>
 <p>Two rows of <code>targets</code> with one identifier are refused
 unless <code>target_time</code> says where in time each row sits,
 because otherwise both rows would read the same record.</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">targets</span><span class="op">[</span><span class="fl">1</span>, <span class="op">]</span><span class="op">)</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>         verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> `targets` holds more than one row for 1 identifier: p01. Give `target_time` to say where in time each row sits.</span></span></code></pre></div>
+<div class="sourceCode" id="cb36" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a>ts.timesift(pd.concat([targets, targets.iloc[[<span class="dv">0</span>]]]), series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a>            verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb36-3"><a href="#cb36-3" tabindex="-1"></a><span class="co">#&gt; ValueError: 1 id appears in more than one row of `targets`: p01. Give `target_time` to anchor repeated targets in time.</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="a-learner-cannot-read-the-representation">A learner cannot read the representation<a class="anchor" aria-label="anchor" href="#a-learner-cannot-read-the-representation"></a>
@@ -381,15 +518,21 @@ sequence whose bins are ordered in time. <code><a href="../reference/elasticnet.
 tabular, and <code><a href="../reference/native.html">native()</a></code> is the record unreduced, one column
 per hourly reading. Pinned to it through <code>data =</code>, it is
 refused before any array is built.</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>         learners <span class="op">=</span> <span class="fu"><a href="../reference/elasticnet.html">elasticnet</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="../reference/native.html">native</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> `elasticnet()` reads a tabular representation; `native()` gives it one column per reading. Use `grain()`, `multigrain()` or `lookback()`.</span></span></code></pre></div>
+<div class="sourceCode" id="cb38" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" tabindex="-1"></a>ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb38-2"><a href="#cb38-2" tabindex="-1"></a>            learners<span class="op">=</span>ts.elasticnet(data<span class="op">=</span>ts.native()), verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb38-3"><a href="#cb38-3" tabindex="-1"></a><span class="co">#&gt; ValueError: elasticnet() reads a tabular representation; native gives it one column per reading. Use grain(), multigrain() or lookback().</span></span></code></pre></div>
+</div>
 <p>When the same pair arises from a <code>sift</code> expansion, the run
 goes ahead without it, says so once, and records why in
 <code>fit$candidates</code>.</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_skip</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>                     sift <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/native.html">native</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/native.html">grain</a></span><span class="op">(</span><span class="st">"week"</span><span class="op">)</span><span class="op">)</span>, resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>,</span>
 <span>                     n_inner <span class="op">=</span> <span class="cn">NULL</span>, ensemble <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
@@ -405,21 +548,41 @@ goes ahead without it, says so once, and records why in
 <span><span class="co">#&gt;                                                                                                                                        note</span></span>
 <span><span class="co">#&gt; 1 `elasticnet()` reads a tabular representation; `native()` gives it one column per reading. Use `grain()`, `multigrain()` or `lookback()`.</span></span>
 <span><span class="co">#&gt; 2                                                                                                                                      &lt;NA&gt;</span></span></code></pre></div>
+<div class="sourceCode" id="cb40"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" tabindex="-1"></a>fit_skip <span class="op">=</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb40-2"><a href="#cb40-2" tabindex="-1"></a>                       sift<span class="op">=</span>[ts.native(), ts.grain(<span class="st">"week"</span>)], resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">3</span>),</span>
+<span id="cb40-3"><a href="#cb40-3" tabindex="-1"></a>                       n_inner<span class="op">=</span><span class="va">None</span>, ensemble<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb40-4"><a href="#cb40-4" tabindex="-1"></a><span class="co">#&gt; building the week representation</span></span>
+<span id="cb40-5"><a href="#cb40-5" tabindex="-1"></a><span class="co">#&gt; not applicable: elasticnet() reads a tabular representation; native gives it one column per reading. Use grain(), multigrain() or lookback().</span></span>
+<span id="cb40-6"><a href="#cb40-6" tabindex="-1"></a><span class="co">#&gt; fold 1 of 3</span></span>
+<span id="cb40-7"><a href="#cb40-7" tabindex="-1"></a><span class="co">#&gt; fold 2 of 3</span></span>
+<span id="cb40-8"><a href="#cb40-8" tabindex="-1"></a><span class="co">#&gt; fold 3 of 3</span></span>
+<span id="cb40-9"><a href="#cb40-9" tabindex="-1"></a><span class="co">#&gt; refitting every candidate on all 24 targets</span></span>
+<span id="cb40-10"><a href="#cb40-10" tabindex="-1"></a>pd.DataFrame(fit_skip.candidates)[[<span class="st">"candidate"</span>, <span class="st">"reason"</span>]]</span>
+<span id="cb40-11"><a href="#cb40-11" tabindex="-1"></a><span class="co">#&gt;              candidate                                             reason</span></span>
+<span id="cb40-12"><a href="#cb40-12" tabindex="-1"></a><span class="co">#&gt; 0  elasticnet / native  elasticnet() reads a tabular representation; n...</span></span>
+<span id="cb40-13"><a href="#cb40-13" tabindex="-1"></a><span class="co">#&gt; 1    elasticnet / week</span></span></code></pre></div>
+</div>
 <p>If no pair in the run can be fitted, the run stops and lists every
 reason.</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>, sift <span class="op">=</span> <span class="fu"><a href="../reference/native.html">native</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>         verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> no learner can read any representation in the sift:</span></span>
 <span><span class="co">#&gt;   `elasticnet()` reads a tabular representation; `native()` gives it one column per reading. Use `grain()`, `multigrain()` or `lookback()`.</span></span></code></pre></div>
+<div class="sourceCode" id="cb42" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" tabindex="-1"></a>ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>, sift<span class="op">=</span>ts.native(), verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb42-2"><a href="#cb42-2" tabindex="-1"></a><span class="co">#&gt; ValueError: no learner can read any of the representations:</span></span>
+<span id="cb42-3"><a href="#cb42-3" tabindex="-1"></a><span class="co">#&gt;   elasticnet() reads a tabular representation; native gives it one column per reading. Use grain(), multigrain() or lookback().</span></span></code></pre></div>
+</div>
 <p>The sequence learners, <code><a href="../reference/torch_learners.html">cnn()</a></code> and <code><a href="../reference/torch_learners.html">rescnn()</a></code>,
 are refused the opposite case: a <code><a href="../reference/native.html">multigrain()</a></code> is a flat
 block of features with no order to convolve along, and a grain the
 record holds only one bin of is a sequence of length one. The first is
 refused before the record is read, the second once the array says how
 many bins it has. Neither needs torch to be refused.</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>         learners <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">cnn</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="../reference/native.html">multigrain</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"week"</span>, <span class="st">"month"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
@@ -429,6 +592,15 @@ many bins it has. Neither needs torch to be refused.</p>
 <span>         learners <span class="op">=</span> <span class="fu"><a href="../reference/torch_learners.html">cnn</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="../reference/native.html">grain</a></span><span class="op">(</span><span class="st">"year"</span><span class="op">)</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> `cnn()` reads a sequence; `grain("year")` gives one row of features.</span></span></code></pre></div>
+<div class="sourceCode" id="cb44" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" tabindex="-1"></a>ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb44-2"><a href="#cb44-2" tabindex="-1"></a>            learners<span class="op">=</span>ts.cnn(data<span class="op">=</span>ts.multigrain((<span class="st">"week"</span>, <span class="st">"month"</span>))), verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb44-3"><a href="#cb44-3" tabindex="-1"></a><span class="co">#&gt; ValueError: no learner can read any of the representations:</span></span>
+<span id="cb44-4"><a href="#cb44-4" tabindex="-1"></a><span class="co">#&gt;   cnn() reads a sequence; multigrain(week+month) gives one row of 11 features</span></span></code></pre></div>
+<div class="sourceCode" id="cb45" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" tabindex="-1"></a>ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb45-2"><a href="#cb45-2" tabindex="-1"></a>            learners<span class="op">=</span>ts.cnn(data<span class="op">=</span>ts.grain(<span class="st">"year"</span>)), verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb45-3"><a href="#cb45-3" tabindex="-1"></a><span class="co">#&gt; ValueError: no learner can read any of the representations:</span></span>
+<span id="cb45-4"><a href="#cb45-4" tabindex="-1"></a><span class="co">#&gt;   cnn() reads a sequence; year gives one row of 1 features</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="a-learners-data-names-a-representation-outside-the-sift">A learner’s <code>data =</code> names a representation outside the
@@ -438,7 +610,8 @@ sift<a class="anchor" aria-label="anchor" href="#a-learners-data-names-a-represe
 alone, and the run builds it whether or not the <code>sift</code> holds
 it. Here the forest reads months while the elastic net runs across the
 sift.</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb46"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_pin</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>                    learners <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="../reference/native.html">grain</a></span><span class="op">(</span><span class="st">"month"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>                    sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"week"</span><span class="op">)</span>, resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>, n_inner <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -447,20 +620,37 @@ sift.</p>
 <span><span class="co">#&gt;           candidate representation bins</span></span>
 <span><span class="co">#&gt; 1 elasticnet / week           week    9</span></span>
 <span><span class="co">#&gt; 2    forest / month          month    2</span></span></code></pre></div>
+<div class="sourceCode" id="cb47"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" tabindex="-1"></a>fit_pin <span class="op">=</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb47-2"><a href="#cb47-2" tabindex="-1"></a>                      learners<span class="op">=</span>[ts.elasticnet(), ts.forest(data<span class="op">=</span>ts.grain(<span class="st">"month"</span>))],</span>
+<span id="cb47-3"><a href="#cb47-3" tabindex="-1"></a>                      sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>), resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">3</span>), n_inner<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb47-4"><a href="#cb47-4" tabindex="-1"></a>                      ensemble<span class="op">=</span><span class="va">False</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb47-5"><a href="#cb47-5" tabindex="-1"></a>pd.DataFrame(fit_pin.candidates)[[<span class="st">"candidate"</span>, <span class="st">"representation"</span>, <span class="st">"bins"</span>]]</span>
+<span id="cb47-6"><a href="#cb47-6" tabindex="-1"></a><span class="co">#&gt;            candidate representation  bins</span></span>
+<span id="cb47-7"><a href="#cb47-7" tabindex="-1"></a><span class="co">#&gt; 0  elasticnet / week           week     9</span></span>
+<span id="cb47-8"><a href="#cb47-8" tabindex="-1"></a><span class="co">#&gt; 1     forest / month          month     2</span></span></code></pre></div>
+</div>
 <p>The error comes when the pinned representation and one in the sift
 would be reported under the same name but differ in their settings, such
 as the weekly mean in the sift and the weekly extremes for the
 forest.</p>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb48"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>         learners <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                      <span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="../reference/native.html">grain</a></span><span class="op">(</span><span class="st">"week"</span>, stats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cold_day"</span>, <span class="st">"warm_day"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>         sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"week"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> two representations are reported under the name "week": the one the forest learner is pinned to and the one in the sift. Name the sift to tell them apart.</span></span></code></pre></div>
-<p>Naming the sift gives its representation a name of its own, and the
-two are then reported apart.</p>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb49" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" tabindex="-1"></a>ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb49-2"><a href="#cb49-2" tabindex="-1"></a>            learners<span class="op">=</span>[ts.elasticnet(),</span>
+<span id="cb49-3"><a href="#cb49-3" tabindex="-1"></a>                      ts.forest(data<span class="op">=</span>ts.grain(<span class="st">"week"</span>, stats<span class="op">=</span>(<span class="st">"cold_day"</span>, <span class="st">"warm_day"</span>)))],</span>
+<span id="cb49-4"><a href="#cb49-4" tabindex="-1"></a>            sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>), verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb49-5"><a href="#cb49-5" tabindex="-1"></a><span class="co">#&gt; ValueError: two representations are reported under the name "week": the one the forest learner is pinned to and the one in the sift. Name the sift to tell them apart.</span></span></code></pre></div>
+</div>
+<p>Give the representation in <code>sift</code> a distinct name so that
+the two candidates can be identified separately.</p>
+<div class="lang-pair">
+<div class="sourceCode" id="cb50"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_named</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>                      learners <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/elasticnet.html">elasticnet</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                                   <span class="fu"><a href="../reference/forest.html">forest</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="../reference/native.html">grain</a></span><span class="op">(</span><span class="st">"week"</span>, stats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cold_day"</span>, <span class="st">"warm_day"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -470,6 +660,16 @@ two are then reported apart.</p>
 <span><span class="co">#&gt;                candidate channels</span></span>
 <span><span class="co">#&gt; 1 elasticnet / week_mean        1</span></span>
 <span><span class="co">#&gt; 2          forest / week        2</span></span></code></pre></div>
+<div class="sourceCode" id="cb51"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" tabindex="-1"></a>fit_named <span class="op">=</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb51-2"><a href="#cb51-2" tabindex="-1"></a>                        learners<span class="op">=</span>[ts.elasticnet(),</span>
+<span id="cb51-3"><a href="#cb51-3" tabindex="-1"></a>                                  ts.forest(data<span class="op">=</span>ts.grain(<span class="st">"week"</span>, stats<span class="op">=</span>(<span class="st">"cold_day"</span>, <span class="st">"warm_day"</span>)))],</span>
+<span id="cb51-4"><a href="#cb51-4" tabindex="-1"></a>                        sift<span class="op">=</span>{<span class="st">"week_mean"</span>: ts.grain(<span class="st">"week"</span>)}, resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">3</span>),</span>
+<span id="cb51-5"><a href="#cb51-5" tabindex="-1"></a>                        n_inner<span class="op">=</span><span class="va">None</span>, ensemble<span class="op">=</span><span class="va">False</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb51-6"><a href="#cb51-6" tabindex="-1"></a>pd.DataFrame(fit_named.candidates)[[<span class="st">"candidate"</span>, <span class="st">"channels"</span>]]</span>
+<span id="cb51-7"><a href="#cb51-7" tabindex="-1"></a><span class="co">#&gt;                 candidate  channels</span></span>
+<span id="cb51-8"><a href="#cb51-8" tabindex="-1"></a><span class="co">#&gt; 0  elasticnet / week_mean         1</span></span>
+<span id="cb51-9"><a href="#cb51-9" tabindex="-1"></a><span class="co">#&gt; 1           forest / week         2</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="day-level-statistics-at-a-sub-daily-grain">Day-level statistics at a sub-daily grain<a class="anchor" aria-label="anchor" href="#day-level-statistics-at-a-sub-daily-grain"></a>
@@ -478,13 +678,18 @@ two are then reported apart.</p>
 <code>mean_daily_min</code> and <code>mean_daily_max</code> first reduce
 each day to one number, so they need bins of a day or longer. The
 refusal comes from the constructor, before any data are read.</p>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb52"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/native.html">grain</a></span><span class="op">(</span><span class="st">"halfday"</span>, stats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"mean"</span>, <span class="st">"cold_day"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> `halfday` bins are shorter than a day, so cold_day is not defined there. Use a grain of `day` or coarser.</span></span></code></pre></div>
+<div class="sourceCode" id="cb53" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" tabindex="-1"></a>ts.grain(<span class="st">"halfday"</span>, stats<span class="op">=</span>(<span class="st">"mean"</span>, <span class="st">"cold_day"</span>))</span>
+<span id="cb53-2"><a href="#cb53-2" tabindex="-1"></a><span class="co">#&gt; ValueError: `halfday` bins are shorter than a day, so cold_day is not defined there. Use a grain of `day` or coarser.</span></span></code></pre></div>
+</div>
 <p>The coldest single reading of a half-day bin is <code>min</code>, and
 the coldest day is defined from the <code>"day"</code> grain upward.</p>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb54"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/native.html">grain</a></span><span class="op">(</span><span class="st">"halfday"</span>, stats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"mean"</span>, <span class="st">"min"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;timesift representation&gt; halfday </span></span>
 <span><span class="co">#&gt; kind    : grain (a sequence) </span></span>
@@ -495,6 +700,17 @@ the coldest day is defined from the <code>"day"</code> grain upward.</p>
 <span><span class="co">#&gt; kind    : grain (a sequence) </span></span>
 <span><span class="co">#&gt; grain   : week </span></span>
 <span><span class="co">#&gt; stats   : cold_day, mean, warm_day</span></span></code></pre></div>
+<div class="sourceCode" id="cb55"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" tabindex="-1"></a>ts.grain(<span class="st">"halfday"</span>, stats<span class="op">=</span>(<span class="st">"mean"</span>, <span class="st">"min"</span>))</span>
+<span id="cb55-2"><a href="#cb55-2" tabindex="-1"></a><span class="co">#&gt; &lt;timesift representation&gt; halfday</span></span>
+<span id="cb55-3"><a href="#cb55-3" tabindex="-1"></a><span class="co">#&gt; kind    : grain (a sequence)</span></span>
+<span id="cb55-4"><a href="#cb55-4" tabindex="-1"></a><span class="co">#&gt; grain   : halfday</span></span>
+<span id="cb55-5"><a href="#cb55-5" tabindex="-1"></a><span class="co">#&gt; stats   : mean, min</span></span>
+<span id="cb55-6"><a href="#cb55-6" tabindex="-1"></a>ts.grain(<span class="st">"week"</span>, stats<span class="op">=</span>(<span class="st">"cold_day"</span>, <span class="st">"mean"</span>, <span class="st">"warm_day"</span>))</span>
+<span id="cb55-7"><a href="#cb55-7" tabindex="-1"></a><span class="co">#&gt; &lt;timesift representation&gt; week</span></span>
+<span id="cb55-8"><a href="#cb55-8" tabindex="-1"></a><span class="co">#&gt; kind    : grain (a sequence)</span></span>
+<span id="cb55-9"><a href="#cb55-9" tabindex="-1"></a><span class="co">#&gt; grain   : week</span></span>
+<span id="cb55-10"><a href="#cb55-10" tabindex="-1"></a><span class="co">#&gt; stats   : cold_day, mean, warm_day</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="a-response-has-too-few-presences-to-score">A response has too few presences to score<a class="anchor" aria-label="anchor" href="#a-response-has-too-few-presences-to-score"></a>
@@ -504,7 +720,8 @@ and a model per response needs both among the units it is fitted on. A
 cell, one response in one fold, where either side of the split holds a
 single class carries no score. Below, <code>sp3</code> is present in two
 plots and <code>sp4</code> in none.</p>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb56"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rare</span> <span class="op">&lt;-</span> <span class="va">targets</span></span>
 <span><span class="va">rare</span><span class="op">$</span><span class="va">sp3</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">22</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">rare</span><span class="op">$</span><span class="va">sp4</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
@@ -521,30 +738,83 @@ plots and <code>sp4</code> in none.</p>
 <span><span class="co">#&gt; 10      sp3    2     2          2        16         0        6    FALSE</span></span>
 <span><span class="co">#&gt; 11      sp3    3     2          0        18         2        4    FALSE</span></span>
 <span><span class="co">#&gt; 12      sp3    4     2          2        16         0        6    FALSE</span></span></code></pre></div>
+<div class="sourceCode" id="cb57"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" tabindex="-1"></a>rare <span class="op">=</span> targets.assign(sp3<span class="op">=</span>[<span class="dv">1</span>, <span class="dv">1</span>] <span class="op">+</span> [<span class="dv">0</span>] <span class="op">*</span> <span class="dv">22</span>, sp4<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb57-2"><a href="#cb57-2" tabindex="-1"></a>fit_rare <span class="op">=</span> ts.timesift(rare, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb57-3"><a href="#cb57-3" tabindex="-1"></a>                       sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>), resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">4</span>), n_inner<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb57-4"><a href="#cb57-4" tabindex="-1"></a>                       ensemble<span class="op">=</span><span class="va">False</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb57-5"><a href="#cb57-5" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> asdict</span>
+<span id="cb57-6"><a href="#cb57-6" tabindex="-1"></a></span>
+<span id="cb57-7"><a href="#cb57-7" tabindex="-1"></a>fit_rare.cells</span>
+<span id="cb57-8"><a href="#cb57-8" tabindex="-1"></a><span class="co">#&gt; &lt;timesift cells&gt; 16 cells over 4 variables</span></span>
+<span id="cb57-9"><a href="#cb57-9" tabindex="-1"></a><span class="co">#&gt; scorable: 8 (50.0%); variables with at least one scorable fold: 2 of 4</span></span>
+<span id="cb57-10"><a href="#cb57-10" tabindex="-1"></a>cells <span class="op">=</span> pd.DataFrame(asdict(fit_rare.cells))</span>
+<span id="cb57-11"><a href="#cb57-11" tabindex="-1"></a>cells[cells[<span class="st">"variable"</span>] <span class="op">==</span> <span class="st">"sp3"</span>]</span>
+<span id="cb57-12"><a href="#cb57-12" tabindex="-1"></a><span class="co">#&gt;    variable  fold  n_occ  pres_train  abs_train  pres_test  abs_test  scorable</span></span>
+<span id="cb57-13"><a href="#cb57-13" tabindex="-1"></a><span class="co">#&gt; 8       sp3     1      2           2         16          0         6     False</span></span>
+<span id="cb57-14"><a href="#cb57-14" tabindex="-1"></a><span class="co">#&gt; 9       sp3     2      2           2         16          0         6     False</span></span>
+<span id="cb57-15"><a href="#cb57-15" tabindex="-1"></a><span class="co">#&gt; 10      sp3     3      2           2         16          0         6     False</span></span>
+<span id="cb57-16"><a href="#cb57-16" tabindex="-1"></a><span class="co">#&gt; 11      sp3     4      2           0         18          2         4     False</span></span></code></pre></div>
+</div>
+<div class="lang-r-only">
 <p>In folds 1, 2 and 4 both presences of <code>sp3</code> sit on the
 training side, leaving no presence to score, and in fold 3 both are held
-out, leaving none to fit on. The run does not stop for this.
-<code>fit$cells</code> is the mask, computed from the response and the
-fold map alone, and every candidate is scored on the same scorable
-cells, so <code>sp3</code> and <code>sp4</code> contribute nothing to
-any mean. <code><a href="../reference/scorable_cells.html">scorable_cells()</a></code> gives the same table before a
-fit, from a response matrix and a fold map.</p>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+out, leaving none to fit on.</p>
+</div>
+<div class="lang-py-only">
+<p>In folds 1, 2 and 3 both presences of <code>sp3</code> sit on the
+training side, leaving no presence to score, and in fold 4 both are held
+out, leaving none to fit on.</p>
+</div>
+<p>The run does not stop for this. <code>fit$cells</code> is the mask,
+computed from the response and the fold map alone, and every candidate
+is scored on the same scorable cells, so <code>sp3</code> and
+<code>sp4</code> contribute nothing to any mean.
+<code><a href="../reference/scorable_cells.html">scorable_cells()</a></code> gives the same table before a fit, from a
+response matrix and a fold map.</p>
+<div class="lang-pair">
+<div class="sourceCode" id="cb58"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">rare</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sp1"</span>, <span class="st">"sp2"</span>, <span class="st">"sp3"</span>, <span class="st">"sp4"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">y</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">rare</span><span class="op">$</span><span class="va">plot</span></span>
 <span><span class="fu"><a href="../reference/scorable_cells.html">scorable_cells</a></span><span class="op">(</span><span class="va">y</span>, <span class="fu"><a href="../reference/fold_map.html">fold_map</a></span><span class="op">(</span><span class="va">y</span>, v <span class="op">=</span> <span class="fl">4</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;timesift cells&gt; 16 cells over 4 variables </span></span>
 <span><span class="co">#&gt; scorable: 8 (50.0%); variables with at least one scorable fold: 2 of 4</span></span></code></pre></div>
+<div class="sourceCode" id="cb59"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" tabindex="-1"></a>y <span class="op">=</span> ts.Response(rare[[<span class="st">"sp1"</span>, <span class="st">"sp2"</span>, <span class="st">"sp3"</span>, <span class="st">"sp4"</span>]].to_numpy(dtype<span class="op">=</span><span class="bu">float</span>), <span class="bu">tuple</span>(rare[<span class="st">"plot"</span>]),</span>
+<span id="cb59-2"><a href="#cb59-2" tabindex="-1"></a>                (<span class="st">"sp1"</span>, <span class="st">"sp2"</span>, <span class="st">"sp3"</span>, <span class="st">"sp4"</span>))</span>
+<span id="cb59-3"><a href="#cb59-3" tabindex="-1"></a>pd.DataFrame(asdict(ts.scorable_cells(y, ts.fold_map(y, v<span class="op">=</span><span class="dv">4</span>))))</span>
+<span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a><span class="co">#&gt;    variable  fold  n_occ  pres_train  abs_train  pres_test  abs_test  scorable</span></span>
+<span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a><span class="co">#&gt; 0       sp1     1     13          10          8          3         3      True</span></span>
+<span id="cb59-6"><a href="#cb59-6" tabindex="-1"></a><span class="co">#&gt; 1       sp1     2     13           8         10          5         1      True</span></span>
+<span id="cb59-7"><a href="#cb59-7" tabindex="-1"></a><span class="co">#&gt; 2       sp1     3     13           9          9          4         2      True</span></span>
+<span id="cb59-8"><a href="#cb59-8" tabindex="-1"></a><span class="co">#&gt; 3       sp1     4     13          12          6          1         5      True</span></span>
+<span id="cb59-9"><a href="#cb59-9" tabindex="-1"></a><span class="co">#&gt; 4       sp2     1     15          11          7          4         2      True</span></span>
+<span id="cb59-10"><a href="#cb59-10" tabindex="-1"></a><span class="co">#&gt; 5       sp2     2     15          12          6          3         3      True</span></span>
+<span id="cb59-11"><a href="#cb59-11" tabindex="-1"></a><span class="co">#&gt; 6       sp2     3     15          12          6          3         3      True</span></span>
+<span id="cb59-12"><a href="#cb59-12" tabindex="-1"></a><span class="co">#&gt; 7       sp2     4     15          10          8          5         1      True</span></span>
+<span id="cb59-13"><a href="#cb59-13" tabindex="-1"></a><span class="co">#&gt; 8       sp3     1      2           2         16          0         6     False</span></span>
+<span id="cb59-14"><a href="#cb59-14" tabindex="-1"></a><span class="co">#&gt; 9       sp3     2      2           2         16          0         6     False</span></span>
+<span id="cb59-15"><a href="#cb59-15" tabindex="-1"></a><span class="co">#&gt; 10      sp3     3      2           2         16          0         6     False</span></span>
+<span id="cb59-16"><a href="#cb59-16" tabindex="-1"></a><span class="co">#&gt; 11      sp3     4      2           0         18          2         4     False</span></span>
+<span id="cb59-17"><a href="#cb59-17" tabindex="-1"></a><span class="co">#&gt; 12      sp4     1      0           0         18          0         6     False</span></span>
+<span id="cb59-18"><a href="#cb59-18" tabindex="-1"></a><span class="co">#&gt; 13      sp4     2      0           0         18          0         6     False</span></span>
+<span id="cb59-19"><a href="#cb59-19" tabindex="-1"></a><span class="co">#&gt; 14      sp4     3      0           0         18          0         6     False</span></span>
+<span id="cb59-20"><a href="#cb59-20" tabindex="-1"></a><span class="co">#&gt; 15      sp4     4      0           0         18          0         6     False</span></span></code></pre></div>
+</div>
 <p>Fewer folds give a rare response more chance of landing on both sides
 of each split. Only when no cell at all is scorable does the run stop,
 as it does for a response absent everywhere.</p>
-<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb60"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">absent</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>plot <span class="op">=</span> <span class="va">ids</span>, sp0 <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">absent</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="va">sp0</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> no (response, fold) cell is scorable under this fold map, so no candidate can be scored: every cell needs both classes on each side of its split. See scorable_cells() for the counts; a rarer response needs fewer folds, or a response present somewhere.</span></span></code></pre></div>
+<div class="sourceCode" id="cb61" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb61-1"><a href="#cb61-1" tabindex="-1"></a>absent <span class="op">=</span> pd.DataFrame({<span class="st">"plot"</span>: ids, <span class="st">"sp0"</span>: <span class="dv">0</span>})</span>
+<span id="cb61-2"><a href="#cb61-2" tabindex="-1"></a>ts.timesift(absent, series, y<span class="op">=</span><span class="st">"sp0"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb61-3"><a href="#cb61-3" tabindex="-1"></a><span class="co">#&gt; ValueError: no candidate scored inside the training data of fold 1. Widen the inner folds or drop the variables that cannot be scored.</span></span></code></pre></div>
+</div>
 <p>The response itself must be 0 and 1, with no missing value.</p>
-<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb62"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">counted</span> <span class="op">&lt;-</span> <span class="va">targets</span></span>
 <span><span class="va">counted</span><span class="op">$</span><span class="va">sp1</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">2</span></span>
 <span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">counted</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
@@ -556,6 +826,15 @@ as it does for a response absent everywhere.</p>
 <span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">unknown</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> the response holds missing values. Fill or drop them before fitting.</span></span></code></pre></div>
+<div class="sourceCode" id="cb63" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb63-1"><a href="#cb63-1" tabindex="-1"></a>counted <span class="op">=</span> targets.copy()</span>
+<span id="cb63-2"><a href="#cb63-2" tabindex="-1"></a>counted.loc[<span class="dv">0</span>, <span class="st">"sp1"</span>] <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb63-3"><a href="#cb63-3" tabindex="-1"></a>ts.timesift(counted, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb63-4"><a href="#cb63-4" tabindex="-1"></a><span class="co">#&gt; ValueError: a presence-absence response must be 0/1 or logical</span></span></code></pre></div>
+<div class="sourceCode" id="cb64" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb64-1"><a href="#cb64-1" tabindex="-1"></a>unknown <span class="op">=</span> targets.astype({<span class="st">"sp1"</span>: <span class="bu">float</span>})</span>
+<span id="cb64-2"><a href="#cb64-2" tabindex="-1"></a>unknown.loc[<span class="dv">0</span>, <span class="st">"sp1"</span>] <span class="op">=</span> np.nan</span>
+<span id="cb64-3"><a href="#cb64-3" tabindex="-1"></a>ts.timesift(unknown, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb64-4"><a href="#cb64-4" tabindex="-1"></a><span class="co">#&gt; ValueError: the response holds missing values</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="a-torch-learner-without-torch">A torch learner without torch<a class="anchor" aria-label="anchor" href="#a-torch-learner-without-torch"></a>
@@ -579,10 +858,15 @@ libraries the first time it is used, which is torch’s step and not
 <p>A calendar grain reads a record by the instants of its bins. A fit
 made on weeks from 30 August to 25 October expects a new record over the
 same weeks, and a shorter or later record is refused.</p>
-<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb66"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>                sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"week"</span>, <span class="st">"month"</span><span class="op">)</span>, resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb67"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb67-1"><a href="#cb67-1" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb67-2"><a href="#cb67-2" tabindex="-1"></a>                  sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>), resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">3</span>), verbose<span class="op">=</span><span class="va">False</span>)</span></code></pre></div>
+</div>
+<div class="lang-pair">
+<div class="sourceCode" id="cb68"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">shorter</span> <span class="op">&lt;-</span> <span class="va">series</span><span class="op">[</span><span class="va">series</span><span class="op">$</span><span class="va">t</span> <span class="op">&lt;</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="st">"2021-10-15"</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span>, <span class="op">]</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">targets</span>, <span class="va">shorter</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
@@ -596,21 +880,37 @@ same weeks, and a shorter or later record is refused.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">targets</span>, <span class="va">gappy</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> 1 (unit, bin) cell holds no readings, first: unit p03 at 2021-09-13T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.</span></span></code></pre></div>
+<div class="sourceCode" id="cb69" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb69-1"><a href="#cb69-1" tabindex="-1"></a>shorter <span class="op">=</span> series[series[<span class="st">"t"</span>] <span class="op">&lt;</span> <span class="st">"2021-10-15"</span>]</span>
+<span id="cb69-2"><a href="#cb69-2" tabindex="-1"></a>fit.predict(targets, shorter)</span>
+<span id="cb69-3"><a href="#cb69-3" tabindex="-1"></a><span class="co">#&gt; ValueError: the representation predicted on has different channels or bins from the fitted one: 7 bins here and 9 bins in the fit. A calendar grain is read by its bins' instants, so a fit predicts a record over the same period; a lookback reads a span relative to each target and predicts any period.</span></span></code></pre></div>
+<div class="sourceCode" id="cb70" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb70-1"><a href="#cb70-1" tabindex="-1"></a>next_year <span class="op">=</span> series.assign(t<span class="op">=</span>series[<span class="st">"t"</span>] <span class="op">+</span> pd.Timedelta(days<span class="op">=</span><span class="dv">365</span>))</span>
+<span id="cb70-2"><a href="#cb70-2" tabindex="-1"></a>fit.predict(targets, next_year)</span>
+<span id="cb70-3"><a href="#cb70-3" tabindex="-1"></a><span class="co">#&gt; ValueError: the representation predicted on has different channels or bins from the fitted one: bin 1 is 2022-08-29T00:00:00Z here and 2021-08-30T00:00:00Z in the fit. A calendar grain is read by its bins' instants, so a fit predicts a record over the same period; a lookback reads a span relative to each target and predicts any period.</span></span></code></pre></div>
+<div class="sourceCode" id="cb71" error="true"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb71-1"><a href="#cb71-1" tabindex="-1"></a>fit.predict(targets, gappy)</span>
+<span id="cb71-2"><a href="#cb71-2" tabindex="-1"></a><span class="co">#&gt; ValueError: 1 (unit, bin) cell holds no readings, first: unit p03 at 2021-09-13T00:00:00. Every unit must span every bin; gaps are not padded. coverage() lists them.</span></span></code></pre></div>
+</div>
 <p>The first two are the same mismatch: the bins of the new record are
 not those the fit was made on. The third is the coverage refusal again,
 raised while building the new array. A record over the same period
 predicts, for any subset of the units.</p>
-<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb72"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">targets</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, <span class="op">]</span>, <span class="va">series</span><span class="op">[</span><span class="va">series</span><span class="op">$</span><span class="va">plot</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">ids</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">]</span>, <span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;           sp1       sp2</span></span>
 <span><span class="co">#&gt; p01 0.1745044 0.6128003</span></span>
 <span><span class="co">#&gt; p02 0.5458671 0.4945805</span></span>
 <span><span class="co">#&gt; p03 0.1465358 0.6298695</span></span></code></pre></div>
+<div class="sourceCode" id="cb73"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb73-1"><a href="#cb73-1" tabindex="-1"></a>fit.predict(targets.iloc[:<span class="dv">3</span>], series[series[<span class="st">"plot"</span>].isin(ids[:<span class="dv">3</span>])]).<span class="bu">round</span>(<span class="dv">3</span>)</span>
+<span id="cb73-2"><a href="#cb73-2" tabindex="-1"></a><span class="co">#&gt; array([[0.523, 0.624],</span></span>
+<span id="cb73-3"><a href="#cb73-3" tabindex="-1"></a><span class="co">#&gt;        [0.631, 0.622],</span></span>
+<span id="cb73-4"><a href="#cb73-4" tabindex="-1"></a><span class="co">#&gt;        [0.565, 0.624]])</span></span></code></pre></div>
+</div>
 <p>To predict another period, the representation has to be anchored on
 each target’s own instant rather than on the calendar. That is a
 <code><a href="../reference/native.html">lookback()</a></code>, with <code>target_time</code> naming the column
 of <code>targets</code> holding the instant.</p>
-<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb74"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">anchored</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/transform.html" class="external-link">transform</a></span><span class="op">(</span><span class="va">targets</span>, at <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="st">"2021-10-30"</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">fit_lb</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">anchored</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>                   target_time <span class="op">=</span> <span class="va">at</span>, sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">lookbacks</a></span><span class="op">(</span><span class="st">"28 days"</span>, <span class="st">"56 days"</span><span class="op">)</span>,</span>
@@ -622,6 +922,17 @@ of <code>targets</code> holding the instant.</p>
 <span><span class="co">#&gt; 1 0.1886727 0.6033119</span></span>
 <span><span class="co">#&gt; 2 0.5668084 0.4835910</span></span>
 <span><span class="co">#&gt; 3 0.1495701 0.6241430</span></span></code></pre></div>
+<div class="sourceCode" id="cb75"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb75-1"><a href="#cb75-1" tabindex="-1"></a>anchored <span class="op">=</span> targets.assign(at<span class="op">=</span>pd.Timestamp(<span class="st">"2021-10-30"</span>))</span>
+<span id="cb75-2"><a href="#cb75-2" tabindex="-1"></a>fit_lb <span class="op">=</span> ts.timesift(anchored, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb75-3"><a href="#cb75-3" tabindex="-1"></a>                     target_time<span class="op">=</span><span class="st">"at"</span>, sift<span class="op">=</span>ts.lookbacks(<span class="st">"28 days"</span>, <span class="st">"56 days"</span>),</span>
+<span id="cb75-4"><a href="#cb75-4" tabindex="-1"></a>                     resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">3</span>), verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb75-5"><a href="#cb75-5" tabindex="-1"></a></span>
+<span id="cb75-6"><a href="#cb75-6" tabindex="-1"></a>later <span class="op">=</span> anchored.assign(at<span class="op">=</span>anchored[<span class="st">"at"</span>] <span class="op">+</span> pd.Timedelta(days<span class="op">=</span><span class="dv">365</span>))</span>
+<span id="cb75-7"><a href="#cb75-7" tabindex="-1"></a>fit_lb.predict(later.iloc[:<span class="dv">3</span>], next_year[next_year[<span class="st">"plot"</span>].isin(ids[:<span class="dv">3</span>])]).<span class="bu">round</span>(<span class="dv">3</span>)</span>
+<span id="cb75-8"><a href="#cb75-8" tabindex="-1"></a><span class="co">#&gt; array([[0.582, 0.613],</span></span>
+<span id="cb75-9"><a href="#cb75-9" tabindex="-1"></a><span class="co">#&gt;        [0.656, 0.591],</span></span>
+<span id="cb75-10"><a href="#cb75-10" tabindex="-1"></a><span class="co">#&gt;        [0.585, 0.613]])</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="runs-take-longer-than-expected">Runs take longer than expected<a class="anchor" aria-label="anchor" href="#runs-take-longer-than-expected"></a>
@@ -634,7 +945,8 @@ per candidate on every target. With <code>n_inner = NULL</code> the
 inner search is skipped and the count drops to
 <code>v_outer * candidates</code>, at the price of the held-out
 <code>estimate</code>.</p>
-<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb76"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">v_outer</span> <span class="op">&lt;-</span> <span class="fl">3</span></span>
 <span><span class="va">candidates</span> <span class="op">&lt;-</span> <span class="fl">2</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nested <span class="op">=</span> <span class="va">v_outer</span> <span class="op">*</span> <span class="op">(</span><span class="fl">5</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span> <span class="op">*</span> <span class="va">candidates</span> <span class="op">+</span> <span class="va">candidates</span>,</span>
@@ -650,13 +962,34 @@ inner search is skipped and the count drops to
 <span>                                   n_inner <span class="op">=</span> <span class="cn">NULL</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nested <span class="op">=</span> <span class="va">nested</span>, outer_only <span class="op">=</span> <span class="va">outer_only</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     nested outer_only </span></span>
-<span><span class="co">#&gt;       0.67       0.15</span></span></code></pre></div>
-<p>On this record the nested run took 0.67 seconds and the run on the
-outer folds alone 0.15.</p>
+<span><span class="co">#&gt;       0.46       0.12</span></span></code></pre></div>
+<div class="sourceCode" id="cb77"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb77-1"><a href="#cb77-1" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb77-2"><a href="#cb77-2" tabindex="-1"></a></span>
+<span id="cb77-3"><a href="#cb77-3" tabindex="-1"></a>v_outer <span class="op">=</span> <span class="dv">3</span></span>
+<span id="cb77-4"><a href="#cb77-4" tabindex="-1"></a>candidates <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb77-5"><a href="#cb77-5" tabindex="-1"></a>{<span class="st">"nested"</span>: v_outer <span class="op">*</span> (<span class="dv">5</span> <span class="op">+</span> <span class="dv">1</span>) <span class="op">*</span> candidates <span class="op">+</span> candidates,</span>
+<span id="cb77-6"><a href="#cb77-6" tabindex="-1"></a> <span class="st">"outer_only"</span>: v_outer <span class="op">*</span> candidates <span class="op">+</span> candidates}</span>
+<span id="cb77-7"><a href="#cb77-7" tabindex="-1"></a><span class="co">#&gt; {'nested': 38, 'outer_only': 8}</span></span>
+<span id="cb77-8"><a href="#cb77-8" tabindex="-1"></a></span>
+<span id="cb77-9"><a href="#cb77-9" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb77-10"><a href="#cb77-10" tabindex="-1"></a>ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb77-11"><a href="#cb77-11" tabindex="-1"></a>            sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>), resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">3</span>), verbose<span class="op">=</span><span class="va">False</span>)<span class="op">;</span></span>
+<span id="cb77-12"><a href="#cb77-12" tabindex="-1"></a>nested <span class="op">=</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb77-13"><a href="#cb77-13" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb77-14"><a href="#cb77-14" tabindex="-1"></a>ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb77-15"><a href="#cb77-15" tabindex="-1"></a>            sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>), resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">3</span>), n_inner<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb77-16"><a href="#cb77-16" tabindex="-1"></a>            verbose<span class="op">=</span><span class="va">False</span>)<span class="op">;</span></span>
+<span id="cb77-17"><a href="#cb77-17" tabindex="-1"></a>outer_only <span class="op">=</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb77-18"><a href="#cb77-18" tabindex="-1"></a>nested <span class="op">&gt;</span> outer_only</span>
+<span id="cb77-19"><a href="#cb77-19" tabindex="-1"></a><span class="co">#&gt; True</span></span></code></pre></div>
+</div>
+<p>On this record the nested run took 0.46 seconds and the run on the
+outer folds alone 0.12.</p>
 <p>Each fit in turn costs what its array costs. A calendar grain has as
 many columns as bins times statistics, and <code><a href="../reference/native.html">native()</a></code> has one
 bin per reading, so its size follows the record directly.</p>
-<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb78"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">xn</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"native"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">xn</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1]   24 1440    1</span></span>
@@ -666,6 +999,16 @@ bin per reading, so its size follows the record directly.</p>
 <span><span class="co"># Three years of hourly readings on 894 plots, one channel, in megabytes</span></span>
 <span><span class="fl">894</span> <span class="op">*</span> <span class="op">(</span><span class="fl">3</span> <span class="op">*</span> <span class="fl">365</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span> <span class="op">*</span> <span class="fl">24</span> <span class="op">*</span> <span class="fl">8</span> <span class="op">/</span> <span class="fl">2</span><span class="op">^</span><span class="fl">20</span></span>
 <span><span class="co">#&gt; [1] 179.4111</span></span></code></pre></div>
+<div class="sourceCode" id="cb79"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb79-1"><a href="#cb79-1" tabindex="-1"></a>xn <span class="op">=</span> ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"native"</span>)</span>
+<span id="cb79-2"><a href="#cb79-2" tabindex="-1"></a>xn.values.shape</span>
+<span id="cb79-3"><a href="#cb79-3" tabindex="-1"></a><span class="co">#&gt; (24, 1440, 1)</span></span>
+<span id="cb79-4"><a href="#cb79-4" tabindex="-1"></a><span class="ss">f"</span><span class="sc">{</span>xn<span class="sc">.</span>values<span class="sc">.</span>nbytes <span class="op">/</span> <span class="dv">2</span><span class="op">**</span><span class="dv">20</span><span class="sc">:.1f}</span><span class="ss"> MB"</span></span>
+<span id="cb79-5"><a href="#cb79-5" tabindex="-1"></a><span class="co">#&gt; 0.3 MB</span></span>
+<span id="cb79-6"><a href="#cb79-6" tabindex="-1"></a></span>
+<span id="cb79-7"><a href="#cb79-7" tabindex="-1"></a><span class="co"># Three years of hourly readings on 894 plots, one channel, in megabytes</span></span>
+<span id="cb79-8"><a href="#cb79-8" tabindex="-1"></a><span class="dv">894</span> <span class="op">*</span> (<span class="dv">3</span> <span class="op">*</span> <span class="dv">365</span> <span class="op">+</span> <span class="dv">1</span>) <span class="op">*</span> <span class="dv">24</span> <span class="op">*</span> <span class="dv">8</span> <span class="op">/</span> <span class="dv">2</span><span class="op">**</span><span class="dv">20</span></span>
+<span id="cb79-9"><a href="#cb79-9" tabindex="-1"></a><span class="co">#&gt; 179.4111328125</span></span></code></pre></div>
+</div>
 <p>The weekly grain of the same record holds 9 bins against the 1440 of
 the native array, and the Schrankogel record of the package’s origin,
 894 plots read hourly for three years, would be about 179 MB for a
@@ -684,7 +1027,8 @@ settled. <code><a href="../reference/elasticnet.html">elasticnet()</a></code> an
 of each learner that draws, such as <code><a href="../reference/elasticnet.html">elasticnet()</a></code>’s inner
 cross-validation and <code><a href="../reference/forest.html">forest()</a></code>’s bootstrap. With the same
 seeds the same call gives the same numbers.</p>
-<div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb80"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">run</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">seed</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
 <span>           sift <span class="op">=</span> <span class="fu"><a href="../reference/grains.html">grains</a></span><span class="op">(</span><span class="st">"week"</span>, <span class="st">"month"</span><span class="op">)</span>, resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">3</span>, seed <span class="op">=</span> <span class="va">seed</span><span class="op">)</span>,</span>
@@ -697,10 +1041,23 @@ seeds the same call gives the same numbers.</p>
 <span><span class="co">#&gt; [1] TRUE</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">a</span><span class="op">$</span><span class="va">scores</span>, <span class="va">c2</span><span class="op">$</span><span class="va">scores</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] FALSE</span></span></code></pre></div>
+<div class="sourceCode" id="cb81"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb81-1"><a href="#cb81-1" tabindex="-1"></a><span class="kw">def</span> run(seed):</span>
+<span id="cb81-2"><a href="#cb81-2" tabindex="-1"></a>    <span class="cf">return</span> ts.timesift(targets, series, y<span class="op">=</span><span class="st">"sp*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"plot"</span>, time<span class="op">=</span><span class="st">"t"</span>,</span>
+<span id="cb81-3"><a href="#cb81-3" tabindex="-1"></a>                       sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>), resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">3</span>, seed<span class="op">=</span>seed),</span>
+<span id="cb81-4"><a href="#cb81-4" tabindex="-1"></a>                       n_inner<span class="op">=</span><span class="va">None</span>, ensemble<span class="op">=</span><span class="va">False</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb81-5"><a href="#cb81-5" tabindex="-1"></a></span>
+<span id="cb81-6"><a href="#cb81-6" tabindex="-1"></a>a <span class="op">=</span> run(<span class="dv">1</span>)</span>
+<span id="cb81-7"><a href="#cb81-7" tabindex="-1"></a>b <span class="op">=</span> run(<span class="dv">1</span>)</span>
+<span id="cb81-8"><a href="#cb81-8" tabindex="-1"></a>c2 <span class="op">=</span> run(<span class="dv">2</span>)</span>
+<span id="cb81-9"><a href="#cb81-9" tabindex="-1"></a>pd.DataFrame(a.scores).equals(pd.DataFrame(b.scores))</span>
+<span id="cb81-10"><a href="#cb81-10" tabindex="-1"></a><span class="co">#&gt; True</span></span>
+<span id="cb81-11"><a href="#cb81-11" tabindex="-1"></a>pd.DataFrame(a.scores).equals(pd.DataFrame(c2.scores))</span>
+<span id="cb81-12"><a href="#cb81-12" tabindex="-1"></a><span class="co">#&gt; False</span></span></code></pre></div>
+</div>
 <p>The fold map draws under its own seed and puts the session’s random
 number stream back as it found it, so a call does not shift the draws
 that follow it.</p>
-<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb82"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">y2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">targets</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sp1"</span>, <span class="st">"sp2"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">y2</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">targets</span><span class="op">$</span><span class="va">plot</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">3</span><span class="op">)</span>; <span class="va">first</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span>
@@ -710,11 +1067,18 @@ that follow it.</p>
 <p>When a rerun differs, the usual cause is a changed input: a row
 order, a time zone or a filter upstream. The digest of the array is a
 quick test of whether two runs read the same representation.</p>
-<div class="sourceCode" id="cb42"><pre class="downlit sourceCode r">
+<div class="lang-pair">
+<div class="sourceCode" id="cb83"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/digest_array.html">digest_array</a></span><span class="op">(</span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "61296ebef3384a8fde101fc1540d2ae8"</span></span>
 <span><span class="fu"><a href="../reference/digest_array.html">digest_array</a></span><span class="op">(</span><span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">)</span>, <span class="op">]</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "61296ebef3384a8fde101fc1540d2ae8"</span></span></code></pre></div>
+<div class="sourceCode" id="cb84"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb84-1"><a href="#cb84-1" tabindex="-1"></a>ts.digest_array(ts.grain_matrix(series, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>))</span>
+<span id="cb84-2"><a href="#cb84-2" tabindex="-1"></a><span class="co">#&gt; 9337f31e937aea21c9a0f1901fe0875f</span></span>
+<span id="cb84-3"><a href="#cb84-3" tabindex="-1"></a>shuffled <span class="op">=</span> series.sample(frac<span class="op">=</span><span class="dv">1</span>, random_state<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb84-4"><a href="#cb84-4" tabindex="-1"></a>ts.digest_array(ts.grain_matrix(shuffled, <span class="st">"plot"</span>, <span class="st">"t"</span>, <span class="st">"temp"</span>, grain<span class="op">=</span><span class="st">"week"</span>))</span>
+<span id="cb84-5"><a href="#cb84-5" tabindex="-1"></a><span class="co">#&gt; 9337f31e937aea21c9a0f1901fe0875f</span></span></code></pre></div>
+</div>
 <p>The two digests agree because the rows of a representation are sorted
 by unit, whatever order the series arrives in. The neural learners are
 seeded through <code>train_control(seed = )</code>, but a network
@@ -731,7 +1095,7 @@ representation contract</a>. <code><a href="../reference/grain_matrix.html">grai
 <code><a href="../reference/lookback_matrix.html">lookback_matrix()</a></code> must give the same array in both, which
 is checked as a digest against fixtures shipped with the package. The
 check can be run on any installation.</p>
-<div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb85"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fx</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"spec"</span>, <span class="st">"fixtures"</span>, package <span class="op">=</span> <span class="st">"timesift"</span><span class="op">)</span></span>
 <span><span class="va">rec</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/utils/read.table.html" class="external-link">read.csv</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">fx</span>, <span class="st">"series.csv"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">rec</span><span class="op">$</span><span class="va">time</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="va">rec</span><span class="op">$</span><span class="va">time</span>, format <span class="op">=</span> <span class="st">"%Y-%m-%dT%H:%M:%SZ"</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span></span>

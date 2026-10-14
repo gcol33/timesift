@@ -1,6 +1,10 @@
 ---
 title: "Coming from biomod2"
+resource_files:
+  - biomod2_files/py-figure-1.svg
 ---
+
+<!-- Python blocks run by tools/python_twins.py (md5 5b3c122f9eaf576ec2c36f1337284c47). -->
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5, fig.height = 4.5,
@@ -14,14 +18,11 @@ air temperature, that table is already a summary of the record, for example mont
 growing-degree-days. `timesift` fits the same algorithms to the record summarised at every temporal
 grain it supports, scores all of them on the same held-out folds, and then combines them.
 
-Each algorithm is implemented once, in a compiled core that the R and the Python interface both
-call, so a model fitted from either language gives the same predictions. Each core reproduces the
-package biomod2 itself calls (rpart, randomForest, gbm, xgboost, maxnet, MASS, earth, mda, mgcv, nnet), and
-the test fixtures check it against that package's output. `timesift` calls neither biomod2 nor these
-packages when it fits a model.
+R and Python use a shared compiled implementation of each algorithm. Tests compare its output with the reference packages used by biomod2: rpart, randomForest, gbm, xgboost, maxnet, MASS, earth, mda, mgcv and nnet. These packages serve as test references; timesift fits models using its own implementations.
 
 ## Installation
 
+::: {.lang-pair}
 ```{r, eval = FALSE}
 # Install from CRAN
 install.packages("timesift")
@@ -41,6 +42,7 @@ pip install "timesift[torch,contrasts,plot]"
 # Or install the development version from GitHub
 pip install git+https://github.com/gcol33/timesift
 ```
+:::
 
 ## The mapping
 
@@ -81,19 +83,37 @@ holds cito's training settings: `optimizer`, `learning_rate`, `penalty` and `alp
 other. Any of these settings can be given to `mlp()` directly. biomod2's default `DNN` is cito's
 defaults,
 
+::: {.lang-pair}
 ```{r dnn-default, eval = FALSE}
 mlp(hidden = c(50L, 50L), activation = "selu", dropout = 0, optimizer = "sgd",
     learning_rate = 0.01, weight_decay = 0, schedule = "constant", epochs = 100L)
 ```
 
+```python
+import timesift as ts
+
+ts.mlp(hidden=(50, 50), activation="selu", dropout=0, optimizer="sgd",
+       learning_rate=0.01, weight_decay=0, schedule="constant", epochs=100);
+```
+:::
+
 and its tuned `DNN` is
 
+::: {.lang-pair}
 ```{r dnn-bigboss, eval = FALSE}
 mlp(hidden = c(100L, 100L), activation = "selu", dropout = 0,
     optimizer = "adam", learning_rate = 0.05, weight_decay = 0,
     penalty = 0.001, alpha = 0, schedule = "plateau", plateau_patience = 7L,
     epochs = 150L, batch_size = 100L, val_frac = 0.2, early_stopping = 14L)
 ```
+
+```python
+ts.mlp(hidden=(100, 100), activation="selu", dropout=0,
+       optimizer="adam", learning_rate=0.05, weight_decay=0,
+       penalty=0.001, alpha=0, schedule="plateau", plateau_patience=7,
+       epochs=150, batch_size=100, val_frac=0.2, early_stopping=14);
+```
+:::
 
 Three differences remain. cito's default batch is a tenth of the fitting rows, where `batch_size`
 counts rows. biomod2 standardises each column for `DNN`, where `mlp()` standardises each channel
@@ -113,6 +133,11 @@ The example uses a simulated record: 200 units with readings every six hours for
 responses that depend on the record through a lagged mechanism acting at weekly grain. Because the
 simulation puts the signal at the week, the comparison below can be checked against it.
 
+::: {.lang-py-only}
+The Python block draws its own record, so the values it prints differ from the ones quoted in the text, which come from the R run. Counts, shapes and calendar boundaries do not depend on the draw and agree.
+:::
+
+::: {.lang-pair}
 ```{r data}
 sim <- simulate_records(n = 200L, mechanism = "lag", variables = 3L, days = 365L,
                         step_hours = 6, prevalence = 0.25, auc = 0.85, seed = 4L)
@@ -120,10 +145,31 @@ targets <- data.frame(unit = rownames(sim$y), sim$y)
 str(sim$readings)
 ```
 
+```python
+import pandas as pd
+
+sim = ts.simulate_records(n=200, mechanism="lag", variables=3, days=365,
+                          step_hours=6, prevalence=0.25, auc=0.85, seed=4)
+targets = pd.DataFrame(sim.y.values, columns=sim.y.variables)
+targets.insert(0, "unit", sim.y.units)
+readings = pd.DataFrame(sim.readings)
+readings.dtypes
+#> unit                 str
+#> time       datetime64[s]
+#> reading          float64
+#> dtype: object
+```
+:::
+
 `models` is a named list, so each candidate is reported under its biomod2 name. A learner without a
 `data =` argument runs at every grain listed in `sift`; a learner with `data =` runs only at that
 representation.
 
+::: {.lang-py-only}
+In Python a learner carries its own name, and `dataclasses.replace(learner, name="CTA")` gives a candidate the name biomod2 uses.
+:::
+
+::: {.lang-pair}
 ```{r models}
 models <- list(
   CTA = tree(),
@@ -141,12 +187,34 @@ models <- list(
 )
 ```
 
+```python
+from dataclasses import replace
+
+models = {
+    "CTA": ts.tree(),
+    "RF": ts.forest(),
+    "RFd": ts.forest(balance=True),
+    "GBM": ts.boosting(),
+    "XGBOOST": ts.boosting(method="xgboost"),
+    "MAXNET": ts.maxent(),
+    "GLM": ts.linear(),
+    "GAM": ts.additive(data=ts.grain("season"), k=5),
+    "MARS": ts.mars(),
+    "FDA": ts.discriminant(),
+    "ANN": ts.perceptron(),
+    "SRE": ts.envelope(data=ts.grain("season")),
+}
+learners = [replace(m, name=name) for name, m in models.items()]
+```
+:::
+
 Two learners are fixed to the seasonal grain. An additive model fits `k - 1` coefficients per
 column. At weekly grain this record has 53 columns, which would need 478 coefficients for 160
 training units, and `additive()` refuses such a fit; the four seasonal columns need 17. The envelope
 excludes one presence in twenty at each end of every column, so each added column leaves fewer units
 inside all the bands, and the envelope is suited to a coarse grain.
 
+::: {.lang-pair}
 ```{r fit}
 fit <- timesift(
   targets, sim$readings,
@@ -160,13 +228,84 @@ fit <- timesift(
 fit$candidates[c("candidate", "grain", "bins", "status")][1:6, ]
 ```
 
+```python
+fit = ts.timesift(
+    targets, readings,
+    y="v*", id="unit", time="time",
+    learners=learners,
+    sift=ts.grains("week", "month", "season"),
+    ensemble=ts.ensemble("weighted", decay=1.6, min_score=0.5),
+    resampling=ts.cv(v=5),
+    verbose=False,
+)
+pd.DataFrame(fit.candidates)[["candidate", "grain", "bins", "reason"]].head(6)
+#>       candidate   grain  bins reason
+#> 0    CTA / week    week    53
+#> 1   CTA / month   month    12
+#> 2  CTA / season  season     5
+#> 3     RF / week    week    53
+#> 4    RF / month   month    12
+#> 5   RF / season  season     5
+```
+:::
+
 The run fitted 32 candidates: ten learners at three grains each and the two fixed learners at one.
 All of them were cross-validated on the same five outer folds and scored on the same cells, so their
 mean scores are directly comparable.
 
+::: {.lang-pair}
 ```{r scores}
 fit
 ```
+
+```python
+fit
+#> timesift  200 targets, 3 responses, 5-fold random CV, roc_auc
+#>
+#> candidates, scored on the outer folds
+#> candidate                  mean    won  responses
+#> CTA / month               0.505      0  separate
+#> ANN / month               0.515      0  separate
+#> SRE / season              0.520      0  separate
+#> RFd / month               0.544      0  separate
+#> RF / month                0.556      0  separate
+#> CTA / season              0.559      0  separate
+#> MARS / season             0.572      0  separate
+#> FDA / season              0.573      0  separate
+#> RF / season               0.584      0  separate
+#> RFd / season              0.587      0  separate
+#> XGBOOST / month           0.587      0  separate
+#> XGBOOST / season          0.590      0  separate
+#> CTA / week                0.598      0  separate
+#> GLM / season              0.605      0  separate
+#> GBM / season              0.608      0  separate
+#> ANN / season              0.611      0  separate
+#> ANN / week                0.615      0  separate
+#> GBM / month               0.627      0  separate
+#> MAXNET / season           0.631      0  separate
+#> GLM / week                0.632      0  separate
+#> FDA / week                0.637      0  separate
+#> GAM / season              0.638      0  separate
+#> MARS / month              0.643      0  separate
+#> RFd / week                0.644      0  separate
+#> GLM / month               0.646      0  separate
+#> RF / week                 0.648      0  separate
+#> FDA / month               0.666      0  separate
+#> MAXNET / month            0.672      0  separate
+#> MARS / week               0.684      0  separate
+#> XGBOOST / week            0.686      0  separate
+#> GBM / week                0.701      0  separate
+#> MAXNET / week             0.738      3  separate
+#>
+#> procedure, chosen and weighted inside each outer training fold
+#> selected                  0.738  se 0.034
+#> ensemble                  0.739  se 0.035
+#> selected MAXNET / week in 5 of 5 folds
+#>
+#> choice on every target  MAXNET / week
+#> weights on every target  MAXNET / week 0.38   GBM / week 0.23   XGBOOST / week 0.15   MARS / week 0.09   MAXNET / month 0.06   FDA / month 0.04   RF / week 0.02   GLM / month 0.01   RFd / week 0.01   MARS / month 0.01
+```
+:::
 
 The report gives the AUC of each candidate, the number of responses on which it scored highest, and
 the held-out scores of the selection procedure and of the weighted ensemble. The four highest mean
@@ -175,15 +314,31 @@ shows which algorithm performs best on one table. Here the run also gives the gr
 algorithm does best, and the ranking of grains within one algorithm need not match the ranking of
 algorithms.
 
+::: {.lang-pair}
 ```{r plot-fit, fig.alt = "Mean AUC of each candidate against the representation it read."}
 plot(fit)
 ```
+
+```{.python fig-alt="Mean AUC of each candidate against the representation it read."}
+ts.plot(fit);
+```
+
+<img src="biomod2_files/py-figure-1.svg" alt="Mean AUC of each candidate against the representation it read." />
+:::
 
 ## Side by side
 
 A biomod2 run formats the data, fits the algorithms under a cross-validation strategy and then
 builds the ensembles. The two calls below set up the same run in each package: biomod2 on a table of
-predictors, `timesift` on a record. Neither chunk is evaluated.
+predictors, `timesift` on a record.
+
+::: {.lang-r-only}
+Neither chunk is evaluated.
+:::
+
+::: {.lang-py-only}
+The biomod2 chunk is not evaluated. The `timesift` call runs on the record above.
+:::
 
 ```{r biomod2-side, eval = FALSE}
 fmt <- BIOMOD_FormatingData(resp.var = y, expl.var = predictors,
@@ -199,6 +354,7 @@ ens <- BIOMOD_EnsembleModeling(mod, models.chosen = "all",
                                metric.eval = c("TSS", "ROC"))
 ```
 
+::: {.lang-pair}
 ```{r timesift-side, eval = FALSE}
 fit <- timesift(targets, series, y = starts_with("sp"), id = plot_id, time = datetime,
                 learners = list(CTA = tree(), RF = forest(), GBM = boosting(),
@@ -210,18 +366,16 @@ fit <- timesift(targets, series, y = starts_with("sp"), id = plot_id, time = dat
                 resampling = cv(v = 5))
 ```
 
-The Python interface takes the same constructors and arguments:
-
 ```python
-import timesift as ts
-
-fit = ts.timesift(targets, series, y="sp_*", id="plot_id", time="datetime",
-                  learners=[ts.tree(), ts.forest(), ts.boosting(method="xgboost"), ts.maxent(),
-                            ts.mars(), ts.discriminant(), ts.perceptron()],
-                  sift=ts.grains("week", "month", "season"),
-                  ensemble=ts.ensemble("weighted", min_score=0.5),
-                  resampling=ts.cv(v=5))
+fit_side = ts.timesift(targets, readings, y="v*", id="unit", time="time",
+                       learners=[m for m in learners if m.name in
+                                 ("CTA", "RF", "GBM", "XGBOOST", "MAXNET", "GLM",
+                                  "MARS", "FDA", "ANN")],
+                       sift=ts.grains("week", "month", "season"),
+                       ensemble=ts.ensemble("weighted", min_score=0.5),
+                       resampling=ts.cv(v=5), verbose=False);
 ```
+:::
 
 biomod2 fits one species per call. In `timesift`, `y` selects all response columns at once, and the
 responses share one fold map, one set of scorable cells and one set of candidates. Each response is
@@ -248,13 +402,27 @@ weight is therefore fitted on a prediction a member made for a unit it was train
 `min_score = 0.5` excluded any candidate whose mean AUC was below 0.5, the role
 `metric.select.thresh` plays in biomod2. The six largest weights in this run:
 
+::: {.lang-pair}
 ```{r weights}
 round(sort(fit$weights, decreasing = TRUE)[1:6], 3)
 ```
 
+```python
+pd.Series(ts.ensemble_weights(fit)).sort_values(ascending=False).head(6).round(3)
+#> MAXNET / week     0.375
+#> GBM / week        0.234
+#> XGBOOST / week    0.146
+#> MARS / week       0.092
+#> MAXNET / month    0.057
+#> FDA / month       0.036
+#> dtype: float64
+```
+:::
+
 Committee averaging converts each member's predictions to presence or absence at a threshold learned
 from that member's out-of-fold predictions, then averages these votes. A smaller run at one grain:
 
+::: {.lang-pair}
 ```{r committee}
 fit_ca <- timesift(
   targets, sim$readings,
@@ -268,15 +436,48 @@ fit_ca <- timesift(
 subset(fit_ca$estimate, metric %in% c("roc_auc", "tss"), c(arm, metric, score, se))
 ```
 
+```python
+fit_ca = ts.timesift(
+    targets, readings,
+    y="v*", id="unit", time="time",
+    learners=[m for m in learners if m.name in ("RF", "GBM", "MAXNET", "MARS", "FDA")],
+    sift=ts.grains("week"),
+    ensemble=ts.ensemble("committee", rule="kappa"),
+    resampling=ts.cv(v=5),
+    verbose=False,
+)
+est = pd.DataFrame(fit_ca.estimate)
+est[est["metric"].isin(["roc_auc", "tss"])][["arm", "metric", "score", "se"]]
+#>          arm   metric     score        se
+#> 24  selected  roc_auc  0.738241  0.033626
+#> 26  selected      tss  0.483651  0.043175
+#> 51  ensemble  roc_auc  0.683104  0.037612
+#> 53  ensemble      tss  0.361158  0.058354
+```
+:::
+
 `EMcv` and `EMci` summarise how much the ensemble members disagree. `type = "spread"` returns, for
 every target and response, the weighted mean, the standard deviation, the coefficient of variation
 and an interval:
 
+::: {.lang-pair}
 ```{r spread}
 sp <- predict(fit, targets[1:5, ], sim$readings, type = "spread")
 dimnames(sp)[[3]]
 round(sp[1:3, 1, ], 3)
 ```
+
+```python
+sp = fit.predict(targets.iloc[:5], readings, type="spread")
+ts.SPREAD_STATISTICS
+#> ('mean', 'sd', 'cv', 'lower', 'upper')
+pd.DataFrame(sp[:3, 0, :], columns=ts.SPREAD_STATISTICS).round(3)
+#>     mean     sd     cv  lower  upper
+#> 0  0.859  0.159  0.185  0.703  1.000
+#> 1  0.120  0.094  0.790  0.027  0.212
+#> 2  0.070  0.077  1.100  0.000  0.146
+```
+:::
 
 With one target per map cell, the coefficient of variation gives an uncertainty map like the one
 `EMcv` produces.
@@ -289,9 +490,18 @@ candidate's threshold from its out-of-fold predictions, and `tss_inflation()` es
 inflation would be for a given set of presence counts. For the three responses above, five folds and
 two levels of true skill:
 
+::: {.lang-pair}
 ```{r inflation}
 tss_inflation(sim$y, fold_map(sim$y, v = 5), skill = c(0.6, 0.9), replicates = 40)
 ```
+
+```python
+pd.DataFrame(ts.tss_inflation(sim.y, ts.fold_map(sim.y, v=5), skill=(0.6, 0.9), replicates=40))
+#>    skill  reported  inflation     lower     upper  replicates
+#> 0    0.6  0.705078   0.105078  0.670762  0.743424          40
+#> 1    0.9  0.949390   0.049390  0.922957  0.968128          40
+```
+:::
 
 `decision_threshold()` returns the cut that turns a prediction into presence or absence, and `rule`
 selects the criterion: `"youden"` (the cut that maximises TSS), `"kappa"`, `"prevalence"`, or
