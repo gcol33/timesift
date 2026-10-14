@@ -63,7 +63,7 @@
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
@@ -115,15 +115,17 @@
     
     
 <!-- Python blocks run by tools/python_twins.py (md5 45da7f24d02d574a5f6be94eaa035164). -->
-<p>Models use an array built from the sensor readings. Its contents
-depend on the time interval represented by each bin, the statistic
-calculated within that bin and the calendar boundaries.
-<code>timesift</code> exposes these choices as arguments and records
-them in the array’s attributes.</p>
-<p>This article shows how to turn a table of readings into model inputs.
-It covers grains, summary statistics, calendars, missing readings and
-partial bins, followed by lookback windows, calendar channels and
-tabular arrays.</p>
+<p>Machine learning models need sensor measurements organised into a
+table. Building that table means choosing how much time each value
+covers, how to summarise the measurements within that period, and when
+each period starts. <code>timesift</code> lets you specify these
+choices, builds the model inputs, and saves the choices alongside
+them.</p>
+<p>A time interval is called a <em>bin</em>, and its time scale, such as
+a week or month, is its <em>grain</em>. A <em>representation</em> is the
+set of choices used to prepare the model inputs. This article works
+through those choices, including summary statistics, calendar
+boundaries, gaps and periods before a survey date.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -148,12 +150,13 @@ tabular arrays.</p>
 <div class="section level2">
 <h2 id="two-tables-and-the-columns-read-from-them">Two tables, and the columns read from them<a class="anchor" aria-label="anchor" href="#two-tables-and-the-columns-read-from-them"></a>
 </h2>
-<p>A run takes two tables linked by a shared unit identifier.
-<code>series</code> contains one row per reading, and
-<code>targets</code> contains one row per prediction target. The example
-has thirty plots logged hourly for 400 days from 1 September 2021. Each
-record includes seasonal and daily cycles, a plot-specific offset and
-noise.</p>
+<p>A run takes two tables linked by a shared identifier.
+<code>series</code> contains one row per sensor reading.
+<code>targets</code> contains one row per observation to predict, such
+as a species survey on a plot. Here a <em>unit</em> is a study plot. The
+example has thirty plots logged hourly for 400 days from 1 September
+2021. Each record includes seasonal and daily cycles, a plot-specific
+offset and noise.</p>
 <div class="lang-py-only">
 <p>The Python block draws its own record, so the values it prints differ
 from the ones quoted in the text, which come from the R run. Counts,
@@ -224,11 +227,13 @@ shapes and calendar boundaries do not depend on the draw and agree.</p>
 <span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a><span class="co">#&gt; 2  p03     2350.0    1    1    0    0</span></span></code></pre></div>
 </div>
 <p><code><a href="../reference/grain_matrix.html">grain_matrix()</a></code> reads three columns of
-<code>series</code>: the unit (<code>id</code>), the instant of each
-reading (<code>time</code>) and the reading itself (<code>value</code>).
-Each is given as a bare column name or as a string. The result is a
-numeric array of shape <code>[unit, bin, channel]</code>, and the
-attributes carry everything the binning decided.</p>
+<code>series</code>: the plot identifier (<code>id</code>), the time of
+each reading (<code>time</code>) and the measurement
+(<code>value</code>). Supply each column as a bare name or a string. The
+result is a three-dimensional numeric array, indexed by
+<code>[unit, bin, channel]</code>. Each channel holds one summary
+statistic, such as the mean temperature. Attributes attached to the
+array record how it was built.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span></span>
@@ -251,19 +256,19 @@ attributes carry everything the binning decided.</p>
 <span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="bu">list</span>(x.__dataclass_fields__)</span>
 <span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co">#&gt; ['values', 'units', 'bins', 'stats', 'grain', 'year_start', 'bin_start', 'bin_end', 'bin_n', 'bin_partial', 'span', 'lag', 'static', 'position', 'coords', 'unit_ids']</span></span></code></pre></div>
 </div>
-<p>The thirty plots became thirty rows, the 400 days fourteen monthly
-bins, and the single statistic one channel. <code>bin_start</code> and
-<code>bin_end</code> give each bin’s first instant on the calendar and
-its last reading, <code>bin_n</code> the count of readings every cell
-was reduced from, and <code>bin_partial</code> which bins the record
-does not cover in full. Bins are named by their start as an ISO 8601
-instant in UTC, which is how the Python side names them too.</p>
-<p>A unit identifier is a name. Text and factor levels are used as they
-are, and a whole number is written as its digits, so an identifier read
-from a file as <code>100000</code> stays <code>100000</code> and never
-becomes <code>1e+05</code>. The rows are sorted under C collation, the
-same order on every machine and in both languages, which puts
-<code>"100000"</code> before <code>"7"</code>.</p>
+<p>The array has thirty plots, fourteen monthly bins covering the 400
+days, and one channel for the mean. <code>bin_start</code> gives the
+start of each calendar interval; <code>bin_end</code> gives its last
+recorded reading. <code>bin_n</code> counts readings for each plot and
+bin, and <code>bin_partial</code> identifies intervals only partly
+covered by the record. Bin names use the ISO 8601 date-time format in
+Coordinated Universal Time (UTC), in both R and Python.</p>
+<p>Unit identifiers are treated as names. Text and factor levels keep
+their labels, and whole numbers are written as digits:
+<code>100000</code> stays <code>100000</code>. Rows are sorted by the
+bytes of their text identifiers, a rule called <em>C collation</em>.
+This gives the same order in both languages and on every machine; for
+example, <code>"100000"</code> sorts before <code>"7"</code>.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">numeric_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/transform.html" class="external-link">transform</a></span><span class="op">(</span><span class="va">series</span><span class="op">[</span><span class="va">series</span><span class="op">$</span><span class="va">plot</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"p01"</span>, <span class="st">"p02"</span><span class="op">)</span>, <span class="op">]</span>,</span>
@@ -2391,11 +2396,13 @@ where an anchor sits near either end of the record.</p>
 <div class="section level2">
 <h2 id="the-position-of-a-bin-in-the-year">The position of a bin in the year<a class="anchor" aria-label="anchor" href="#the-position-of-a-bin-in-the-year"></a>
 </h2>
-<p>An encoder that ends in global pooling loses when in the year an
-event happened. <code><a href="../reference/calendar_channels.html">calendar_channels()</a></code> gives that position
-back as input: the sine and cosine of each bin’s fractional place in the
-year, read at the midpoint of the record the bin holds.
-<code><a href="../reference/bind_channels.html">bind_channels()</a></code> puts them beside the readings.</p>
+<p>Some neural networks average their internal values across time, an
+operation called <em>global pooling</em>. To let these networks
+distinguish the season of an event, <code><a href="../reference/calendar_channels.html">calendar_channels()</a></code>
+supplies the position of each bin within the year. It represents that
+position with a sine and cosine pair calculated at the midpoint of the
+readings in the bin. <code><a href="../reference/bind_channels.html">bind_channels()</a></code> adds these values
+alongside the measurements.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb47"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">wk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grain_matrix.html">grain_matrix</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">plot</span>, <span class="va">t</span>, <span class="va">temp</span>, grain <span class="op">=</span> <span class="st">"week"</span>, stats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cold_day"</span>, <span class="st">"mean"</span>, <span class="st">"warm_day"</span><span class="op">)</span><span class="op">)</span></span>
@@ -2426,13 +2433,10 @@ year, read at the midpoint of the record the bin holds.
 <span id="cb48-13"><a href="#cb48-13" tabindex="-1"></a>both_wk.position</span>
 <span id="cb48-14"><a href="#cb48-14" tabindex="-1"></a><span class="co">#&gt; ('year_sin', 'year_cos')</span></span></code></pre></div>
 </div>
-<p>The two channels are identical across units and are a time index, not
-a summary of the readings, so whatever a model does with them it could
-have done with a calendar. The sine and cosine pair is continuous across
-the turn of the year, where the fraction itself jumps from one back to
-zero. The <code>position</code> attribute marks them, and the torch
-encoders read marked channels at their own amplitude instead of
-standardising them.</p>
+<p>The two channels have the same values for every unit. The sine and
+cosine vary continuously across the end of the year. Their
+<code>position</code> attribute tells the torch networks to use these
+values at their original scale.</p>
 <p>On a grain finer than a day, <code>cycles = "day"</code> adds the
 place in the daily cycle as a second pair. At a day or coarser every bin
 would sit at the same place in the day, and that cycle is refused.</p>
@@ -2594,14 +2598,13 @@ the weekly array covers thirty plots, so the two cannot share a set.</p>
 <div class="section level2">
 <h2 id="digests-and-the-artifacts-that-cross-languages">Digests and the artifacts that cross languages<a class="anchor" aria-label="anchor" href="#digests-and-the-artifacts-that-cross-languages"></a>
 </h2>
-<p>A representation is a set of numbers fixed by a specification,
-<code>inst/spec/representation.md</code>, and
-<code><a href="../reference/digest_array.html">digest_array()</a></code> is the MD5 of an array written the way that
-specification defines: every value to twelve decimal places, unit
-fastest, then bin, then channel, joined by line feeds. The Python twin
-computes the same digest from the same array, and the package’s test
-fixtures pin the digest of every grain and statistic on a small input,
-so a change to binning shows up as a changed string.</p>
+<p>A <em>digest</em> is a short string used to compare the contents of
+arrays. <code><a href="../reference/digest_array.html">digest_array()</a></code> calculates an MD5 digest after
+writing every value to twelve decimal places, with units varying
+fastest, then bins, then channels, and line feeds between values. The
+format is defined in <code>inst/spec/representation.md</code>. R and
+Python use the same format, and tests compare their digests with saved
+expected results.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb61"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/digest_array.html">digest_array</a></span><span class="op">(</span><span class="va">ladder</span><span class="op">[[</span><span class="st">"month"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
@@ -2618,14 +2621,14 @@ its own give the same digest, so they are the same representation to the
 twelfth decimal place. Comparing two digests is a quick way to check
 that a representation built on another machine, in another session or in
 Python is the one expected.</p>
-<p>The representation is rebuilt in each language from the shared core.
-The fold map, the response matrix and the mask of scorable cells are
-built once and handed over as files, because two random streams seeded
-alike in R and Python still draw different folds.
-<code><a href="../reference/artifacts.html">write_folds()</a></code>, <code><a href="../reference/artifacts.html">read_folds()</a></code> and their siblings
-for the response and the cells write and read that format: CSV, LF line
-endings and rows in C collation, byte for byte the same from either
-side.</p>
+<p>R and Python rebuild the model inputs using the same compiled code.
+To use identical training and test splits, save the fold assignments,
+observed responses and eligible response-fold pairs in one language and
+read them in the other. The same random seed can produce different
+splits in R and Python. <code><a href="../reference/artifacts.html">write_folds()</a></code>,
+<code><a href="../reference/artifacts.html">read_folds()</a></code> and the corresponding response and cell
+functions use a shared CSV format with line-feed endings and identifiers
+sorted by C collation.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb63"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">targets</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"sp"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>

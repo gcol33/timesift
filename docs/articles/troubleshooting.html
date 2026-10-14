@@ -63,7 +63,7 @@
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
@@ -115,15 +115,17 @@
     
     
 <!-- Python blocks run by tools/python_twins.py (md5 b524448c6802ddcead5d167cd90cd12a). -->
-<p><code>timesift</code> refuses a record it cannot represent
-faithfully, and says why. This article collects the refusals and
-surprises met most often, each reproduced on a small simulated record:
-the message as it appears, what produced it, and the call that
-works.</p>
-<p>Every example below reads the same two tables: 24 plots, each with a
-logger reading soil temperature every hour for 60 days from 1 September
-2021, and two species whose presence follows each plot’s own level of
-warmth.</p>
+<p>This article explains common errors and unexpected results when
+preparing sensor records, fitting models and predicting new
+observations. Each example shows the message, its cause and a working
+call.</p>
+<p>The examples use 24 study plots, each with hourly soil-temperature
+readings for 60 days from 1 September 2021, and two species whose
+presence depends on each plot’s average warmth. A plot is a
+<em>unit</em>. Readings are grouped into time intervals called
+<em>bins</em>, and the interval length, such as a week or month, is the
+<em>grain</em>. A <em>learner</em> specifies the model to fit; its
+combination with a particular input summary is a <em>candidate</em>.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -313,13 +315,12 @@ runs past its end.</p>
 <span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>x.bin_n[<span class="dv">0</span>]</span>
 <span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="co">#&gt; array([120, 168, 168, 168, 168, 168, 168, 168, 144], dtype=int32)</span></span></code></pre></div>
 </div>
-<p>Nothing is wrong: the calendar tiles the record, and a record that
-does not start on a Monday has a partial week at its start.
-<code>bin_partial</code> marks those bins and <code>bin_n</code> counts
-the readings each bin was reduced from, 120 in the first week against
-168 in a full one. A partial bin’s mean is taken over fewer readings,
-and its <code>cold_day</code> and <code>warm_day</code> are drawn from
-fewer days, so they sit closer to the mean than a full bin’s would.</p>
+<p>Weekly intervals start on Monday. The record begins on Wednesday, so
+the first week contains fewer readings. <code>bin_partial</code> marks
+incomplete intervals and <code>bin_n</code> counts their readings: 120
+in the first week and 168 in a full week. A partial bin’s mean and daily
+extremes are calculated from the readings available in that
+interval.</p>
 <p><code>partial = "drop"</code> removes them.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
@@ -513,11 +514,11 @@ because otherwise both rows would read the same record.</p>
 <div class="section level2">
 <h2 id="a-learner-cannot-read-the-representation">A learner cannot read the representation<a class="anchor" aria-label="anchor" href="#a-learner-cannot-read-the-representation"></a>
 </h2>
-<p>A learner declares what it reads: a tabular block of features, or a
-sequence whose bins are ordered in time. <code><a href="../reference/elasticnet.html">elasticnet()</a></code> is
-tabular, and <code><a href="../reference/native.html">native()</a></code> is the record unreduced, one column
-per hourly reading. Pinned to it through <code>data =</code>, it is
-refused before any array is built.</p>
+<p>Learners accept either a table of predictors or values ordered by
+time. <code><a href="../reference/elasticnet.html">elasticnet()</a></code> uses a table. <code><a href="../reference/native.html">native()</a></code>
+keeps every reading as a separate time bin, and the package rejects this
+representation for tabular learners. Assigning it explicitly through
+<code>data =</code> raises the error before the array is built.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/timesift.html">timesift</a></span><span class="op">(</span><span class="va">targets</span>, <span class="va">series</span>, y <span class="op">=</span> <span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"sp"</span><span class="op">)</span>, id <span class="op">=</span> <span class="va">plot</span>, time <span class="op">=</span> <span class="va">t</span>,</span>
@@ -715,11 +716,12 @@ the coldest day is defined from the <code>"day"</code> grain upward.</p>
 <div class="section level2">
 <h2 id="a-response-has-too-few-presences-to-score">A response has too few presences to score<a class="anchor" aria-label="anchor" href="#a-response-has-too-few-presences-to-score"></a>
 </h2>
-<p>A presence-absence score needs both classes among the held-out units,
-and a model per response needs both among the units it is fitted on. A
-cell, one response in one fold, where either side of the split holds a
-single class carries no score. Below, <code>sp3</code> is present in two
-plots and <code>sp4</code> in none.</p>
+<p>Cross-validation divides plots into groups called <em>folds</em>,
+then predicts each fold using models trained on the others. To score a
+species in a test fold, that fold must contain both presences and
+absences. A model fitted separately for the species also needs both in
+its training set. A species-fold pair is called a <em>cell</em>. Below,
+<code>sp3</code> occurs on two plots and <code>sp4</code> on none.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb56"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rare</span> <span class="op">&lt;-</span> <span class="va">targets</span></span>
@@ -765,12 +767,12 @@ out, leaving none to fit on.</p>
 training side, leaving no presence to score, and in fold 4 both are held
 out, leaving none to fit on.</p>
 </div>
-<p>The run does not stop for this. <code>fit$cells</code> is the mask,
-computed from the response and the fold map alone, and every candidate
-is scored on the same scorable cells, so <code>sp3</code> and
-<code>sp4</code> contribute nothing to any mean.
-<code><a href="../reference/scorable_cells.html">scorable_cells()</a></code> gives the same table before a fit, from a
-response matrix and a fold map.</p>
+<p>The run continues using the eligible species-fold pairs.
+<code>fit$cells</code> lists these pairs, based on the observed
+responses and fold assignments. Every candidate is scored on the same
+pairs, and <code>sp3</code> and <code>sp4</code> contribute to none of
+the means here. <code><a href="../reference/scorable_cells.html">scorable_cells()</a></code> calculates this
+eligibility table before fitting.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb58"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">rare</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sp1"</span>, <span class="st">"sp2"</span>, <span class="st">"sp3"</span>, <span class="st">"sp4"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
@@ -937,14 +939,14 @@ of <code>targets</code> holding the instant.</p>
 <div class="section level2">
 <h2 id="runs-take-longer-than-expected">Runs take longer than expected<a class="anchor" aria-label="anchor" href="#runs-take-longer-than-expected"></a>
 </h2>
-<p>The cost of a run is a count of fits. With <code>n_inner</code> set,
-every candidate is cross-validated inside every outer training fold and
-then refitted on that fold once, which is
-<code>v_outer * (n_inner + 1) * candidates</code> fits, plus one refit
-per candidate on every target. With <code>n_inner = NULL</code> the
-inner search is skipped and the count drops to
-<code>v_outer * candidates</code>, at the price of the held-out
-<code>estimate</code>.</p>
+<p>With <code>n_inner</code> set, each candidate is cross-validated
+within each outer training set, then fitted once on that whole training
+set. This requires <code>v_outer * (n_inner + 1) * candidates</code>
+fits, plus one final fit per candidate on all targets.
+<code>n_inner = NULL</code> runs only the outer cross-validation,
+requiring <code>v_outer * candidates</code> fits before the final
+refits. It reports candidate scores and omits the performance estimate
+for selection and combination.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb76"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">v_outer</span> <span class="op">&lt;-</span> <span class="fl">3</span></span>
@@ -962,7 +964,7 @@ inner search is skipped and the count drops to
 <span>                                   n_inner <span class="op">=</span> <span class="cn">NULL</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nested <span class="op">=</span> <span class="va">nested</span>, outer_only <span class="op">=</span> <span class="va">outer_only</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     nested outer_only </span></span>
-<span><span class="co">#&gt;       0.46       0.12</span></span></code></pre></div>
+<span><span class="co">#&gt;       0.44       0.12</span></span></code></pre></div>
 <div class="sourceCode" id="cb77"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb77-1"><a href="#cb77-1" tabindex="-1"></a><span class="im">import</span> time</span>
 <span id="cb77-2"><a href="#cb77-2" tabindex="-1"></a></span>
 <span id="cb77-3"><a href="#cb77-3" tabindex="-1"></a>v_outer <span class="op">=</span> <span class="dv">3</span></span>
@@ -983,7 +985,7 @@ inner search is skipped and the count drops to
 <span id="cb77-18"><a href="#cb77-18" tabindex="-1"></a>nested <span class="op">&gt;</span> outer_only</span>
 <span id="cb77-19"><a href="#cb77-19" tabindex="-1"></a><span class="co">#&gt; True</span></span></code></pre></div>
 </div>
-<p>On this record the nested run took 0.46 seconds and the run on the
+<p>On this record the nested run took 0.44 seconds and the run on the
 outer folds alone 0.12.</p>
 <p>Each fit in turn costs what its array costs. A calendar grain has as
 many columns as bins times statistics, and <code><a href="../reference/native.html">native()</a></code> has one

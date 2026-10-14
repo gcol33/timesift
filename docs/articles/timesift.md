@@ -1,9 +1,9 @@
 # Choosing how a record is read
 
-A sensor record can be summarised at several time scales, such as daily,
-weekly or monthly means. `timesift` fits models at each scale and
-compares their predictive performance on held-out data. Each time scale
-is called a *grain*.
+Sensor measurements can be summarised as daily, weekly or monthly
+values. `timesift` fits models using each of these summaries and
+compares how well they predict observations excluded from fitting. The
+time scale of a summary is called its *grain*.
 
 This vignette uses a small simulated dataset to show how to prepare the
 two input tables, compare grains and predict new observations.
@@ -33,8 +33,10 @@ pip install git+https://github.com/gcol33/timesift
 
 ## Two tables
 
-`targets` contains one row per sampling unit and its responses. `series`
-contains the time-stamped readings for those units. A shared identifier
+`targets` contains one row per sampling unit, such as a study plot, and
+the values to predict, called *responses*. Here the responses record
+whether each species occurs on a plot. `series` contains the
+time-stamped sensor readings for those plots. A shared plot identifier
 links the two tables.
 
 In Python either table can be a mapping of column names to arrays,
@@ -161,24 +163,28 @@ fit
 #> weights on every target  elasticnet / month 0.96   elasticnet / week 0.04
 ```
 
-Every representation named in `sift` was built, and `learners`
-defaulting to
-[`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md),
-a penalised logistic regression was fitted on each of them over the same
-five folds. The report has two parts.
+The call builds a table of predictors at each time scale listed in
+`sift`. By default, it fits a penalised logistic regression, which
+estimates presence probabilities while limiting the size of its
+coefficients. To evaluate predictions, the plots are divided into five
+groups, called *folds*. Each fold is predicted by a model fitted on the
+other four. This is five-fold cross-validation.
 
-Each candidate is a model fitted at one grain. The candidate rows
-compare their scores on the same five outer folds and the same
-response-fold pairs, called *cells*. `won` counts the responses on which
-a candidate scored highest. `responses` indicates whether the model fits
-responses jointly or separately. Choosing the highest candidate mean
-uses these evaluation scores for model selection.
+Each model and time-scale combination is a *candidate*. The candidate
+rows compare scores on the same folds for the same responses. A response
+in one fold is called a *cell* in the scoring output. `won` counts the
+responses on which a candidate scored highest. `responses` indicates
+whether the model fits responses jointly or separately. The default
+score is the area under the receiver operating characteristic curve
+(AUC), which measures how well predictions rank presences above
+absences.
 
-Use the `selected` and `ensemble` rows to report predictive performance.
-Within each outer training fold, five inner folds are used to select a
-candidate and estimate the ensemble weights. The selected candidate and
-ensemble then predict the outer test fold. These scores evaluate the
-full selection and weighting procedure.
+The `selected` row evaluates the process of choosing a candidate. The
+`ensemble` row evaluates a weighted combination of candidates. Both use
+an additional round of cross-validation within each training set: these
+*inner folds* choose the candidate and estimate the weights, and the
+*outer test fold* evaluates their predictions. Use these rows to report
+predictive performance after selection or combination.
 
 ``` r
 
@@ -338,8 +344,10 @@ pd.DataFrame(fit.candidates)[["candidate", "representation", "bins", "channels"]
 #> 2  elasticnet / month          month     4         2
 ```
 
-Two channels at every grain: the binned temperature, and elevation held
-constant across the bins.
+The model now receives temperature and elevation. Each is stored as a
+separate *channel*, a set of values over the time bins. A bin is one
+interval, such as a calendar week. Elevation has the same value in every
+bin for a given plot.
 
 ``` r
 
@@ -356,11 +364,11 @@ ts.plot(fit);
 ![Mean AUC against representation, with the level the combination
 reached drawn across it.](timesift_files/py-figure-1.svg)
 
-[`predict()`](https://rdrr.io/r/stats/predict.html) rebuilds each
-member’s representation for new rows from the settings its own arm was
-built with, and combines them through the ensemble refitted on every
-target; `candidate = "selected"` predicts with the candidate the rule
-chose on every target instead.
+[`predict()`](https://rdrr.io/r/stats/predict.html) prepares the new
+data using each candidate’s saved settings, applies models refitted on
+all training plots, and combines their predictions using the fitted
+ensemble weights. Set `candidate = "selected"` to use the candidate
+chosen from all training plots.
 
 ``` r
 
@@ -473,16 +481,17 @@ ts.lookback("30 days", bins=3)
 #> stats   : mean
 ```
 
-[`grains()`](https://gillescolling.com/timesift/reference/grains.md) and
-[`lookbacks()`](https://gillescolling.com/timesift/reference/grains.md)
-are sets of them, and `grains("auto")` reads off the record every named
-grain it gives at least two bins.
+[`grains()`](https://gillescolling.com/timesift/reference/grains.md)
+defines several time scales to compare. `grains("auto")` includes each
+named scale that gives at least two time bins.
 [`multigrain()`](https://gillescolling.com/timesift/reference/native.md)
-flattens several grains side by side into one block of features;
+puts summaries at several scales into one table. A *lookback window*
+covers a fixed period before a prediction date, such as the four weeks
+before a survey.
 [`lookback()`](https://gillescolling.com/timesift/reference/native.md)
-is a fixed span ending at each target’s own instant, which is what a
-plot carrying several targets through time needs, given as
-`target_time`.
+defines one window and
+[`lookbacks()`](https://gillescolling.com/timesift/reference/grains.md)
+defines several to compare; `target_time` identifies the date column.
 
 By default, each learner runs on all compatible representations in the
 set. Use `data` to assign a specific representation:
@@ -535,15 +544,14 @@ raises an error.
 
 ## The split, and the cells a score is defined on
 
-One fold map is read by everything that scores, so every candidate is
-fitted and scored on identical splits.
-[`cv()`](https://gillescolling.com/timesift/reference/cv.md) deals units
-into folds balanced on a stratifying value and
+A *fold map* records which test fold each plot belongs to. Every
+candidate uses the same map.
+[`cv()`](https://gillescolling.com/timesift/reference/cv.md) distributes
+plots across folds with similar values of a chosen variable.
 [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md)
-keeps every target sharing a group value on one side of each split;
-`resampling` also takes a fold vector or a
-[`fold_map()`](https://gillescolling.com/timesift/reference/fold_map.md)
-result directly.
+keeps observations from the same group together, such as repeated
+surveys of one plot. You can also supply fold assignments directly
+through `resampling`.
 
 ``` r
 
@@ -584,30 +592,32 @@ differences use matching observations.
 
 ## Learners, and how they are trained
 
-[`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
-and [`linear()`](https://gillescolling.com/timesift/reference/linear.md)
-read a block of features,
-[`forest()`](https://gillescolling.com/timesift/reference/forest.md)
-grows a probability forest over one, and the `torch` encoders predict
-every response together through a joint multi-label head from a shared
-embedding:
+A *learner* specifies how to fit and predict with a model.
+[`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md),
+[`linear()`](https://gillescolling.com/timesift/reference/linear.md) and
+[`forest()`](https://gillescolling.com/timesift/reference/forest.md) use
+a table of predictors. The neural networks
+[`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md),
 [`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
 and
 [`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
-convolve along the sequence of bins, and
+model all responses together, sharing information between them.
 [`mlp()`](https://gillescolling.com/timesift/reference/torch_learners.md)
-reads the same bins flattened into one block. Pooling strength across
-responses is what makes the rarer ones learnable at these sample sizes.
+uses a table;
+[`cnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
+and
+[`rescnn()`](https://gillescolling.com/timesift/reference/torch_learners.md)
+use the order of the time bins to detect patterns across neighbouring
+periods. These three networks require the torch library.
 
+The R and Python versions of
 [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
-is the arm a network is measured against, so it is fitted by the same
-compiled core both packages call rather than by a fitter on either side:
-the penalty path, the standardisation and the cross-validated choice of
-penalty are one implementation, and the two languages return the same
-coefficients for the same design. `s` reads that fit at `"lambda.1se"`,
-glmnet’s default, at `"lambda.min"`, or at a penalty of your own, and
-`tol` trades how close the descent settles to the optimum against what
-it costs.
+use the same compiled implementation to standardise predictors, fit the
+models and choose the penalty by cross-validation. The `s` argument
+selects the penalty: `"lambda.min"` gives the lowest cross-validation
+error; `"lambda.1se"` chooses a stronger penalty within one standard
+error of that minimum. A numeric value specifies the penalty directly.
+`tol` controls when the fitting algorithm stops.
 
 Set the network architecture in the learner constructor and shared
 training settings in
@@ -672,13 +682,13 @@ ts.cnn(channels=(16, 32), epochs=300)
 #> needs   : torch
 ```
 
-A learner of your own is a fit and a predict pair, and it goes through
-the same folds, the same cells and the same scoring as the ones that
-ship. [`as.matrix()`](https://rdrr.io/r/base/matrix.html)`flatten()`
-lays a representation out as the block of predictors the tabular
-learners read, one column per bin of each channel. A fit that declares a
-`weights` argument is handed the case weights every shipped learner fits
-under, which weight a presence by how rare it is.
+To add a model, supply functions for fitting and prediction. It will use
+the same folds and scoring rules as the built-in models.
+[`as.matrix()`](https://rdrr.io/r/base/matrix.html)`flatten()` converts
+the input to a table with one predictor per bin and channel. A fitting
+function with a `weights` argument receives weights for the
+observations; the default presence-absence weights give more weight to
+rare presences.
 
 ``` r
 
@@ -794,12 +804,13 @@ print(ts.summary(both))
 
 ## The combination
 
-The combiner uses out-of-fold predictions, observed responses, the
-scorable-cell mask and the fold map. `"stack"` estimates non-negative
-weights summing to one by minimising the response-specific loss. The
-other methods combine predictions by their mean, median, score-based
-weights or thresholded votes (`"committee"`). The weights below use the
-outer out-of-fold predictions from all targets and are used by
+The ensemble combines *out-of-fold predictions*: predictions for
+observations excluded from the model’s training data. The `"stack"`
+method chooses non-negative weights that sum to one to minimise
+prediction error, using the loss function defined for the response type.
+Other methods take the mean, median, score-weighted mean or the share of
+models predicting presence (`"committee"`). The weights below use
+out-of-fold predictions for all targets and are used by
 [`predict()`](https://rdrr.io/r/stats/predict.html). The reported
 ensemble score uses weights estimated separately within each outer
 training fold, stored in `fit$fold_weights``fit.fold_weights`.
@@ -860,8 +871,9 @@ operating characteristic curve (AUC).
 ## The arrays on their own
 
 [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
-is the representation without the fitting layer around it. It bins the
-readings by the calendar and summarises every bin.
+groups readings into calendar intervals and summarises each interval. It
+returns the model inputs so you can inspect them or fit a model
+separately.
 
 ``` r
 
@@ -933,9 +945,10 @@ pd.Series(week.values[0, 0], index=week.stats).round(2)
 #> dtype: float64
 ```
 
-Calendar channels provide the position of each bin in the year as model
-inputs. They allow an encoder with global pooling to use the timing of
-temperature events.
+[`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
+adds values describing when each bin occurs within the year. This lets a
+neural network use the season of an event even when it averages
+information across time later in the network.
 
 ``` r
 
@@ -952,10 +965,10 @@ ts.bind_channels(week_mean, ts.calendar_channels(week_mean)).stats
 
 ## One grain at a time
 
-Where the arrays are already built,
 [`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md)
-fits every learner at every grain of a set on one split and one mask. It
-is the ladder a run reports as a curve, reachable on its own.
+fits and evaluates each learner at each grain using arrays you have
+already built. All combinations use the same folds and eligible
+response-fold pairs.
 
 ``` r
 
@@ -1011,11 +1024,11 @@ pd.Series(ts.paired_contrast(lad, "month|elasticnet", "day|elasticnet"))
 #> dtype: object
 ```
 
-Where the whole curve is the question rather than one step of it,
 [`grain_contrasts()`](https://gillescolling.com/timesift/reference/grain_contrasts.md)
-fits a mixed model on the per-cell scores and compares every grain
-against the best one, correcting for the comparisons made and no
-others.It needs scipy, the `contrasts` extra of the wheel.
+compares each grain with the best-scoring grain using a mixed model,
+which accounts for differences among responses and folds. It adjusts the
+comparisons for testing several grains.It needs scipy, available through
+the `contrasts` extra.
 
 ``` r
 
@@ -1034,10 +1047,10 @@ pd.DataFrame(ts.grain_contrasts(lad))
 
 ## Identifying influential bins
 
-With the per-fold fits kept,
 [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md)
-holds each bin of the record back in turn, rescores the held-out units,
-and records the fall in score as that bin’s weight. Nothing is refitted.
+measures how much a score changes when the information in one time bin
+is disrupted. It uses the saved models for each fold and evaluates the
+modified inputs on the held-out observations.
 
 ``` r
 

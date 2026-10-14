@@ -6,7 +6,7 @@ title: "Installing torch"
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
 ```
 
-The neural learners `cnn()`, `rescnn()` and `mlp()` require torch. This article covers GPU setup, download problems and installation checks. The README describes the default installation. The other learners use timesift's C++ code.
+The neural networks `cnn()`, `rescnn()` and `mlp()` require torch, a library for training and using neural networks. This article covers installation and checks for running on a central processor (CPU) or graphics processor (GPU). The README describes the default timesift installation. Other learners use timesift's compiled C++ code.
 
 torch for R is an R package plus two libraries it downloads after installation, LibTorch and
 LibLantern. torch for Python is one wheel from PyPI or from PyTorch's own index. The steps below

@@ -63,7 +63,7 @@
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
@@ -114,10 +114,12 @@
 
     
     
-<p>The neural learners <code><a href="../reference/torch_learners.html">cnn()</a></code>, <code><a href="../reference/torch_learners.html">rescnn()</a></code> and
-<code><a href="../reference/torch_learners.html">mlp()</a></code> require torch. This article covers GPU setup,
-download problems and installation checks. The README describes the
-default installation. The other learners use timesift’s C++ code.</p>
+<p>The neural networks <code><a href="../reference/torch_learners.html">cnn()</a></code>, <code><a href="../reference/torch_learners.html">rescnn()</a></code> and
+<code><a href="../reference/torch_learners.html">mlp()</a></code> require torch, a library for training and using
+neural networks. This article covers installation and checks for running
+on a central processor (CPU) or graphics processor (GPU). The README
+describes the default timesift installation. Other learners use
+timesift’s compiled C++ code.</p>
 <p>torch for R is an R package plus two libraries it downloads after
 installation, LibTorch and LibLantern. torch for Python is one wheel
 from PyPI or from PyTorch’s own index. The steps below follow the <a href="https://torch.mlverse.org/docs/articles/installation.html" class="external-link">torch

@@ -63,7 +63,7 @@
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
@@ -115,21 +115,20 @@
     
     
 <!-- Python blocks run by tools/python_twins.py (md5 bc61174b4ccbaafc6b22acd826b3015a). -->
-<p>A candidate pairs a representation with a learner: the representation
-defines the model inputs, and the learner fits the model.
-<code>timesift</code> includes fifteen learners, from penalised logistic
-regression to residual convolutional networks. Built-in and custom
-learners use the same fitting, prediction and scoring interface.</p>
+<p>A <em>learner</em> specifies how to fit a model and make predictions.
+<code>timesift</code> includes fifteen learners, including regression
+models, decision trees and neural networks. Each learner can be fitted
+using different summaries of a sensor record, such as weekly or monthly
+means. A model paired with one such summary is a <em>candidate</em>.</p>
 <p>This article covers the available learners, compatible inputs, model
 settings, neural-network training and tuning. It also shows how to add a
 custom learner, response type or metric, and compares fitting times on a
 small example.</p>
-<p>The examples use one simulated record throughout: 150 units read
-every six hours for a year, and four presence-absence responses that
-depend on the record through a lagged mechanism acting at the weekly
-grain. In this simulation the response reads each unit’s departure from
-its own mean, so a learner can find the signal only at a grain fine
-enough to keep that departure.</p>
+<p>The examples use 150 sampling units, each measured every six hours
+for a year, and four responses recording presence or absence. The
+simulated responses depend on changes in each unit’s readings across
+several weeks. Summarising over longer periods can remove those changes.
+The time scale of each summary is called its <em>grain</em>.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -219,11 +218,13 @@ as <code>None</code> takes its default when the model is fitted.</p>
 <span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co">#&gt; data    : every representation of the run</span></span>
 <span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co">#&gt; settings: trees = None, mtry = None, min_node = None, balance = True, preset = default, seed = 1, threads = 1</span></span></code></pre></div>
 </div>
-<p><code>fit</code> is handed a <code>[unit, bin, channel]</code> array
-and the response matrix of the same units, and <code>predict</code>
-returns one column per response. A learner that fits one model per
-response is still handed the whole response matrix, so nothing above the
-learner layer needs to know which kind it was.</p>
+<p><code>fit</code> receives a numeric array indexed by
+<code>[unit, bin, channel]</code> and a response matrix with the same
+units. A bin is one time interval; a channel contains one variable and
+summary statistic, such as mean temperature. <code>predict</code>
+returns one column per response. Each learner receives the full response
+matrix, including learners that fit a separate model for each
+response.</p>
 <div class="lang-r-only">
 <p><code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code> binds learners into a set, which
 <code><a href="../reference/timesift.html">timesift()</a></code> takes as <code>learners</code>.</p>
@@ -308,14 +309,13 @@ declarations can be read off the constructor:</p>
 <span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a><span class="co">#&gt; 13        rescnn  sequence     joint  torch</span></span>
 <span id="cb10-21"><a href="#cb10-21" tabindex="-1"></a><span class="co">#&gt; 14          tree   tabular  separate</span></span></code></pre></div>
 </div>
-<p>Twelve learners read a tabular block and fit one model per response.
-<code><a href="../reference/torch_learners.html">mlp()</a></code> also reads a tabular block, flattening the channels,
-but fits every response jointly through one shared embedding, as the two
-convolutional encoders do. Only <code><a href="../reference/torch_learners.html">cnn()</a></code> and
-<code><a href="../reference/torch_learners.html">rescnn()</a></code> read the bins as a sequence. The three encoders
-need <code>torch</code>. Every other learner runs on the compiled core
-the package ships, which the Python package calls as well, so the two
-languages fit the same model.</p>
+<p>Twelve learners use a table of predictors and fit one model per
+response. The neural networks <code><a href="../reference/torch_learners.html">mlp()</a></code>, <code><a href="../reference/torch_learners.html">cnn()</a></code> and
+<code><a href="../reference/torch_learners.html">rescnn()</a></code> fit all responses together, sharing internal
+features between responses. <code><a href="../reference/torch_learners.html">mlp()</a></code> uses a table;
+<code><a href="../reference/torch_learners.html">cnn()</a></code> and <code><a href="../reference/torch_learners.html">rescnn()</a></code> use the time order of the
+bins. These three networks require torch. The other learners use the
+compiled implementation shared by the R and Python packages.</p>
 <p>Each compiled learner is written from the published method and is
 checked in the test fixtures against the package whose numbers it
 reproduces. The <a href="biomod2.html">biomod2 article</a> maps each of
@@ -434,15 +434,16 @@ field</td>
 </tr>
 </tbody>
 </table>
-<p>“Every head” means the learner fits whatever loss the response head
-names: a logistic model under presence-absence, a Gaussian one under the
-continuous, abundance and ordinal heads, and a Poisson one under the
-count head. <code><a href="../reference/hierarchical.html">hierarchical()</a></code> has no reference package. It
-finds the posterior by Laplace’s method and integrates its
-hyperparameters over a grid around their mode (Rue, Martino and Chopin
-2009), and with <code>spatial = "nngp"</code> or <code>"hsgp"</code> it
-adds a Gaussian-process field over the coordinates that
-<code>timesift(coords = )</code> names.</p>
+<p>A <em>response head</em> specifies the type of values being predicted
+and the loss function used to fit them. “All response types” in the
+table means logistic fitting for presence-absence, squared-error fitting
+for continuous, abundance and ordinal responses, and Poisson fitting for
+counts. <code><a href="../reference/hierarchical.html">hierarchical()</a></code> supports presence-absence. It
+approximates the posterior distribution using Laplace’s method and
+integrates over a grid of hyperparameter values (Rue, Martino and Chopin
+2009). Its <code>"nngp"</code> and <code>"hsgp"</code> options model
+spatial variation using coordinates supplied through
+<code>timesift(coords = )</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="what-a-learner-may-be-handed">What a learner may be handed<a class="anchor" aria-label="anchor" href="#what-a-learner-may-be-handed"></a>
@@ -485,13 +486,21 @@ single bin. That refusal is shown with the encoders below.</p>
 <div class="section level2">
 <h2 id="several-learners-in-one-run">Several learners in one run<a class="anchor" aria-label="anchor" href="#several-learners-in-one-run"></a>
 </h2>
-<p><code>learners</code> takes a set or a named list. A named list
-reports each candidate under its own name, which is how two settings of
-one learner sit side by side. Every learner without a
-<code>data =</code> runs at every grain of <code>sift</code>;
-<code><a href="../reference/linear.html">linear()</a></code> is pinned to the monthly grain here, and the
-elastic net is given a looser stopping tolerance, both to keep the run
-short. The section on settings shows what the tolerance changes.</p>
+<p><code>learners</code> takes a set or a named list. Names distinguish
+candidates that use different settings of the same learner. Each learner
+is fitted at every compatible grain in <code>sift</code>, unless its
+<code>data</code> argument specifies one representation. Here
+<code><a href="../reference/linear.html">linear()</a></code> uses monthly summaries. The elastic net uses a
+looser stopping tolerance to shorten the example; the settings section
+explains that choice.</p>
+<p>Cross-validation divides the units into groups called <em>folds</em>.
+Each fold is predicted using models trained on the other folds. An
+additional split within the training data, called <em>inner
+cross-validation</em>, chooses candidates and estimates ensemble weights
+before the outer test fold is predicted. A response in one fold is
+called a <em>cell</em> in the scoring output. The score used here is the
+area under the receiver operating characteristic curve (AUC), which
+measures how well predictions rank presences above absences.</p>
 <div class="lang-py-only">
 <p>In Python <code>learners</code> takes a list, and a candidate reports
 under its learner’s <code>name</code>, which
@@ -515,7 +524,7 @@ under its learner’s <code>name</code>, which
 <span>                  resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, n_inner <span class="op">=</span> <span class="fl">3L</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">run_time</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 17.36</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 16.08</span></span></code></pre></div>
 <div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="im">import</span> time</span>
 <span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> replace</span>
 <span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
@@ -534,9 +543,9 @@ under its learner’s <code>name</code>, which
 <span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a>                  learners<span class="op">=</span>models, sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>),</span>
 <span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a>                  resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">5</span>), n_inner<span class="op">=</span><span class="dv">3</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
 <span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="bu">round</span>(time.perf_counter() <span class="op">-</span> start)</span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="co">#&gt; 16</span></span></code></pre></div>
+<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="co">#&gt; 17</span></span></code></pre></div>
 </div>
-<p>The run took 17 seconds for 15 candidates. With three inner folds in
+<p>The run took 16 seconds for 15 candidates. With three inner folds in
 each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20
 times, three inner fits and one outer fit in each outer fold, and once
 more on every target.</p>
@@ -798,15 +807,14 @@ candidates, before acting on it.</p>
 <div class="section level2">
 <h2 id="neural-encoders">Neural encoders<a class="anchor" aria-label="anchor" href="#neural-encoders"></a>
 </h2>
-<p>The encoders separate architecture from training. <code><a href="../reference/torch_learners.html">mlp()</a></code>,
-<code><a href="../reference/torch_learners.html">cnn()</a></code> and <code><a href="../reference/torch_learners.html">rescnn()</a></code> take the layer widths, the
-kernel and the dropout, and <code><a href="../reference/train_control.html">train_control()</a></code> holds every
-training setting: epochs, batch size, learning rate, optimiser,
-schedule, early stopping and device. <code><a href="../reference/train_control.html">train_control()</a></code> is the
-one place a training setting is defaulted. A run hands its control to
-every neural learner, and a training setting given to one learner
-overrides the run’s control for that learner alone, on the settings it
-names.</p>
+<p>The neural-network constructors <code><a href="../reference/torch_learners.html">mlp()</a></code>,
+<code><a href="../reference/torch_learners.html">cnn()</a></code> and <code><a href="../reference/torch_learners.html">rescnn()</a></code> set the network structure,
+including layer widths and the number of neighbouring bins each
+convolution uses. <code><a href="../reference/train_control.html">train_control()</a></code> sets how the networks are
+trained: passes through the data (epochs), observations per update
+(batch size), learning rate, optimiser, stopping rule and computing
+device. Settings on an individual learner override the corresponding
+settings for the run.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/train_control.html">train_control</a></span><span class="op">(</span>epochs <span class="op">=</span> <span class="fl">5L</span>, device <span class="op">=</span> <span class="st">"cpu"</span><span class="op">)</span></span>
@@ -1286,11 +1294,11 @@ at the weekly grain, which flattens to 53 columns.</p>
 <span><span class="op">}</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">seconds</span>, <span class="fl">2</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                 linear             elasticnet                 forest </span></span>
-<span><span class="co">#&gt;                   4.64                   2.63                   0.29 </span></span>
+<span><span class="co">#&gt;                   4.33                   2.25                   0.30 </span></span>
 <span><span class="co">#&gt;                 maxent elasticnet(tol = 1e-4)           discriminant </span></span>
-<span><span class="co">#&gt;                   0.21                   0.16                   0.09 </span></span>
-<span><span class="co">#&gt;                xgboost                   tree             perceptron </span></span>
-<span><span class="co">#&gt;                   0.06                   0.02                   0.02 </span></span>
+<span><span class="co">#&gt;                   0.21                   0.14                   0.08 </span></span>
+<span><span class="co">#&gt;                xgboost             perceptron                   tree </span></span>
+<span><span class="co">#&gt;                   0.05                   0.03                   0.01 </span></span>
 <span><span class="co">#&gt;               boosting               envelope                   mars </span></span>
 <span><span class="co">#&gt;                   0.01                   0.00                   0.00 </span></span>
 <span><span class="co">#&gt;           hierarchical </span></span>
@@ -1310,16 +1318,16 @@ at the weekly grain, which flattens to 53 columns.</p>
 <span id="cb55-13"><a href="#cb55-13" tabindex="-1"></a></span>
 <span id="cb55-14"><a href="#cb55-14" tabindex="-1"></a>seconds <span class="op">=</span> pd.Series({name: seconds_to_fit(l) <span class="cf">for</span> name, l <span class="kw">in</span> timed.items()})</span>
 <span id="cb55-15"><a href="#cb55-15" tabindex="-1"></a>seconds.<span class="bu">round</span>(<span class="dv">2</span>).sort_values(ascending<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb55-16"><a href="#cb55-16" tabindex="-1"></a><span class="co">#&gt; linear                  2.54</span></span>
-<span id="cb55-17"><a href="#cb55-17" tabindex="-1"></a><span class="co">#&gt; elasticnet              2.22</span></span>
-<span id="cb55-18"><a href="#cb55-18" tabindex="-1"></a><span class="co">#&gt; forest                  0.32</span></span>
-<span id="cb55-19"><a href="#cb55-19" tabindex="-1"></a><span class="co">#&gt; maxent                  0.25</span></span>
+<span id="cb55-16"><a href="#cb55-16" tabindex="-1"></a><span class="co">#&gt; linear                  2.46</span></span>
+<span id="cb55-17"><a href="#cb55-17" tabindex="-1"></a><span class="co">#&gt; elasticnet              2.17</span></span>
+<span id="cb55-18"><a href="#cb55-18" tabindex="-1"></a><span class="co">#&gt; forest                  0.31</span></span>
+<span id="cb55-19"><a href="#cb55-19" tabindex="-1"></a><span class="co">#&gt; maxent                  0.24</span></span>
 <span id="cb55-20"><a href="#cb55-20" tabindex="-1"></a><span class="co">#&gt; elasticnet(tol=1e-4)    0.10</span></span>
 <span id="cb55-21"><a href="#cb55-21" tabindex="-1"></a><span class="co">#&gt; discriminant            0.09</span></span>
-<span id="cb55-22"><a href="#cb55-22" tabindex="-1"></a><span class="co">#&gt; xgboost                 0.06</span></span>
-<span id="cb55-23"><a href="#cb55-23" tabindex="-1"></a><span class="co">#&gt; tree                    0.02</span></span>
+<span id="cb55-22"><a href="#cb55-22" tabindex="-1"></a><span class="co">#&gt; xgboost                 0.05</span></span>
+<span id="cb55-23"><a href="#cb55-23" tabindex="-1"></a><span class="co">#&gt; perceptron              0.02</span></span>
 <span id="cb55-24"><a href="#cb55-24" tabindex="-1"></a><span class="co">#&gt; boosting                0.02</span></span>
-<span id="cb55-25"><a href="#cb55-25" tabindex="-1"></a><span class="co">#&gt; perceptron              0.02</span></span>
+<span id="cb55-25"><a href="#cb55-25" tabindex="-1"></a><span class="co">#&gt; tree                    0.01</span></span>
 <span id="cb55-26"><a href="#cb55-26" tabindex="-1"></a><span class="co">#&gt; mars                    0.01</span></span>
 <span id="cb55-27"><a href="#cb55-27" tabindex="-1"></a><span class="co">#&gt; envelope                0.00</span></span>
 <span id="cb55-28"><a href="#cb55-28" tabindex="-1"></a><span class="co">#&gt; hierarchical            0.00</span></span>
@@ -1346,28 +1354,26 @@ coefficients than there are units:</p>
 <span>  `k = 5` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="fu"><a href="../reference/fit_learner.html">fit_learner</a></span><span class="op">(</span><span class="fu"><a href="../reference/additive.html">additive</a></span><span class="op">(</span>k <span class="op">=</span> <span class="fl">5L</span><span class="op">)</span>, <span class="va">month</span>, <span class="va">sim</span><span class="op">$</span><span class="va">y</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">additive_seconds</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt; k = 10  k = 5 </span></span>
-<span><span class="co">#&gt;  11.42   0.29</span></span></code></pre></div>
+<span><span class="co">#&gt;  11.06   0.25</span></span></code></pre></div>
 <div class="sourceCode" id="cb59"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" tabindex="-1"></a>month <span class="op">=</span> ts.grain_matrix(sim.readings, <span class="st">"unit"</span>, <span class="st">"time"</span>, <span class="st">"reading"</span>, grain<span class="op">=</span><span class="st">"month"</span>)</span>
 <span id="cb59-2"><a href="#cb59-2" tabindex="-1"></a>pd.Series({<span class="st">"k = 10"</span>: seconds_to_fit(ts.additive(), month),</span>
 <span id="cb59-3"><a href="#cb59-3" tabindex="-1"></a>           <span class="st">"k = 5"</span>: seconds_to_fit(ts.additive(k<span class="op">=</span><span class="dv">5</span>), month)}).<span class="bu">round</span>(<span class="dv">2</span>)</span>
-<span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a><span class="co">#&gt; k = 10    6.43</span></span>
+<span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a><span class="co">#&gt; k = 10    6.83</span></span>
 <span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a><span class="co">#&gt; k = 5     0.39</span></span>
 <span id="cb59-6"><a href="#cb59-6" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
 </div>
-<p>With <code>k = 10</code> the fit took 11.4 seconds, and with
-<code>k = 5</code> it took 0.3 seconds.</p>
-<p>The elastic net is the learner to start with. It reads every column
-without a selection step, chooses its penalty inside the units it is
-fitted on, and is the arm the package measures a network against. At its
-default tolerance it took 2.6 seconds here, and <code>tol = 1e-4</code>
-took 0.2, at the same held-out AUC on the split above.
-<code><a href="../reference/linear.html">linear()</a></code> was the slowest at 4.6 seconds: its two-way search
-refits the model for every term it could add or drop at every step, and
-the weekly grain offers it 106 terms, each column and its square. Pinned
-to a coarse grain, or searched forward under a bound as
-<code>linear(select = "forward", terms = "column", max_terms = 3)</code>
-does, the search has fewer steps to take. Every other tabular learner
-took at most 0.29 seconds.</p>
+<p>With <code>k = 10</code> the fit took 11.1 seconds, and with
+<code>k = 5</code> it took 0.2 seconds.</p>
+<p>The elastic net includes every predictor and uses a penalty to limit
+coefficient size. It chooses that penalty within the training data. At
+its default tolerance it took 2.2 seconds here; <code>tol = 1e-4</code>
+took 0.1 seconds and gave the same held-out AUC on the split above.
+<code><a href="../reference/linear.html">linear()</a></code> took 4.3 seconds. Its search refits the model for
+each term it could add or remove, with 106 possible terms at the weekly
+grain. A coarser grain or a bounded search, such as
+<code>linear(select = "forward", terms = "column", max_terms = 3)</code>,
+reduces the number of fits. Every other tabular learner took at most 0.3
+seconds.</p>
 <p>What a learner can be fitted on depends on the number of units
 against the number of columns its representation flattens to:</p>
 <ul>

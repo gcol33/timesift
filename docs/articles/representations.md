@@ -1,14 +1,16 @@
 # Representing a record
 
-Models use an array built from the sensor readings. Its contents depend
-on the time interval represented by each bin, the statistic calculated
-within that bin and the calendar boundaries. `timesift` exposes these
-choices as arguments and records them in the array’s attributes.
+Machine learning models need sensor measurements organised into a table.
+Building that table means choosing how much time each value covers, how
+to summarise the measurements within that period, and when each period
+starts. `timesift` lets you specify these choices, builds the model
+inputs, and saves the choices alongside them.
 
-This article shows how to turn a table of readings into model inputs. It
-covers grains, summary statistics, calendars, missing readings and
-partial bins, followed by lookback windows, calendar channels and
-tabular arrays.
+A time interval is called a *bin*, and its time scale, such as a week or
+month, is its *grain*. A *representation* is the set of choices used to
+prepare the model inputs. This article works through those choices,
+including summary statistics, calendar boundaries, gaps and periods
+before a survey date.
 
 ## Installation
 
@@ -35,11 +37,12 @@ pip install git+https://github.com/gcol33/timesift
 
 ## Two tables, and the columns read from them
 
-A run takes two tables linked by a shared unit identifier. `series`
-contains one row per reading, and `targets` contains one row per
-prediction target. The example has thirty plots logged hourly for 400
-days from 1 September 2021. Each record includes seasonal and daily
-cycles, a plot-specific offset and noise.
+A run takes two tables linked by a shared identifier. `series` contains
+one row per sensor reading. `targets` contains one row per observation
+to predict, such as a species survey on a plot. Here a *unit* is a study
+plot. The example has thirty plots logged hourly for 400 days from 1
+September 2021. Each record includes seasonal and daily cycles, a
+plot-specific offset and noise.
 
 The Python block draws its own record, so the values it prints differ
 from the ones quoted in the text, which come from the R run. Counts,
@@ -114,11 +117,12 @@ targets.head(3)
 ```
 
 [`grain_matrix()`](https://gillescolling.com/timesift/reference/grain_matrix.md)
-reads three columns of `series`: the unit (`id`), the instant of each
-reading (`time`) and the reading itself (`value`). Each is given as a
-bare column name or as a string. The result is a numeric array of shape
-`[unit, bin, channel]`, and the attributes carry everything the binning
-decided.
+reads three columns of `series`: the plot identifier (`id`), the time of
+each reading (`time`) and the measurement (`value`). Supply each column
+as a bare name or a string. The result is a three-dimensional numeric
+array, indexed by `[unit, bin, channel]`. Each channel holds one summary
+statistic, such as the mean temperature. Attributes attached to the
+array record how it was built.
 
 ``` r
 
@@ -146,19 +150,19 @@ list(x.__dataclass_fields__)
 #> ['values', 'units', 'bins', 'stats', 'grain', 'year_start', 'bin_start', 'bin_end', 'bin_n', 'bin_partial', 'span', 'lag', 'static', 'position', 'coords', 'unit_ids']
 ```
 
-The thirty plots became thirty rows, the 400 days fourteen monthly bins,
-and the single statistic one channel. `bin_start` and `bin_end` give
-each bin’s first instant on the calendar and its last reading, `bin_n`
-the count of readings every cell was reduced from, and `bin_partial`
-which bins the record does not cover in full. Bins are named by their
-start as an ISO 8601 instant in UTC, which is how the Python side names
-them too.
+The array has thirty plots, fourteen monthly bins covering the 400 days,
+and one channel for the mean. `bin_start` gives the start of each
+calendar interval; `bin_end` gives its last recorded reading. `bin_n`
+counts readings for each plot and bin, and `bin_partial` identifies
+intervals only partly covered by the record. Bin names use the ISO 8601
+date-time format in Coordinated Universal Time (UTC), in both R and
+Python.
 
-A unit identifier is a name. Text and factor levels are used as they
-are, and a whole number is written as its digits, so an identifier read
-from a file as `100000` stays `100000` and never becomes `1e+05`. The
-rows are sorted under C collation, the same order on every machine and
-in both languages, which puts `"100000"` before `"7"`.
+Unit identifiers are treated as names. Text and factor levels keep their
+labels, and whole numbers are written as digits: `100000` stays
+`100000`. Rows are sorted by the bytes of their text identifiers, a rule
+called *C collation*. This gives the same order in both languages and on
+every machine; for example, `"100000"` sorts before `"7"`.
 
 ``` r
 
@@ -1017,14 +1021,15 @@ anchor sits near either end of the record.
 
 ## The position of a bin in the year
 
-An encoder that ends in global pooling loses when in the year an event
-happened.
+Some neural networks average their internal values across time, an
+operation called *global pooling*. To let these networks distinguish the
+season of an event,
 [`calendar_channels()`](https://gillescolling.com/timesift/reference/calendar_channels.md)
-gives that position back as input: the sine and cosine of each bin’s
-fractional place in the year, read at the midpoint of the record the bin
-holds.
+supplies the position of each bin within the year. It represents that
+position with a sine and cosine pair calculated at the midpoint of the
+readings in the bin.
 [`bind_channels()`](https://gillescolling.com/timesift/reference/bind_channels.md)
-puts them beside the readings.
+adds these values alongside the measurements.
 
 ``` r
 
@@ -1060,12 +1065,10 @@ both_wk.position
 #> ('year_sin', 'year_cos')
 ```
 
-The two channels are identical across units and are a time index, not a
-summary of the readings, so whatever a model does with them it could
-have done with a calendar. The sine and cosine pair is continuous across
-the turn of the year, where the fraction itself jumps from one back to
-zero. The `position` attribute marks them, and the torch encoders read
-marked channels at their own amplitude instead of standardising them.
+The two channels have the same values for every unit. The sine and
+cosine vary continuously across the end of the year. Their `position`
+attribute tells the torch networks to use these values at their original
+scale.
 
 On a grain finer than a day, `cycles = "day"` adds the place in the
 daily cycle as a second pair. At a day or coarser every bin would sit at
@@ -1257,15 +1260,13 @@ ts.timesift_set({"week": wk, "visits": lb})
 
 ## Digests and the artifacts that cross languages
 
-A representation is a set of numbers fixed by a specification,
-`inst/spec/representation.md`, and
+A *digest* is a short string used to compare the contents of arrays.
 [`digest_array()`](https://gillescolling.com/timesift/reference/digest_array.md)
-is the MD5 of an array written the way that specification defines: every
-value to twelve decimal places, unit fastest, then bin, then channel,
-joined by line feeds. The Python twin computes the same digest from the
-same array, and the package’s test fixtures pin the digest of every
-grain and statistic on a small input, so a change to binning shows up as
-a changed string.
+calculates an MD5 digest after writing every value to twelve decimal
+places, with units varying fastest, then bins, then channels, and line
+feeds between values. The format is defined in
+`inst/spec/representation.md`. R and Python use the same format, and
+tests compare their digests with saved expected results.
 
 ``` r
 
@@ -1288,15 +1289,15 @@ twelfth decimal place. Comparing two digests is a quick way to check
 that a representation built on another machine, in another session or in
 Python is the one expected.
 
-The representation is rebuilt in each language from the shared core. The
-fold map, the response matrix and the mask of scorable cells are built
-once and handed over as files, because two random streams seeded alike
-in R and Python still draw different folds.
+R and Python rebuild the model inputs using the same compiled code. To
+use identical training and test splits, save the fold assignments,
+observed responses and eligible response-fold pairs in one language and
+read them in the other. The same random seed can produce different
+splits in R and Python.
 [`write_folds()`](https://gillescolling.com/timesift/reference/artifacts.md),
 [`read_folds()`](https://gillescolling.com/timesift/reference/artifacts.md)
-and their siblings for the response and the cells write and read that
-format: CSV, LF line endings and rows in C collation, byte for byte the
-same from either side.
+and the corresponding response and cell functions use a shared CSV
+format with line-feed endings and identifiers sorted by C collation.
 
 ``` r
 

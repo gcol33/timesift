@@ -63,7 +63,7 @@
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
@@ -1757,7 +1757,7 @@ dimension.</p>
 <div class="sourceCode" id="cb44"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">took</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="va">now</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/project.html">project</a></span><span class="op">(</span><span class="va">fit</span>, series <span class="op">=</span> <span class="va">grid</span>, static <span class="op">=</span> <span class="va">elev</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">took</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 0.15</span></span>
+<span><span class="co">#&gt; [1] 0.12</span></span>
 <span><span class="va">now</span></span>
 <span><span class="co">#&gt; class       : SpatRaster</span></span>
 <span><span class="co">#&gt; size        : 10, 12, 4  (nrow, ncol, nlyr)</span></span>
@@ -3008,7 +3008,7 @@ z
  </defs>
 </svg></div></p>
 </div>
-<p>The projection of the ensemble onto the 120 cells took 0.15 seconds.
+<p>The projection of the ensemble onto the 120 cells took 0.12 seconds.
 It is the same prediction <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> gives for the same
 cells as targets, which <code><a href="https://rdrr.io/r/base/all.equal.html" class="external-link">all.equal()</a></code> confirms for
 <code>sp1</code>. A raster too large for memory is read
@@ -11573,7 +11573,7 @@ a logger and would otherwise be split across training and test. Under
 any blocked split the inner split keeps blocks whole too, which bounds
 <code>n_inner</code> and the elastic net’s own <code>n_inner</code>.</p>
 <p>A projection costs one prediction per cell. The ensemble of four
-members took 0.15 seconds for 120 cells with a year of daily readings,
+members took 0.12 seconds for 120 cells with a year of daily readings,
 and the time grows with the number of cells and the length of the
 record. A large raster is better projected once from a script, with
 <code>chunk</code> set to what memory allows. The two runs themselves

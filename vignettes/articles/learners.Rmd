@@ -12,14 +12,11 @@ library(timesift)
 has_torch <- requireNamespace("torch", quietly = TRUE) && torch::torch_is_installed()
 ```
 
-A candidate pairs a representation with a learner: the representation defines the model inputs, and the learner fits the model. `timesift` includes fifteen learners, from penalised logistic regression to residual convolutional networks. Built-in and custom learners use the same fitting, prediction and scoring interface.
+A *learner* specifies how to fit a model and make predictions. `timesift` includes fifteen learners, including regression models, decision trees and neural networks. Each learner can be fitted using different summaries of a sensor record, such as weekly or monthly means. A model paired with one such summary is a *candidate*.
 
 This article covers the available learners, compatible inputs, model settings, neural-network training and tuning. It also shows how to add a custom learner, response type or metric, and compares fitting times on a small example.
 
-The examples use one simulated record throughout: 150 units read every six hours for a year, and
-four presence-absence responses that depend on the record through a lagged mechanism acting at the
-weekly grain. In this simulation the response reads each unit's departure from its own mean, so a
-learner can find the signal only at a grain fine enough to keep that departure.
+The examples use 150 sampling units, each measured every six hours for a year, and four responses recording presence or absence. The simulated responses depend on changes in each unit's readings across several weeks. Summarising over longer periods can remove those changes. The time scale of each summary is called its *grain*.
 
 ## Installation
 
@@ -105,10 +102,7 @@ ts.forest(balance=True)
 ```
 :::
 
-`fit` is handed a `[unit, bin, channel]` array and the response matrix of the same units, and
-`predict` returns one column per response. A learner that fits one model per response is still
-handed the whole response matrix, so nothing above the learner layer needs to know which kind it
-was.
+`fit` receives a numeric array indexed by `[unit, bin, channel]` and a response matrix with the same units. A bin is one time interval; a channel contains one variable and summary statistic, such as mean temperature. `predict` returns one column per response. Each learner receives the full response matrix, including learners that fit a separate model for each response.
 
 ::: {.lang-r-only}
 `c()` binds learners into a set, which `timesift()` takes as `learners`.
@@ -183,11 +177,7 @@ pd.DataFrame({"learner": ts.learners(),
 ```
 :::
 
-Twelve learners read a tabular block and fit one model per response. `mlp()` also reads a tabular
-block, flattening the channels, but fits every response jointly through one shared embedding, as
-the two convolutional encoders do. Only `cnn()` and `rescnn()` read the bins as a sequence. The
-three encoders need `torch`. Every other learner runs on the compiled core the package ships, which
-the Python package calls as well, so the two languages fit the same model.
+Twelve learners use a table of predictors and fit one model per response. The neural networks `mlp()`, `cnn()` and `rescnn()` fit all responses together, sharing internal features between responses. `mlp()` uses a table; `cnn()` and `rescnn()` use the time order of the bins. These three networks require torch. The other learners use the compiled implementation shared by the R and Python packages.
 
 Each compiled learner is written from the published method and is checked in the test fixtures
 against the package whose numbers it reproduces. The [biomod2 article](biomod2.html) maps each of
@@ -211,12 +201,7 @@ them to the biomod2 algorithm it corresponds to, with the option sets biomod2 us
 | `cnn()` | convolutional encoder, joint head | torch | every head |
 | `rescnn()` | dilated residual convolutional encoder, joint head | torch | every head |
 
-"Every head" means the learner fits whatever loss the response head names: a logistic model under
-presence-absence, a Gaussian one under the continuous, abundance and ordinal heads, and a Poisson
-one under the count head. `hierarchical()` has no reference package. It finds the posterior by
-Laplace's method and integrates its hyperparameters over a grid around their mode (Rue, Martino and
-Chopin 2009), and with `spatial = "nngp"` or `"hsgp"` it adds a Gaussian-process field over the
-coordinates that `timesift(coords = )` names.
+A *response head* specifies the type of values being predicted and the loss function used to fit them. "All response types" in the table means logistic fitting for presence-absence, squared-error fitting for continuous, abundance and ordinal responses, and Poisson fitting for counts. `hierarchical()` supports presence-absence. It approximates the posterior distribution using Laplace's method and integrates over a grid of hyperparameter values (Rue, Martino and Chopin 2009). Its `"nngp"` and `"hsgp"` options model spatial variation using coordinates supplied through `timesift(coords = )`.
 
 ## What a learner may be handed
 
@@ -257,11 +242,9 @@ encoders below.
 
 ## Several learners in one run
 
-`learners` takes a set or a named list. A named list reports each candidate under its own name,
-which is how two settings of one learner sit side by side. Every learner without a `data =` runs at
-every grain of `sift`; `linear()` is pinned to the monthly grain here, and the elastic net is given
-a looser stopping tolerance, both to keep the run short. The section on settings shows what the
-tolerance changes.
+`learners` takes a set or a named list. Names distinguish candidates that use different settings of the same learner. Each learner is fitted at every compatible grain in `sift`, unless its `data` argument specifies one representation. Here `linear()` uses monthly summaries. The elastic net uses a looser stopping tolerance to shorten the example; the settings section explains that choice.
+
+Cross-validation divides the units into groups called *folds*. Each fold is predicted using models trained on the other folds. An additional split within the training data, called *inner cross-validation*, chooses candidates and estimates ensemble weights before the outer test fold is predicted. A response in one fold is called a *cell* in the scoring output. The score used here is the area under the receiver operating characteristic curve (AUC), which measures how well predictions rank presences above absences.
 
 ::: {.lang-py-only}
 In Python `learners` takes a list, and a candidate reports under its learner's `name`, which `dataclasses.replace(learner, name="...")` sets.
@@ -306,7 +289,7 @@ fit = ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
                   learners=models, sift=ts.grains("week", "month"),
                   resampling=ts.cv(v=5), n_inner=3, verbose=False)
 round(time.perf_counter() - start)
-#> 16
+#> 17
 ```
 :::
 
@@ -524,12 +507,7 @@ named candidates, before acting on it.
 
 ## Neural encoders
 
-The encoders separate architecture from training. `mlp()`, `cnn()` and `rescnn()` take the layer
-widths, the kernel and the dropout, and `train_control()` holds every training setting: epochs,
-batch size, learning rate, optimiser, schedule, early stopping and device. `train_control()` is the
-one place a training setting is defaulted. A run hands its control to every neural learner, and a
-training setting given to one learner overrides the run's control for that learner alone, on the
-settings it names.
+The neural-network constructors `mlp()`, `cnn()` and `rescnn()` set the network structure, including layer widths and the number of neighbouring bins each convolution uses. `train_control()` sets how the networks are trained: passes through the data (epochs), observations per update (batch size), learning rate, optimiser, stopping rule and computing device. Settings on an individual learner override the corresponding settings for the run.
 
 ::: {.lang-pair}
 ```{r control, eval = has_torch}
@@ -994,16 +972,16 @@ def seconds_to_fit(learner, x=week):
 
 seconds = pd.Series({name: seconds_to_fit(l) for name, l in timed.items()})
 seconds.round(2).sort_values(ascending=False)
-#> linear                  2.54
-#> elasticnet              2.22
-#> forest                  0.32
-#> maxent                  0.25
+#> linear                  2.46
+#> elasticnet              2.17
+#> forest                  0.31
+#> maxent                  0.24
 #> elasticnet(tol=1e-4)    0.10
 #> discriminant            0.09
-#> xgboost                 0.06
-#> tree                    0.02
-#> boosting                0.02
+#> xgboost                 0.05
 #> perceptron              0.02
+#> boosting                0.02
+#> tree                    0.01
 #> mars                    0.01
 #> envelope                0.00
 #> hierarchical            0.00
@@ -1040,7 +1018,7 @@ round(additive_seconds, 2)
 month = ts.grain_matrix(sim.readings, "unit", "time", "reading", grain="month")
 pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
            "k = 5": seconds_to_fit(ts.additive(k=5), month)}).round(2)
-#> k = 10    6.43
+#> k = 10    6.83
 #> k = 5     0.39
 #> dtype: float64
 ```
@@ -1049,16 +1027,7 @@ pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
 With `k = 10` the fit took `r round(additive_seconds[["k = 10"]], 1)` seconds, and with `k = 5` it
 took `r round(additive_seconds[["k = 5"]], 1)` seconds.
 
-The elastic net is the learner to start with. It reads every column without a selection step,
-chooses its penalty inside the units it is fitted on, and is the arm the package measures a network
-against. At its default tolerance it took `r round(seconds[["elasticnet"]], 1)` seconds here, and
-`tol = 1e-4` took `r round(seconds[["elasticnet(tol = 1e-4)"]], 1)`, at the same held-out AUC on the
-split above. `linear()` was the slowest at `r round(seconds[["linear"]], 1)` seconds: its two-way
-search refits the model for every term it could add or drop at every step, and the weekly grain
-offers it 106 terms, each column and its square. Pinned to a coarse grain, or searched forward under
-a bound as `linear(select = "forward", terms = "column", max_terms = 3)` does, the search has fewer
-steps to take. Every other tabular learner took at most
-`r round(max(seconds[!names(seconds) %in% c("linear", "elasticnet")]), 2)` seconds.
+The elastic net includes every predictor and uses a penalty to limit coefficient size. It chooses that penalty within the training data. At its default tolerance it took `r round(seconds[["elasticnet"]], 1)` seconds here; `tol = 1e-4` took `r round(seconds[["elasticnet(tol = 1e-4)"]], 1)` seconds and gave the same held-out AUC on the split above. `linear()` took `r round(seconds[["linear"]], 1)` seconds. Its search refits the model for each term it could add or remove, with 106 possible terms at the weekly grain. A coarser grain or a bounded search, such as `linear(select = "forward", terms = "column", max_terms = 3)`, reduces the number of fits. Every other tabular learner took at most `r round(max(seconds[!names(seconds) %in% c("linear", "elasticnet")]), 2)` seconds.
 
 What a learner can be fitted on depends on the number of units against the number of columns its
 representation flattens to:

@@ -1,16 +1,16 @@
 # Finding the grain
 
-`timesift` compares time scales to find which gives the best predictions
-from a record. Simulated data provide a way to check this comparison:
+`timesift` compares models built from daily, weekly or longer summaries
+of a sensor record. Each time scale is called a *grain*. Simulated data
+let us check whether the comparison identifies a known relationship:
 [`simulate_records()`](https://gillescolling.com/timesift/reference/simulate_records.md)
-generates responses that depend on the record at a specified grain.
+generates responses that depend on readings at a specified time scale.
 
-This article starts with responses generated from weekly summaries and
-compares four grains using
-[`grain_ladder()`](https://gillescolling.com/timesift/reference/grain_ladder.md),
-paired and mixed-model contrasts, nested selection and occlusion.
-Further examples use seasonal, daily and signal-free responses to
-examine how the results depend on the simulated mechanism.
+The first example generates presence-absence responses from weekly
+summaries, then tests models at four time scales. It compares their
+prediction scores, evaluates the process of choosing a time scale, and
+checks which periods affect the predictions. Later examples use
+seasonal, daily and unrelated responses.
 
 ## Installation
 
@@ -38,14 +38,13 @@ pip install git+https://github.com/gcol33/timesift
 ## A record with a known answer
 
 [`simulate_records()`](https://gillescolling.com/timesift/reference/simulate_records.md)
-draws, for each unit, a year of readings made of three parts: a seasonal
-cycle every unit shares, a constant offset of the unit’s own, and an
-autocorrelated anomaly. Measurement noise is added on top. Each response
-variable is driven by a weighted mean of the unit’s anomaly over a short
-stretch of the year, and the shape of the weights sets the grain. Under
-`mechanism = "lag"` the weights decay geometrically over four
-consecutive weeks from an anchor week, one anchor per variable, so the
-driver is an exact linear combination of weekly means.
+generates a year of readings for each sampling unit. All units share a
+seasonal cycle. Each also has its own average level and deviations that
+persist across nearby readings. Measurement noise is added to these
+values. The responses depend on a weighted average of the deviations
+over a short period. With `mechanism = "lag"`, that period covers four
+consecutive weeks, with weights decreasing geometrically from the first
+week. Each response uses its own starting week.
 
 The Python block draws its own record, so the values it prints differ
 from the ones quoted in the text, which come from the R run. Counts,
@@ -78,18 +77,18 @@ sim.anchor + 1
 #> array([ 2,  9, 15, 22, 29, 36, 42, 49])
 ```
 
-The true grain of a mechanism is defined as the coarsest grain at which
-the driver is still an exact linear function of the binned record. Day
-bins nest inside weeks, so a daily representation also holds everything
-the driver reads, spread over seven times as many columns. Month bins
-straddle week boundaries, and a season bin averages thirteen weeks
-together, so both lose part of the driver. The anchors are the positions
-of each variable’s first week among the 53 weekly bins of this record.
+Here the *true grain* is the coarsest time scale whose summaries retain
+the full quantity used to generate the response, called the *driver*.
+Daily summaries retain the weekly driver across seven times as many
+columns. Monthly and seasonal summaries combine readings from weeks with
+different weights and lose some of that information. The simulator calls
+each response’s starting week its *anchor*.
 
-`auc = 0.9` is the area under the ROC curve of the driver itself against
-the response. No fitted model reaches it: the readings carry noise the
-driver does not, and the weights have to be estimated from 200 units.
-The prevalence is shared by every variable.
+`auc = 0.9` sets the driver’s population area under the receiver
+operating characteristic curve (AUC), a measure of how well it ranks
+presences above absences. Models must estimate the relationship from 200
+units of noisy readings. *Prevalence* is the proportion of units with a
+presence; it is the same for every simulated response.
 
 The first variable reads four weeks starting at its anchor:
 
@@ -140,13 +139,15 @@ series.info()
 ## One run over four grains
 
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
-builds each representation in `sift`, fits every learner on each, and
-scores all of them on one set of outer folds. The learner here is the
-elastic net with a shorter penalty path and a looser stopping tolerance
-than its defaults, to keep this article quick to build. `year_start`
-matches the boundary the simulation located its bins with, which matters
-for the seasonal grain. `keep_fits = TRUE` keeps the per-fold models,
-which the occlusion profile later reads.
+builds each summary specified in `sift` and pairs it with each learner,
+producing the model candidates. It evaluates all candidates on the same
+groups of held-out units, called *outer folds*. Within each training
+set, *inner folds* choose a candidate and estimate weights for combining
+candidates into an ensemble. The elastic net here uses a shorter penalty
+path and a looser stopping tolerance to keep the example quick.
+`year_start` matches the simulation’s seasonal boundaries.
+`keep_fits = TRUE` saves the fold-specific models for the later analysis
+of influential periods.
 
 ``` r
 
@@ -278,11 +279,12 @@ The interval is across the eight responses, which are fitted and scored
 on the same units and the same folds, so it carries the spread between
 responses and not the error they share.
 
-`resampling = cv(v = 5)` dealt the 200 units into five folds of equal
-size, balanced on richness, the number of responses present at a unit,
-because one fold map serves all eight responses at once. The mask of
-scorable cells is computed from the responses and that map alone, before
-any model is fitted.
+`resampling = cv(v = 5)` divides the 200 units into five equal folds,
+balanced on the number of responses present at each unit. The same
+assignments are used for all eight responses. Each response-fold pair is
+called a *cell*. Before fitting, `timesift` identifies which cells
+contain enough presences and absences to score; this table of eligible
+pairs is the *scorable-cell mask*.
 
 ``` r
 
@@ -380,11 +382,11 @@ ts.plot(lad);
 across responses and an open circle at
 week.](comparing-grains_files/py-figure-2.svg)
 
-The curve rises from day to week and falls from week on. The rise is the
-cost of variance: the daily array holds the driver exactly, but the
-penalised fit has to find it among 365 columns with 160 training units.
-The fall is the cost of bias, where the bins average away part of what
-the driver reads.
+The weekly summaries score highest. The daily summaries retain the
+driver across 365 columns, with 160 units available for fitting each
+model. The monthly and seasonal summaries average together periods that
+contribute differently to the response. These differences help explain
+the observed curve.
 
 ## Two arms on matched cells
 
@@ -646,10 +648,10 @@ pd.DataFrame(ts.grain_ladder(x_null, null.y, en, folds=folds_null, verbose=False
 #> 3  elasticnet  season  0.498661           8   True
 ```
 
-The ladder has a best grain all the same, the daily one at 0.524. The
-highest of four means read on the folds it was chosen on is the number
-most open to chance, and a reader who took it as the level would report
-skill that is not there.
+The daily candidate has the highest mean score, 0.524. Even unrelated
+responses can produce differences between candidates by chance.
+Selecting the highest of these scores can therefore overstate predictive
+performance.
 
 ``` r
 
@@ -805,10 +807,10 @@ through week, month and season.](comparing-grains_files/py-figure-4.svg)
 ## What the weekly model read
 
 [`occlusion()`](https://gillescolling.com/timesift/reference/occlusion.md)
-holds one bin back at a time from the per-fold models the run kept,
-rescores the held-out units, and records the fall in score as that bin’s
-weight. Nothing is refitted. Here each weekly bin is permuted across the
-held-out units five times.
+evaluates how predictions depend on each time bin. Here it shuffles a
+bin’s values across the held-out units and records the change in AUC,
+repeating the shuffle five times per bin. It uses the saved models for
+each fold.
 
 ``` r
 
@@ -993,15 +995,17 @@ the mechanism putting weight there.
 
 ## Scores, thresholds and their inflation
 
-A run scores presence-absence responses by
+By default,
 [`roc_auc()`](https://gillescolling.com/timesift/reference/roc_auc.md)
-unless told otherwise. TSS, the statistic species distribution studies
-usually report, is the maximum of sensitivity plus specificity minus one
-over every cut, and the cut is chosen on the units the score is then
-read on. That choice inflates the level, by more the fewer presences a
-cell holds.
+scores how well predictions rank presences above absences. The true
+skill statistic (TSS) evaluates binary predictions: sensitivity, the
+proportion of presences identified, plus specificity, the proportion of
+absences identified, minus one.
+[`tss()`](https://gillescolling.com/timesift/reference/tss.md) selects
+the threshold giving the highest TSS on the evaluation data. That
+selection can inflate the score, especially with few presences.
 [`score_predictions()`](https://gillescolling.com/timesift/reference/score_predictions.md)
-scores any matrix of held-out predictions on the scorable cells, here
+applies metrics to each eligible response-fold pair. Here it evaluates
 the weekly candidate’s out-of-fold predictions under four metrics:
 
 ``` r

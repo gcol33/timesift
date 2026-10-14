@@ -1,14 +1,17 @@
 # Troubleshooting
 
-`timesift` refuses a record it cannot represent faithfully, and says
-why. This article collects the refusals and surprises met most often,
-each reproduced on a small simulated record: the message as it appears,
-what produced it, and the call that works.
+This article explains common errors and unexpected results when
+preparing sensor records, fitting models and predicting new
+observations. Each example shows the message, its cause and a working
+call.
 
-Every example below reads the same two tables: 24 plots, each with a
-logger reading soil temperature every hour for 60 days from 1 September
-2021, and two species whose presence follows each plot’s own level of
-warmth.
+The examples use 24 study plots, each with hourly soil-temperature
+readings for 60 days from 1 September 2021, and two species whose
+presence depends on each plot’s average warmth. A plot is a *unit*.
+Readings are grouped into time intervals called *bins*, and the interval
+length, such as a week or month, is the *grain*. A *learner* specifies
+the model to fit; its combination with a particular input summary is a
+*candidate*.
 
 ## Installation
 
@@ -227,13 +230,11 @@ x.bin_n[0]
 #> array([120, 168, 168, 168, 168, 168, 168, 168, 144], dtype=int32)
 ```
 
-Nothing is wrong: the calendar tiles the record, and a record that does
-not start on a Monday has a partial week at its start. `bin_partial`
-marks those bins and `bin_n` counts the readings each bin was reduced
-from, 120 in the first week against 168 in a full one. A partial bin’s
-mean is taken over fewer readings, and its `cold_day` and `warm_day` are
-drawn from fewer days, so they sit closer to the mean than a full bin’s
-would.
+Weekly intervals start on Monday. The record begins on Wednesday, so the
+first week contains fewer readings. `bin_partial` marks incomplete
+intervals and `bin_n` counts their readings: 120 in the first week and
+168 in a full week. A partial bin’s mean and daily extremes are
+calculated from the readings available in that interval.
 
 `partial = "drop"` removes them.
 
@@ -478,13 +479,13 @@ ts.timesift(pd.concat([targets, targets.iloc[[0]]]), series, y="sp*", id="plot",
 
 ## A learner cannot read the representation
 
-A learner declares what it reads: a tabular block of features, or a
-sequence whose bins are ordered in time.
+Learners accept either a table of predictors or values ordered by time.
 [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)
-is tabular, and
-[`native()`](https://gillescolling.com/timesift/reference/native.md) is
-the record unreduced, one column per hourly reading. Pinned to it
-through `data =`, it is refused before any array is built.
+uses a table.
+[`native()`](https://gillescolling.com/timesift/reference/native.md)
+keeps every reading as a separate time bin, and the package rejects this
+representation for tabular learners. Assigning it explicitly through
+`data =` raises the error before the array is built.
 
 ``` r
 
@@ -723,11 +724,12 @@ ts.grain("week", stats=("cold_day", "mean", "warm_day"))
 
 ## A response has too few presences to score
 
-A presence-absence score needs both classes among the held-out units,
-and a model per response needs both among the units it is fitted on. A
-cell, one response in one fold, where either side of the split holds a
-single class carries no score. Below, `sp3` is present in two plots and
-`sp4` in none.
+Cross-validation divides plots into groups called *folds*, then predicts
+each fold using models trained on the others. To score a species in a
+test fold, that fold must contain both presences and absences. A model
+fitted separately for the species also needs both in its training set. A
+species-fold pair is called a *cell*. Below, `sp3` occurs on two plots
+and `sp4` on none.
 
 ``` r
 
@@ -776,13 +778,12 @@ In folds 1, 2 and 3 both presences of `sp3` sit on the training side,
 leaving no presence to score, and in fold 4 both are held out, leaving
 none to fit on.
 
-The run does not stop for this. `fit$cells` is the mask, computed from
-the response and the fold map alone, and every candidate is scored on
-the same scorable cells, so `sp3` and `sp4` contribute nothing to any
-mean.
+The run continues using the eligible species-fold pairs. `fit$cells`
+lists these pairs, based on the observed responses and fold assignments.
+Every candidate is scored on the same pairs, and `sp3` and `sp4`
+contribute to none of the means here.
 [`scorable_cells()`](https://gillescolling.com/timesift/reference/scorable_cells.md)
-gives the same table before a fit, from a response matrix and a fold
-map.
+calculates this eligibility table before fitting.
 
 ``` r
 
@@ -990,13 +991,13 @@ fit_lb.predict(later.iloc[:3], next_year[next_year["plot"].isin(ids[:3])]).round
 
 ## Runs take longer than expected
 
-The cost of a run is a count of fits. With `n_inner` set, every
-candidate is cross-validated inside every outer training fold and then
-refitted on that fold once, which is
-`v_outer * (n_inner + 1) * candidates` fits, plus one refit per
-candidate on every target. With `n_inner = NULL` the inner search is
-skipped and the count drops to `v_outer * candidates`, at the price of
-the held-out `estimate`.
+With `n_inner` set, each candidate is cross-validated within each outer
+training set, then fitted once on that whole training set. This requires
+`v_outer * (n_inner + 1) * candidates` fits, plus one final fit per
+candidate on all targets. `n_inner = NULL` runs only the outer
+cross-validation, requiring `v_outer * candidates` fits before the final
+refits. It reports candidate scores and omits the performance estimate
+for selection and combination.
 
 ``` r
 
@@ -1015,7 +1016,7 @@ outer_only <- system.time(timesift(targets, series, y = starts_with("sp"), id = 
                                    n_inner = NULL, verbose = FALSE))[["elapsed"]]
 c(nested = nested, outer_only = outer_only)
 #>     nested outer_only 
-#>       0.46       0.12
+#>       0.44       0.12
 ```
 
 ``` python
@@ -1040,7 +1041,7 @@ nested > outer_only
 #> True
 ```
 
-On this record the nested run took 0.46 seconds and the run on the outer
+On this record the nested run took 0.44 seconds and the run on the outer
 folds alone 0.12.
 
 Each fit in turn costs what its array costs. A calendar grain has as

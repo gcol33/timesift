@@ -63,7 +63,7 @@
     <li><a class="dropdown-item" href="../articles/python-reference.html">Reference</a></li>
   </ul>
 </li>
-<li class="active nav-item dropdown">
+<li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/representations.html">Representing a record</a></li>
@@ -115,15 +115,17 @@
     
     
 <!-- Python blocks run by tools/python_twins.py (md5 34ceb4401a16cc1bfa4ab54db4aaca8b). -->
-<p><code>timesift</code> compares time scales to find which gives the
-best predictions from a record. Simulated data provide a way to check
-this comparison: <code><a href="../reference/simulate_records.html">simulate_records()</a></code> generates responses
-that depend on the record at a specified grain.</p>
-<p>This article starts with responses generated from weekly summaries
-and compares four grains using <code><a href="../reference/grain_ladder.html">grain_ladder()</a></code>, paired and
-mixed-model contrasts, nested selection and occlusion. Further examples
-use seasonal, daily and signal-free responses to examine how the results
-depend on the simulated mechanism.</p>
+<p><code>timesift</code> compares models built from daily, weekly or
+longer summaries of a sensor record. Each time scale is called a
+<em>grain</em>. Simulated data let us check whether the comparison
+identifies a known relationship: <code><a href="../reference/simulate_records.html">simulate_records()</a></code>
+generates responses that depend on readings at a specified time
+scale.</p>
+<p>The first example generates presence-absence responses from weekly
+summaries, then tests models at four time scales. It compares their
+prediction scores, evaluates the process of choosing a time scale, and
+checks which periods affect the predictions. Later examples use
+seasonal, daily and unrelated responses.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -148,15 +150,14 @@ depend on the simulated mechanism.</p>
 <div class="section level2">
 <h2 id="a-record-with-a-known-answer">A record with a known answer<a class="anchor" aria-label="anchor" href="#a-record-with-a-known-answer"></a>
 </h2>
-<p><code><a href="../reference/simulate_records.html">simulate_records()</a></code> draws, for each unit, a year of
-readings made of three parts: a seasonal cycle every unit shares, a
-constant offset of the unit’s own, and an autocorrelated anomaly.
-Measurement noise is added on top. Each response variable is driven by a
-weighted mean of the unit’s anomaly over a short stretch of the year,
-and the shape of the weights sets the grain. Under
-<code>mechanism = "lag"</code> the weights decay geometrically over four
-consecutive weeks from an anchor week, one anchor per variable, so the
-driver is an exact linear combination of weekly means.</p>
+<p><code><a href="../reference/simulate_records.html">simulate_records()</a></code> generates a year of readings for each
+sampling unit. All units share a seasonal cycle. Each also has its own
+average level and deviations that persist across nearby readings.
+Measurement noise is added to these values. The responses depend on a
+weighted average of the deviations over a short period. With
+<code>mechanism = "lag"</code>, that period covers four consecutive
+weeks, with weights decreasing geometrically from the first week. Each
+response uses its own starting week.</p>
 <div class="lang-py-only">
 <p>The Python block draws its own record, so the values it prints differ
 from the ones quoted in the text, which come from the R run. Counts,
@@ -185,18 +186,19 @@ shapes and calendar boundaries do not depend on the draw and agree.</p>
 <span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>sim.anchor <span class="op">+</span> <span class="dv">1</span></span>
 <span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt; array([ 2,  9, 15, 22, 29, 36, 42, 49])</span></span></code></pre></div>
 </div>
-<p>The true grain of a mechanism is defined as the coarsest grain at
-which the driver is still an exact linear function of the binned record.
-Day bins nest inside weeks, so a daily representation also holds
-everything the driver reads, spread over seven times as many columns.
-Month bins straddle week boundaries, and a season bin averages thirteen
-weeks together, so both lose part of the driver. The anchors are the
-positions of each variable’s first week among the 53 weekly bins of this
-record.</p>
-<p><code>auc = 0.9</code> is the area under the ROC curve of the driver
-itself against the response. No fitted model reaches it: the readings
-carry noise the driver does not, and the weights have to be estimated
-from 200 units. The prevalence is shared by every variable.</p>
+<p>Here the <em>true grain</em> is the coarsest time scale whose
+summaries retain the full quantity used to generate the response, called
+the <em>driver</em>. Daily summaries retain the weekly driver across
+seven times as many columns. Monthly and seasonal summaries combine
+readings from weeks with different weights and lose some of that
+information. The simulator calls each response’s starting week its
+<em>anchor</em>.</p>
+<p><code>auc = 0.9</code> sets the driver’s population area under the
+receiver operating characteristic curve (AUC), a measure of how well it
+ranks presences above absences. Models must estimate the relationship
+from 200 units of noisy readings. <em>Prevalence</em> is the proportion
+of units with a presence; it is the same for every simulated
+response.</p>
 <p>The first variable reads four weeks starting at its anchor:</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
@@ -238,14 +240,16 @@ that belongs to them.</p>
 <div class="section level2">
 <h2 id="one-run-over-four-grains">One run over four grains<a class="anchor" aria-label="anchor" href="#one-run-over-four-grains"></a>
 </h2>
-<p><code><a href="../reference/timesift.html">timesift()</a></code> builds each representation in
-<code>sift</code>, fits every learner on each, and scores all of them on
-one set of outer folds. The learner here is the elastic net with a
-shorter penalty path and a looser stopping tolerance than its defaults,
-to keep this article quick to build. <code>year_start</code> matches the
-boundary the simulation located its bins with, which matters for the
-seasonal grain. <code>keep_fits = TRUE</code> keeps the per-fold models,
-which the occlusion profile later reads.</p>
+<p><code><a href="../reference/timesift.html">timesift()</a></code> builds each summary specified in
+<code>sift</code> and pairs it with each learner, producing the model
+candidates. It evaluates all candidates on the same groups of held-out
+units, called <em>outer folds</em>. Within each training set, <em>inner
+folds</em> choose a candidate and estimate weights for combining
+candidates into an ensemble. The elastic net here uses a shorter penalty
+path and a looser stopping tolerance to keep the example quick.
+<code>year_start</code> matches the simulation’s seasonal boundaries.
+<code>keep_fits = TRUE</code> saves the fold-specific models for the
+later analysis of influential periods.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">en</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/elasticnet.html">elasticnet</a></span><span class="op">(</span>n_inner <span class="op">=</span> <span class="fl">5L</span>, n_lambda <span class="op">=</span> <span class="fl">50L</span>, tol <span class="op">=</span> <span class="fl">1e-6</span><span class="op">)</span></span>
@@ -1487,11 +1491,13 @@ are the ones a presence-absence study usually reads:</p>
 <p>The interval is across the eight responses, which are fitted and
 scored on the same units and the same folds, so it carries the spread
 between responses and not the error they share.</p>
-<p><code>resampling = cv(v = 5)</code> dealt the 200 units into five
-folds of equal size, balanced on richness, the number of responses
-present at a unit, because one fold map serves all eight responses at
-once. The mask of scorable cells is computed from the responses and that
-map alone, before any model is fitted.</p>
+<p><code>resampling = cv(v = 5)</code> divides the 200 units into five
+equal folds, balanced on the number of responses present at each unit.
+The same assignments are used for all eight responses. Each
+response-fold pair is called a <em>cell</em>. Before fitting,
+<code>timesift</code> identifies which cells contain enough presences
+and absences to score; this table of eligible pairs is the
+<em>scorable-cell mask</em>.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">folds</span><span class="op">)</span></span>
@@ -2612,11 +2618,11 @@ L 414.72 41.472
  </defs>
 </svg></div></p>
 </div>
-<p>The curve rises from day to week and falls from week on. The rise is
-the cost of variance: the daily array holds the driver exactly, but the
-penalised fit has to find it among 365 columns with 160 training units.
-The fall is the cost of bias, where the bins average away part of what
-the driver reads.</p>
+<p>The weekly summaries score highest. The daily summaries retain the
+driver across 365 columns, with 160 units available for fitting each
+model. The monthly and seasonal summaries average together periods that
+contribute differently to the response. These differences help explain
+the observed curve.</p>
 </div>
 <div class="section level2">
 <h2 id="two-arms-on-matched-cells">Two arms on matched cells<a class="anchor" aria-label="anchor" href="#two-arms-on-matched-cells"></a>
@@ -4049,10 +4055,10 @@ AUC should sit near 0.5.</p>
 <span id="cb34-10"><a href="#cb34-10" tabindex="-1"></a><span class="co">#&gt; 2  elasticnet   month  0.489988           8  False</span></span>
 <span id="cb34-11"><a href="#cb34-11" tabindex="-1"></a><span class="co">#&gt; 3  elasticnet  season  0.498661           8   True</span></span></code></pre></div>
 </div>
-<p>The ladder has a best grain all the same, the daily one at 0.524. The
-highest of four means read on the folds it was chosen on is the number
-most open to chance, and a reader who took it as the level would report
-skill that is not there.</p>
+<p>The daily candidate has the highest mean score, 0.524. Even unrelated
+responses can produce differences between candidates by chance.
+Selecting the highest of these scores can therefore overstate predictive
+performance.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/select_grain.html">select_grain</a></span><span class="op">(</span><span class="va">x_null</span>, <span class="va">null</span><span class="op">$</span><span class="va">y</span>, <span class="va">en</span>, folds <span class="op">=</span> <span class="va">folds_null</span>, n_inner <span class="op">=</span> <span class="fl">3L</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
@@ -5286,10 +5292,10 @@ L 414.72 41.472
 <div class="section level2">
 <h2 id="what-the-weekly-model-read">What the weekly model read<a class="anchor" aria-label="anchor" href="#what-the-weekly-model-read"></a>
 </h2>
-<p><code><a href="../reference/occlusion.html">occlusion()</a></code> holds one bin back at a time from the
-per-fold models the run kept, rescores the held-out units, and records
-the fall in score as that bin’s weight. Nothing is refitted. Here each
-weekly bin is permuted across the held-out units five times.</p>
+<p><code><a href="../reference/occlusion.html">occlusion()</a></code> evaluates how predictions depend on each
+time bin. Here it shuffles a bin’s values across the held-out units and
+records the change in AUC, repeating the shuffle five times per bin. It
+uses the saved models for each fold.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">weight</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/occlusion.html">occlusion</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"elasticnet / week"</span>, permutations <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
@@ -6793,13 +6799,14 @@ the mechanism putting weight there.</p>
 <div class="section level2">
 <h2 id="scores-thresholds-and-their-inflation">Scores, thresholds and their inflation<a class="anchor" aria-label="anchor" href="#scores-thresholds-and-their-inflation"></a>
 </h2>
-<p>A run scores presence-absence responses by <code><a href="../reference/roc_auc.html">roc_auc()</a></code>
-unless told otherwise. TSS, the statistic species distribution studies
-usually report, is the maximum of sensitivity plus specificity minus one
-over every cut, and the cut is chosen on the units the score is then
-read on. That choice inflates the level, by more the fewer presences a
-cell holds. <code><a href="../reference/score_predictions.html">score_predictions()</a></code> scores any matrix of
-held-out predictions on the scorable cells, here the weekly candidate’s
+<p>By default, <code><a href="../reference/roc_auc.html">roc_auc()</a></code> scores how well predictions rank
+presences above absences. The true skill statistic (TSS) evaluates
+binary predictions: sensitivity, the proportion of presences identified,
+plus specificity, the proportion of absences identified, minus one.
+<code><a href="../reference/tss.html">tss()</a></code> selects the threshold giving the highest TSS on the
+evaluation data. That selection can inflate the score, especially with
+few presences. <code><a href="../reference/score_predictions.html">score_predictions()</a></code> applies metrics to each
+eligible response-fold pair. Here it evaluates the weekly candidate’s
 out-of-fold predictions under four metrics:</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb52"><pre class="downlit sourceCode r">
