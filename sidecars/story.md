@@ -39,7 +39,7 @@ inflation of a self-selected threshold; the docs teach those.
 - home: vignettes/articles/representations.Rmd
 - also: README, DESCRIPTION, Get started, ?grain_matrix, python.Rmd
 
-### A2 Evaluation scores
+### A2 Report evaluation scores
 - question: "is the best grain's score an honest estimate?"
 - answer: every candidate is scored on one fold map and one scorable-cell mask computed without a
   model; the chosen grain and the ensemble weights are chosen inside each outer training fold, so

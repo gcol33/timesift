@@ -33,7 +33,7 @@ timesift lets you:
   elastic net, stepwise GLMs, classification trees, random forests,
   boosting, Maxent, surface range envelopes, MARS, flexible discriminant
   analysis, GAMs and neural networks, or add your own model.
-- **Evaluation scores.** Evaluate model selection and ensembles on
+- **Report evaluation scores.** Evaluate model selection and ensembles on
   held-out data: each training fold chooses the grain and estimates the
   ensemble weights, and the matching test fold scores the predictions.
   Selecting the TSS threshold on the same data used to evaluate it can
