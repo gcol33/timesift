@@ -36,3 +36,4 @@
 ^src/.*\.dll$
 ^TODO\.md$
 ^CITATION\.cff$
+^sidecars$

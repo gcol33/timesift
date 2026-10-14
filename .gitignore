@@ -31,3 +31,6 @@ python/timesift/_core*.so
 
 # Local notes and run files, never part of the package or the site.
 dev_notes/
+
+# knitr's default figure folder, written when an Rmd is knitted outside pkgdown.
+figure/

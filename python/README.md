@@ -1,108 +1,166 @@
-# timesift (Python)
+# timesift <img src="https://gillescolling.com/timesift/reference/figures/logo.svg" align="right" height="139" alt="timesift logo" />
 
-The Python side of `timesift`. It fits and compares representations of time-varying data against a
-prediction target, from the same one call the R package offers, and it answers to
-`../inst/spec/representation.md`, the document both implementations answer to.
+*choosing the time scale of a sensor record*
+
+[![PyPI](https://img.shields.io/pypi/v/timesift)](https://pypi.org/project/timesift/)
+[![pytest](https://github.com/gcol33/timesift/actions/workflows/pytest.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/pytest.yaml)
+[![contract](https://github.com/gcol33/timesift/actions/workflows/contract.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/contract.yaml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+<p align="center"><img src="https://gillescolling.com/timesift/reference/figures/timesift-hero.png" alt="Three years of hourly soil temperature from one alpine plot drawn at seven time scales, from hourly readings down to yearly means, beside the true skill statistic a convolutional network reached on each over 101 species: 0.658 hourly, rising to a peak of 0.706 at the weekly mean, falling to 0.626 yearly" width="100%"></p>
+
+timesift finds the time scale at which a long sensor record best predicts something, such as
+whether a plant species grows at the plot where a soil temperature logger recorded every hour for
+three years.
+
+Before a model is fitted, a record like that is usually reduced once, to monthly means or
+growing-degree-days, and the reduction is rarely revisited. timesift makes it an argument. Each
+time scale is a *grain*: the record is cut into calendar bins, a real week or a real month, and
+each bin is reduced to a statistic such as its mean. The package builds the record at every grain
+you name, fits each learner on every grain it can read, and scores every pairing on the same
+held-out folds and the same cells. You can then compare the grains cell by cell, choose one inside
+the training data, or combine them into an ensemble.
+
+timesift supports:
+
+- **Calendar grains and lookbacks.** From the readings as recorded through half-days, days, weeks,
+  months, seasons and years, with day-level statistics such as the coldest and warmest day of each
+  bin, and `lookback()` spans that end at each target's own date.
+- **The learners species distribution modelling uses.** Elastic net, stepwise GLM, CART, random
+  forest, boosting, Maxent, surface range envelope, MARS, flexible discriminant analysis, GAM and a
+  one-layer network, plus convolutional and fully connected networks through torch, and any
+  learner of your own.
+- **Scores you can report.** The grain and the ensemble weights are chosen inside each outer
+  training fold, so the held-out score covers the choosing too.
+- **Thin presences.** `tss_inflation()` estimates how far a true skill statistic read at its own
+  best threshold overstates skill for your design's presence counts.
+- **Python and R.** This package and the [R package](https://gillescolling.com/timesift/) call one
+  C++ core, so they give the same arrays and the same baseline fits.
+
+Every learner core is timesift's own code, written from the published method and pinned in the
+test fixtures against the reference package a species modeller already uses: glmnet, MASS, rpart,
+earth, mda, mgcv, nnet, maxnet and biomod2. Both test suites assert the same 257 digests of the
+binned record, so a difference between the languages fails a check. A methods section cites the
+package version, which fixes every core and its defaults.
+
+## Installation
+
+```bash
+pip install timesift
+```
+
+Wheels are built for CPython 3.11, 3.12 and 3.13 on Linux, Windows and macOS. On another
+interpreter pip builds from the source distribution, which needs a C++17 compiler.
+
+At runtime the package needs only NumPy. The optional parts are extras:
+
+| Extra | Adds | For |
+|---|---|---|
+| `torch` | PyTorch | `cnn()`, `rescnn()` and `mlp()` |
+| `contrasts` | SciPy | `grain_contrasts()` |
+| `plot` | Matplotlib | `plot()` |
+| `grid` | xarray | `project()` and `range_change()` |
+
+```bash
+pip install "timesift[torch,contrasts,plot]"
+```
+
+A function that needs one of them raises an error naming the package to install when it is
+missing.
+
+## Usage
+
+1. Bring two tables: `targets`, one row per thing to predict with its response, and `series`,
+   the time-stamped readings belonging to those rows.
+2. Call `timesift()` with the response columns, the identifier both tables carry, the time column
+   and the grains to compare.
+3. Read the scores, then call `fit.predict()` on new rows.
+
+`simulate_records()` draws a record with a known answer to try this on: 150 sensors with a reading
+every three hours for a year, and four responses that depend on the record's seasonal level.
 
 ```python
 import timesift as ts
 
-fit = ts.timesift(plots, logger, y="sp_*", id="plot_id", time="datetime",
-                  learners = [ts.elasticnet(), ts.forest()],
-                  sift=ts.grains("day", "week", "month"),
-                  resampling=ts.cv(v=5))
-print(ts.summary(fit))
+sim = ts.simulate_records(n=150, mechanism="season", variables=4,
+                          prevalence=0.3, auc=0.9)
+targets = {"unit": sim.y.units}
+targets.update(zip(sim.y.variables, sim.y.values.T))
+
+fit = ts.timesift(targets, sim.readings, y=list(sim.y.variables),
+                  id="unit", time="time",
+                  sift=ts.grains("day", "week", "month", "season"))
+print(fit)
 ```
 
-```
-timesift  80 targets, 4 responses, 5-fold random CV, tss
+The printed run lists every candidate with its score on the outer folds, then the `selected` and
+`ensemble` rows. A *candidate* is one grain paired with one learner; `elasticnet()` is the learner
+when none is named. The `selected` and `ensemble` rows are the numbers to report: the candidate
+and the ensemble weights were chosen inside each outer training fold and then scored once on the
+held-out fold.
 
-candidate                    mean    won  responses
-forest / week               0.503      0  separate
-elasticnet / month          0.504      0  separate
-forest / month              0.507      1  separate
-elasticnet / day            0.515      1  separate
-elasticnet / week           0.528      1  separate
-forest / day                0.535      1  separate
-ensemble                    0.571      -
+`targets` and `series` are mappings of column name to array, which a pandas data frame satisfies.
+`y` selects over its own table by a column name, a list of names, a glob such as `"sp_*"`, or a
+function of a name. A table with a missing reading in a bin is refused, and `coverage()` shows
+which unit and bin lack readings. A time column that carries a zone bins by that zone's clock.
 
-weights  elasticnet / week 0.37   elasticnet / day 0.22   forest / month 0.17   elasticnet / month 0.12   forest / day 0.09   forest / week 0.04
-```
+`fit.predict(new_targets, new_series)` rebuilds each member's grain for the new rows and predicts
+through the ensemble fitted on every target. `type="binary"` cuts each response into presence and
+absence at a threshold learned from the out-of-fold predictions.
 
-`targets` and `series` are mappings of column name to array, which a data frame satisfies. `y`, `x`
-and `static` are selections over their own table: a column name, a list of names, a glob such as
-`"sp_*"`, or a function of a name. `fit.predict(targets, series)` rebuilds each member's
-representation for the new rows and combines them, and `type="binary"` cuts each response at a
-threshold learned from the fit's own out-of-fold predictions.
+## The grain in an alpine study
 
-## What is here
+timesift was built for a study of 894 alpine plots on the Schrankogel, Austria, with 101 plant
+species and three years of hourly soil temperature per plot. The figure at the top shows that run:
+the convolutional network scored 0.048 TSS lower on the hourly record than on its best grain, and
+skill peaked at the weekly mean. The
+[reproduction README](https://github.com/gcol33/timesift/blob/master/inst/reproduce/README.md)
+compares every number with the paper.
 
-- `timesift`, `Timesift`: the entry point and the fitted run, carrying its candidates, its scores,
-  its out-of-fold predictions and its stack.
-- `native`, `grain`, `multigrain`, `lookback` and the sets `grains` and `lookbacks`: what a
-  representation is, before any record has been read. `build_representation` turns one into the
-  array a learner is handed.
-- `grain_matrix`, `lookback_matrix`, `calendar_channels`, `bind_channels`, `feature_matrix`,
-  `timesift_set`: the arrays themselves, reachable without the fitting layer. `coverage` is the
-  count of readings per unit and bin, which is where a refused record's gaps are read off.
-- `cv`, `grouped_cv`, `fold_map`, `read_folds`, `scorable_cells`: the split, and which cells admit
-  a score.
-- `elasticnet`, `stepwise`, `tree`, `forest`, `mlp`, `cnn`, `rescnn` (torch), and `Learner`
-  for one of your own. `train_control` carries how any of the neural ones is trained.
-- `ensemble`, `ensemble_fit`, `ensemble_combine`, `ensemble_weights`: the stack over the
-  candidates' out-of-fold predictions.
-- `tss`, `roc_auc`, `kappa_score`, `model_agreement`, `decision_threshold`: the metrics.
-- `grain_ladder`, `select_grain`, `paired_contrast`, `tss_inflation`, `implied_skill`: fitting
-  across a set of grains on its own, comparing two arms cell by cell, and reading a level that was
-  taken at its own best threshold.
-- `occlusion`: hold each bin or each channel back and rescore, without refitting. It takes a run or
-  a ladder.
-- `register_learner`, `register_metric`, `register_response`: the three registries the fitting path
-  reads.
+## Working across R and Python
 
-The mixed-model grain contrast the R side offers as `grain_contrasts()` has no counterpart here.
-The contract's last section carries the rest of what each language holds.
+The binning, the statistics and the elastic net are one implementation, so the same input gives
+the same arrays and the same coefficients in both languages. The fold builders draw on each
+language's own random stream, so the same seed gives different folds; `write_folds()` saves a fold
+map and `read_folds()` reads it in the other language.
+[The contract between R and Python](https://gillescolling.com/timesift/articles/contract.html)
+lists what each language carries.
 
-The binning and the reduction are not written here. They are `../src/ts_core.cpp`, the same
-implementation the R package compiles, reached through the `_core` extension that `../CMakeLists.txt`
-builds with nanobind. What is written here is the boundary: resolving the columns, resolving the
-zone, and putting the result into a `TimesiftMatrix`.
+## Documentation
 
-At runtime the package needs numpy alone. A learner that needs a package declares it and stops
-without it.
+Start with [Choosing how a record is read, in Python](https://gillescolling.com/timesift/articles/python.html):
+one path from two tables to a scored comparison and predictions.
 
-## The time zone
+- [Python reference](https://gillescolling.com/timesift/articles/python-reference.html): every function, grouped by job.
+- [Representing a record](https://gillescolling.com/timesift/articles/representations.html), [Learners](https://gillescolling.com/timesift/articles/learners.html), [Finding the grain](https://gillescolling.com/timesift/articles/comparing-grains.html) and [Ensembles, thresholds and maps](https://gillescolling.com/timesift/articles/prediction.html): the concepts, with R code that the Python functions of the same name follow.
+- [Troubleshooting](https://gillescolling.com/timesift/articles/troubleshooting.html): the errors a run raises and how to fix them.
 
-`grain_matrix` takes a `tz` argument. Left at `None` the instants are taken as already expressed
-in the calendar to bin by, which is what a zone-free `datetime64` says. Given a zone name they are
-read as UTC and binned by that zone's clock, which is what the R side does for a series carrying a
-`tzone`. The same instants and the same zone give the same answer in both languages, and
-`digests.csv` carries zone rows that pin it.
+## Getting help
 
-A time column that carries a zone of its own names the calendar the same way, so a `pandas` column
-in `Europe/Vienna` bins by Vienna days without being told to. Naming a different zone in `tz`
-beside one the column carries is an error rather than a silent choice between the two.
+Questions and bug reports go to the [issue tracker](https://github.com/gcol33/timesift/issues).
+With a bug report, include a small example that reproduces it.
 
-## The fold map crosses the language boundary; the fold builder does not
+## Contributing
 
-`fold_map` draws on numpy's random stream and the R side draws on R's, so the same seed gives
-different maps. Where both languages must see identical splits, build the map once and read it in
-the other with `read_folds`. The map is an artifact, like the response and the representation.
+Building from a checkout, the test suites and the rules for the shared fixtures are in
+[CONTRIBUTING.md](https://github.com/gcol33/timesift/blob/master/CONTRIBUTING.md).
 
-## Two rules govern this directory
+## Support
 
-- **`tests/oracle.py` is implemented from the spec, not transcribed from the R source.** It is the
-  NumPy representation as it was written before the two languages shared a core, kept because
-  reading the R code and copying it would reproduce its bugs and hide its assumptions. Nothing
-  imports it outside the suite; it exists so the shared core is checked against an implementation
-  that shares none of its code.
-- **A digest mismatch is a bug, never a fixture to regenerate.** Regenerating fixtures happens on
-  the R side, deliberately, in its own commit, and only when the spec changed with it.
+> "Software is like sex: it's better when it's free." — Linus Torvalds
 
-The project directory is the repository root, because a source distribution cannot reach above
-itself and the shared sources are not vendored into a second copy. Build and test from there:
+I'm a PhD student who builds R packages in my free time because I believe good tools should be free and open. I started these projects for my own work and figured others might find them useful too.
 
-```
-pip install -e ".[test,torch]"
-pytest
-```
+If this package saved you some time, buying me a coffee is a nice way to say thanks. It helps with my coffee addiction.
+
+[![Buy Me A Coffee](https://img.shields.io/badge/-Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/gcol33)
+
+## License
+
+MIT
+
+## Citation
+
+Download the citation as [BibTeX](https://gillescolling.com/timesift/timesift.bib) or
+[RIS](https://gillescolling.com/timesift/timesift.ris), or use GitHub's "Cite this repository" on
+the [repository](https://github.com/gcol33/timesift).
