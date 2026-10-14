@@ -246,18 +246,6 @@
 <span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="bu">print</span>(fit)</span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="the-grain-in-an-alpine-study">The grain in an alpine study<a class="anchor" aria-label="anchor" href="#the-grain-in-an-alpine-study"></a>
-</h2>
-<p>timesift was built for a study of 894 alpine plots on the Schrankogel, Austria, with 101 plant species and three years of hourly soil temperature per plot. The figure at the top shows that run:</p>
-<ul>
-<li>The hourly record was the best input for none of three network architectures. The convolutional network scored 0.048 TSS lower on it than on its best grain.</li>
-<li>Skill peaked at the weekly mean and fell from monthly on, 0.080 lower at yearly.</li>
-<li>The coldest and warmest day of a bin carried more than its mean, by 0.006 weekly up to 0.046 yearly.</li>
-<li>A fully connected network on the same series scored level with a penalised logistic model on 188 hand-built features (-0.002 TSS, p = 0.63).</li>
-</ul>
-<p><code>inst/reproduce/schrankogel.R</code> runs that grid from the <a href="https://doi.org/10.5281/zenodo.17047026" class="external-link">Zenodo deposit</a> and checks the plot, species, cell and bin counts before fitting anything. <a href="https://github.com/gcol33/timesift/blob/master/inst/reproduce/README.md" class="external-link">Its README</a> compares every number with the paper.</p>
-</div>
-<div class="section level2">
 <h2 id="reading-a-record-at-several-grains">Reading a record at several grains<a class="anchor" aria-label="anchor" href="#reading-a-record-at-several-grains"></a>
 </h2>
 <p><code>grains("day", "week", "month")</code> names a set of grains to compare, and <code>grains("auto")</code> takes every named grain that gives the record at least two bins. A learner runs across the whole set, or at one grain when it is given one, as in <code>cnn(data = grain("week"))</code>.</p>

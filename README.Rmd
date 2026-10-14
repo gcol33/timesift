@@ -163,25 +163,6 @@ fit = ts.timesift(targets, sim.readings, y=list(sim.y.variables),
 print(fit)
 ```
 
-## The grain in an alpine study
-
-timesift was built for a study of 894 alpine plots on the Schrankogel, Austria, with 101 plant
-species and three years of hourly soil temperature per plot. The figure at the top shows that run:
-
-- The hourly record was the best input for none of three network architectures. The
-  convolutional network scored 0.048 TSS lower on it than on its best grain.
-- Skill peaked at the weekly mean and fell from monthly on, 0.080 lower at yearly.
-- The coldest and warmest day of a bin carried more than its mean, by 0.006 weekly up to 0.046
-  yearly.
-- A fully connected network on the same series scored level with a penalised logistic model on
-  188 hand-built features (-0.002 TSS, p = 0.63).
-
-`inst/reproduce/schrankogel.R` runs that grid from the
-[Zenodo deposit](https://doi.org/10.5281/zenodo.17047026) and checks the plot, species, cell and
-bin counts before fitting anything.
-[Its README](https://github.com/gcol33/timesift/blob/master/inst/reproduce/README.md) compares every
-number with the paper.
-
 ## Reading a record at several grains
 
 `grains("day", "week", "month")` names a set of grains to compare, and `grains("auto")` takes every

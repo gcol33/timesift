@@ -108,15 +108,6 @@ which unit and bin lack readings. A time column that carries a zone bins by that
 through the ensemble fitted on every target. `type="binary"` cuts each response into presence and
 absence at a threshold learned from the out-of-fold predictions.
 
-## The grain in an alpine study
-
-timesift was built for a study of 894 alpine plots on the Schrankogel, Austria, with 101 plant
-species and three years of hourly soil temperature per plot. The figure at the top shows that run:
-the convolutional network scored 0.048 TSS lower on the hourly record than on its best grain, and
-skill peaked at the weekly mean. The
-[reproduction README](https://github.com/gcol33/timesift/blob/master/inst/reproduce/README.md)
-compares every number with the paper.
-
 ## Working across R and Python
 
 The binning, the statistics and the elastic net are one implementation, so the same input gives
