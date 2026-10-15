@@ -65,11 +65,9 @@ logger <- data.frame(
   plot = rep(units, each = length(t)), datetime = rep(t, 30),
   temp = as.numeric(vapply(warmth, function(w) w + sin(seq_along(t) / 300), numeric(length(t)))))
 plots <- data.frame(plot = units, sp_a = rbinom(30, 1, plogis(2 * warmth)))
-# \donttest{
 fit <- timesift(plots, logger, y = sp_a, id = plot, time = datetime,
                 sift = grains("month"), resampling = cv(v = 3L), ensemble = FALSE,
                 verbose = FALSE)
 x <- build_representation(grain("week"), logger, plots, fit$spec)
 dim(x)
-# }
 ```

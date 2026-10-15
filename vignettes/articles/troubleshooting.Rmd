@@ -2,13 +2,14 @@
 title: "Troubleshooting"
 ---
 
-<!-- Python blocks run by tools/python_twins.py (md5 b524448c6802ddcead5d167cd90cd12a). -->
+<!-- Python blocks run by tools/python_twins.py (md5 168dddd9fc7a7aafb25d8e7538e3ca3c). -->
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5, fig.height = 4.5,
                       dev.args = list(pointsize = 14))
 set.seed(1)
 library(timesift)
+if (nzchar(Sys.getenv("TIMESIFT_DOCS_CACHE"))) source(Sys.getenv("TIMESIFT_DOCS_CACHE"))
 ```
 
 This article explains common errors and unexpected results when preparing sensor records, fitting models and predicting new observations. Each example shows the message, its cause and a working call.
@@ -37,10 +38,6 @@ pip install "timesift[torch,contrasts,plot]"
 # Or install the development version from GitHub
 pip install git+https://github.com/gcol33/timesift
 ```
-:::
-
-::: {.lang-py-only}
-The Python block draws its own record, so the values it prints differ from the ones quoted in the text, which come from the R run. Counts, shapes and calendar boundaries do not depend on the draw and agree.
 :::
 
 ::: {.lang-pair}
@@ -203,7 +200,7 @@ x.bin_n[0]
 ```
 :::
 
-Weekly intervals start on Monday. The record begins on Wednesday, so the first week contains fewer readings. `bin_partial` marks incomplete intervals and `bin_n` counts their readings: `r attr(x, "bin_n")[1, 1]` in the first week and `r attr(x, "bin_n")[1, 2]` in a full week. A partial bin's mean and daily extremes are calculated from the readings available in that interval.
+Weekly intervals start on Monday. The record begins on Wednesday, so the first week contains fewer readings. `bin_partial` marks incomplete intervals and `bin_n` counts their readings: [`r attr(x, "bin_n")[1, 1]`]{.lang-r-only}[120]{.lang-py-only py="x.bin_n[0, 0]"} in the first week and [`r attr(x, "bin_n")[1, 2]`]{.lang-r-only}[168]{.lang-py-only py="x.bin_n[0, 1]"} in a full week. A partial bin's mean and daily extremes are calculated from the readings available in that interval.
 
 `partial = "drop"` removes them.
 
@@ -309,7 +306,7 @@ xv.bin_n[0, :2]
 :::
 
 The first Vienna day began two hours before the first reading, so it is partial and holds
-`r attr(xv, "bin_n")[1, 1]` readings. In a zone that keeps daylight saving time the day the clock
+[`r attr(xv, "bin_n")[1, 1]`]{.lang-r-only}[22]{.lang-py-only py="xv.bin_n[0, 0]"} readings. In a zone that keeps daylight saving time the day the clock
 goes forward holds 23 hours and the day it goes back 25. A record kept on a fixed offset bins
 into days of 24 hours once its `tzone` names that offset, such as `"Etc/GMT-1"` for Central
 European standard time. The zone is a decision about what a day means for the question,
@@ -401,7 +398,7 @@ fit_fewer.y.values.shape
 ```
 :::
 
-The fit holds `r nrow(fit_fewer$y)` targets, although the series carries `r length(ids)` plots. When
+The fit holds [`r nrow(fit_fewer$y)`]{.lang-r-only}[22]{.lang-py-only py="fit_fewer.y.values.shape[0]"} targets, although the series carries [`r length(ids)`]{.lang-r-only}[24]{.lang-py-only py="len(ids)"} plots. When
 a plot seems to be missing from the results, `rownames(fit$y)` lists the targets that were fitted.
 
 Two rows of `targets` with one identifier are refused unless `target_time` says where in time each
@@ -664,8 +661,8 @@ and in fold 3 both are held out, leaving none to fit on.
 :::
 
 ::: {.lang-py-only}
-In folds 1, 2 and 3 both presences of `sp3` sit on the training side, leaving no presence to score,
-and in fold 4 both are held out, leaving none to fit on.
+In folds [1, 2 and 3]{.lang-py-only py="(lambda f: ', '.join(map(str, f[:-1])) + ' and ' + str(f[-1]))(cells.loc[(cells['variable'] == 'sp3') & (cells['pres_test'] == 0), 'fold'].tolist())"} both presences of `sp3` sit on the training side, leaving no presence to score,
+and in fold [4]{.lang-py-only py="cells.loc[(cells['variable'] == 'sp3') & (cells['pres_test'] == 2), 'fold'].item()"} both are held out, leaving none to fit on.
 :::
 
 The run continues using the eligible species-fold pairs. `fit$cells` lists these pairs, based on the observed responses and fold assignments. Every candidate is scored on the same pairs, and `sp3` and `sp4` contribute to none of the means here. `scorable_cells()` calculates this eligibility table before fitting.
@@ -895,8 +892,8 @@ nested > outer_only
 ```
 :::
 
-On this record the nested run took `r nested` seconds and the run on the outer folds alone
-`r outer_only`.
+On this record the nested run took [`r nested`]{.lang-r-only}[0.84]{.lang-py-only py="f'{nested:.2f}'"} seconds and the run on the outer folds alone
+[`r outer_only`]{.lang-r-only}[0.37]{.lang-py-only py="f'{outer_only:.2f}'"}.
 
 Each fit in turn costs what its array costs. A calendar grain has as many columns as bins times
 statistics, and `native()` has one bin per reading, so its size follows the record directly.
@@ -924,7 +921,7 @@ f"{xn.values.nbytes / 2**20:.1f} MB"
 ```
 :::
 
-The weekly grain of the same record holds `r dim(x)[2]` bins against the `r dim(xn)[2]` of the
+The weekly grain of the same record holds [`r dim(x)[2]`]{.lang-r-only}[9]{.lang-py-only py="x.values.shape[1]"} bins against the [`r dim(xn)[2]`]{.lang-r-only}[1440]{.lang-py-only py="xn.values.shape[1]"} of the
 native array, and the Schrankogel record of the package's origin, 894 plots read hourly for three
 years, would be about `r round(894 * (3 * 365 + 1) * 24 * 8 / 2^20)` MB for a single channel. A
 run on a long hourly record is quickest to iterate on at a few coarse grains with `n_inner = NULL`,

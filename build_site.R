@@ -10,6 +10,8 @@ for (tool in c("tools/python_reference.py", "tools/python_twins.py")) {
          call. = FALSE)
   }
 }
+# Article chunks are cached under vignettes/ and survive clean_site(); pkgdown/docs_cache.R keys them.
+Sys.setenv(TIMESIFT_DOCS_CACHE = normalizePath("pkgdown/docs_cache.R"))
 pkgdown::clean_site(quiet = TRUE)
 build_pkgdown_site()
 # The digest the site workflow checks the committed build against.

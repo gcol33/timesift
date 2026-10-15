@@ -40,10 +40,6 @@ pip install "timesift[torch,contrasts,plot]"
 pip install git+https://github.com/gcol33/timesift
 ```
 
-The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.
-
 ``` r
 
 sim <- simulate_records(n = 150L, mechanism = "lag", variables = 4L, days = 365L,
@@ -351,7 +347,7 @@ run_time <- system.time(
                   resampling = cv(v = 5), n_inner = 3L, verbose = FALSE)
 )
 run_time[["elapsed"]]
-#> [1] 16.45
+#> [1] 30.61
 ```
 
 ``` python
@@ -372,11 +368,12 @@ start = time.perf_counter()
 fit = ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
                   learners=models, sift=ts.grains("week", "month"),
                   resampling=ts.cv(v=5), n_inner=3, verbose=False)
-round(time.perf_counter() - start)
-#> 16
+elapsed = time.perf_counter() - start
+round(elapsed)
+#> 27
 ```
 
-The run took 16 seconds for 15 candidates. With three inner folds in
+The run took 3127 seconds for 15 candidates. With three inner folds in
 each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20
 times, three inner fits and one outer fit in each outer fold, and once
 more on every target.
@@ -451,13 +448,14 @@ print(ts.summary(fit))
 
 Each learner run at both grains scores higher at the weekly one, which
 is the grain the simulation acts at. At the monthly grain the tree, both
-forests and gbm score below 0.5, so they find nothing there.
-`maxent / week` has the highest mean, 0.750, and scored highest on all
-four responses. The procedure rows are the scores to report: inside each
+forests and gbm score below 0.5, so they find nothing
+therebetween0.513and0.589. `maxent / week``elasticnet / week` has the
+highest mean, 0.7500.791, and scored highest on all four2 of the four
+responses. The procedure rows are the scores to report: inside each
 outer training fold the inner folds chose a candidate and fitted the
 stack’s weights, and the outer test fold then scored that choice once,
-0.741 for the selected candidate and 0.740 for the stack. The highest
-candidate mean was picked out on the same folds it is scored on.
+0.7410.777 for the selected candidate and 0.7400.775 for the stack. The
+highest candidate mean was picked out on the same folds it is scored on.
 
 The candidate table records how each candidate was built: its learner,
 its grain, the number of bins and channels, whether it was fitted, and,
@@ -636,7 +634,8 @@ variants = {
     "maxent()": ts.maxent(),
     'maxent(classes="lq")': ts.maxent(classes="lq"),
 }
-pd.Series({name: held_out_auc(l) for name, l in variants.items()}).round(3)
+held_out = pd.Series({name: held_out_auc(l) for name, l in variants.items()})
+held_out.round(3)
 #> elasticnet()                  0.729
 #> elasticnet(s="lambda.min")    0.726
 #> elasticnet(alpha=1)           0.727
@@ -650,14 +649,15 @@ pd.Series({name: held_out_auc(l) for name, l in variants.items()}).round(3)
 #> dtype: float64
 ```
 
-On this split the elastic net read at `"lambda.min"` scores 0.680
-against 0.631 at the default `"lambda.1se"`, and the lasso scores 0.608.
-The looser tolerance gives the same AUC as the default to three
-decimals, and the timings at the end of the article show what it saves.
-`maxent(classes = "lq")` scores 0.693 against 0.665 for the classes
-maxnet chooses, and both forests score close to 0.5 at this grain on 75
-units. A single split of 75 units is a noisy comparison, so a difference
-of this size is worth checking under
+On this split the elastic net read at `"lambda.min"` scores 0.6800.726
+against 0.6310.729 at the default `"lambda.1se"`, and the lasso scores
+0.6080.727. The looser tolerance gives the same AUC as the default to
+three decimals0.727against0.729at the default, and the timings at the
+end of the article show what it saves. `maxent(classes = "lq")` scores
+0.6930.736 against 0.6650.710 for the classes maxnet chooses, and both
+forests score close to 0.50.626and0.605 at this grain on 75 units. A
+single split of 75 units is a noisy comparison, so a difference of this
+size is worth checking under
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)’s
 folds, with the two settings as two named candidates, before acting on
 it.
@@ -844,8 +844,8 @@ pd.DataFrame(tf.model.table)
 #> 3  mtry = 8, min_node = 5  0.566769
 ```
 
-The search chose `mtry = 8` and `min_node = 5`, the combination with the
-highest mean inner AUC. Under
+The search chose `mtry = 8` and `min_node = 5``mtry = 8` and
+`min_node = 5`, the combination with the highest mean inner AUC. Under
 [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md),
 the settings each tuned candidate chose on all targets are in the
 `settings` column of the candidate table.
@@ -1036,11 +1036,12 @@ print(ts.summary(own))
 #> choice on every target  elasticnet / week
 ```
 
-`channel_means` scores 0.461 at both grains. The mean of a channel over
-the whole year is nearly the same number whichever bins it is averaged
-from, and in this simulation the responses read each unit’s departure
-from its own level, which a yearly mean averages away. The weekly
-elastic net, which reads every bin, scores 0.701.
+`channel_means` scores 0.461 at both grains0.470 at the monthly grain
+and 0.472 at the weekly. The mean of a channel over the whole year is
+nearly the same number whichever bins it is averaged from, and in this
+simulation the responses read each unit’s departure from its own level,
+which a yearly mean averages away. The weekly elastic net, which reads
+every bin, scores 0.7010.789.
 
 ## Other responses, and other metrics
 
@@ -1210,8 +1211,8 @@ print(ts.summary(capped))
 ```
 
 The run is chosen and reported by the Brier score under the capped
-weights. The elastic net, at -0.239, scored above the forest, at -0.259,
-and scored highest on all four responses.
+weights. The elastic net, at -0.239-0.238, scored above the forest, at
+-0.259-0.240, and scored highest on all four2 of the four responses.
 
 ## Choosing learners
 
@@ -1232,14 +1233,14 @@ seconds <- vapply(timed, function(l) {
 }, numeric(1))
 sort(round(seconds, 2), decreasing = TRUE)
 #>                 linear             elasticnet                 forest 
-#>                   4.48                   2.29                   0.30 
+#>                  10.08                   3.91                   0.46 
 #>                 maxent elasticnet(tol = 1e-4)           discriminant 
-#>                   0.23                   0.14                   0.09 
+#>                   0.43                   0.31                   0.18 
 #>                xgboost             perceptron               boosting 
-#>                   0.05                   0.03                   0.02 
-#>                   mars                   tree               envelope 
-#>                   0.02                   0.01                   0.00 
-#>           hierarchical 
+#>                   0.09                   0.06                   0.03 
+#>                   tree                   mars           hierarchical 
+#>                   0.02                   0.02                   0.02 
+#>               envelope 
 #>                   0.00
 ```
 
@@ -1259,16 +1260,16 @@ def seconds_to_fit(learner, x=week):
 
 seconds = pd.Series({name: seconds_to_fit(l) for name, l in timed.items()})
 seconds.round(2).sort_values(ascending=False)
-#> linear                  2.47
-#> elasticnet              2.14
-#> forest                  0.32
-#> maxent                  0.24
-#> elasticnet(tol=1e-4)    0.10
-#> discriminant            0.09
-#> xgboost                 0.05
+#> linear                  4.89
+#> elasticnet              3.85
+#> maxent                  0.57
+#> forest                  0.46
+#> discriminant            0.19
+#> elasticnet(tol=1e-4)    0.18
+#> xgboost                 0.09
+#> perceptron              0.03
+#> boosting                0.03
 #> tree                    0.02
-#> boosting                0.02
-#> perceptron              0.02
 #> mars                    0.01
 #> hierarchical            0.01
 #> envelope                0.00
@@ -1301,31 +1302,33 @@ additive_seconds <- c(
   `k = 5` = system.time(fit_learner(additive(k = 5L), month, sim$y))[["elapsed"]])
 round(additive_seconds, 2)
 #> k = 10  k = 5 
-#>  11.28   0.26
+#>  21.86   0.54
 ```
 
 ``` python
 month = ts.grain_matrix(sim.readings, "unit", "time", "reading", grain="month")
-pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
-           "k = 5": seconds_to_fit(ts.additive(k=5), month)}).round(2)
-#> k = 10    6.51
-#> k = 5     0.38
+additive_seconds = pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
+                              "k = 5": seconds_to_fit(ts.additive(k=5), month)})
+additive_seconds.round(2)
+#> k = 10    12.11
+#> k = 5      0.70
 #> dtype: float64
 ```
 
-With `k = 10` the fit took 11.3 seconds, and with `k = 5` it took 0.3
-seconds.
+With `k = 10` the fit took 21.912.1 seconds, and with `k = 5` it took
+0.50.7 seconds.
 
 The elastic net includes every predictor and uses a penalty to limit
 coefficient size. It chooses that penalty within the training data. At
-its default tolerance it took 2.3 seconds here; `tol = 1e-4` took 0.1
-seconds and gave the same held-out AUC on the split above.
+its default tolerance it took 3.93.9 seconds here; `tol = 1e-4` took
+0.30.2 seconds and gave the same held-out AUC on the split abovea
+held-out AUC of0.727on the split above, against0.729at the default.
 [`linear()`](https://gillescolling.com/timesift/reference/linear.md)
-took 4.5 seconds. Its search refits the model for each term it could add
-or remove, with 106 possible terms at the weekly grain. A coarser grain
-or a bounded search, such as
+took 10.14.9 seconds. Its search refits the model for each term it could
+add or remove, with 106 possible terms at the weekly grain. A coarser
+grain or a bounded search, such as
 `linear(select = "forward", terms = "column", max_terms = 3)`, reduces
-the number of fits. Every other tabular learner took at most 0.3
+the number of fits. Every other tabular learner took at most 0.460.57
 seconds.
 
 What a learner can be fitted on depends on the number of units against

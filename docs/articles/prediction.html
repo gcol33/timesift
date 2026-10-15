@@ -108,7 +108,7 @@
 
     
     
-<!-- Python blocks run by tools/python_twins.py (md5 a9edd65585366c292fcd789d0bc52016). -->
+<!-- Python blocks run by tools/python_twins.py (md5 0a6f6b791007fae51469a6bc9b548f5a). -->
 <p>This article shows how to choose cross-validation folds, combine
 candidate predictions, set presence-absence thresholds and project
 predictions onto rasters. The examples use a small simulated grid and
@@ -147,9 +147,9 @@ cold snap in early February goes, deeper towards the north. The first
 two species follow warmth in opposite directions, the third follows the
 depth of the snap, and the fourth both.</p>
 <div class="lang-py-only">
-<p>The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.</p>
+<p>The Python code simulates its own random data, so the numbers it
+prints differ from those quoted in the text, which come from the R run.
+Counts, shapes and calendar boundaries are the same in both.</p>
 </div>
 <div class="lang-pair">
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
@@ -340,10 +340,11 @@ alone.</p>
 <span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="co">#&gt; 3      sp1     4      True</span></span></code></pre></div>
 </div>
 <p>Every one of the 20 cells is scorable here, because each species is
-present at between 47 and 59 of the 120 cells. With a rare species some
-folds would hold no presence, and those cells would drop out of every
-candidate’s score at once. Because no model enters the mask, all
-candidates share one denominator.</p>
+present at between <span class="lang-r-only">47</span><span class="lang-py-only" py="int(resp.values.sum(axis=0).min())">48</span>
+and <span class="lang-r-only">59</span><span class="lang-py-only" py="int(resp.values.sum(axis=0).max())">54</span> of the 120 cells. With
+a rare species some folds would hold no presence, and those cells would
+drop out of every candidate’s score at once. Because no model enters the
+mask, all candidates share one denominator.</p>
 </div>
 <div class="section level2">
 <h2 id="one-run-under-two-splits">One run under two splits<a class="anchor" aria-label="anchor" href="#one-run-under-two-splits"></a>
@@ -401,7 +402,8 @@ the candidates were cross-validated again on five inner folds; one was
 chosen on its inner score and the stack’s weights were fitted on the
 inner out-of-fold predictions, and both then predicted the outer test
 fold once. Under the random split the selected candidate scores an AUC
-of 0.866 and the stack 0.861.</p>
+of <span class="lang-r-only">0.866</span><span class="lang-py-only" py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'">0.832</span>
+and the stack <span class="lang-r-only">0.861</span><span class="lang-py-only" py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'">0.820</span>.</p>
 <p>The block run differs in two settings, and both follow from the
 blocks. The inner split of a nested run deals whole blocks as the outer
 one does, so with five blocks an outer training set holds four and
@@ -1163,16 +1165,21 @@ z
 <span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a><span class="co">#&gt; block  0  selected  0.776500  0.041876</span></span>
 <span id="cb19-11"><a href="#cb19-11" tabindex="-1"></a><span class="co">#&gt;        1  ensemble  0.757886  0.039561</span></span></code></pre></div>
 </div>
-<p>Under blocks the selected candidate falls by 0.082, to 0.784, and the
-stack by 0.070, to 0.791. The likely reason is the gradient: in the
-random split a held-out cell nearly always has neighbours on the
-training side at the same position on the warmth gradient, while under
-blocks a whole region is held out and the model has to reach a stretch
-of the gradient it saw less of. The block number is the one that
-describes prediction into a part of the grid the fit was not trained in.
-The ranking of the candidates keeps its order between the two runs, and
-the forests lose more than the elastic nets: 0.840 to 0.682 at the
-month, against 0.870 to 0.784.</p>
+<p>Under blocks the selected candidate falls by <span class="lang-r-only">0.082</span><span class="lang-py-only" py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'">0.056</span>,
+to <span class="lang-r-only">0.784</span><span class="lang-py-only" py="f'{next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'">0.776</span>,
+and the stack by <span class="lang-r-only">0.070</span><span class="lang-py-only" py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'">0.062</span>,
+to <span class="lang-r-only">0.791</span><span class="lang-py-only" py="f'{next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'">0.758</span>.
+The likely reason is the gradient: in the random split a held-out cell
+nearly always has neighbours on the training side at the same position
+on the warmth gradient, while under blocks a whole region is held out
+and the model has to reach a stretch of the gradient it saw less of. The
+block number is the one that describes prediction into a part of the
+grid the fit was not trained in. The ranking of the candidates keeps its
+order between the two runs, and the forests lose more than the elastic
+nets: <span class="lang-r-only">0.840</span><span class="lang-py-only" py="f'{dict((r['candidate'], r['mean']) for r in ts.candidate_table(fit))['forest / month']:.3f}'">0.795</span>
+to <span class="lang-r-only">0.682</span><span class="lang-py-only" py="f'{dict((r['candidate'], r['mean']) for r in ts.candidate_table(blocked))['forest / month']:.3f}'">0.699</span>
+at the month, against <span class="lang-r-only">0.870</span><span class="lang-py-only" py="f'{dict((r['candidate'], r['mean']) for r in ts.candidate_table(fit))['elasticnet / month']:.3f}'">0.845</span>
+to <span class="lang-r-only">0.784</span><span class="lang-py-only" py="f'{dict((r['candidate'], r['mean']) for r in ts.candidate_table(blocked))['elasticnet / month']:.3f}'">0.782</span>.</p>
 </div>
 <div class="section level2">
 <h2 id="the-combination">The combination<a class="anchor" aria-label="anchor" href="#the-combination"></a>
@@ -1222,16 +1229,18 @@ weight vector is used across all responses.</p>
 </div>
 <p><code><a href="../reference/ensemble_weights.html">ensemble_weights()</a></code> returns the weights fitted on the
 outer out-of-fold predictions of every target, which are the weights
-<code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> uses. They put 0.516 on the weekly forest, 0.264
-on the monthly elastic net and 0.220 on the monthly forest, and nothing
-on the weekly elastic net. Those weights were fitted to the responses
-the run is scored against, so the ensemble’s score is never read with
-them. <code>fit$fold_weights</code> holds the weights each outer fold
-fitted on its own training targets, and these are the ones behind the
-held-out <code>ensemble</code> row. They move between folds: the weekly
-forest takes 0.968 in fold 1 and 0.318 in fold 3.
-<code>fit$selected</code> shows the same instability for the single
-choice, which alternates between the two elastic nets.</p>
+<code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> uses. They put <span class="lang-r-only">0.516</span><span class="lang-py-only" py="f'{ts.ensemble_weights(fit)['forest / week']:.3f}'">0.410</span>
+on the weekly forest, <span class="lang-r-only">0.264</span><span class="lang-py-only" py="f'{ts.ensemble_weights(fit)['elasticnet / month']:.3f}'">0.324</span>
+on the monthly elastic net and <span class="lang-r-only">0.220</span><span class="lang-py-only" py="f'{ts.ensemble_weights(fit)['forest / month']:.3f}'">0.266</span>
+on the monthly forest, and nothing on the weekly elastic net. Those
+weights were fitted to the responses the run is scored against, so the
+ensemble’s score is never read with them. <code>fit$fold_weights</code>
+holds the weights each outer fold fitted on its own training targets,
+and these are the ones behind the held-out <code>ensemble</code> row.
+They move between folds: the weekly forest takes <span class="lang-r-only">0.968</span><span class="lang-py-only" py="f'{next(r['forest / week'] for r in fit.fold_weights if r['fold'] == 1):.3f}'">0.279</span>
+in fold 1 and <span class="lang-r-only">0.318</span><span class="lang-py-only" py="f'{next(r['forest / week'] for r in fit.fold_weights if r['fold'] == 3):.3f}'">0.163</span>
+in fold 3. <code>fit$selected</code> shows the same instability for the
+single choice, which alternates between the two elastic nets.</p>
 <p><code><a href="../reference/ensemble.html">ensemble()</a></code> offers five methods. <code>"stack"</code>
 fits the weights; <code>"mean"</code> and <code>"median"</code> combine
 without fitting anything; <code>"weighted"</code> weights each candidate
@@ -1314,11 +1323,15 @@ scored on here, so their scores are optimistic, and the nested
 <span id="cb25-12"><a href="#cb25-12" tabindex="-1"></a><span class="co">#&gt; committee    0.818</span></span>
 <span id="cb25-13"><a href="#cb25-13" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
 </div>
-<p>The plain mean of the four candidates scores 0.870, level with the
-best single candidate’s 0.870 on the same folds, and the median 0.868.
-The committee scores 0.834. With four members, a committee’s prediction
-is a share of four votes and takes only five values, so it ranks the
-units coarsely, and AUC reads the ranking.</p>
+<p>The plain mean of the four candidates scores <span class="lang-r-only">0.870</span><span class="lang-py-only" py="f'{mean_auc(stacks['mean']):.3f}'">0.831</span><span class="lang-r-only">, level with the best single candidate’s
+0.870</span><span class="lang-py-only">,</span><span class="lang-py-only" py="(lambda d: 'level with' if abs(d) &lt; 0.0005 else '{:.3f} {}'.format(abs(d), 'below' if d &lt; 0 else 'above'))(mean_auc(stacks['mean']) - max(r['mean'] for r in ts.candidate_table(fit)))">0.015
+below</span><span class="lang-py-only">the best single
+candidate’s</span><span class="lang-py-only" py="f'{max(r['mean'] for r in ts.candidate_table(fit)):.3f}'">0.845</span>
+on the same folds, and the median <span class="lang-r-only">0.868</span><span class="lang-py-only" py="f'{mean_auc(stacks['median']):.3f}'">0.833</span>.
+The committee scores <span class="lang-r-only">0.834</span><span class="lang-py-only" py="f'{mean_auc(stacks['committee']):.3f}'">0.818</span>.
+With four members, a committee’s prediction is a share of four votes and
+takes only five values, so it ranks the units coarsely, and AUC reads
+the ranking.</p>
 <p><code><a href="../reference/ensemble_spread.html">ensemble_spread()</a></code> reads the members side by side instead
 of combining them: for each target and response the weighted mean,
 standard deviation, coefficient of variation and an interval. It is the
@@ -1456,8 +1469,9 @@ members under the refitted stack; <code>"selected"</code> is the
 candidate the rule chose on every target, here
 <code>elasticnet / month</code>; any candidate’s name predicts with that
 candidate alone. The selected elastic net’s predictions lie closer to
-one half than the ensemble’s, which carries half its weight on a forest
-whose predictions reach further towards zero and one.</p>
+one half than the ensemble’s, which carries <span class="lang-r-only">half its weight</span><span class="lang-py-only" py="f'{ts.ensemble_weights(fit)['forest / week']:.2f} of its weight'">0.41
+of its weight</span> on a forest whose predictions reach further towards
+zero and one.</p>
 </div>
 <div class="section level2">
 <h2 id="thresholds">Thresholds<a class="anchor" aria-label="anchor" href="#thresholds"></a>
@@ -1478,12 +1492,13 @@ learned.</p>
 <span><span class="co">#&gt; sp3  0.401 0.401      0.508 0.368</span></span>
 <span><span class="co">#&gt; sp4  0.467 0.640      0.518 0.218</span></span></code></pre></div>
 <div class="sourceCode" id="cb33"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a>rules <span class="op">=</span> [<span class="st">"youden"</span>, <span class="st">"kappa"</span>, <span class="st">"prevalence"</span>, <span class="st">"mpa"</span>]</span>
-<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a>pd.DataFrame({r: ts.decision_threshold(fit, rule<span class="op">=</span>r) <span class="cf">for</span> r <span class="kw">in</span> rules}).<span class="bu">round</span>(<span class="dv">3</span>)</span>
-<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a><span class="co">#&gt;      youden  kappa  prevalence    mpa</span></span>
-<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a><span class="co">#&gt; sp1   0.455  0.614       0.513  0.320</span></span>
-<span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a><span class="co">#&gt; sp2   0.536  0.536       0.444  0.242</span></span>
-<span id="cb33-6"><a href="#cb33-6" tabindex="-1"></a><span class="co">#&gt; sp3   0.448  0.448       0.505  0.303</span></span>
-<span id="cb33-7"><a href="#cb33-7" tabindex="-1"></a><span class="co">#&gt; sp4   0.464  0.464       0.494  0.332</span></span></code></pre></div>
+<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a>thresholds <span class="op">=</span> pd.DataFrame({r: ts.decision_threshold(fit, rule<span class="op">=</span>r) <span class="cf">for</span> r <span class="kw">in</span> rules}).<span class="bu">round</span>(<span class="dv">3</span>)</span>
+<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a>thresholds</span>
+<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a><span class="co">#&gt;      youden  kappa  prevalence    mpa</span></span>
+<span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a><span class="co">#&gt; sp1   0.455  0.614       0.513  0.320</span></span>
+<span id="cb33-6"><a href="#cb33-6" tabindex="-1"></a><span class="co">#&gt; sp2   0.536  0.536       0.444  0.242</span></span>
+<span id="cb33-7"><a href="#cb33-7" tabindex="-1"></a><span class="co">#&gt; sp3   0.448  0.448       0.505  0.303</span></span>
+<span id="cb33-8"><a href="#cb33-8" tabindex="-1"></a><span class="co">#&gt; sp4   0.464  0.464       0.494  0.332</span></span></code></pre></div>
 </div>
 <p><code>"youden"</code> maximises sensitivity plus specificity, the cut
 TSS is read at. <code>"kappa"</code> maximises Cohen’s kappa.
@@ -1492,9 +1507,11 @@ and reads nothing from which units held them. <code>"mpa"</code>, the
 minimum predicted area, takes the highest cut that keeps a share
 <code>perc</code> of the observed presences, 0.9 by default, so it reads
 the presences alone. Here youden and kappa agree on three species and
-part on <code>sp4</code>, 0.467 against 0.640, and mpa cuts lowest on
-every species. The number of cells each rule calls present, against the
-observed count:</p>
+part on <span class="lang-r-only"><code>sp4</code></span><span class="lang-py-only" py="'`' + thresholds[thresholds['youden'] != thresholds['kappa']].index[0] + '`'"><code>sp1</code></span>,
+<span class="lang-r-only">0.467</span><span class="lang-py-only" py="f'{thresholds[thresholds['youden'] != thresholds['kappa']]['youden'].iloc[0]:.3f}'">0.455</span>
+against <span class="lang-r-only">0.640</span><span class="lang-py-only" py="f'{thresholds[thresholds['youden'] != thresholds['kappa']]['kappa'].iloc[0]:.3f}'">0.614</span>,
+and mpa cuts lowest on every species. The number of cells each rule
+calls present, against the observed count:</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">called</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="va">rules</span>, <span class="kw">function</span><span class="op">(</span><span class="va">r</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">colSums</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">targets</span>, <span class="va">series</span>, type <span class="op">=</span> <span class="st">"binary"</span>, rule <span class="op">=</span> <span class="va">r</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
@@ -1531,12 +1548,13 @@ observed count:</p>
 <span id="cb35-17"><a href="#cb35-17" tabindex="-1"></a><span class="co">#&gt; 5     0.0  0.0  1.0  0.0</span></span>
 <span id="cb35-18"><a href="#cb35-18" tabindex="-1"></a><span class="co">#&gt; 6     1.0  0.0  0.0  1.0</span></span></code></pre></div>
 </div>
-<p>The prevalence rule reproduces the observed counts to within one
-cell, as it is built to. Youden and kappa land within two cells of them
-on this grid, and mpa calls between 53 and 74 cells present against 47
-to 59 observed, because it gives up specificity to keep nine presences
-in ten. The binary matrix is integer, 1 for presence, and a response
-whose held-out predictions give no cut would be <code>NA</code>.</p>
+<p>The prevalence rule reproduces the observed counts to within <span class="lang-r-only">one cell</span><span class="lang-py-only" py="f'{int((called['prevalence'] - called['observed']).abs().max())} cell' + ('s' if int((called['prevalence'] - called['observed']).abs().max()) != 1 else '')">2
+cells</span>, as it is built to. Youden and kappa land within <span class="lang-r-only">two cells</span><span class="lang-py-only" py="f'{int(max((called['youden'] - called['observed']).abs().max(), (called['kappa'] - called['observed']).abs().max()))} cell' + ('s' if int(max((called['youden'] - called['observed']).abs().max(), (called['kappa'] - called['observed']).abs().max())) != 1 else '')">4
+cells</span> of them on this grid, and mpa calls between <span class="lang-r-only">53</span><span class="lang-py-only" py="int(called['mpa'].min())">61</span> and <span class="lang-r-only">74</span><span class="lang-py-only" py="int(called['mpa'].max())">69</span> cells present against
+<span class="lang-r-only">47</span><span class="lang-py-only" py="int(resp.values.sum(axis=0).min())">48</span> to <span class="lang-r-only">59</span><span class="lang-py-only" py="int(resp.values.sum(axis=0).max())">54</span> observed, because it
+gives up specificity to keep nine presences in ten. The binary matrix is
+integer, 1 for presence, and a response whose held-out predictions give
+no cut would be <code>NA</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="how-far-the-members-disagree">How far the members disagree<a class="anchor" aria-label="anchor" href="#how-far-the-members-disagree"></a>
@@ -1568,10 +1586,13 @@ on the members’ predictions for new targets, a
 </div>
 <p>The interval is held inside zero and one, since the predictions are
 probabilities. Where the mean is small the coefficient of variation is
-large: the first three cells sit below 0.15 with a coefficient above
-one, while cell 5 has a mean of 0.798 and a coefficient of 0.178. On one
-target per map cell this is an uncertainty map, and the sections on maps
-below draw one.</p>
+large: the first three cells<span class="lang-r-only">sit below 0.15
+with a coefficient above one</span><span class="lang-py-only">have means
+from</span><span class="lang-py-only" py="f'{s[:3, 0, 0].min():.3f}'">0.212</span><span class="lang-py-only">to</span><span class="lang-py-only" py="f'{s[:3, 0, 0].max():.3f}'">0.298</span><span class="lang-py-only">with coefficients from</span><span class="lang-py-only" py="f'{s[:3, 0, 2].min():.3f}'">0.453</span><span class="lang-py-only">to</span><span class="lang-py-only" py="f'{s[:3, 0, 2].max():.3f}'">0.640</span>, while cell <span class="lang-r-only">5</span><span class="lang-py-only" py="int(new['cell'].iloc[int(np.argmax(s[:, 0, 0]))])">6</span>
+has a mean of <span class="lang-r-only">0.798</span><span class="lang-py-only" py="f'{s[int(np.argmax(s[:, 0, 0])), 0, 0]:.3f}'">0.799</span>
+and a coefficient of <span class="lang-r-only">0.178</span><span class="lang-py-only" py="f'{s[int(np.argmax(s[:, 0, 0])), 0, 2]:.3f}'">0.200</span>.
+On one target per map cell this is an uncertainty map, and the sections
+on maps below draw one.</p>
 </div>
 <div class="section level2">
 <h2 id="presence-only-records">Presence-only records<a class="anchor" aria-label="anchor" href="#presence-only-records"></a>
@@ -1640,11 +1661,13 @@ presence is never drawn.</p>
 <span id="cb39-29"><a href="#cb39-29" tabindex="-1"></a><span class="co">#&gt; 9    71  10.5  4.5     2001.0    1    True</span></span></code></pre></div>
 </div>
 <p>The header says how many units of the pool a strategy admits. On this
-grid the disk strategy admits 18 cells at least 1.5 cells from any
-presence, and the envelope strategy 15 cells outside the band holding
-the middle 80% of the presences’ elevations; asking either for more than
-it admits is an error that names both counts. <code>repeats</code> makes
-several independent draws, numbered in <code>set</code>.</p>
+grid the disk strategy admits <span class="lang-r-only">18</span><span class="lang-py-only" py="int((np.sqrt((np.array(pool['x'])[:, None] - np.array(presence_rows['x'])) ** 2 + (np.array(pool['y'])[:, None] - np.array(presence_rows['y'])) ** 2).min(axis=1) &gt;= 1.5).sum())">14</span>
+cells at least 1.5 cells from any presence, and the envelope strategy
+<span class="lang-r-only">15</span><span class="lang-py-only" py="int(((np.array(pool['elevation']) &lt; np.quantile(presence_rows['elevation'], 0.1)) | (np.array(pool['elevation']) &gt; np.quantile(presence_rows['elevation'], 0.9)))[~np.isin(pool['cell'], presence_rows['cell'])].sum())">13</span>
+cells outside the band holding the middle 80% of the presences’
+elevations; asking either for more than it admits is an error that names
+both counts. <code>repeats</code> makes several independent draws,
+numbered in <code>set</code>.</p>
 <div class="lang-py-only">
 <p>In Python the draw is a mapping of columns with no header; asking for
 more units than a strategy admits raises the same error naming both
@@ -1693,7 +1716,7 @@ counts.</p>
 <span id="cb41-21"><a href="#cb41-21" tabindex="-1"></a><span class="co">#&gt; choice on every target  elasticnet / week</span></span></code></pre></div>
 </div>
 <p>The drawn units are ordinary rows once bound to the presences with a
-response of zero, and the fit does not mark them. Its AUC of 0.772
+response of zero, and the fit does not mark them. Its AUC of <span class="lang-r-only">0.772</span><span class="lang-py-only" py="f'{ts.candidate_table(po_fit)[0]['mean']:.3f}'">0.854</span>
 separates presences from background cells, some of which hold the
 species, so it is a different quantity from the AUC of the
 presence-absence run above. A fit per draw, each scored the same way,
@@ -1751,7 +1774,7 @@ dimension.</p>
 <div class="sourceCode" id="cb44"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">took</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="va">now</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/project.html">project</a></span><span class="op">(</span><span class="va">fit</span>, series <span class="op">=</span> <span class="va">grid</span>, static <span class="op">=</span> <span class="va">elev</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">took</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 0.16</span></span>
+<span><span class="co">#&gt; [1] 0.28</span></span>
 <span><span class="va">now</span></span>
 <span><span class="co">#&gt; class       : SpatRaster</span></span>
 <span><span class="co">#&gt; size        : 10, 12, 4  (nrow, ncol, nlyr)</span></span>
@@ -2507,18 +2530,19 @@ dimension.</p>
 <span id="cb45-2"><a href="#cb45-2" tabindex="-1"></a></span>
 <span id="cb45-3"><a href="#cb45-3" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
 <span id="cb45-4"><a href="#cb45-4" tabindex="-1"></a>now <span class="op">=</span> ts.project(fit, series<span class="op">=</span>grid, static<span class="op">=</span>elev)</span>
-<span id="cb45-5"><a href="#cb45-5" tabindex="-1"></a><span class="bu">round</span>(time.perf_counter() <span class="op">-</span> start, <span class="dv">2</span>)</span>
-<span id="cb45-6"><a href="#cb45-6" tabindex="-1"></a><span class="co">#&gt; 0.06</span></span>
-<span id="cb45-7"><a href="#cb45-7" tabindex="-1"></a><span class="bu">dict</span>(now.sizes)</span>
-<span id="cb45-8"><a href="#cb45-8" tabindex="-1"></a><span class="co">#&gt; {'response': 4, 'y': 10, 'x': 12}</span></span>
-<span id="cb45-9"><a href="#cb45-9" tabindex="-1"></a><span class="bu">bool</span>(np.allclose(now.sel(response<span class="op">=</span><span class="st">"sp1"</span>).values.ravel(), fit.predict(targets, series)[:, <span class="dv">0</span>]))</span>
-<span id="cb45-10"><a href="#cb45-10" tabindex="-1"></a><span class="co">#&gt; True</span></span>
-<span id="cb45-11"><a href="#cb45-11" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">2</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">7</span>, <span class="dv">5</span>))</span>
-<span id="cb45-12"><a href="#cb45-12" tabindex="-1"></a><span class="cf">for</span> ax, r <span class="kw">in</span> <span class="bu">zip</span>(axes.flat, now[<span class="st">"response"</span>].values):</span>
-<span id="cb45-13"><a href="#cb45-13" tabindex="-1"></a>    im <span class="op">=</span> ax.imshow(now.sel(response<span class="op">=</span>r).values, vmin<span class="op">=</span><span class="dv">0</span>, vmax<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb45-14"><a href="#cb45-14" tabindex="-1"></a>    ax.set_title(r)<span class="op">;</span></span>
-<span id="cb45-15"><a href="#cb45-15" tabindex="-1"></a>    ax.axis(<span class="st">"off"</span>)<span class="op">;</span></span>
-<span id="cb45-16"><a href="#cb45-16" tabindex="-1"></a>fig.colorbar(im, ax<span class="op">=</span>axes)<span class="op">;</span></span></code></pre></div>
+<span id="cb45-5"><a href="#cb45-5" tabindex="-1"></a>took <span class="op">=</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb45-6"><a href="#cb45-6" tabindex="-1"></a><span class="bu">round</span>(took, <span class="dv">2</span>)</span>
+<span id="cb45-7"><a href="#cb45-7" tabindex="-1"></a><span class="co">#&gt; 0.1</span></span>
+<span id="cb45-8"><a href="#cb45-8" tabindex="-1"></a><span class="bu">dict</span>(now.sizes)</span>
+<span id="cb45-9"><a href="#cb45-9" tabindex="-1"></a><span class="co">#&gt; {'response': 4, 'y': 10, 'x': 12}</span></span>
+<span id="cb45-10"><a href="#cb45-10" tabindex="-1"></a><span class="bu">bool</span>(np.allclose(now.sel(response<span class="op">=</span><span class="st">"sp1"</span>).values.ravel(), fit.predict(targets, series)[:, <span class="dv">0</span>]))</span>
+<span id="cb45-11"><a href="#cb45-11" tabindex="-1"></a><span class="co">#&gt; True</span></span>
+<span id="cb45-12"><a href="#cb45-12" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">2</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">7</span>, <span class="dv">5</span>))</span>
+<span id="cb45-13"><a href="#cb45-13" tabindex="-1"></a><span class="cf">for</span> ax, r <span class="kw">in</span> <span class="bu">zip</span>(axes.flat, now[<span class="st">"response"</span>].values):</span>
+<span id="cb45-14"><a href="#cb45-14" tabindex="-1"></a>    im <span class="op">=</span> ax.imshow(now.sel(response<span class="op">=</span>r).values, vmin<span class="op">=</span><span class="dv">0</span>, vmax<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb45-15"><a href="#cb45-15" tabindex="-1"></a>    ax.set_title(r)<span class="op">;</span></span>
+<span id="cb45-16"><a href="#cb45-16" tabindex="-1"></a>    ax.axis(<span class="st">"off"</span>)<span class="op">;</span></span>
+<span id="cb45-17"><a href="#cb45-17" tabindex="-1"></a>fig.colorbar(im, ax<span class="op">=</span>axes)<span class="op">;</span></span></code></pre></div>
 <p><div class="svg-container"><button type="button" class="btn btn-primary btn-copy-svg" title="Copy SVG to clipboard" aria-label="Copy SVG to clipboard" data-bs-toggle="tooltip" data-bs-placement="left"><i class="fa fa-copy"></i></button>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
@@ -3002,12 +3026,12 @@ z
  </defs>
 </svg></div></p>
 </div>
-<p>The projection of the ensemble onto the 120 cells took 0.16 seconds.
-It is the same prediction <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> gives for the same
-cells as targets, which <code><a href="https://rdrr.io/r/base/all.equal.html" class="external-link">all.equal()</a></code> confirms for
-<code>sp1</code>. A raster too large for memory is read
-<code>chunk</code> cells at a time, 5000 by default. A cell missing a
-reading anywhere in its record is <code>NA</code> in every layer.</p>
+<p>The projection of the ensemble onto the 120 cells took <span class="lang-r-only">0.28</span><span class="lang-py-only" py="f'{took:.2f}'">0.10</span> seconds. It is the same
+prediction <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> gives for the same cells as targets,
+which <code><a href="https://rdrr.io/r/base/all.equal.html" class="external-link">all.equal()</a></code> confirms for <code>sp1</code>. A raster
+too large for memory is read <code>chunk</code> cells at a time, 5000 by
+default. A cell missing a reading anywhere in its record is
+<code>NA</code> in every layer.</p>
 <p>A map for another period is the same call with that period’s record.
 Here the later record is the present one warmed by 1.5 degrees
 throughout, with elevation unchanged. <code>type = "binary"</code> cuts
@@ -3203,10 +3227,15 @@ iVBORw0KGgoAAAANSUhEUgAAAbwAAAFyCAYAAACOUm8bAAAGkUlEQVR4nO3Ywa3aWhhGUfNEI8wzdyFW
  </defs>
 </svg></div></p>
 </div>
-<p>The warm-favoured <code>sp1</code> and <code>sp4</code> gain 30 and
-38 cells, the cold-favoured <code>sp2</code> loses 42 of its 58, and
-<code>sp3</code>, which the simulation ties to the depth of the snap
-alone, loses and gains 14 cells each and keeps its size.
+<p>The warm-favoured <code>sp1</code> and <code>sp4</code> gain <span class="lang-r-only">30</span><span class="lang-py-only" py="int(pd.DataFrame(change.table).set_index('variable').loc['sp1', 'gained'])">45</span>
+and <span class="lang-r-only">38</span><span class="lang-py-only" py="int(pd.DataFrame(change.table).set_index('variable').loc['sp4', 'gained'])">38</span>
+cells, the cold-favoured <code>sp2</code> loses <span class="lang-r-only">42</span><span class="lang-py-only" py="int(pd.DataFrame(change.table).set_index('variable').loc['sp2', 'lost'])">36</span>
+of its <span class="lang-r-only">58</span><span class="lang-py-only" py="int(pd.DataFrame(change.table).set_index('variable').loc['sp2', ['lost', 'kept']].sum())">52</span>,
+and <code>sp3</code>, which the simulation ties to the depth of the snap
+alone, <span class="lang-r-only">loses and gains 14 cells
+each</span><span class="lang-py-only" py="f'loses {int(pd.DataFrame(change.table).set_index('variable').loc['sp3', 'lost'])} and gains {int(pd.DataFrame(change.table).set_index('variable').loc['sp3', 'gained'])} cells'">loses
+12 and gains 9 cells</span> <span class="lang-r-only">and keeps its
+size</span><span class="lang-py-only">for a change of</span><span class="lang-py-only" py="f'{float(pd.DataFrame(change.table).set_index('variable').loc['sp3', 'change']):+.0f}'">-6</span><span class="lang-py-only">per cent of its present range</span>.
 <code>change</code> is the gain minus the loss as a percentage of the
 present range. The map codes a cell as biomod2 does, and the plot
 colours the codes: red for lost (-2), grey for kept (-1), pale for
@@ -4962,10 +4991,11 @@ L 379.799688 98.604813
 mean any cell has to the warmest, so the curve sweeps a whole year from
 deep winter to high summer. <code>sp1</code> rises and <code>sp2</code>
 falls along it, as the simulation has them, and <code>sp3</code>, which
-depends on one cold week, changes little. For the ensemble every member
-is moved the same way and the combination is taken through the stack;
-<code>spread = TRUE</code> adds the members’ standard deviation and
-interval.</p>
+depends on one cold week, <span class="lang-r-only">changes
+little</span><span class="lang-py-only">ranges from</span><span class="lang-py-only" py="f'{rc.prediction[:, 2].min():.2f}'">0.28</span><span class="lang-py-only">to</span><span class="lang-py-only" py="f'{rc.prediction[:, 2].max():.2f}'">0.75</span>. For the
+ensemble every member is moved the same way and the combination is taken
+through the stack; <code>spread = TRUE</code> adds the members’ standard
+deviation and interval.</p>
 <p>The signal for <code>sp3</code> sits in a single week, and a curve
 over that bin alone shows it. The coldest week of the mean record is the
 week of the snap.</p>
@@ -11520,25 +11550,29 @@ hardly along elevation, darker colours being higher.</p>
 </h2>
 <p>The stack and the selected candidate are both estimated by the nested
 procedure, so their held-out scores can be read against each other.
-Under the random split the selected candidate scored 0.866 and the stack
-0.861, a difference well inside the standard errors of 0.014 and 0.019.
+Under the random split the selected candidate scored <span class="lang-r-only">0.866</span><span class="lang-py-only" py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'">0.832</span>
+and the stack <span class="lang-r-only">0.861</span><span class="lang-py-only" py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'">0.820</span>,
+a difference <span class="lang-r-only">well inside the standard errors
+of</span><span class="lang-py-only">of</span><span class="lang-py-only" py="f'{abs(next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected') - next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble')):.3f}'">0.013</span><span class="lang-py-only">against standard errors of</span><span class="lang-r-only">0.014</span><span class="lang-py-only" py="f'{next(e['se'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'">0.007</span>
+and <span class="lang-r-only">0.019</span><span class="lang-py-only" py="f'{next(e['se'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'">0.010</span>.
 One elastic net led on three of the four responses, and the weight the
 stack moved onto the forests did not raise the held-out score. Under
-spatial blocks the order reversed, 0.784 for the selected candidate
-against 0.791 for the stack, again within the standard errors. A stack
-pays when the members carry different parts of the signal and none leads
-everywhere; when one candidate wins most responses, as the monthly
-elastic net does here, the stack mostly reproduces it at the cost of
-more models to fit and store. The weights in
+spatial blocks <span class="lang-r-only">the order reversed,</span><span class="lang-py-only">the selected candidate scored</span><span class="lang-r-only">0.784</span><span class="lang-py-only" py="f'{next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'">0.776</span><span class="lang-r-only">for the selected candidate</span> against <span class="lang-r-only">0.791</span><span class="lang-py-only" py="f'{next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'">0.758</span>
+for the stack, <span class="lang-r-only">again within the standard
+errors</span><span class="lang-py-only">a difference of</span><span class="lang-py-only" py="f'{abs(next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble')):.3f}'">0.019</span><span class="lang-py-only">with standard errors of</span><span class="lang-py-only" py="f'{next(e['se'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'">0.042</span><span class="lang-py-only">and</span><span class="lang-py-only" py="f'{next(e['se'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'">0.040</span>.
+A stack pays when the members carry different parts of the signal and
+none leads everywhere; when one candidate wins most responses, as the
+monthly elastic net does here, the stack mostly reproduces it at the
+cost of more models to fit and store. The weights in
 <code>fit$fold_weights</code> say which case a run is in: weights that
 swing between folds, as the weekly forest’s do here, mean the stack has
 no stable composition to report, and the selected candidate is the
 simpler model to describe.</p>
-<p>Among the methods that fit nothing, the plain mean was level with the
-best candidate on the outer folds. It is a reasonable choice where the
-stack’s weights are unstable. The committee ranks coarsely when there
-are few members, which costs AUC; it is suited to a binary map, where
-only the votes matter.</p>
+<p>Among the methods that fit nothing, the plain mean <span class="lang-r-only">was level with the best candidate</span><span class="lang-py-only">scored</span><span class="lang-py-only" py="f'{mean_auc(stacks['mean']):.3f}'">0.831</span><span class="lang-py-only">against the best candidate’s</span><span class="lang-py-only" py="f'{max(r['mean'] for r in ts.candidate_table(fit)):.3f}'">0.845</span>
+on the outer folds. It is a reasonable choice where the stack’s weights
+are unstable. The committee ranks coarsely when there are few members,
+which costs AUC; it is suited to a binary map, where only the votes
+matter.</p>
 <p>For the threshold rule:</p>
 <ul>
 <li>
@@ -11550,29 +11584,31 @@ read, since it selects nothing from which units held them.</li>
 same; it is the cut TSS is read at.</li>
 <li>
 <code>"kappa"</code> where agreement beyond chance is the target,
-which here moved only the cut of <code>sp4</code>.</li>
+which here moved only the cut of <span class="lang-r-only"><code>sp4</code></span><span class="lang-py-only" py="'`' + thresholds[thresholds['youden'] != thresholds['kappa']].index[0] + '`'"><code>sp1</code></span>.</li>
 <li>
 <code>"mpa"</code> where missing a presence costs more than
 predicting a false one, as for a conservation area that should contain
-nearly all known occurrences. On this grid it called up to 23 more cells
-present than were observed.</li>
+nearly all known occurrences. On this grid it called up to <span class="lang-r-only">23</span><span class="lang-py-only" py="int((called['mpa'] - called['observed']).max())">17</span>
+more cells present than were observed.</li>
 </ul>
 <p>Spatial folds belong wherever units are clustered in space or along
 the predictor gradients the model reads, and wherever the map will be
 read in places the training data did not cover. The two runs above
-differ by 0.070 to 0.082 AUC, the random split being the higher.
-<code><a href="../reference/cv.html">env_cv()</a></code> is the analogue for environmental extrapolation,
-and <code><a href="../reference/cv.html">grouped_cv()</a></code> for units that share a site, a transect or
-a logger and would otherwise be split across training and test. Under
-any blocked split the inner split keeps blocks whole too, which bounds
-<code>n_inner</code> and the elastic net’s own <code>n_inner</code>.</p>
+differ by <span class="lang-r-only">0.070</span><span class="lang-py-only" py="f'{min(next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'), next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble')):.3f}'">0.056</span>
+to <span class="lang-r-only">0.082</span><span class="lang-py-only" py="f'{max(next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'), next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble')):.3f}'">0.062</span>
+AUC, the random split being the higher. <code><a href="../reference/cv.html">env_cv()</a></code> is the
+analogue for environmental extrapolation, and <code><a href="../reference/cv.html">grouped_cv()</a></code>
+for units that share a site, a transect or a logger and would otherwise
+be split across training and test. Under any blocked split the inner
+split keeps blocks whole too, which bounds <code>n_inner</code> and the
+elastic net’s own <code>n_inner</code>.</p>
 <p>A projection costs one prediction per cell. The ensemble of four
-members took 0.16 seconds for 120 cells with a year of daily readings,
-and the time grows with the number of cells and the length of the
-record. A large raster is better projected once from a script, with
-<code>chunk</code> set to what memory allows. The two runs themselves
-cost far more than the projection: each fitted every candidate on every
-inner and outer fold.</p>
+members took <span class="lang-r-only">0.28</span><span class="lang-py-only" py="f'{took:.2f}'">0.10</span> seconds for
+120 cells with a year of daily readings, and the time grows with the
+number of cells and the length of the record. A large raster is better
+projected once from a script, with <code>chunk</code> set to what memory
+allows. The two runs themselves cost far more than the projection: each
+fitted every candidate on every inner and outer fold.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

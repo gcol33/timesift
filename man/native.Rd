@@ -44,7 +44,8 @@ A representation is the way a record is reduced before a learner reads it. It is
 things: the record as recorded, the record at a calendar grain, several grains side by side in
 one block of features, or a lookback of fixed length that ends at each target's own instant. A
 representation holds only its settings. It can therefore be described before any record is seen,
-name the arm it produced in a fitted object, and be rebuilt for new targets in \code{\link[=predict.timesift]{predict.timesift()}}.
+name the arm it produced in a fitted object, and be rebuilt for new targets in
+\code{\link[=predict.timesift]{predict.timesift()}}.
 }
 \details{
 Every representation carries \code{label}, the name it is reported under; \code{kind}, one of \code{"grain"},

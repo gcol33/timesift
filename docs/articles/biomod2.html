@@ -108,7 +108,7 @@
 
     
     
-<!-- Python blocks run by tools/python_twins.py (md5 5b3c122f9eaf576ec2c36f1337284c47). -->
+<!-- Python blocks run by tools/python_twins.py (md5 c554e1d5375488b1e12a09f5f55bcfd8). -->
 <p>biomod2 fits several species distribution algorithms to one table of
 predictors and combines their predictions. When the predictors come from
 a sensor record, such as hourly soil temperature or daily air
@@ -318,11 +318,6 @@ six hours for a year, and three responses that depend on the record
 through a lagged mechanism acting at weekly grain. Because the
 simulation puts the signal at the week, the comparison below can be
 checked against it.</p>
-<div class="lang-py-only">
-<p>The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.</p>
-</div>
 <div class="lang-pair">
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_records.html">simulate_records</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">200L</span>, mechanism <span class="op">=</span> <span class="st">"lag"</span>, variables <span class="op">=</span> <span class="fl">3L</span>, days <span class="op">=</span> <span class="fl">365L</span>,</span>
@@ -532,12 +527,12 @@ are directly comparable.</p>
 </div>
 <p>The report gives the AUC of each candidate, the number of responses
 on which it scored highest, and the held-out scores of the selection
-procedure and of the weighted ensemble. The four highest mean AUCs
-belong to weekly candidates, the grain at which the simulation places
-the signal. A biomod2 run shows which algorithm performs best on one
-table. Here the run also gives the grain at which each algorithm does
-best, and the ranking of grains within one algorithm need not match the
-ranking of algorithms.</p>
+procedure and of the weighted ensemble. The <span class="lang-r-only">four</span><span class="lang-py-only" py="['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'][ next((i for i, r in enumerate(sorted((r for r in ts.candidate_table(fit) if r['mean'] is not None), key=lambda r: -r['mean'])) if not r['candidate'].endswith(' / week')), 0)]">four</span>
+highest mean AUCs belong to weekly candidates, the grain at which the
+simulation places the signal. A biomod2 run shows which algorithm
+performs best on one table. Here the run also gives the grain at which
+each algorithm does best, and the ranking of grains within one algorithm
+need not match the ranking of algorithms.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></code></pre></div>

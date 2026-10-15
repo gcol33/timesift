@@ -19,6 +19,14 @@ statement, the way a knitted R chunk shows it. A block's info string takes ``err
 must raise, and the error is its output) and ``fig-alt="..."``. A figure a block leaves open is
 saved as SVG beside the article and drawn under the block; the ``<img>`` line is this tool's.
 
+A number in the prose that comes from the Python run is a span beside the R number:
+
+    The weekly candidate scores [0.838]{.lang-r-only}[0.800]{.lang-py-only py="f'{mean_auc:.3f}'"}.
+
+The expression in ``py`` is evaluated in the article's namespace at the span's place in the text,
+after the blocks above it have run, and its value is written back as the span's content. An
+expression uses single quotes inside, because the attribute is double-quoted.
+
 The article records the digest of the Python it was run from, so ``--check`` says whether every
 article is current without running anything and without the compiled core:
 
@@ -50,6 +58,7 @@ BANNER = re.compile(r"^<!-- Python blocks run by tools/python_twins.py \(md5 ([0
 BANNER_TEXT = "<!-- Python blocks run by tools/python_twins.py (md5 {digest}). -->"
 FIGURE = re.compile(r'^<img src="[^"]*py-figure-\d+\.svg" alt="[^"]*" />$')
 FIGURE_NAME = "py-figure-"
+SPAN = re.compile(r'\[([^\[\]\n]*)\]\{\.lang-py-only py="([^"]*)"\}')
 
 
 def digest(text: str) -> str:
@@ -221,9 +230,22 @@ def split_front_matter(lines: list[str]) -> int:
     return next(i for i in range(1, len(lines)) if lines[i].strip() == "---")
 
 
-def article_digest(found: list[Block]) -> str:
+def article_digest(found: list[Block], lines: list[str]) -> str:
+    spans = [" ".join(m.group(2).split()) for m in SPAN.finditer("".join(lines))]
     return digest("\n\x00\n".join("\n".join(b.source) + repr(sorted(b.options.items()))
-                                  for b in found))
+                                  for b in found) + "\n\x01\n" + "\n".join(spans))
+
+
+def fill_spans(segment: list[str], namespace: dict) -> list[str]:
+    """The prose lines with each Python span's content replaced by its expression's value."""
+    def value(match: re.Match) -> str:
+        expression = " ".join(match.group(2).split())
+        try:
+            shown = str(eval(expression, namespace))
+        except Exception as error:  # noqa: BLE001 -- named with its expression below
+            raise SystemExit(f'the span py="{expression}" raised {type(error).__name__}: {error}')
+        return f'[{shown}]{{.lang-py-only py="{match.group(2)}"}}'
+    return SPAN.sub(value, "".join(segment)).splitlines(keepends=True)
 
 
 def recorded(lines: list[str]) -> str | None:
@@ -261,7 +283,7 @@ def render(name: str, path: Path) -> tuple[str, dict[str, str]]:
     out: list[str] = []
     cursor = 0
     for block in found:
-        out += lines[cursor:block.first]
+        out += fill_spans(lines[cursor:block.first], namespace)
         # Pandoc reads options on a fence only inside braces, so a fence that has any is written
         # as {.python key=value}.
         options = " ".join(f'{k}="{v}"' if " " in v else f"{k}={v}" for k, v in block.options.items())
@@ -280,10 +302,10 @@ def render(name: str, path: Path) -> tuple[str, dict[str, str]]:
             trailing += 1
         out += ["\n"] * trailing
         cursor = block.figures_end
-    out += lines[cursor:]
+    out += fill_spans(lines[cursor:], namespace)
 
     close = split_front_matter(out)
-    banner = BANNER_TEXT.format(digest=article_digest(found)) + "\n"
+    banner = BANNER_TEXT.format(digest=article_digest(found, lines)) + "\n"
     body = [l for l in out[close + 1:] if not BANNER.match(l.rstrip("\n"))]
     while body and not body[0].strip():
         body.pop(0)
@@ -307,7 +329,7 @@ def main() -> int:
         stale = []
         for name in names:
             lines = available[name].read_text(encoding="utf-8").splitlines(keepends=True)
-            if recorded(lines) != article_digest(blocks(lines)):
+            if recorded(lines) != article_digest(blocks(lines), lines):
                 stale.append(name)
         if stale:
             print("Older than its Python, rerun tools/python_twins.py: " + ", ".join(stale),

@@ -108,7 +108,7 @@
 
     
     
-<!-- Python blocks run by tools/python_twins.py (md5 bc61174b4ccbaafc6b22acd826b3015a). -->
+<!-- Python blocks run by tools/python_twins.py (md5 2d38b283524f1d0dfa9b1932648b46a1). -->
 <p>A <em>learner</em> specifies how to fit a model and make predictions.
 <code>timesift</code> includes fifteen learners, including regression
 models, decision trees and neural networks. Each learner can be fitted
@@ -142,11 +142,6 @@ The time scale of each summary is called its <em>grain</em>.</p>
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
 <span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
 <span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
-</div>
-<div class="lang-py-only">
-<p>The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.</p>
 </div>
 <div class="lang-pair">
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
@@ -518,7 +513,7 @@ under its learner’s <code>name</code>, which
 <span>                  resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, n_inner <span class="op">=</span> <span class="fl">3L</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">run_time</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 16.45</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 30.61</span></span></code></pre></div>
 <div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="im">import</span> time</span>
 <span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> replace</span>
 <span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
@@ -536,13 +531,14 @@ under its learner’s <code>name</code>, which
 <span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>fit <span class="op">=</span> ts.timesift(targets, sim.readings, y<span class="op">=</span><span class="st">"v*"</span>, <span class="bu">id</span><span class="op">=</span><span class="st">"unit"</span>, time<span class="op">=</span><span class="st">"time"</span>,</span>
 <span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a>                  learners<span class="op">=</span>models, sift<span class="op">=</span>ts.grains(<span class="st">"week"</span>, <span class="st">"month"</span>),</span>
 <span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a>                  resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">5</span>), n_inner<span class="op">=</span><span class="dv">3</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="bu">round</span>(time.perf_counter() <span class="op">-</span> start)</span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="co">#&gt; 16</span></span></code></pre></div>
+<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a>elapsed <span class="op">=</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="bu">round</span>(elapsed)</span>
+<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a><span class="co">#&gt; 27</span></span></code></pre></div>
 </div>
-<p>The run took 16 seconds for 15 candidates. With three inner folds in
-each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20
-times, three inner fits and one outer fit in each outer fold, and once
-more on every target.</p>
+<p>The run took <span class="lang-r-only">31</span><span class="lang-py-only" py="round(elapsed)">27</span> seconds for 15
+candidates. With three inner folds in each of five outer folds, every
+candidate is fitted 5 x (3 + 1) = 20 times, three inner fits and one
+outer fit in each outer fold, and once more on every target.</p>
 <p><code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> lists the candidates in order of their mean
 score on the outer folds, with the number of responses on which each
 scored highest, and then the held-out score of the procedure that
@@ -608,14 +604,18 @@ chooses and weights them.</p>
 </div>
 <p>Each learner run at both grains scores higher at the weekly one,
 which is the grain the simulation acts at. At the monthly grain the
-tree, both forests and gbm score below 0.5, so they find nothing there.
-<code>maxent / week</code> has the highest mean, 0.750, and scored
-highest on all four responses. The procedure rows are the scores to
+tree, both forests and gbm score <span class="lang-r-only">below 0.5, so
+they find nothing there</span><span class="lang-py-only">between</span><span class="lang-py-only" py="'%.3f' % min(r['mean'] for r in ts.candidate_table(fit) if r['candidate'] in ('tree / month', 'forest / month', 'forest_balanced / month', 'gbm / month'))">0.513</span><span class="lang-py-only">and</span><span class="lang-py-only" py="'%.3f' % max(r['mean'] for r in ts.candidate_table(fit) if r['candidate'] in ('tree / month', 'forest / month', 'forest_balanced / month', 'gbm / month'))">0.589</span>.
+<span class="lang-r-only"><code>maxent / week</code></span><span class="lang-py-only" py="'`' + ts.candidate_table(fit)[-1]['candidate'] + '`'"><code>elasticnet / week</code></span>
+has the highest mean, <span class="lang-r-only">0.750</span><span class="lang-py-only" py="'%.3f' % ts.candidate_table(fit)[-1]['mean']">0.791</span>,
+and scored highest on <span class="lang-r-only">all four</span><span class="lang-py-only" py="str(ts.candidate_table(fit)[-1]['won']) + ' of the four'">2
+of the four</span> responses. The procedure rows are the scores to
 report: inside each outer training fold the inner folds chose a
 candidate and fitted the stack’s weights, and the outer test fold then
-scored that choice once, 0.741 for the selected candidate and 0.740 for
-the stack. The highest candidate mean was picked out on the same folds
-it is scored on.</p>
+scored that choice once, <span class="lang-r-only">0.741</span><span class="lang-py-only" py="'%.3f' % ts.procedure_table(fit)[0]['mean']">0.777</span>
+for the selected candidate and <span class="lang-r-only">0.740</span><span class="lang-py-only" py="'%.3f' % ts.procedure_table(fit)[1]['mean']">0.775</span>
+for the stack. The highest candidate mean was picked out on the same
+folds it is scored on.</p>
 <p>The candidate table records how each candidate was built: its
 learner, its grain, the number of bins and channels, whether it was
 fitted, and, for a tuned learner, the settings it chose.</p>
@@ -774,29 +774,32 @@ its AUC on the other half, averaged over the four responses.</p>
 <span id="cb25-14"><a href="#cb25-14" tabindex="-1"></a>    <span class="st">"maxent()"</span>: ts.maxent(),</span>
 <span id="cb25-15"><a href="#cb25-15" tabindex="-1"></a>    <span class="st">'maxent(classes="lq")'</span>: ts.maxent(classes<span class="op">=</span><span class="st">"lq"</span>),</span>
 <span id="cb25-16"><a href="#cb25-16" tabindex="-1"></a>}</span>
-<span id="cb25-17"><a href="#cb25-17" tabindex="-1"></a>pd.Series({name: held_out_auc(l) <span class="cf">for</span> name, l <span class="kw">in</span> variants.items()}).<span class="bu">round</span>(<span class="dv">3</span>)</span>
-<span id="cb25-18"><a href="#cb25-18" tabindex="-1"></a><span class="co">#&gt; elasticnet()                  0.729</span></span>
-<span id="cb25-19"><a href="#cb25-19" tabindex="-1"></a><span class="co">#&gt; elasticnet(s="lambda.min")    0.726</span></span>
-<span id="cb25-20"><a href="#cb25-20" tabindex="-1"></a><span class="co">#&gt; elasticnet(alpha=1)           0.727</span></span>
-<span id="cb25-21"><a href="#cb25-21" tabindex="-1"></a><span class="co">#&gt; elasticnet(tol=1e-4)          0.727</span></span>
-<span id="cb25-22"><a href="#cb25-22" tabindex="-1"></a><span class="co">#&gt; forest()                      0.626</span></span>
-<span id="cb25-23"><a href="#cb25-23" tabindex="-1"></a><span class="co">#&gt; forest(balance=True)          0.605</span></span>
-<span id="cb25-24"><a href="#cb25-24" tabindex="-1"></a><span class="co">#&gt; boosting()                    0.615</span></span>
-<span id="cb25-25"><a href="#cb25-25" tabindex="-1"></a><span class="co">#&gt; boosting(method="xgboost")    0.638</span></span>
-<span id="cb25-26"><a href="#cb25-26" tabindex="-1"></a><span class="co">#&gt; maxent()                      0.710</span></span>
-<span id="cb25-27"><a href="#cb25-27" tabindex="-1"></a><span class="co">#&gt; maxent(classes="lq")          0.736</span></span>
-<span id="cb25-28"><a href="#cb25-28" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
+<span id="cb25-17"><a href="#cb25-17" tabindex="-1"></a>held_out <span class="op">=</span> pd.Series({name: held_out_auc(l) <span class="cf">for</span> name, l <span class="kw">in</span> variants.items()})</span>
+<span id="cb25-18"><a href="#cb25-18" tabindex="-1"></a>held_out.<span class="bu">round</span>(<span class="dv">3</span>)</span>
+<span id="cb25-19"><a href="#cb25-19" tabindex="-1"></a><span class="co">#&gt; elasticnet()                  0.729</span></span>
+<span id="cb25-20"><a href="#cb25-20" tabindex="-1"></a><span class="co">#&gt; elasticnet(s="lambda.min")    0.726</span></span>
+<span id="cb25-21"><a href="#cb25-21" tabindex="-1"></a><span class="co">#&gt; elasticnet(alpha=1)           0.727</span></span>
+<span id="cb25-22"><a href="#cb25-22" tabindex="-1"></a><span class="co">#&gt; elasticnet(tol=1e-4)          0.727</span></span>
+<span id="cb25-23"><a href="#cb25-23" tabindex="-1"></a><span class="co">#&gt; forest()                      0.626</span></span>
+<span id="cb25-24"><a href="#cb25-24" tabindex="-1"></a><span class="co">#&gt; forest(balance=True)          0.605</span></span>
+<span id="cb25-25"><a href="#cb25-25" tabindex="-1"></a><span class="co">#&gt; boosting()                    0.615</span></span>
+<span id="cb25-26"><a href="#cb25-26" tabindex="-1"></a><span class="co">#&gt; boosting(method="xgboost")    0.638</span></span>
+<span id="cb25-27"><a href="#cb25-27" tabindex="-1"></a><span class="co">#&gt; maxent()                      0.710</span></span>
+<span id="cb25-28"><a href="#cb25-28" tabindex="-1"></a><span class="co">#&gt; maxent(classes="lq")          0.736</span></span>
+<span id="cb25-29"><a href="#cb25-29" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
 </div>
 <p>On this split the elastic net read at <code>"lambda.min"</code>
-scores 0.680 against 0.631 at the default <code>"lambda.1se"</code>, and
-the lasso scores 0.608. The looser tolerance gives the same AUC as the
-default to three decimals, and the timings at the end of the article
-show what it saves. <code>maxent(classes = "lq")</code> scores 0.693
-against 0.665 for the classes maxnet chooses, and both forests score
-close to 0.5 at this grain on 75 units. A single split of 75 units is a
-noisy comparison, so a difference of this size is worth checking under
-<code><a href="../reference/timesift.html">timesift()</a></code>’s folds, with the two settings as two named
-candidates, before acting on it.</p>
+scores <span class="lang-r-only">0.680</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[1]">0.726</span> against <span class="lang-r-only">0.631</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[0]">0.729</span> at the default
+<code>"lambda.1se"</code>, and the lasso scores <span class="lang-r-only">0.608</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[2]">0.727</span>. The looser
+tolerance gives <span class="lang-r-only">the same AUC as the default to
+three decimals</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[3]">0.727</span><span class="lang-py-only">against</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[0]">0.729</span><span class="lang-py-only">at the default</span>, and the timings at the end
+of the article show what it saves. <code>maxent(classes = "lq")</code>
+scores <span class="lang-r-only">0.693</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[9]">0.736</span> against <span class="lang-r-only">0.665</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[8]">0.710</span> for the classes
+maxnet chooses, and both forests score <span class="lang-r-only">close
+to 0.5</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[4]">0.626</span><span class="lang-py-only">and</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[5]">0.605</span> at this grain on 75
+units. A single split of 75 units is a noisy comparison, so a difference
+of this size is worth checking under <code><a href="../reference/timesift.html">timesift()</a></code>’s folds,
+with the two settings as two named candidates, before acting on it.</p>
 </div>
 <div class="section level2">
 <h2 id="neural-encoders">Neural encoders<a class="anchor" aria-label="anchor" href="#neural-encoders"></a>
@@ -957,11 +960,12 @@ carries, and every combination is tried.</p>
 <span id="cb33-9"><a href="#cb33-9" tabindex="-1"></a><span class="co">#&gt; 2  mtry = 2, min_node = 5  0.520598</span></span>
 <span id="cb33-10"><a href="#cb33-10" tabindex="-1"></a><span class="co">#&gt; 3  mtry = 8, min_node = 5  0.566769</span></span></code></pre></div>
 </div>
-<p>The search chose <code>mtry = 8</code> and <code>min_node = 5</code>,
-the combination with the highest mean inner AUC. Under
-<code><a href="../reference/timesift.html">timesift()</a></code>, the settings each tuned candidate chose on all
-targets are in the <code>settings</code> column of the candidate
-table.</p>
+<p>The search chose <span class="lang-r-only"><code>mtry = 8</code> and
+<code>min_node = 5</code></span><span class="lang-py-only" py="'`mtry = %d` and `min_node = %d`' % (tf.model.chosen['mtry'], tf.model.chosen['min_node'])"><code>mtry = 8</code>
+and <code>min_node = 5</code></span>, the combination with the highest
+mean inner AUC. Under <code><a href="../reference/timesift.html">timesift()</a></code>, the settings each tuned
+candidate chose on all targets are in the <code>settings</code> column
+of the candidate table.</p>
 <p>Given no <code>grid</code>, <code><a href="../reference/tune.html">tune()</a></code> searches the grid
 registered under the learner’s name. Eight shipped learners carry the
 grids that biomod2’s <code>BIOMOD_Tuning()</code> searches:</p>
@@ -1123,11 +1127,13 @@ from it.</p>
 <span id="cb41-17"><a href="#cb41-17" tabindex="-1"></a><span class="co">#&gt;</span></span>
 <span id="cb41-18"><a href="#cb41-18" tabindex="-1"></a><span class="co">#&gt; choice on every target  elasticnet / week</span></span></code></pre></div>
 </div>
-<p><code>channel_means</code> scores 0.461 at both grains. The mean of a
+<p><code>channel_means</code> scores <span class="lang-r-only">0.461 at
+both grains</span><span class="lang-py-only" py="'%.3f at the monthly grain and %.3f at the weekly' % ({r['candidate']: r['mean'] for r in ts.candidate_table(own)}['channel_means / month'], {r['candidate']: r['mean'] for r in ts.candidate_table(own)}['channel_means / week'])">0.470
+at the monthly grain and 0.472 at the weekly</span>. The mean of a
 channel over the whole year is nearly the same number whichever bins it
 is averaged from, and in this simulation the responses read each unit’s
 departure from its own level, which a yearly mean averages away. The
-weekly elastic net, which reads every bin, scores 0.701.</p>
+weekly elastic net, which reads every bin, scores <span class="lang-r-only">0.701</span><span class="lang-py-only" py="'%.3f' % {r['candidate']: r['mean'] for r in ts.candidate_table(own)}['elasticnet / week']">0.789</span>.</p>
 </div>
 <div class="section level2">
 <h2 id="other-responses-and-other-metrics">Other responses, and other metrics<a class="anchor" aria-label="anchor" href="#other-responses-and-other-metrics"></a>
@@ -1266,8 +1272,10 @@ better, as the choice of a candidate assumes of every metric.</p>
 <span id="cb53-14"><a href="#cb53-14" tabindex="-1"></a><span class="co">#&gt; choice on every target  elasticnet / month</span></span></code></pre></div>
 </div>
 <p>The run is chosen and reported by the Brier score under the capped
-weights. The elastic net, at -0.239, scored above the forest, at -0.259,
-and scored highest on all four responses.</p>
+weights. The elastic net, at <span class="lang-r-only">-0.239</span><span class="lang-py-only" py="'%.3f' % {r['candidate']: r['mean'] for r in ts.candidate_table(capped)}['elasticnet / month']">-0.238</span>,
+scored above the forest, at <span class="lang-r-only">-0.259</span><span class="lang-py-only" py="'%.3f' % {r['candidate']: r['mean'] for r in ts.candidate_table(capped)}['forest / month']">-0.240</span>,
+and scored highest on <span class="lang-r-only">all four</span><span class="lang-py-only" py="str({r['candidate']: r['won'] for r in ts.candidate_table(capped)}['elasticnet / month']) + ' of the four'">2
+of the four</span> responses.</p>
 </div>
 <div class="section level2">
 <h2 id="choosing-learners">Choosing learners<a class="anchor" aria-label="anchor" href="#choosing-learners"></a>
@@ -1288,14 +1296,14 @@ at the weekly grain, which flattens to 53 columns.</p>
 <span><span class="op">}</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">seconds</span>, <span class="fl">2</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                 linear             elasticnet                 forest </span></span>
-<span><span class="co">#&gt;                   4.48                   2.29                   0.30 </span></span>
+<span><span class="co">#&gt;                  10.08                   3.91                   0.46 </span></span>
 <span><span class="co">#&gt;                 maxent elasticnet(tol = 1e-4)           discriminant </span></span>
-<span><span class="co">#&gt;                   0.23                   0.14                   0.09 </span></span>
+<span><span class="co">#&gt;                   0.43                   0.31                   0.18 </span></span>
 <span><span class="co">#&gt;                xgboost             perceptron               boosting </span></span>
-<span><span class="co">#&gt;                   0.05                   0.03                   0.02 </span></span>
-<span><span class="co">#&gt;                   mars                   tree               envelope </span></span>
-<span><span class="co">#&gt;                   0.02                   0.01                   0.00 </span></span>
-<span><span class="co">#&gt;           hierarchical </span></span>
+<span><span class="co">#&gt;                   0.09                   0.06                   0.03 </span></span>
+<span><span class="co">#&gt;                   tree                   mars           hierarchical </span></span>
+<span><span class="co">#&gt;                   0.02                   0.02                   0.02 </span></span>
+<span><span class="co">#&gt;               envelope </span></span>
 <span><span class="co">#&gt;                   0.00</span></span></code></pre></div>
 <div class="sourceCode" id="cb55"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" tabindex="-1"></a>timed <span class="op">=</span> {</span>
 <span id="cb55-2"><a href="#cb55-2" tabindex="-1"></a>    <span class="st">"elasticnet"</span>: ts.elasticnet(), <span class="st">"elasticnet(tol=1e-4)"</span>: ts.elasticnet(tol<span class="op">=</span><span class="fl">1e-4</span>),</span>
@@ -1312,16 +1320,16 @@ at the weekly grain, which flattens to 53 columns.</p>
 <span id="cb55-13"><a href="#cb55-13" tabindex="-1"></a></span>
 <span id="cb55-14"><a href="#cb55-14" tabindex="-1"></a>seconds <span class="op">=</span> pd.Series({name: seconds_to_fit(l) <span class="cf">for</span> name, l <span class="kw">in</span> timed.items()})</span>
 <span id="cb55-15"><a href="#cb55-15" tabindex="-1"></a>seconds.<span class="bu">round</span>(<span class="dv">2</span>).sort_values(ascending<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb55-16"><a href="#cb55-16" tabindex="-1"></a><span class="co">#&gt; linear                  2.47</span></span>
-<span id="cb55-17"><a href="#cb55-17" tabindex="-1"></a><span class="co">#&gt; elasticnet              2.14</span></span>
-<span id="cb55-18"><a href="#cb55-18" tabindex="-1"></a><span class="co">#&gt; forest                  0.32</span></span>
-<span id="cb55-19"><a href="#cb55-19" tabindex="-1"></a><span class="co">#&gt; maxent                  0.24</span></span>
-<span id="cb55-20"><a href="#cb55-20" tabindex="-1"></a><span class="co">#&gt; elasticnet(tol=1e-4)    0.10</span></span>
-<span id="cb55-21"><a href="#cb55-21" tabindex="-1"></a><span class="co">#&gt; discriminant            0.09</span></span>
-<span id="cb55-22"><a href="#cb55-22" tabindex="-1"></a><span class="co">#&gt; xgboost                 0.05</span></span>
-<span id="cb55-23"><a href="#cb55-23" tabindex="-1"></a><span class="co">#&gt; tree                    0.02</span></span>
-<span id="cb55-24"><a href="#cb55-24" tabindex="-1"></a><span class="co">#&gt; boosting                0.02</span></span>
-<span id="cb55-25"><a href="#cb55-25" tabindex="-1"></a><span class="co">#&gt; perceptron              0.02</span></span>
+<span id="cb55-16"><a href="#cb55-16" tabindex="-1"></a><span class="co">#&gt; linear                  4.89</span></span>
+<span id="cb55-17"><a href="#cb55-17" tabindex="-1"></a><span class="co">#&gt; elasticnet              3.85</span></span>
+<span id="cb55-18"><a href="#cb55-18" tabindex="-1"></a><span class="co">#&gt; maxent                  0.57</span></span>
+<span id="cb55-19"><a href="#cb55-19" tabindex="-1"></a><span class="co">#&gt; forest                  0.46</span></span>
+<span id="cb55-20"><a href="#cb55-20" tabindex="-1"></a><span class="co">#&gt; discriminant            0.19</span></span>
+<span id="cb55-21"><a href="#cb55-21" tabindex="-1"></a><span class="co">#&gt; elasticnet(tol=1e-4)    0.18</span></span>
+<span id="cb55-22"><a href="#cb55-22" tabindex="-1"></a><span class="co">#&gt; xgboost                 0.09</span></span>
+<span id="cb55-23"><a href="#cb55-23" tabindex="-1"></a><span class="co">#&gt; perceptron              0.03</span></span>
+<span id="cb55-24"><a href="#cb55-24" tabindex="-1"></a><span class="co">#&gt; boosting                0.03</span></span>
+<span id="cb55-25"><a href="#cb55-25" tabindex="-1"></a><span class="co">#&gt; tree                    0.02</span></span>
 <span id="cb55-26"><a href="#cb55-26" tabindex="-1"></a><span class="co">#&gt; mars                    0.01</span></span>
 <span id="cb55-27"><a href="#cb55-27" tabindex="-1"></a><span class="co">#&gt; hierarchical            0.01</span></span>
 <span id="cb55-28"><a href="#cb55-28" tabindex="-1"></a><span class="co">#&gt; envelope                0.00</span></span>
@@ -1348,25 +1356,32 @@ coefficients than there are units:</p>
 <span>  `k = 5` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="fu"><a href="../reference/fit_learner.html">fit_learner</a></span><span class="op">(</span><span class="fu"><a href="../reference/additive.html">additive</a></span><span class="op">(</span>k <span class="op">=</span> <span class="fl">5L</span><span class="op">)</span>, <span class="va">month</span>, <span class="va">sim</span><span class="op">$</span><span class="va">y</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">additive_seconds</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt; k = 10  k = 5 </span></span>
-<span><span class="co">#&gt;  11.28   0.26</span></span></code></pre></div>
+<span><span class="co">#&gt;  21.86   0.54</span></span></code></pre></div>
 <div class="sourceCode" id="cb59"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" tabindex="-1"></a>month <span class="op">=</span> ts.grain_matrix(sim.readings, <span class="st">"unit"</span>, <span class="st">"time"</span>, <span class="st">"reading"</span>, grain<span class="op">=</span><span class="st">"month"</span>)</span>
-<span id="cb59-2"><a href="#cb59-2" tabindex="-1"></a>pd.Series({<span class="st">"k = 10"</span>: seconds_to_fit(ts.additive(), month),</span>
-<span id="cb59-3"><a href="#cb59-3" tabindex="-1"></a>           <span class="st">"k = 5"</span>: seconds_to_fit(ts.additive(k<span class="op">=</span><span class="dv">5</span>), month)}).<span class="bu">round</span>(<span class="dv">2</span>)</span>
-<span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a><span class="co">#&gt; k = 10    6.51</span></span>
-<span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a><span class="co">#&gt; k = 5     0.38</span></span>
-<span id="cb59-6"><a href="#cb59-6" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
+<span id="cb59-2"><a href="#cb59-2" tabindex="-1"></a>additive_seconds <span class="op">=</span> pd.Series({<span class="st">"k = 10"</span>: seconds_to_fit(ts.additive(), month),</span>
+<span id="cb59-3"><a href="#cb59-3" tabindex="-1"></a>                              <span class="st">"k = 5"</span>: seconds_to_fit(ts.additive(k<span class="op">=</span><span class="dv">5</span>), month)})</span>
+<span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a>additive_seconds.<span class="bu">round</span>(<span class="dv">2</span>)</span>
+<span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a><span class="co">#&gt; k = 10    12.11</span></span>
+<span id="cb59-6"><a href="#cb59-6" tabindex="-1"></a><span class="co">#&gt; k = 5      0.70</span></span>
+<span id="cb59-7"><a href="#cb59-7" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
 </div>
-<p>With <code>k = 10</code> the fit took 11.3 seconds, and with
-<code>k = 5</code> it took 0.3 seconds.</p>
+<p>With <code>k = 10</code> the fit took <span class="lang-r-only">21.9</span><span class="lang-py-only" py="format(additive_seconds['k = 10'], '.1f')">12.1</span>
+seconds, and with <code>k = 5</code> it took <span class="lang-r-only">0.5</span><span class="lang-py-only" py="format(additive_seconds['k = 5'], '.1f')">0.7</span>
+seconds.</p>
 <p>The elastic net includes every predictor and uses a penalty to limit
 coefficient size. It chooses that penalty within the training data. At
-its default tolerance it took 2.3 seconds here; <code>tol = 1e-4</code>
-took 0.1 seconds and gave the same held-out AUC on the split above.
-<code><a href="../reference/linear.html">linear()</a></code> took 4.5 seconds. Its search refits the model for
-each term it could add or remove, with 106 possible terms at the weekly
-grain. A coarser grain or a bounded search, such as
+its default tolerance it took <span class="lang-r-only">3.9</span><span class="lang-py-only" py="format(seconds['elasticnet'], '.1f')">3.9</span>
+seconds here; <code>tol = 1e-4</code> took <span class="lang-r-only">0.3</span><span class="lang-py-only" py="format(seconds['elasticnet(tol=1e-4)'], '.1f')">0.2</span>
+seconds and gave <span class="lang-r-only">the same held-out AUC on the
+split above</span><span class="lang-py-only">a held-out AUC
+of</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[3]">0.727</span><span class="lang-py-only">on the split above, against</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[0]">0.729</span><span class="lang-py-only">at the default</span>. <code><a href="../reference/linear.html">linear()</a></code> took
+<span class="lang-r-only">10.1</span><span class="lang-py-only" py="format(seconds['linear'], '.1f')">4.9</span>
+seconds. Its search refits the model for each term it could add or
+remove, with 106 possible terms at the weekly grain. A coarser grain or
+a bounded search, such as
 <code>linear(select = "forward", terms = "column", max_terms = 3)</code>,
-reduces the number of fits. Every other tabular learner took at most 0.3
+reduces the number of fits. Every other tabular learner took at most
+<span class="lang-r-only">0.46</span><span class="lang-py-only" py="format(seconds.drop(['linear', 'elasticnet']).max(), '.2f')">0.57</span>
 seconds.</p>
 <p>What a learner can be fitted on depends on the number of units
 against the number of columns its representation flattens to:</p>

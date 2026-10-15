@@ -124,12 +124,10 @@
 #' plots <- data.frame(plot = units,
 #'                     sp_a = rbinom(30, 1, plogis(2 * warmth)),
 #'                     sp_b = rbinom(30, 1, plogis(-2 * warmth)))
-#' \donttest{
 #' fit <- timesift(plots, logger, y = starts_with("sp_"), id = plot, time = datetime,
 #'                 sift = grains("week", "month"), resampling = cv(v = 3L),
 #'                 ensemble = FALSE, verbose = FALSE)
 #' fit
-#' }
 #'
 #' @export
 timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL,
@@ -736,12 +734,10 @@ timesift <- function(targets, series = NULL, y, x = NULL, id = NULL, time = NULL
 #' plots <- data.frame(plot = units,
 #'                     sp_a = rbinom(30, 1, plogis(2 * warmth)),
 #'                     sp_b = rbinom(30, 1, plogis(-2 * warmth)))
-#' \donttest{
 #' fit <- timesift(plots, logger, y = starts_with("sp_"), id = plot, time = datetime,
 #'                 sift = grains("week", "month"), resampling = cv(v = 3L), verbose = FALSE)
 #' head(predict(fit, plots, logger), 3)
 #' predict(fit, plots, logger, type = "binary", rule = "prevalence")[1:3, ]
-#' }
 #'
 #' @export
 predict.timesift <- function(object, targets, series = NULL, candidate = "ensemble",

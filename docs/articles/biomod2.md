@@ -152,10 +152,6 @@ hours for a year, and three responses that depend on the record through
 a lagged mechanism acting at weekly grain. Because the simulation puts
 the signal at the week, the comparison below can be checked against it.
 
-The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.
-
 ``` r
 
 sim <- simulate_records(n = 200L, mechanism = "lag", variables = 3L, days = 365L,
@@ -384,7 +380,7 @@ fit
 
 The report gives the AUC of each candidate, the number of responses on
 which it scored highest, and the held-out scores of the selection
-procedure and of the weighted ensemble. The four highest mean AUCs
+procedure and of the weighted ensemble. The fourfour highest mean AUCs
 belong to weekly candidates, the grain at which the simulation places
 the signal. A biomod2 run shows which algorithm performs best on one
 table. Here the run also gives the grain at which each algorithm does

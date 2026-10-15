@@ -38,13 +38,11 @@
 #' plots <- data.frame(plot = units,
 #'                     sp_a = rbinom(30, 1, plogis(2 * warmth)),
 #'                     sp_b = rbinom(30, 1, plogis(-2 * warmth)))
-#' \donttest{
 #' fit <- timesift(plots, logger, y = starts_with("sp_"), id = plot, time = datetime,
 #'                 sift = grains("week", "month"), resampling = cv(v = 3L), verbose = FALSE)
 #' report <- summary(fit)
 #' report
 #' attr(report, "weights")
-#' }
 #'
 #' @name timesift_report
 NULL

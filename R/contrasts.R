@@ -22,7 +22,6 @@
 #'   reference, its interval, and the adjusted p-value. Needs `lme4`, `lmerTest` and `emmeans`.
 #'
 #' @examplesIf all(vapply(c("lme4", "lmerTest", "emmeans"), requireNamespace, logical(1), quietly = TRUE))
-#' \donttest{
 #' set.seed(1)
 #' t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 200)
 #' units <- sprintf("p%03d", 1:60)
@@ -36,7 +35,6 @@
 #' x <- grain_matrix(d, plot, t, temp, grain = c("day", "week", "month"))
 #' lad <- grain_ladder(x, y, elasticnet(), folds = fold_map(y, v = 5), verbose = FALSE)
 #' grain_contrasts(lad)
-#' }
 #'
 #' @export
 grain_contrasts <- function(ladder, learner = NULL, reference = NULL, adjust = "mvt") {

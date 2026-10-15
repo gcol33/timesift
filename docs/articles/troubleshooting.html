@@ -108,7 +108,7 @@
 
     
     
-<!-- Python blocks run by tools/python_twins.py (md5 b524448c6802ddcead5d167cd90cd12a). -->
+<!-- Python blocks run by tools/python_twins.py (md5 168dddd9fc7a7aafb25d8e7538e3ca3c). -->
 <p>This article explains common errors and unexpected results when
 preparing sensor records, fitting models and predicting new
 observations. Each example shows the message, its cause and a working
@@ -139,11 +139,6 @@ combination with a particular input summary is a <em>candidate</em>.</p>
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
 <span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Or install the development version from GitHub</span></span>
 <span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/gcol33/timesift</span></code></pre></div>
-</div>
-<div class="lang-py-only">
-<p>The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.</p>
 </div>
 <div class="lang-pair">
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
@@ -311,9 +306,8 @@ runs past its end.</p>
 </div>
 <p>Weekly intervals start on Monday. The record begins on Wednesday, so
 the first week contains fewer readings. <code>bin_partial</code> marks
-incomplete intervals and <code>bin_n</code> counts their readings: 120
-in the first week and 168 in a full week. A partial bin’s mean and daily
-extremes are calculated from the readings available in that
+incomplete intervals and <code>bin_n</code> counts their readings: <span class="lang-r-only">120</span><span class="lang-py-only" py="x.bin_n[0, 0]">120</span> in the first week and <span class="lang-r-only">168</span><span class="lang-py-only" py="x.bin_n[0, 1]">168</span> in a full week. A partial bin’s mean and
+daily extremes are calculated from the readings available in that
 interval.</p>
 <p><code>partial = "drop"</code> removes them.</p>
 <div class="lang-pair">
@@ -407,13 +401,13 @@ time column carries.</p>
 <span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a><span class="co">#&gt; array([22, 24], dtype=int32)</span></span></code></pre></div>
 </div>
 <p>The first Vienna day began two hours before the first reading, so it
-is partial and holds 22 readings. In a zone that keeps daylight saving
-time the day the clock goes forward holds 23 hours and the day it goes
-back 25. A record kept on a fixed offset bins into days of 24 hours once
-its <code>tzone</code> names that offset, such as
-<code>"Etc/GMT-1"</code> for Central European standard time. The zone is
-a decision about what a day means for the question, and it is worth
-setting explicitly.</p>
+is partial and holds <span class="lang-r-only">22</span><span class="lang-py-only" py="xv.bin_n[0, 0]">22</span> readings. In a zone
+that keeps daylight saving time the day the clock goes forward holds 23
+hours and the day it goes back 25. A record kept on a fixed offset bins
+into days of 24 hours once its <code>tzone</code> names that offset,
+such as <code>"Etc/GMT-1"</code> for Central European standard time. The
+zone is a decision about what a day means for the question, and it is
+worth setting explicitly.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fixed</span> <span class="op">&lt;-</span> <span class="va">series</span></span>
@@ -488,9 +482,10 @@ identified in <code>targets</code> enter the fit.</p>
 <span id="cb34-5"><a href="#cb34-5" tabindex="-1"></a>fit_fewer.y.values.shape</span>
 <span id="cb34-6"><a href="#cb34-6" tabindex="-1"></a><span class="co">#&gt; (22, 2)</span></span></code></pre></div>
 </div>
-<p>The fit holds 22 targets, although the series carries 24 plots. When
-a plot seems to be missing from the results,
-<code>rownames(fit$y)</code> lists the targets that were fitted.</p>
+<p>The fit holds <span class="lang-r-only">22</span><span class="lang-py-only" py="fit_fewer.y.values.shape[0]">22</span> targets,
+although the series carries <span class="lang-r-only">24</span><span class="lang-py-only" py="len(ids)">24</span> plots. When a plot seems to
+be missing from the results, <code>rownames(fit$y)</code> lists the
+targets that were fitted.</p>
 <p>Two rows of <code>targets</code> with one identifier are refused
 unless <code>target_time</code> says where in time each row sits,
 because otherwise both rows would read the same record.</p>
@@ -757,9 +752,10 @@ training side, leaving no presence to score, and in fold 3 both are held
 out, leaving none to fit on.</p>
 </div>
 <div class="lang-py-only">
-<p>In folds 1, 2 and 3 both presences of <code>sp3</code> sit on the
-training side, leaving no presence to score, and in fold 4 both are held
-out, leaving none to fit on.</p>
+<p>In folds <span class="lang-py-only" py="(lambda f: ', '.join(map(str, f[:-1])) + ' and ' + str(f[-1]))(cells.loc[(cells['variable'] == 'sp3') &amp; (cells['pres_test'] == 0), 'fold'].tolist())">1,
+2 and 3</span> both presences of <code>sp3</code> sit on the training
+side, leaving no presence to score, and in fold <span class="lang-py-only" py="cells.loc[(cells['variable'] == 'sp3') &amp; (cells['pres_test'] == 2), 'fold'].item()">4</span>
+both are held out, leaving none to fit on.</p>
 </div>
 <p>The run continues using the eligible species-fold pairs.
 <code>fit$cells</code> lists these pairs, based on the observed
@@ -958,7 +954,7 @@ for selection and combination.</p>
 <span>                                   n_inner <span class="op">=</span> <span class="cn">NULL</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nested <span class="op">=</span> <span class="va">nested</span>, outer_only <span class="op">=</span> <span class="va">outer_only</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     nested outer_only </span></span>
-<span><span class="co">#&gt;       0.45       0.15</span></span></code></pre></div>
+<span><span class="co">#&gt;       1.08       0.29</span></span></code></pre></div>
 <div class="sourceCode" id="cb77"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb77-1"><a href="#cb77-1" tabindex="-1"></a><span class="im">import</span> time</span>
 <span id="cb77-2"><a href="#cb77-2" tabindex="-1"></a></span>
 <span id="cb77-3"><a href="#cb77-3" tabindex="-1"></a>v_outer <span class="op">=</span> <span class="dv">3</span></span>
@@ -979,8 +975,8 @@ for selection and combination.</p>
 <span id="cb77-18"><a href="#cb77-18" tabindex="-1"></a>nested <span class="op">&gt;</span> outer_only</span>
 <span id="cb77-19"><a href="#cb77-19" tabindex="-1"></a><span class="co">#&gt; True</span></span></code></pre></div>
 </div>
-<p>On this record the nested run took 0.45 seconds and the run on the
-outer folds alone 0.15.</p>
+<p>On this record the nested run took <span class="lang-r-only">1.08</span><span class="lang-py-only" py="f'{nested:.2f}'">0.84</span> seconds and the run on the
+outer folds alone <span class="lang-r-only">0.29</span><span class="lang-py-only" py="f'{outer_only:.2f}'">0.37</span>.</p>
 <p>Each fit in turn costs what its array costs. A calendar grain has as
 many columns as bins times statistics, and <code><a href="../reference/native.html">native()</a></code> has one
 bin per reading, so its size follows the record directly.</p>
@@ -1005,14 +1001,14 @@ bin per reading, so its size follows the record directly.</p>
 <span id="cb79-8"><a href="#cb79-8" tabindex="-1"></a><span class="dv">894</span> <span class="op">*</span> (<span class="dv">3</span> <span class="op">*</span> <span class="dv">365</span> <span class="op">+</span> <span class="dv">1</span>) <span class="op">*</span> <span class="dv">24</span> <span class="op">*</span> <span class="dv">8</span> <span class="op">/</span> <span class="dv">2</span><span class="op">**</span><span class="dv">20</span></span>
 <span id="cb79-9"><a href="#cb79-9" tabindex="-1"></a><span class="co">#&gt; 179.4111328125</span></span></code></pre></div>
 </div>
-<p>The weekly grain of the same record holds 9 bins against the 1440 of
-the native array, and the Schrankogel record of the package’s origin,
-894 plots read hourly for three years, would be about 179 MB for a
-single channel. A run on a long hourly record is quickest to iterate on
-at a few coarse grains with <code>n_inner = NULL</code>, reaching for
-<code><a href="../reference/native.html">native()</a></code> and the inner search once the comparison is
-settled. <code><a href="../reference/elasticnet.html">elasticnet()</a></code> and <code><a href="../reference/forest.html">forest()</a></code> take
-<code>threads</code>, and what they return does not depend on it.</p>
+<p>The weekly grain of the same record holds <span class="lang-r-only">9</span><span class="lang-py-only" py="x.values.shape[1]">9</span> bins against the <span class="lang-r-only">1440</span><span class="lang-py-only" py="xn.values.shape[1]">1440</span> of the native array, and the
+Schrankogel record of the package’s origin, 894 plots read hourly for
+three years, would be about 179 MB for a single channel. A run on a long
+hourly record is quickest to iterate on at a few coarse grains with
+<code>n_inner = NULL</code>, reaching for <code><a href="../reference/native.html">native()</a></code> and the
+inner search once the comparison is settled. <code><a href="../reference/elasticnet.html">elasticnet()</a></code>
+and <code><a href="../reference/forest.html">forest()</a></code> take <code>threads</code>, and what they
+return does not depend on it.</p>
 </div>
 <div class="section level2">
 <h2 id="two-runs-give-different-numbers">Two runs give different numbers<a class="anchor" aria-label="anchor" href="#two-runs-give-different-numbers"></a>

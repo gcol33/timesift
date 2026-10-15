@@ -222,9 +222,9 @@ from a scored run to maps.
 
 ## TSS and threshold selection
 
-The true skill statistic (TSS) is overestimated when the threshold that maximises it is chosen on the same held-out units the score is then read from. The overestimate grows as the number of presences shrinks. For the Schrankogel design, the estimated inflation is 0.110 on average when the true skill is 0.60.
+The true skill statistic (TSS) is overestimated when the threshold is chosen to maximise TSS on the same held-out observations used to report the score. The fewer presences there are in the held-out data, the more TSS tends to overestimate population skill. For the Schrankogel design, the estimated inflation is 0.110 on average when the true skill is 0.60.
 
-`tss_inflation()` estimates the TSS a given sampling design would report for a known population skill. `implied_skill()` works in reverse: given a reported TSS, it estimates the population skill that would produce that score on average under the same design. By default, runs are scored by the area under the receiver operating characteristic curve (AUC), with TSS also reported.
+`tss_inflation()` estimates the TSS that a given sampling design would report for a known population skill. `implied_skill()` reverses this calculation: given a reported TSS, it estimates the population skill that would yield that score on average under the same sampling design and assumed prediction distribution. This simulation-based matching follows the principle of indirect inference ([Gouriéroux et al., 1993](https://stat.cmu.edu/~cshalizi/462/readings/Indirect%20Inference%20%28Gourieroux%2C%20Monfort%20and%20Renault%29.pdf)). By default, runs are scored by the area under the receiver operating characteristic curve (AUC), with TSS also reported.
 
 ## Documentation
 

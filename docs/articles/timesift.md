@@ -40,9 +40,7 @@ time-stamped sensor readings for those plots. A shared plot identifier
 links the two tables.
 
 In Python either table can be a mapping of column names to arrays,
-including a pandas or polars data frame. The Python block draws its own
-record, so the values it prints differ from the ones quoted in the text,
-which come from the R run.
+including a pandas or polars data frame.
 
 ``` r
 
@@ -837,9 +835,10 @@ combining their predictions improved performance in this run.
 
 ## TSS and threshold selection
 
-The true skill statistic (TSS) is overestimated when the threshold that
-maximises it is chosen on the same held-out units the score is then read
-from. The overestimate grows as the number of presences shrinks.
+The true skill statistic (TSS) is overestimated when the threshold is
+chosen to maximise TSS on the same held-out observations used to report
+the score. The fewer presences there are in the held-out data, the more
+TSS tends to overestimate population skill.
 [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
 estimates the TSS a given sampling design would report for a known
 population skill, here the presence counts in your response-fold cells.

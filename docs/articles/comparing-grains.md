@@ -46,9 +46,9 @@ over a short period. With `mechanism = "lag"`, that period covers four
 consecutive weeks, with weights decreasing geometrically from the first
 week. Each response uses its own starting week.
 
-The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.
+The Python code simulates its own random data, so the numbers it prints
+differ from those quoted in the text, which come from the R run. Counts,
+shapes and calendar boundaries are the same in both.
 
 ``` r
 
@@ -195,6 +195,9 @@ fit = ts.timesift(
     keep_fits=True,
     verbose=False,
 )
+by_grain = (pd.DataFrame(fit.scores)
+            .assign(grain=lambda d: d.candidate.str.split(" / ").str[1])
+            .groupby("grain").score.mean())
 fit
 #> timesift  200 targets, 8 responses, 5-fold random CV, roc_auc
 #>
@@ -214,13 +217,13 @@ fit
 #> weights on every target  elasticnet / week 1.00
 ```
 
-The weekly candidate has the highest mean AUC, 0.838, and scored highest
-on all eight responses. The daily candidate, which holds the same
-information over 365 columns, sits at 0.784; the monthly and seasonal
-candidates fall further, to 0.704 and 0.550, the last close to what a
-model with no information would score. The planted grain is recovered,
-and the level reached is about 0.06 below the population ceiling of
-0.90.
+The weekly candidate has the highest mean AUC, 0.8380.836, and scored
+highest on all eight responses. The daily candidate, which holds the
+same information over 365 columns, sits at 0.7840.806; the monthly and
+seasonal candidates fall further, to 0.7040.660 and 0.5500.532, the last
+close to what a model with no information would score. The planted grain
+is recovered, and the level reached is about 0.060.06 below the
+population ceiling of 0.90.
 
 The procedure rows were computed differently. In each outer training
 fold the four candidates were cross-validated again on three inner
@@ -410,8 +413,9 @@ rbind(paired_contrast(lad, "week|elasticnet", "month|elasticnet"),
 ```
 
 ``` python
-pd.DataFrame([ts.paired_contrast(lad, "week|elasticnet", "month|elasticnet"),
-              ts.paired_contrast(lad, "week|elasticnet", "day|elasticnet")])
+contrasts = pd.DataFrame([ts.paired_contrast(lad, "week|elasticnet", "month|elasticnet"),
+                         ts.paired_contrast(lad, "week|elasticnet", "day|elasticnet")])
+contrasts
 #>                  a                 b      diff  ...   p_value  p_method   interval
 #> 0  week|elasticnet  month|elasticnet  0.175458  ...  0.007812     exact  variables
 #> 1  week|elasticnet    day|elasticnet  0.029934  ...  0.023438     exact  variables
@@ -419,12 +423,13 @@ pd.DataFrame([ts.paired_contrast(lad, "week|elasticnet", "month|elasticnet"),
 #> [2 rows x 12 columns]
 ```
 
-Week leads month by 0.134 and day by 0.054 in AUC, and both intervals
-exclude zero. Each contrast rests on 40 paired cells, and every one of
-the eight responses favours the weekly arm (`n_favour`). Both p-values
-are 0.0078, and they are equal because with eight responses all on one
-side, the exact signed-rank test has reached the smallest value it can
-give. That floor depends only on the number of responses:
+Week leads month by 0.1340.175 and day by 0.0540.030 in AUC, and both
+intervals exclude zero. Each contrast rests on 40 paired cells, and
+every one of the eight responses favours the weekly arm (`n_favour`).
+Both p-values are 0.0078, and they are equal because with eight
+responses all on one side, the exact signed-rank test has reached the
+smallest value it can give. That floor depends only on the number of
+responses:
 
 ``` r
 
@@ -518,7 +523,8 @@ grain_contrasts(lad)
 ```
 
 ``` python
-pd.DataFrame(ts.grain_contrasts(lad))
+gc = pd.DataFrame(ts.grain_contrasts(lad))
+gc
 #>       learner   grain reference      diff     lower     upper   p_value
 #> 0  elasticnet     day      week -0.029934 -0.068114  0.008246  0.158714
 #> 1  elasticnet   month      week -0.175458 -0.213638 -0.137278  0.000000
@@ -531,7 +537,7 @@ read in the usual way.
 
 Every grain falls below week, and the day contrast, the closest, has an
 adjusted interval that excludes zero. The three intervals have the same
-width, about 0.09, because the model estimates one residual variance
+width, about 0.090.08, because the model estimates one residual variance
 from all the cells and the design is balanced. The paired intervals each
 carry their own spread across responses instead: the week-to-day one is
 narrower than its mixed-model counterpart, and the week-to-month one
@@ -571,10 +577,12 @@ sel$selected[c("fold", "grain", "inner_score", "inner_se")]
 
 ``` python
 sel = ts.select_grain(x, sim.y, en, folds=fit.folds, n_inner=3, verbose=False)
-pd.DataFrame(sel.estimate).query("metric == 'roc_auc'")[["metric", "score", "lower", "upper"]]
+sel_auc = pd.DataFrame(sel.estimate).query("metric == 'roc_auc'")
+sel_auc[["metric", "score", "lower", "upper"]]
 #>      metric     score     lower     upper
 #> 24  roc_auc  0.835511  0.811616  0.859406
-pd.DataFrame(sel.selected)[["fold", "grain", "inner_score", "inner_se"]]
+sel_inner = pd.DataFrame(sel.selected)
+sel_inner[["fold", "grain", "inner_score", "inner_se"]]
 #>    fold grain  inner_score  inner_se
 #> 0     1  week     0.825691  0.005974
 #> 1     2  week     0.822040  0.001189
@@ -583,11 +591,11 @@ pd.DataFrame(sel.selected)[["fold", "grain", "inner_score", "inner_se"]]
 #> 4     5  week     0.809012  0.004680
 ```
 
-All five outer folds chose week, and the procedure scores 0.838, the
-same as the run’s estimate, which made the same choice on the same
-folds. The inner scores, between 0.767 and 0.817, are lower than the
-outer ones because each inner model was fitted on two thirds of 160
-units. They are used only to rank the candidates within a fold.
+All five outer folds chose week, and the procedure scores 0.8380.836,
+the same as the run’s estimate, which made the same choice on the same
+folds. The inner scores, between 0.7670.803 and 0.8170.826, are lower
+than the outer ones because each inner model was fitted on two thirds of
+160 units. They are used only to rank the candidates within a fold.
 
 The plot draws every candidate’s inner score in every outer fold, one
 line per fold, and circles the candidate each fold chose.
@@ -640,7 +648,9 @@ null = ts.simulate_records(n=200, mechanism="none", variables=8, days=365, step_
 x_null = ts.grain_matrix(null.readings, "unit", "time", "reading",
                          grain=("day", "week", "month", "season"), year_start="09-01")
 folds_null = ts.fold_map(null.y, v=5)
-pd.DataFrame(ts.grain_ladder(x_null, null.y, en, folds=folds_null, verbose=False).summary())
+null_ladder = pd.DataFrame(
+    ts.grain_ladder(x_null, null.y, en, folds=folds_null, verbose=False).summary())
+null_ladder
 #>       learner   grain     score  n_variable   best
 #> 0  elasticnet     day  0.476731           8  False
 #> 1  elasticnet    week  0.491963           8  False
@@ -668,7 +678,8 @@ select_grain(x_null, null$y, en, folds = folds_null, n_inner = 3L, verbose = FAL
 
 ``` python
 null_sel = ts.select_grain(x_null, null.y, en, folds=folds_null, n_inner=3, verbose=False)
-pd.DataFrame(null_sel.estimate).query("metric == 'roc_auc'")[["metric", "score", "lower", "upper"]]
+null_auc = pd.DataFrame(null_sel.estimate).query("metric == 'roc_auc'")
+null_auc[["metric", "score", "lower", "upper"]]
 #>      metric     score     lower     upper
 #> 24  roc_auc  0.485783  0.463086  0.508481
 pd.DataFrame(null_sel.selected)[["fold", "grain", "inner_score"]]
@@ -680,12 +691,12 @@ pd.DataFrame(null_sel.selected)[["fold", "grain", "inner_score"]]
 #> 4     5     day     0.507563
 ```
 
-The procedure scores 0.520 with an interval from 0.480 to 0.560, which
-contains 0.5. The folds chose day four times and month once, and the
-inner scores of all four candidates lie between 0.498 and 0.510. On this
-record the gap between the best candidate and the procedure is small,
-0.004; it grows with the number of candidates searched and with how much
-they differ by chance.
+The procedure scores 0.5200.486 with an interval from 0.4800.463 to
+0.5600.508, which contains 0.5. The folds chose day four times and month
+once, and the inner scores of all four candidates lie between 0.498 and
+0.510. On this record the gap between the best candidate and the
+procedure is small, 0.0040.013; it grows with the number of candidates
+searched and with how much they differ by chance.
 
 `choose = "coarsest_adequate"` replaces the highest inner score by the
 coarsest candidate within one standard error of it. On a flat profile
@@ -767,6 +778,8 @@ def ladder_for(mechanism):
 
 lad_season = ladder_for("season")
 lad_event = ladder_for("event")
+season_scores = pd.DataFrame(lad_season.summary()).set_index("grain").score
+event_scores = pd.DataFrame(lad_event.summary()).set_index("grain").score
 pd.DataFrame(lad_season.summary())[["grain", "score", "best"]]
 #>     grain     score   best
 #> 0     day  0.507631  False
@@ -782,11 +795,11 @@ pd.DataFrame(lad_event.summary())[["grain", "score", "best"]]
 ```
 
 Each ladder peaks at its planted grain: the seasonal record at season,
-0.835, and the event record at day, 0.864. The seasonal ladder falls
-gently from season to month, 0.809, where the month array holds the
-driver exactly over three times as many columns, and steeply below that.
-The event ladder drops by 0.083 from day to week, the information the
-weekly mean averages away.
+0.8350.799, and the event record at day, 0.8640.864. The seasonal ladder
+falls gently from season to month, 0.8090.773, where the month array
+holds the driver exactly over three times as many columns, and steeply
+below that. The event ladder drops by 0.0830.101 from day to week, the
+information the weekly mean averages away.
 
 ``` r
 
@@ -896,12 +909,12 @@ weight["v02"].nlargest(4)
 ```
 
 For both variables the heaviest bin is the anchor week, with a fall in
-AUC of 0.287 and 0.247. The planted weights decay by a factor of e from
-one week to the next, and for the first variable the following week is
-also among the heaviest. Bins outside the planted stretch carry smaller
-weights, such as 0.112 for a January week in the first variable, which
-suggests the penalised fit picks up some structure the mechanism does
-not contain when it has 160 units to fit 53 columns.
+AUC of 0.2870.304 and 0.2470.295. The planted weights decay by a factor
+of e from one week to the next, and for the first variable the following
+week is also among the heaviest. Bins outside the planted stretch carry
+smaller weights, such as 0.112 for a January week in the first variable,
+which suggests the penalised fit picks up some structure the mechanism
+does not contain when it has 160 units to fit 53 columns.
 
 `over = "channel"` holds back a whole statistic instead. The simulated
 response reads the weekly mean, so a run that also offers each week’s
@@ -931,16 +944,17 @@ fit_ch = ts.timesift(targets, series, y="v*", id="unit", time="time",
                      resampling=ts.cv(v=5), n_inner=None, ensemble=False,
                      keep_fits=True, verbose=False)
 by_channel = ts.occlusion(fit_ch, "elasticnet / week", over="channel", permutations=5)
-pd.DataFrame(by_channel["weight"], index=by_channel["part"]).mean(axis=1)
+channel_weight = pd.DataFrame(by_channel["weight"], index=by_channel["part"]).mean(axis=1)
+channel_weight
 #> cold_day    0.075573
 #> mean        0.149820
 #> warm_day    0.072888
 #> dtype: float64
 ```
 
-The mean carries the largest fall, 0.157, about twice the coldest day’s.
-The extreme days are not independent of the mean, which is why they
-carry some weight too.
+The mean carries the largest fall, 0.1570.150, about twice the coldest
+day’s. The extreme days are not independent of the mean, which is why
+they carry some weight too.
 
 ## How the prediction responds
 
@@ -970,7 +984,8 @@ tapply(rc$prediction, rc$variable, function(p) round(diff(range(p)), 3))
 ``` python
 rc = ts.response_curve(fit, "elasticnet / week", {"bin": anchors[0], "channel": "mean"}, n=20)
 ts.plot(rc);
-pd.Series(np.ptp(rc.prediction, axis=0).round(3), index=rc.variable)
+spread = pd.Series(np.ptp(rc.prediction, axis=0).round(3), index=rc.variable)
+spread
 #> v01    0.981
 #> v02    0.000
 #> v03    0.097
@@ -987,11 +1002,11 @@ September 2021, rising steeply for v01 and nearly flat for the other
 responses.](comparing-grains_files/py-figure-5.svg)
 
 The first variable’s prediction rises with that week’s mean, as the
-positive sign of its planted driver says it should, and spans 0.926 of
-the probability scale. The other variables read different weeks. Five of
-them do not move at the third decimal, a sixth moves by 0.001, and the
-eighth by 0.097, a coefficient the penalised fit gave that cell without
-the mechanism putting weight there.
+positive sign of its planted driver says it should, and spans 0.9260.981
+of the probability scale. The other variables read different weeks. Five
+of them do not move at the third decimal, a sixth moves by 0.001, and
+the eighth by 0.097, a coefficient the penalised fit gave that cell
+without the mechanism putting weight there.
 
 ## Scores, thresholds and their inflation
 
@@ -1055,14 +1070,15 @@ tss_inflation(sim$y, fit$folds, skill = c(0.6, 0.9), replicates = 50)
 ```
 
 ``` python
-pd.DataFrame(ts.tss_inflation(sim.y, fit.folds, skill=(0.6, 0.9), replicates=50))
+inflation = pd.DataFrame(ts.tss_inflation(sim.y, fit.folds, skill=(0.6, 0.9), replicates=50))
+inflation
 #>    skill  reported  inflation     lower     upper  replicates
 #> 0    0.6  0.694101   0.094101  0.661214  0.717694          50
 #> 1    0.9  0.947449   0.047449  0.932442  0.963985          50
 ```
 
 At a true skill of 0.6, the level read back is about 0.1 higher; at 0.9
-the inflation is smaller, 0.046, nearer the upper bound of 1.
+the inflation is smaller, 0.0460.047, nearer the upper bound of 1.
 [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.md)
 inverts the map: given the TSS the weekly candidate reached, it returns
 the population skill whose expected reported level that is.
@@ -1075,13 +1091,15 @@ implied_skill(sim$y, fit$folds, observed = per_metric[["tss"]], replicates = 50)
 ```
 
 ``` python
-pd.DataFrame(ts.implied_skill(sim.y, fit.folds, observed=per_metric["tss"], replicates=50))
+implied = pd.DataFrame(ts.implied_skill(sim.y, fit.folds, observed=per_metric["tss"],
+                                        replicates=50))
+implied
 #>    observed     skill  within_grid
 #> 0   0.61332  0.508748         True
 ```
 
-A TSS of 0.625 on this design is consistent with a population skill near
-0.51. The inversion holds under the distribution of predictions
+A TSS of 0.6250.613 on this design is consistent with a population skill
+near 0.510.51. The inversion holds under the distribution of predictions
 [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
 plants, and two models of equal skill whose predictions are distributed
 differently can be inflated by different amounts. A paired difference in
@@ -1115,23 +1133,27 @@ tss_inflation(rare$y, folds_rare, skill = c(0.6, 0.9), replicates = 50)
 ``` python
 rare = ts.simulate_records(n=200, mechanism="lag", variables=8, days=365, step_hours=6,
                           prevalence=0.03, auc=0.9, seed=2)
-rare.y.values.sum(axis=0)
+presences = rare.y.values.sum(axis=0)
+presences
 #> array([ 8.,  6.,  8.,  3.,  3.,  4.,  5., 11.])
 folds_rare = ts.fold_map(rare.y, v=5)
-ts.scorable_cells(rare.y, folds_rare)
+rare_cells = ts.scorable_cells(rare.y, folds_rare)
+rare_cells
 #> <timesift cells> 40 cells over 8 variables
 #> scorable: 28 (70.0%); variables with at least one scorable fold: 8 of 8
-pd.DataFrame(ts.tss_inflation(rare.y, folds_rare, skill=(0.6, 0.9), replicates=50))
+rare_inflation = pd.DataFrame(ts.tss_inflation(rare.y, folds_rare, skill=(0.6, 0.9),
+                                               replicates=50))
+rare_inflation
 #>    skill  reported  inflation     lower     upper  replicates
 #> 0    0.6  0.841685   0.241685  0.797155  0.886818          50
 #> 1    0.9  0.984536   0.084536  0.965115  0.998109          50
 ```
 
-At a prevalence of 0.03 the eight responses hold between 4 and 11
-presences in 200 units, eight of the forty cells are unscorable, and the
-inflation of TSS at a true skill of 0.6 rises to 0.235. A response with
-four presences spread over five folds is scored on at most four of them,
-each holding one presence.
+At a prevalence of 0.03 the eight responses hold between 43 and 1111
+presences in 200 units, eight12 of the forty cells are unscorable, and
+the inflation of TSS at a true skill of 0.6 rises to 0.2350.242. A
+response with four presences spread over five folds is scored on at most
+four of them, each holding one presence.
 
 ## Practical guidance
 
@@ -1151,10 +1173,10 @@ response and fold map.
   It takes the best observed grain as its reference, so it is read
   beside the paired contrasts.
 - With 200 units and five outer folds, 40 units are held out per fold.
-  For the lag record that was enough to separate week from day by 0.054
-  AUC with all eight responses agreeing. The selection’s inner folds see
-  two thirds of each outer training set, so their scores sit lower than
-  the outer ones and serve only to rank.
+  For the lag record that was enough to separate week from day by
+  0.0540.030 AUC with all eight responses agreeing. The selection’s
+  inner folds see two thirds of each outer training set, so their scores
+  sit lower than the outer ones and serve only to rank.
 - Rare responses shrink the scorable cells and widen the TSS inflation.
   [`scorable_cells()`](https://gillescolling.com/timesift/reference/scorable_cells.md)
   and
@@ -1162,9 +1184,9 @@ response and fold map.
   run in seconds on the response and the fold map before any model is
   fitted, and fewer folds leave more presences in each held-out cell.
 - The best candidate’s outer mean is chosen on the folds it is scored
-  on. On the record with no signal it read 0.524 while the procedure’s
-  interval contained 0.5. The level to report is the procedure’s
-  estimate, from
+  on. On the record with no signal it read 0.5240.499 while the
+  procedure’s interval contained 0.5. The level to report is the
+  procedure’s estimate, from
   [`timesift()`](https://gillescolling.com/timesift/reference/timesift.md)
   with `n_inner` set or from
   [`select_grain()`](https://gillescolling.com/timesift/reference/select_grain.md).

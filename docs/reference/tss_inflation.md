@@ -1,13 +1,18 @@
 # How much a self-selected threshold inflates the reported level
 
-The true skill statistic (TSS) is overestimated when the threshold that
-maximises it is chosen on the same held-out units the score is then read
-from. The overestimate grows as the number of presences shrinks.
-`tss_inflation()` estimates the TSS a given sampling design would report
-for a known population skill.
+The true skill statistic (TSS) is overestimated when the threshold is
+chosen to maximise TSS on the same held-out observations used to report
+the score. The fewer presences there are in the held-out data, the more
+TSS tends to overestimate population skill. `tss_inflation()` estimates
+the TSS that a given sampling design would report for a known population
+skill.
 [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.md)
-works in reverse: given a reported TSS, it estimates the population
-skill that would produce that score on average under the same design.
+reverses this calculation: given a reported TSS, it estimates the
+population skill that would yield that score on average under the same
+sampling design and assumed prediction distribution. This
+simulation-based matching follows the principle of indirect inference
+([Gouriéroux et al.,
+1993](https://stat.cmu.edu/~cshalizi/462/readings/Indirect%20Inference%20%28Gourieroux%2C%20Monfort%20and%20Renault%29.pdf)).
 
 ## Usage
 

@@ -44,10 +44,6 @@ plot. The example has thirty plots logged hourly for 400 days from 1
 September 2021. Each record includes seasonal and daily cycles, a
 plot-specific offset and noise.
 
-The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.
-
 ``` r
 
 hours <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 400)
@@ -427,9 +423,9 @@ pd.DataFrame(m.values[0, :3, :].T, index=m.stats, columns=[b[:10] for b in m.bin
 Within every bin the two families order themselves around the mean:
 `min` sits below `mean_daily_min`, which sits below `mean`, and `min`
 sits below `cold_day` likewise. In September 2021 plot `p01` read a
-coldest hour of -4.61, an average daily minimum of -1.07 and a coldest
-day of 1.88, against a mean of 3.72. The figure lays the weekly versions
-of five of them over the whole record.
+coldest hour of -4.61-4.33, an average daily minimum of -1.07-0.13 and a
+coldest day of 1.882.81, against a mean of 3.724.63. The figure lays the
+weekly versions of five of them over the whole record.
 
 ``` r
 
@@ -511,13 +507,15 @@ pd.DataFrame(sp.values[:, 0, :].T, index=sp.stats, columns=sp.units).round(2)
 #> max                   11.65            11.65
 ```
 
-`min` follows the hour all the way, from -4.61 to -24.61. `cold_day`
-moves from 1.88 to 1.05, which is the 20 degrees divided over the 24
-readings of the day the hour fell on. `mean_daily_min` moves from -1.07
-to -1.74, the 20 degrees divided over the 30 daily minima of the month,
-and the mean moves by 0.03. The warm side does not move at all. An
-extreme day is a state the unit was in for a whole day; an extreme
-reading can be one hour.
+`min` follows the hour all the way, from -4.61-4.33 to -24.61-24.33.
+`cold_day` moves from 1.882.81 to 1.052.01, which is the 20 degrees
+divided over the 24 readings of the day the hour fell ona shift of0.80,
+against the0.83of the 20 degrees divided over the 24 readings of the day
+the hour fell on, because a different day can become the coldest.
+`mean_daily_min` moves from -1.07-0.13 to -1.74-0.79, the 20 degrees
+divided over the 30 daily minima of the month, and the mean moves by
+0.030.03. The warm side does not move at all. An extreme day is a state
+the unit was in for a whole day; an extreme reading can be one hour.
 
 Where the record is clean, the two still carry different things. In the
 Schrankogel study a window’s coldest and warmest day carried more than
@@ -984,8 +982,8 @@ The rows are the three targets in `at`’s own order, two of them on plot
 `p01`. The four bins are named by where each opens relative to the
 anchor, oldest first, so the columns line up across targets that share
 no calendar date. The weekly means before the May visit to `p01` rise
-from -2.43 to 0.42; before the July visits they rise from 5.36 to 6.65
-on `p01` and from 6.08 to 7.82 on `p02`.
+from -2.43-1.45 to 0.421.45; before the July visits they rise from
+5.366.16 to 6.657.76 on `p01` and from 6.086.76 to 7.828.04 on `p02`.
 
 A lookback measures fixed lengths: a month is 30 days and a year 365
 there, since every target has to read the same amount of record for the

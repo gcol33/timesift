@@ -23,11 +23,14 @@ A data frame with one row per \code{skill} value: the skill, the mean level read
 inflation, and its interval across replicates.
 }
 \description{
-The true skill statistic (TSS) is overestimated when the threshold that maximises it is chosen
-on the same held-out units the score is then read from. The overestimate grows as the number of
-presences shrinks. \code{tss_inflation()} estimates the TSS a given sampling design would report for
-a known population skill. \code{\link[=implied_skill]{implied_skill()}} works in reverse: given a reported TSS, it estimates
-the population skill that would produce that score on average under the same design.
+The true skill statistic (TSS) is overestimated when the threshold is chosen to maximise TSS on
+the same held-out observations used to report the score. The fewer presences there are in the
+held-out data, the more TSS tends to overestimate population skill. \code{tss_inflation()} estimates
+the TSS that a given sampling design would report for a known population skill.
+\code{\link[=implied_skill]{implied_skill()}} reverses this calculation: given a reported TSS, it estimates the population
+skill that would yield that score on average under the same sampling design and assumed
+prediction distribution. This simulation-based matching follows the principle of indirect
+inference (\href{https://stat.cmu.edu/~cshalizi/462/readings/Indirect\%20Inference\%20\%28Gourieroux\%2C\%20Monfort\%20and\%20Renault\%29.pdf}{Gouriéroux et al., 1993}).
 }
 \details{
 Predictions are simulated for each value of \code{skill} as normal scores of equal variance, at the

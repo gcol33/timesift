@@ -9,13 +9,14 @@ resource_files:
   - timesift_files/py-figure-1.svg
 ---
 
-<!-- Python blocks run by tools/python_twins.py (md5 c33432fb6b00e768c799b51e7b3bb9ec). -->
+<!-- Python blocks run by tools/python_twins.py (md5 d04c92095ee11778a2295b4cfc9fca13). -->
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5, fig.height = 4.5,
                       dev.args = list(pointsize = 14))
 set.seed(1)
 library(timesift)
+if (nzchar(Sys.getenv("TIMESIFT_DOCS_CACHE"))) source(Sys.getenv("TIMESIFT_DOCS_CACHE"))
 ```
 
 Sensor measurements can be summarised as daily, weekly or monthly values. `timesift` fits models using each of these summaries and compares how well they predict observations excluded from fitting. The time scale of a summary is called its *grain*.
@@ -51,7 +52,7 @@ pip install git+https://github.com/gcol33/timesift
 `targets` contains one row per sampling unit, such as a study plot, and the values to predict, called *responses*. Here the responses record whether each species occurs on a plot. `series` contains the time-stamped sensor readings for those plots. A shared plot identifier links the two tables.
 
 ::: {.lang-py-only}
-In Python either table can be a mapping of column names to arrays, including a pandas or polars data frame. The Python block draws its own record, so the values it prints differ from the ones quoted in the text, which come from the R run.
+In Python either table can be a mapping of column names to arrays, including a pandas or polars data frame.
 :::
 
 ::: {.lang-pair}
@@ -584,7 +585,7 @@ The weights determine each candidate's contribution to the ensemble prediction. 
 
 ## TSS and threshold selection
 
-The true skill statistic (TSS) is overestimated when the threshold that maximises it is chosen on the same held-out units the score is then read from. The overestimate grows as the number of presences shrinks. `tss_inflation()` estimates the TSS a given sampling design would report for a known population skill, here the presence counts in your response-fold cells.
+The true skill statistic (TSS) is overestimated when the threshold is chosen to maximise TSS on the same held-out observations used to report the score. The fewer presences there are in the held-out data, the more TSS tends to overestimate population skill. `tss_inflation()` estimates the TSS a given sampling design would report for a known population skill, here the presence counts in your response-fold cells.
 
 ::: {.lang-pair}
 ```{r inflation}

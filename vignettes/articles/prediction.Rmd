@@ -10,13 +10,14 @@ resource_files:
   - prediction_files/py-figure-7.svg
 ---
 
-<!-- Python blocks run by tools/python_twins.py (md5 a9edd65585366c292fcd789d0bc52016). -->
+<!-- Python blocks run by tools/python_twins.py (md5 0a6f6b791007fae51469a6bc9b548f5a). -->
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5, fig.height = 4.5,
                       dev.args = list(pointsize = 14))
 set.seed(1)
 library(timesift)
+if (nzchar(Sys.getenv("TIMESIFT_DOCS_CACHE"))) source(Sys.getenv("TIMESIFT_DOCS_CACHE"))
 ```
 
 This article shows how to choose cross-validation folds, combine candidate predictions, set presence-absence thresholds and project predictions onto rasters. The examples use a small simulated grid and compare maps from the original temperature record with maps from a warmer version.
@@ -55,7 +56,7 @@ towards the north. The first two species follow warmth in opposite directions, t
 the depth of the snap, and the fourth both.
 
 ::: {.lang-py-only}
-The Python block draws its own record, so the values it prints differ from the ones quoted in the text, which come from the R run. Counts, shapes and calendar boundaries do not depend on the draw and agree.
+The Python code simulates its own random data, so the numbers it prints differ from those quoted in the text, which come from the R run. Counts, shapes and calendar boundaries are the same in both.
 :::
 
 ::: {.lang-pair}
@@ -230,7 +231,7 @@ pd.DataFrame({k: getattr(cells, k) for k in ("variable", "fold", "scorable")}).h
 ```
 :::
 
-Every one of the 20 cells is scorable here, because each species is present at between 47 and 59 of
+Every one of the 20 cells is scorable here, because each species is present at between [47]{.lang-r-only}[48]{.lang-py-only py="int(resp.values.sum(axis=0).min())"} and [59]{.lang-r-only}[54]{.lang-py-only py="int(resp.values.sum(axis=0).max())"} of
 the 120 cells. With a rare species some folds would hold no presence, and those cells would drop out
 of every candidate's score at once. Because no model enters the mask, all candidates share one
 denominator.
@@ -277,7 +278,7 @@ The candidate rows are the comparison on the outer folds, and the two procedure 
 held-out level. Inside each outer training fold the candidates were cross-validated again on five
 inner folds; one was chosen on its inner score and the stack's weights were fitted on the inner
 out-of-fold predictions, and both then predicted the outer test fold once. Under the random split
-the selected candidate scores an AUC of 0.866 and the stack 0.861.
+the selected candidate scores an AUC of [0.866]{.lang-r-only}[0.832]{.lang-py-only py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'"} and the stack [0.861]{.lang-r-only}[0.820]{.lang-py-only py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'"}.
 
 The block run differs in two settings, and both follow from the blocks. The inner split of a nested
 run deals whole blocks as the outer one does, so with five blocks an outer training set holds four
@@ -373,13 +374,13 @@ pd.concat({"random": est(fit), "block": est(blocked)})
 ```
 :::
 
-Under blocks the selected candidate falls by 0.082, to 0.784, and the stack by 0.070, to 0.791. The
+Under blocks the selected candidate falls by [0.082]{.lang-r-only}[0.056]{.lang-py-only py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'"}, to [0.784]{.lang-r-only}[0.776]{.lang-py-only py="f'{next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'"}, and the stack by [0.070]{.lang-r-only}[0.062]{.lang-py-only py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'"}, to [0.791]{.lang-r-only}[0.758]{.lang-py-only py="f'{next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'"}. The
 likely reason is the gradient: in the random split a held-out cell nearly always has neighbours on
 the training side at the same position on the warmth gradient, while under blocks a whole region is
 held out and the model has to reach a stretch of the gradient it saw less of. The block number is the
 one that describes prediction into a part of the grid the fit was not trained in. The ranking
 of the candidates keeps its order between the two runs, and the forests lose more than the elastic
-nets: 0.840 to 0.682 at the month, against 0.870 to 0.784.
+nets: [0.840]{.lang-r-only}[0.795]{.lang-py-only py="f'{dict((r['candidate'], r['mean']) for r in ts.candidate_table(fit))['forest / month']:.3f}'"} to [0.682]{.lang-r-only}[0.699]{.lang-py-only py="f'{dict((r['candidate'], r['mean']) for r in ts.candidate_table(blocked))['forest / month']:.3f}'"} at the month, against [0.870]{.lang-r-only}[0.845]{.lang-py-only py="f'{dict((r['candidate'], r['mean']) for r in ts.candidate_table(fit))['elasticnet / month']:.3f}'"} to [0.784]{.lang-r-only}[0.782]{.lang-py-only py="f'{dict((r['candidate'], r['mean']) for r in ts.candidate_table(blocked))['elasticnet / month']:.3f}'"}.
 
 ## The combination
 
@@ -415,12 +416,12 @@ pd.DataFrame(fit.selected)[["fold", "candidate", "inner_score"]]
 :::
 
 `ensemble_weights()` returns the weights fitted on the outer out-of-fold predictions of every
-target, which are the weights `predict()` uses. They put 0.516 on the weekly forest, 0.264 on the
-monthly elastic net and 0.220 on the monthly forest, and nothing on the weekly elastic net. Those
+target, which are the weights `predict()` uses. They put [0.516]{.lang-r-only}[0.410]{.lang-py-only py="f'{ts.ensemble_weights(fit)['forest / week']:.3f}'"} on the weekly forest, [0.264]{.lang-r-only}[0.324]{.lang-py-only py="f'{ts.ensemble_weights(fit)['elasticnet / month']:.3f}'"} on the
+monthly elastic net and [0.220]{.lang-r-only}[0.266]{.lang-py-only py="f'{ts.ensemble_weights(fit)['forest / month']:.3f}'"} on the monthly forest, and nothing on the weekly elastic net. Those
 weights were fitted to the responses the run is scored against, so the ensemble's score is never
 read with them. `fit$fold_weights` holds the weights each
 outer fold fitted on its own training targets, and these are the ones behind the held-out
-`ensemble` row. They move between folds: the weekly forest takes 0.968 in fold 1 and 0.318 in
+`ensemble` row. They move between folds: the weekly forest takes [0.968]{.lang-r-only}[0.279]{.lang-py-only py="f'{next(r['forest / week'] for r in fit.fold_weights if r['fold'] == 1):.3f}'"} in fold 1 and [0.318]{.lang-r-only}[0.163]{.lang-py-only py="f'{next(r['forest / week'] for r in fit.fold_weights if r['fold'] == 3):.3f}'"} in
 fold 3. `fit$selected` shows the same instability for the single choice, which alternates between
 the two elastic nets.
 
@@ -497,8 +498,8 @@ pd.Series({m: mean_auc(st) for m, st in stacks.items()}).round(3)
 ```
 :::
 
-The plain mean of the four candidates scores 0.870, level with the best single candidate's 0.870 on
-the same folds, and the median 0.868. The committee scores 0.834. With four members, a committee's
+The plain mean of the four candidates scores [0.870]{.lang-r-only}[0.831]{.lang-py-only py="f'{mean_auc(stacks['mean']):.3f}'"}[, level with the best single candidate's 0.870]{.lang-r-only}[, ]{.lang-py-only}[0.015 below]{.lang-py-only py="(lambda d: 'level with' if abs(d) < 0.0005 else '{:.3f} {}'.format(abs(d), 'below' if d < 0 else 'above'))(mean_auc(stacks['mean']) - max(r['mean'] for r in ts.candidate_table(fit)))"}[ the best single candidate's ]{.lang-py-only}[0.845]{.lang-py-only py="f'{max(r['mean'] for r in ts.candidate_table(fit)):.3f}'"} on
+the same folds, and the median [0.868]{.lang-r-only}[0.833]{.lang-py-only py="f'{mean_auc(stacks['median']):.3f}'"}. The committee scores [0.834]{.lang-r-only}[0.818]{.lang-py-only py="f'{mean_auc(stacks['committee']):.3f}'"}. With four members, a committee's
 prediction is a share of four votes and takes only five values, so it ranks the units coarsely,
 and AUC reads the ranking.
 
@@ -607,7 +608,7 @@ show(fit.predict(new, new_series, candidate="forest / week"))
 `candidate = "ensemble"` is the default and combines the members under the refitted stack;
 `"selected"` is the candidate the rule chose on every target, here `elasticnet / month`; any
 candidate's name predicts with that candidate alone. The selected elastic net's predictions lie
-closer to one half than the ensemble's, which carries half its weight on a forest whose predictions
+closer to one half than the ensemble's, which carries [half its weight]{.lang-r-only}[0.41 of its weight]{.lang-py-only py="f'{ts.ensemble_weights(fit)['forest / week']:.2f} of its weight'"} on a forest whose predictions
 reach further towards zero and one.
 
 ## Thresholds
@@ -625,7 +626,8 @@ round(sapply(rules, function(r) decision_threshold(fit, rule = r)), 3)
 
 ```python
 rules = ["youden", "kappa", "prevalence", "mpa"]
-pd.DataFrame({r: ts.decision_threshold(fit, rule=r) for r in rules}).round(3)
+thresholds = pd.DataFrame({r: ts.decision_threshold(fit, rule=r) for r in rules}).round(3)
+thresholds
 #>      youden  kappa  prevalence    mpa
 #> sp1   0.455  0.614       0.513  0.320
 #> sp2   0.536  0.536       0.444  0.242
@@ -638,7 +640,7 @@ pd.DataFrame({r: ts.decision_threshold(fit, rule=r) for r in rules}).round(3)
 Cohen's kappa. `"prevalence"` predicts as many presences as were observed, and reads nothing from
 which units held them. `"mpa"`, the minimum predicted area, takes the highest cut that keeps a share
 `perc` of the observed presences, 0.9 by default, so it reads the presences alone. Here youden and
-kappa agree on three species and part on `sp4`, 0.467 against 0.640, and mpa cuts lowest on every
+kappa agree on three species and part on [`sp4`]{.lang-r-only}[`sp1`]{.lang-py-only py="'`' + thresholds[thresholds['youden'] != thresholds['kappa']].index[0] + '`'"}, [0.467]{.lang-r-only}[0.455]{.lang-py-only py="f'{thresholds[thresholds['youden'] != thresholds['kappa']]['youden'].iloc[0]:.3f}'"} against [0.640]{.lang-r-only}[0.614]{.lang-py-only py="f'{thresholds[thresholds['youden'] != thresholds['kappa']]['kappa'].iloc[0]:.3f}'"}, and mpa cuts lowest on every
 species. The number of cells each rule calls present, against the observed count:
 
 ::: {.lang-pair}
@@ -670,9 +672,9 @@ show(fit.predict(new, new_series, type="binary", rule="prevalence"))
 ```
 :::
 
-The prevalence rule reproduces the observed counts to within one cell, as it is built to. Youden and
-kappa land within two cells of them on this grid, and mpa calls between 53 and 74 cells present
-against 47 to 59 observed, because it gives up specificity to keep nine presences in ten. The
+The prevalence rule reproduces the observed counts to within [one cell]{.lang-r-only}[2 cells]{.lang-py-only py="f'{int((called['prevalence'] - called['observed']).abs().max())} cell' + ('s' if int((called['prevalence'] - called['observed']).abs().max()) != 1 else '')"}, as it is built to. Youden and
+kappa land within [two cells]{.lang-r-only}[4 cells]{.lang-py-only py="f'{int(max((called['youden'] - called['observed']).abs().max(), (called['kappa'] - called['observed']).abs().max()))} cell' + ('s' if int(max((called['youden'] - called['observed']).abs().max(), (called['kappa'] - called['observed']).abs().max())) != 1 else '')"} of them on this grid, and mpa calls between [53]{.lang-r-only}[61]{.lang-py-only py="int(called['mpa'].min())"} and [74]{.lang-r-only}[69]{.lang-py-only py="int(called['mpa'].max())"} cells present
+against [47]{.lang-r-only}[48]{.lang-py-only py="int(resp.values.sum(axis=0).min())"} to [59]{.lang-r-only}[54]{.lang-py-only py="int(resp.values.sum(axis=0).max())"} observed, because it gives up specificity to keep nine presences in ten. The
 binary matrix is integer, 1 for presence, and a response whose held-out predictions give no cut
 would be `NA`.
 
@@ -702,8 +704,8 @@ pd.DataFrame(s[:, 0, :], index=new["cell"], columns=ts.SPREAD_STATISTICS).round(
 :::
 
 The interval is held inside zero and one, since the predictions are probabilities. Where the mean is
-small the coefficient of variation is large: the first three cells sit below 0.15 with a
-coefficient above one, while cell 5 has a mean of 0.798 and a coefficient of 0.178. On one target
+small the coefficient of variation is large: the first three cells[ sit below 0.15 with a
+coefficient above one]{.lang-r-only}[ have means from ]{.lang-py-only}[0.212]{.lang-py-only py="f'{s[:3, 0, 0].min():.3f}'"}[ to ]{.lang-py-only}[0.298]{.lang-py-only py="f'{s[:3, 0, 0].max():.3f}'"}[ with coefficients from ]{.lang-py-only}[0.453]{.lang-py-only py="f'{s[:3, 0, 2].min():.3f}'"}[ to ]{.lang-py-only}[0.640]{.lang-py-only py="f'{s[:3, 0, 2].max():.3f}'"}, while cell [5]{.lang-r-only}[6]{.lang-py-only py="int(new['cell'].iloc[int(np.argmax(s[:, 0, 0]))])"} has a mean of [0.798]{.lang-r-only}[0.799]{.lang-py-only py="f'{s[int(np.argmax(s[:, 0, 0])), 0, 0]:.3f}'"} and a coefficient of [0.178]{.lang-r-only}[0.200]{.lang-py-only py="f'{s[int(np.argmax(s[:, 0, 0])), 0, 2]:.3f}'"}. On one target
 per map cell this is an uncertainty map, and the sections on maps below draw one.
 
 ## Presence-only records
@@ -758,7 +760,7 @@ pd.DataFrame(ts.pseudo_absences(pool, presence_rows, n=10, strategy="sre", id="c
 :::
 
 The header says how many units of the pool a strategy admits. On this grid the disk strategy admits
-18 cells at least 1.5 cells from any presence, and the envelope strategy 15 cells outside the band
+[18]{.lang-r-only}[14]{.lang-py-only py="int((np.sqrt((np.array(pool['x'])[:, None] - np.array(presence_rows['x'])) ** 2 + (np.array(pool['y'])[:, None] - np.array(presence_rows['y'])) ** 2).min(axis=1) >= 1.5).sum())"} cells at least 1.5 cells from any presence, and the envelope strategy [15]{.lang-r-only}[13]{.lang-py-only py="int(((np.array(pool['elevation']) < np.quantile(presence_rows['elevation'], 0.1)) | (np.array(pool['elevation']) > np.quantile(presence_rows['elevation'], 0.9)))[~np.isin(pool['cell'], presence_rows['cell'])].sum())"} cells outside the band
 holding the middle 80% of the presences' elevations; asking either for more than it admits is an
 error that names both counts. `repeats` makes several independent draws, numbered in `set`.
 
@@ -804,7 +806,7 @@ po_fit
 :::
 
 The drawn units are ordinary rows once bound to the presences with a response of zero, and the fit
-does not mark them. Its AUC of 0.772 separates presences from background cells, some of which hold
+does not mark them. Its AUC of [0.772]{.lang-r-only}[0.854]{.lang-py-only py="f'{ts.candidate_table(po_fit)[0]['mean']:.3f}'"} separates presences from background cells, some of which hold
 the species, so it is a different quantity from the AUC of the presence-absence run above. A fit per
 draw, each scored the same way, shows how much the result depends on which cells were drawn.
 
@@ -860,8 +862,9 @@ import time
 
 start = time.perf_counter()
 now = ts.project(fit, series=grid, static=elev)
-round(time.perf_counter() - start, 2)
-#> 0.06
+took = time.perf_counter() - start
+round(took, 2)
+#> 0.1
 dict(now.sizes)
 #> {'response': 4, 'y': 10, 'x': 12}
 bool(np.allclose(now.sel(response="sp1").values.ravel(), fit.predict(targets, series)[:, 0]))
@@ -879,7 +882,7 @@ fig.colorbar(im, ax=axes);
 :::
 
 The projection of the ensemble onto the 120 cells took
-`r if (exists("took")) round(took[["elapsed"]], 2) else "a fraction of a"` seconds. It is the same
+[`r if (exists("took")) round(took[["elapsed"]], 2) else "a fraction of a"`]{.lang-r-only}[0.10]{.lang-py-only py="f'{took:.2f}'"} seconds. It is the same
 prediction `predict()` gives for the same cells as targets, which `all.equal()` confirms for
 `sp1`. A raster
 too large for memory is read `chunk` cells at a time, 5000 by default. A cell missing a reading
@@ -924,9 +927,9 @@ ax.axis("off");
 
 :::
 
-The warm-favoured `sp1` and `sp4` gain 30 and 38 cells, the cold-favoured `sp2` loses 42 of its 58,
-and `sp3`, which the simulation ties to the depth of the snap alone, loses and gains 14 cells each
-and keeps its size. `change` is the gain minus the loss as a percentage of the present
+The warm-favoured `sp1` and `sp4` gain [30]{.lang-r-only}[45]{.lang-py-only py="int(pd.DataFrame(change.table).set_index('variable').loc['sp1', 'gained'])"} and [38]{.lang-r-only}[38]{.lang-py-only py="int(pd.DataFrame(change.table).set_index('variable').loc['sp4', 'gained'])"} cells, the cold-favoured `sp2` loses [42]{.lang-r-only}[36]{.lang-py-only py="int(pd.DataFrame(change.table).set_index('variable').loc['sp2', 'lost'])"} of its [58]{.lang-r-only}[52]{.lang-py-only py="int(pd.DataFrame(change.table).set_index('variable').loc['sp2', ['lost', 'kept']].sum())"},
+and `sp3`, which the simulation ties to the depth of the snap alone, [loses and gains 14 cells each]{.lang-r-only}[loses 12 and gains 9 cells]{.lang-py-only py="f'loses {int(pd.DataFrame(change.table).set_index('variable').loc['sp3', 'lost'])} and gains {int(pd.DataFrame(change.table).set_index('variable').loc['sp3', 'gained'])} cells'"}
+[and keeps its size]{.lang-r-only}[for a change of ]{.lang-py-only}[-6]{.lang-py-only py="f'{float(pd.DataFrame(change.table).set_index('variable').loc['sp3', 'change']):+.0f}'"}[ per cent of its present range]{.lang-py-only}. `change` is the gain minus the loss as a percentage of the present
 range. The map codes a cell as biomod2 does, and the plot colours the codes: red for lost (-2), grey
 for kept (-1), pale for absent in both (0) and green for gained (1). Given maps on the probability
 scale instead, `range_change()` takes `threshold`, one cut per response.
@@ -1002,7 +1005,7 @@ ts.plot(rc, ylim=(0, 1.3));
 
 Moved in every week at once, the mean runs from the coldest weekly mean any cell has to the warmest,
 so the curve sweeps a whole year from deep winter to high summer. `sp1` rises and `sp2` falls along
-it, as the simulation has them, and `sp3`, which depends on one cold week, changes little. For
+it, as the simulation has them, and `sp3`, which depends on one cold week, [changes little]{.lang-r-only}[ranges from ]{.lang-py-only}[0.28]{.lang-py-only py="f'{rc.prediction[:, 2].min():.2f}'"}[ to ]{.lang-py-only}[0.75]{.lang-py-only py="f'{rc.prediction[:, 2].max():.2f}'"}. For
 the ensemble every member is moved the same way and the combination is taken through the stack; `spread = TRUE` adds the members' standard deviation and
 interval.
 
@@ -1063,18 +1066,18 @@ being higher.
 ## Practical guidance
 
 The stack and the selected candidate are both estimated by the nested procedure, so their held-out
-scores can be read against each other. Under the random split the selected candidate scored 0.866
-and the stack 0.861, a difference well inside the standard errors of 0.014 and 0.019. One elastic
+scores can be read against each other. Under the random split the selected candidate scored [0.866]{.lang-r-only}[0.832]{.lang-py-only py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'"}
+and the stack [0.861]{.lang-r-only}[0.820]{.lang-py-only py="f'{next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'"}, a difference [well inside the standard errors of ]{.lang-r-only}[of ]{.lang-py-only}[0.013]{.lang-py-only py="f'{abs(next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected') - next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble')):.3f}'"}[ against standard errors of ]{.lang-py-only}[0.014]{.lang-r-only}[0.007]{.lang-py-only py="f'{next(e['se'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'"} and [0.019]{.lang-r-only}[0.010]{.lang-py-only py="f'{next(e['se'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'"}. One elastic
 net led on three of the four responses, and the weight the stack moved onto the forests did not
-raise the held-out score. Under spatial blocks the order reversed, 0.784 for the selected candidate against 0.791 for the stack, again
-within the standard errors. A stack pays when the members carry different parts of the signal and
+raise the held-out score. Under spatial blocks [the order reversed, ]{.lang-r-only}[the selected candidate scored ]{.lang-py-only}[0.784]{.lang-r-only}[0.776]{.lang-py-only py="f'{next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'"}[ for the selected candidate]{.lang-r-only} against [0.791]{.lang-r-only}[0.758]{.lang-py-only py="f'{next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'"} for the stack, [again
+within the standard errors]{.lang-r-only}[a difference of ]{.lang-py-only}[0.019]{.lang-py-only py="f'{abs(next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble')):.3f}'"}[ with standard errors of ]{.lang-py-only}[0.042]{.lang-py-only py="f'{next(e['se'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'):.3f}'"}[ and ]{.lang-py-only}[0.040]{.lang-py-only py="f'{next(e['se'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble'):.3f}'"}. A stack pays when the members carry different parts of the signal and
 none leads everywhere; when one candidate wins most responses, as the monthly elastic net does here,
 the stack mostly reproduces it at the cost of more models to fit and store. The weights in
 `fit$fold_weights` say which case a run is in: weights that swing between folds, as the weekly
 forest's do here, mean the stack has no stable composition to report, and the selected candidate is
 the simpler model to describe.
 
-Among the methods that fit nothing, the plain mean was level with the best candidate on the outer
+Among the methods that fit nothing, the plain mean [was level with the best candidate]{.lang-r-only}[scored ]{.lang-py-only}[0.831]{.lang-py-only py="f'{mean_auc(stacks['mean']):.3f}'"}[ against the best candidate's ]{.lang-py-only}[0.845]{.lang-py-only py="f'{max(r['mean'] for r in ts.candidate_table(fit)):.3f}'"} on the outer
 folds. It is a reasonable choice where the stack's weights are unstable. The committee ranks
 coarsely when there are few members, which costs AUC; it is suited to a binary map, where only the
 votes matter.
@@ -1084,20 +1087,20 @@ For the threshold rule:
 - `"prevalence"` where the map is to carry the observed number of presences, and where an absolute
   level such as kappa is to be read, since it selects nothing from which units held them.
 - `"youden"` where omission and commission errors cost the same; it is the cut TSS is read at.
-- `"kappa"` where agreement beyond chance is the target, which here moved only the cut of `sp4`.
+- `"kappa"` where agreement beyond chance is the target, which here moved only the cut of [`sp4`]{.lang-r-only}[`sp1`]{.lang-py-only py="'`' + thresholds[thresholds['youden'] != thresholds['kappa']].index[0] + '`'"}.
 - `"mpa"` where missing a presence costs more than predicting a false one, as for a conservation
-  area that should contain nearly all known occurrences. On this grid it called up to 23 more
+  area that should contain nearly all known occurrences. On this grid it called up to [23]{.lang-r-only}[17]{.lang-py-only py="int((called['mpa'] - called['observed']).max())"} more
   cells present than were observed.
 
 Spatial folds belong wherever units are clustered in space or along the predictor gradients the
 model reads, and wherever the map will be read in places the training data did not cover. The two
-runs above differ by 0.070 to 0.082 AUC, the random split being the higher. `env_cv()` is the analogue
+runs above differ by [0.070]{.lang-r-only}[0.056]{.lang-py-only py="f'{min(next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'), next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble')):.3f}'"} to [0.082]{.lang-r-only}[0.062]{.lang-py-only py="f'{max(next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'selected'), next(e['score'] for e in fit.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble') - next(e['score'] for e in blocked.estimate if e['metric'] == 'roc_auc' and e['arm'] == 'ensemble')):.3f}'"} AUC, the random split being the higher. `env_cv()` is the analogue
 for environmental extrapolation, and `grouped_cv()` for units that share a site, a transect or a
 logger and would otherwise be split across training and test. Under any blocked split the inner
 split keeps blocks whole too, which bounds `n_inner` and the elastic net's own `n_inner`.
 
 A projection costs one prediction per cell. The ensemble of four members took
-`r if (exists("took")) round(took[["elapsed"]], 2) else "a fraction of a"` seconds for 120 cells
+[`r if (exists("took")) round(took[["elapsed"]], 2) else "a fraction of a"`]{.lang-r-only}[0.10]{.lang-py-only py="f'{took:.2f}'"} seconds for 120 cells
 with a year of daily readings, and the time grows with the number of cells and the length of the
 record. A large raster is better projected once from a script, with `chunk` set to what memory
 allows. The two runs themselves cost far more than the projection: each fitted every candidate on

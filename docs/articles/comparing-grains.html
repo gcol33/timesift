@@ -108,7 +108,7 @@
 
     
     
-<!-- Python blocks run by tools/python_twins.py (md5 34ceb4401a16cc1bfa4ab54db4aaca8b). -->
+<!-- Python blocks run by tools/python_twins.py (md5 e0f817b68a9cb6bc58756b04df724d82). -->
 <p><code>timesift</code> compares models built from daily, weekly or
 longer summaries of a sensor record. Each time scale is called a
 <em>grain</em>. Simulated data let us check whether the comparison
@@ -153,9 +153,9 @@ weighted average of the deviations over a short period. With
 weeks, with weights decreasing geometrically from the first week. Each
 response uses its own starting week.</p>
 <div class="lang-py-only">
-<p>The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.</p>
+<p>The Python code simulates its own random data, so the numbers it
+prints differ from those quoted in the text, which come from the R run.
+Counts, shapes and calendar boundaries are the same in both.</p>
 </div>
 <div class="lang-pair">
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
@@ -287,31 +287,34 @@ later analysis of influential periods.</p>
 <span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>    keep_fits<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>    verbose<span class="op">=</span><span class="va">False</span>,</span>
 <span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>)</span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>fit</span>
-<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a><span class="co">#&gt; timesift  200 targets, 8 responses, 5-fold random CV, roc_auc</span></span>
-<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a><span class="co">#&gt;</span></span>
-<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a><span class="co">#&gt; candidates, scored on the outer folds</span></span>
-<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a><span class="co">#&gt; candidate                     mean    won  responses</span></span>
-<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a><span class="co">#&gt; elasticnet / season          0.532      0  separate</span></span>
-<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a><span class="co">#&gt; elasticnet / month           0.660      0  separate</span></span>
-<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a><span class="co">#&gt; elasticnet / day             0.806      1  separate</span></span>
-<span id="cb10-21"><a href="#cb10-21" tabindex="-1"></a><span class="co">#&gt; elasticnet / week            0.836      7  separate</span></span>
-<span id="cb10-22"><a href="#cb10-22" tabindex="-1"></a><span class="co">#&gt;</span></span>
-<span id="cb10-23"><a href="#cb10-23" tabindex="-1"></a><span class="co">#&gt; procedure, chosen and weighted inside each outer training fold</span></span>
-<span id="cb10-24"><a href="#cb10-24" tabindex="-1"></a><span class="co">#&gt; selected                     0.836  se 0.010</span></span>
-<span id="cb10-25"><a href="#cb10-25" tabindex="-1"></a><span class="co">#&gt; ensemble                     0.836  se 0.010</span></span>
-<span id="cb10-26"><a href="#cb10-26" tabindex="-1"></a><span class="co">#&gt; selected elasticnet / week in 5 of 5 folds</span></span>
-<span id="cb10-27"><a href="#cb10-27" tabindex="-1"></a><span class="co">#&gt;</span></span>
-<span id="cb10-28"><a href="#cb10-28" tabindex="-1"></a><span class="co">#&gt; choice on every target  elasticnet / week</span></span>
-<span id="cb10-29"><a href="#cb10-29" tabindex="-1"></a><span class="co">#&gt; weights on every target  elasticnet / week 1.00</span></span></code></pre></div>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>by_grain <span class="op">=</span> (pd.DataFrame(fit.scores)</span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>            .assign(grain<span class="op">=</span><span class="kw">lambda</span> d: d.candidate.<span class="bu">str</span>.split(<span class="st">" / "</span>).<span class="bu">str</span>[<span class="dv">1</span>])</span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a>            .groupby(<span class="st">"grain"</span>).score.mean())</span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>fit</span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a><span class="co">#&gt; timesift  200 targets, 8 responses, 5-fold random CV, roc_auc</span></span>
+<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a><span class="co">#&gt; candidates, scored on the outer folds</span></span>
+<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a><span class="co">#&gt; candidate                     mean    won  responses</span></span>
+<span id="cb10-21"><a href="#cb10-21" tabindex="-1"></a><span class="co">#&gt; elasticnet / season          0.532      0  separate</span></span>
+<span id="cb10-22"><a href="#cb10-22" tabindex="-1"></a><span class="co">#&gt; elasticnet / month           0.660      0  separate</span></span>
+<span id="cb10-23"><a href="#cb10-23" tabindex="-1"></a><span class="co">#&gt; elasticnet / day             0.806      1  separate</span></span>
+<span id="cb10-24"><a href="#cb10-24" tabindex="-1"></a><span class="co">#&gt; elasticnet / week            0.836      7  separate</span></span>
+<span id="cb10-25"><a href="#cb10-25" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb10-26"><a href="#cb10-26" tabindex="-1"></a><span class="co">#&gt; procedure, chosen and weighted inside each outer training fold</span></span>
+<span id="cb10-27"><a href="#cb10-27" tabindex="-1"></a><span class="co">#&gt; selected                     0.836  se 0.010</span></span>
+<span id="cb10-28"><a href="#cb10-28" tabindex="-1"></a><span class="co">#&gt; ensemble                     0.836  se 0.010</span></span>
+<span id="cb10-29"><a href="#cb10-29" tabindex="-1"></a><span class="co">#&gt; selected elasticnet / week in 5 of 5 folds</span></span>
+<span id="cb10-30"><a href="#cb10-30" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb10-31"><a href="#cb10-31" tabindex="-1"></a><span class="co">#&gt; choice on every target  elasticnet / week</span></span>
+<span id="cb10-32"><a href="#cb10-32" tabindex="-1"></a><span class="co">#&gt; weights on every target  elasticnet / week 1.00</span></span></code></pre></div>
 </div>
-<p>The weekly candidate has the highest mean AUC, 0.838, and scored
-highest on all eight responses. The daily candidate, which holds the
-same information over 365 columns, sits at 0.784; the monthly and
-seasonal candidates fall further, to 0.704 and 0.550, the last close to
+<p>The weekly candidate has the highest mean AUC, <span class="lang-r-only">0.838</span><span class="lang-py-only" py="'%.3f' % by_grain.week">0.836</span>, and scored highest on
+all eight responses. The daily candidate, which holds the same
+information over 365 columns, sits at <span class="lang-r-only">0.784</span><span class="lang-py-only" py="'%.3f' % by_grain.day">0.806</span>; the monthly and
+seasonal candidates fall further, to <span class="lang-r-only">0.704</span><span class="lang-py-only" py="'%.3f' % by_grain.month">0.660</span> and <span class="lang-r-only">0.550</span><span class="lang-py-only" py="'%.3f' % by_grain.season">0.532</span>, the last close to
 what a model with no information would score. The planted grain is
-recovered, and the level reached is about 0.06 below the population
-ceiling of 0.90.</p>
+recovered, and the level reached is about <span class="lang-r-only">0.06</span><span class="lang-py-only" py="'%.2f' % (0.9 - by_grain.week)">0.06</span> below the
+population ceiling of 0.90.</p>
 <p>The procedure rows were computed differently. In each outer training
 fold the four candidates were cross-validated again on three inner
 folds, one was chosen and the stack’s weights were fitted, and only then
@@ -2637,20 +2640,23 @@ test of those differences against zero.</p>
 <span><span class="co">#&gt;   n_variable n_cell n_favour   p_value p_method  interval</span></span>
 <span><span class="co">#&gt; 1          8     40        8 0.0078125    exact variables</span></span>
 <span><span class="co">#&gt; 2          8     40        8 0.0078125    exact variables</span></span></code></pre></div>
-<div class="sourceCode" id="cb22"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>pd.DataFrame([ts.paired_contrast(lad, <span class="st">"week|elasticnet"</span>, <span class="st">"month|elasticnet"</span>),</span>
-<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>              ts.paired_contrast(lad, <span class="st">"week|elasticnet"</span>, <span class="st">"day|elasticnet"</span>)])</span>
-<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a><span class="co">#&gt;                  a                 b      diff  ...   p_value  p_method   interval</span></span>
-<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a><span class="co">#&gt; 0  week|elasticnet  month|elasticnet  0.175458  ...  0.007812     exact  variables</span></span>
-<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a><span class="co">#&gt; 1  week|elasticnet    day|elasticnet  0.029934  ...  0.023438     exact  variables</span></span>
-<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="co">#&gt;</span></span>
-<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a><span class="co">#&gt; [2 rows x 12 columns]</span></span></code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>contrasts <span class="op">=</span> pd.DataFrame([ts.paired_contrast(lad, <span class="st">"week|elasticnet"</span>, <span class="st">"month|elasticnet"</span>),</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>                         ts.paired_contrast(lad, <span class="st">"week|elasticnet"</span>, <span class="st">"day|elasticnet"</span>)])</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>contrasts</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a><span class="co">#&gt;                  a                 b      diff  ...   p_value  p_method   interval</span></span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a><span class="co">#&gt; 0  week|elasticnet  month|elasticnet  0.175458  ...  0.007812     exact  variables</span></span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="co">#&gt; 1  week|elasticnet    day|elasticnet  0.029934  ...  0.023438     exact  variables</span></span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a><span class="co">#&gt; [2 rows x 12 columns]</span></span></code></pre></div>
 </div>
-<p>Week leads month by 0.134 and day by 0.054 in AUC, and both intervals
-exclude zero. Each contrast rests on 40 paired cells, and every one of
-the eight responses favours the weekly arm (<code>n_favour</code>). Both
-p-values are 0.0078, and they are equal because with eight responses all
-on one side, the exact signed-rank test has reached the smallest value
-it can give. That floor depends only on the number of responses:</p>
+<p>Week leads month by <span class="lang-r-only">0.134</span><span class="lang-py-only" py="'%.3f' % contrasts['diff'].iloc[0]">0.175</span> and
+day by <span class="lang-r-only">0.054</span><span class="lang-py-only" py="'%.3f' % contrasts['diff'].iloc[1]">0.030</span> in
+AUC, and both intervals exclude zero. Each contrast rests on 40 paired
+cells, and every one of the eight responses favours the weekly arm
+(<code>n_favour</code>). Both p-values are 0.0078, and they are equal
+because with eight responses all on one side, the exact signed-rank test
+has reached the smallest value it can give. That floor depends only on
+the number of responses:</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">n_responses</span> <span class="op">&lt;-</span> <span class="fl">3</span><span class="op">:</span><span class="fl">10</span></span>
@@ -2732,11 +2738,12 @@ fold.</p>
 <span><span class="co">#&gt; 1 elasticnet    day      week -0.05424728 -0.09933213 -0.00916242 1.355957e-02</span></span>
 <span><span class="co">#&gt; 2 elasticnet  month      week -0.13417500 -0.17925986 -0.08909015 1.543908e-10</span></span>
 <span><span class="co">#&gt; 3 elasticnet season      week -0.28807111 -0.33315597 -0.24298626 0.000000e+00</span></span></code></pre></div>
-<div class="sourceCode" id="cb28"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a>pd.DataFrame(ts.grain_contrasts(lad))</span>
-<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a><span class="co">#&gt;       learner   grain reference      diff     lower     upper   p_value</span></span>
-<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a><span class="co">#&gt; 0  elasticnet     day      week -0.029934 -0.068114  0.008246  0.158714</span></span>
-<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a><span class="co">#&gt; 1  elasticnet   month      week -0.175458 -0.213638 -0.137278  0.000000</span></span>
-<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a><span class="co">#&gt; 2  elasticnet  season      week -0.303850 -0.342030 -0.265670  0.000000</span></span></code></pre></div>
+<div class="sourceCode" id="cb28"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a>gc <span class="op">=</span> pd.DataFrame(ts.grain_contrasts(lad))</span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>gc</span>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a><span class="co">#&gt;       learner   grain reference      diff     lower     upper   p_value</span></span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a><span class="co">#&gt; 0  elasticnet     day      week -0.029934 -0.068114  0.008246  0.158714</span></span>
+<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a><span class="co">#&gt; 1  elasticnet   month      week -0.175458 -0.213638 -0.137278  0.000000</span></span>
+<span id="cb28-6"><a href="#cb28-6" tabindex="-1"></a><span class="co">#&gt; 2  elasticnet  season      week -0.303850 -0.342030 -0.265670  0.000000</span></span></code></pre></div>
 </div>
 <div class="lang-r-only">
 <p>The singular-fit message from lme4 means that one of the two variance
@@ -2745,13 +2752,14 @@ read in the usual way.</p>
 </div>
 <p>Every grain falls below week, and the day contrast, the closest, has
 an adjusted interval that excludes zero. The three intervals have the
-same width, about 0.09, because the model estimates one residual
-variance from all the cells and the design is balanced. The paired
-intervals each carry their own spread across responses instead: the
-week-to-day one is narrower than its mixed-model counterpart, and the
-week-to-month one wider. The reference was itself chosen as the best
-observed grain, which favours it, so this table is best read beside the
-paired contrasts, which single out no grain.</p>
+same width, about <span class="lang-r-only">0.09</span><span class="lang-py-only" py="'%.2f' % (gc.upper - gc.lower).mean()">0.08</span>, because
+the model estimates one residual variance from all the cells and the
+design is balanced. The paired intervals each carry their own spread
+across responses instead: the week-to-day one is narrower than its
+mixed-model counterpart, and the week-to-month one wider. The reference
+was itself chosen as the best observed grain, which favours it, so this
+table is best read beside the paired contrasts, which single out no
+grain.</p>
 </div>
 <div class="section level2">
 <h2 id="choosing-inside-the-training-data">Choosing inside the training data<a class="anchor" aria-label="anchor" href="#choosing-inside-the-training-data"></a>
@@ -2782,22 +2790,25 @@ procedure.</p>
 <span><span class="co">#&gt; 4    4  week   0.7791096 0.025934327</span></span>
 <span><span class="co">#&gt; 5    5  week   0.8166510 0.017529066</span></span></code></pre></div>
 <div class="sourceCode" id="cb30"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a>sel <span class="op">=</span> ts.select_grain(x, sim.y, en, folds<span class="op">=</span>fit.folds, n_inner<span class="op">=</span><span class="dv">3</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a>pd.DataFrame(sel.estimate).query(<span class="st">"metric == 'roc_auc'"</span>)[[<span class="st">"metric"</span>, <span class="st">"score"</span>, <span class="st">"lower"</span>, <span class="st">"upper"</span>]]</span>
-<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a><span class="co">#&gt;      metric     score     lower     upper</span></span>
-<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a><span class="co">#&gt; 24  roc_auc  0.835511  0.811616  0.859406</span></span>
-<span id="cb30-5"><a href="#cb30-5" tabindex="-1"></a>pd.DataFrame(sel.selected)[[<span class="st">"fold"</span>, <span class="st">"grain"</span>, <span class="st">"inner_score"</span>, <span class="st">"inner_se"</span>]]</span>
-<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a><span class="co">#&gt;    fold grain  inner_score  inner_se</span></span>
-<span id="cb30-7"><a href="#cb30-7" tabindex="-1"></a><span class="co">#&gt; 0     1  week     0.825691  0.005974</span></span>
-<span id="cb30-8"><a href="#cb30-8" tabindex="-1"></a><span class="co">#&gt; 1     2  week     0.822040  0.001189</span></span>
-<span id="cb30-9"><a href="#cb30-9" tabindex="-1"></a><span class="co">#&gt; 2     3  week     0.802607  0.010073</span></span>
-<span id="cb30-10"><a href="#cb30-10" tabindex="-1"></a><span class="co">#&gt; 3     4  week     0.805170  0.008538</span></span>
-<span id="cb30-11"><a href="#cb30-11" tabindex="-1"></a><span class="co">#&gt; 4     5  week     0.809012  0.004680</span></span></code></pre></div>
+<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a>sel_auc <span class="op">=</span> pd.DataFrame(sel.estimate).query(<span class="st">"metric == 'roc_auc'"</span>)</span>
+<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a>sel_auc[[<span class="st">"metric"</span>, <span class="st">"score"</span>, <span class="st">"lower"</span>, <span class="st">"upper"</span>]]</span>
+<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a><span class="co">#&gt;      metric     score     lower     upper</span></span>
+<span id="cb30-5"><a href="#cb30-5" tabindex="-1"></a><span class="co">#&gt; 24  roc_auc  0.835511  0.811616  0.859406</span></span>
+<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a>sel_inner <span class="op">=</span> pd.DataFrame(sel.selected)</span>
+<span id="cb30-7"><a href="#cb30-7" tabindex="-1"></a>sel_inner[[<span class="st">"fold"</span>, <span class="st">"grain"</span>, <span class="st">"inner_score"</span>, <span class="st">"inner_se"</span>]]</span>
+<span id="cb30-8"><a href="#cb30-8" tabindex="-1"></a><span class="co">#&gt;    fold grain  inner_score  inner_se</span></span>
+<span id="cb30-9"><a href="#cb30-9" tabindex="-1"></a><span class="co">#&gt; 0     1  week     0.825691  0.005974</span></span>
+<span id="cb30-10"><a href="#cb30-10" tabindex="-1"></a><span class="co">#&gt; 1     2  week     0.822040  0.001189</span></span>
+<span id="cb30-11"><a href="#cb30-11" tabindex="-1"></a><span class="co">#&gt; 2     3  week     0.802607  0.010073</span></span>
+<span id="cb30-12"><a href="#cb30-12" tabindex="-1"></a><span class="co">#&gt; 3     4  week     0.805170  0.008538</span></span>
+<span id="cb30-13"><a href="#cb30-13" tabindex="-1"></a><span class="co">#&gt; 4     5  week     0.809012  0.004680</span></span></code></pre></div>
 </div>
-<p>All five outer folds chose week, and the procedure scores 0.838, the
-same as the run’s estimate, which made the same choice on the same
-folds. The inner scores, between 0.767 and 0.817, are lower than the
-outer ones because each inner model was fitted on two thirds of 160
-units. They are used only to rank the candidates within a fold.</p>
+<p>All five outer folds chose week, and the procedure scores <span class="lang-r-only">0.838</span><span class="lang-py-only" py="'%.3f' % sel_auc.score.iloc[0]">0.836</span>, the same as
+the run’s estimate, which made the same choice on the same folds. The
+inner scores, between <span class="lang-r-only">0.767</span><span class="lang-py-only" py="'%.3f' % sel_inner.inner_score.min()">0.803</span> and <span class="lang-r-only">0.817</span><span class="lang-py-only" py="'%.3f' % sel_inner.inner_score.max()">0.826</span>, are
+lower than the outer ones because each inner model was fitted on two
+thirds of 160 units. They are used only to rank the candidates within a
+fold.</p>
 <p>The plot draws every candidate’s inner score in every outer fold, one
 line per fold, and circles the candidate each fold chose.</p>
 <div class="lang-pair">
@@ -4042,12 +4053,14 @@ AUC should sit near 0.5.</p>
 <span id="cb34-3"><a href="#cb34-3" tabindex="-1"></a>x_null <span class="op">=</span> ts.grain_matrix(null.readings, <span class="st">"unit"</span>, <span class="st">"time"</span>, <span class="st">"reading"</span>,</span>
 <span id="cb34-4"><a href="#cb34-4" tabindex="-1"></a>                         grain<span class="op">=</span>(<span class="st">"day"</span>, <span class="st">"week"</span>, <span class="st">"month"</span>, <span class="st">"season"</span>), year_start<span class="op">=</span><span class="st">"09-01"</span>)</span>
 <span id="cb34-5"><a href="#cb34-5" tabindex="-1"></a>folds_null <span class="op">=</span> ts.fold_map(null.y, v<span class="op">=</span><span class="dv">5</span>)</span>
-<span id="cb34-6"><a href="#cb34-6" tabindex="-1"></a>pd.DataFrame(ts.grain_ladder(x_null, null.y, en, folds<span class="op">=</span>folds_null, verbose<span class="op">=</span><span class="va">False</span>).summary())</span>
-<span id="cb34-7"><a href="#cb34-7" tabindex="-1"></a><span class="co">#&gt;       learner   grain     score  n_variable   best</span></span>
-<span id="cb34-8"><a href="#cb34-8" tabindex="-1"></a><span class="co">#&gt; 0  elasticnet     day  0.476731           8  False</span></span>
-<span id="cb34-9"><a href="#cb34-9" tabindex="-1"></a><span class="co">#&gt; 1  elasticnet    week  0.491963           8  False</span></span>
-<span id="cb34-10"><a href="#cb34-10" tabindex="-1"></a><span class="co">#&gt; 2  elasticnet   month  0.489988           8  False</span></span>
-<span id="cb34-11"><a href="#cb34-11" tabindex="-1"></a><span class="co">#&gt; 3  elasticnet  season  0.498661           8   True</span></span></code></pre></div>
+<span id="cb34-6"><a href="#cb34-6" tabindex="-1"></a>null_ladder <span class="op">=</span> pd.DataFrame(</span>
+<span id="cb34-7"><a href="#cb34-7" tabindex="-1"></a>    ts.grain_ladder(x_null, null.y, en, folds<span class="op">=</span>folds_null, verbose<span class="op">=</span><span class="va">False</span>).summary())</span>
+<span id="cb34-8"><a href="#cb34-8" tabindex="-1"></a>null_ladder</span>
+<span id="cb34-9"><a href="#cb34-9" tabindex="-1"></a><span class="co">#&gt;       learner   grain     score  n_variable   best</span></span>
+<span id="cb34-10"><a href="#cb34-10" tabindex="-1"></a><span class="co">#&gt; 0  elasticnet     day  0.476731           8  False</span></span>
+<span id="cb34-11"><a href="#cb34-11" tabindex="-1"></a><span class="co">#&gt; 1  elasticnet    week  0.491963           8  False</span></span>
+<span id="cb34-12"><a href="#cb34-12" tabindex="-1"></a><span class="co">#&gt; 2  elasticnet   month  0.489988           8  False</span></span>
+<span id="cb34-13"><a href="#cb34-13" tabindex="-1"></a><span class="co">#&gt; 3  elasticnet  season  0.498661           8   True</span></span></code></pre></div>
 </div>
 <p>The daily candidate has the highest mean score, 0.524. Even unrelated
 responses can produce differences between candidates by chance.
@@ -4065,23 +4078,26 @@ performance.</p>
 <span><span class="co">#&gt; 3   week elasticnet          0   0.0   0.5036710</span></span>
 <span><span class="co">#&gt; 4 season elasticnet          0   0.0   0.4984559</span></span></code></pre></div>
 <div class="sourceCode" id="cb36"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a>null_sel <span class="op">=</span> ts.select_grain(x_null, null.y, en, folds<span class="op">=</span>folds_null, n_inner<span class="op">=</span><span class="dv">3</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a>pd.DataFrame(null_sel.estimate).query(<span class="st">"metric == 'roc_auc'"</span>)[[<span class="st">"metric"</span>, <span class="st">"score"</span>, <span class="st">"lower"</span>, <span class="st">"upper"</span>]]</span>
-<span id="cb36-3"><a href="#cb36-3" tabindex="-1"></a><span class="co">#&gt;      metric     score     lower     upper</span></span>
-<span id="cb36-4"><a href="#cb36-4" tabindex="-1"></a><span class="co">#&gt; 24  roc_auc  0.485783  0.463086  0.508481</span></span>
-<span id="cb36-5"><a href="#cb36-5" tabindex="-1"></a>pd.DataFrame(null_sel.selected)[[<span class="st">"fold"</span>, <span class="st">"grain"</span>, <span class="st">"inner_score"</span>]]</span>
-<span id="cb36-6"><a href="#cb36-6" tabindex="-1"></a><span class="co">#&gt;    fold   grain  inner_score</span></span>
-<span id="cb36-7"><a href="#cb36-7" tabindex="-1"></a><span class="co">#&gt; 0     1  season     0.515159</span></span>
-<span id="cb36-8"><a href="#cb36-8" tabindex="-1"></a><span class="co">#&gt; 1     2    week     0.514769</span></span>
-<span id="cb36-9"><a href="#cb36-9" tabindex="-1"></a><span class="co">#&gt; 2     3     day     0.508139</span></span>
-<span id="cb36-10"><a href="#cb36-10" tabindex="-1"></a><span class="co">#&gt; 3     4    week     0.503433</span></span>
-<span id="cb36-11"><a href="#cb36-11" tabindex="-1"></a><span class="co">#&gt; 4     5     day     0.507563</span></span></code></pre></div>
+<span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a>null_auc <span class="op">=</span> pd.DataFrame(null_sel.estimate).query(<span class="st">"metric == 'roc_auc'"</span>)</span>
+<span id="cb36-3"><a href="#cb36-3" tabindex="-1"></a>null_auc[[<span class="st">"metric"</span>, <span class="st">"score"</span>, <span class="st">"lower"</span>, <span class="st">"upper"</span>]]</span>
+<span id="cb36-4"><a href="#cb36-4" tabindex="-1"></a><span class="co">#&gt;      metric     score     lower     upper</span></span>
+<span id="cb36-5"><a href="#cb36-5" tabindex="-1"></a><span class="co">#&gt; 24  roc_auc  0.485783  0.463086  0.508481</span></span>
+<span id="cb36-6"><a href="#cb36-6" tabindex="-1"></a>pd.DataFrame(null_sel.selected)[[<span class="st">"fold"</span>, <span class="st">"grain"</span>, <span class="st">"inner_score"</span>]]</span>
+<span id="cb36-7"><a href="#cb36-7" tabindex="-1"></a><span class="co">#&gt;    fold   grain  inner_score</span></span>
+<span id="cb36-8"><a href="#cb36-8" tabindex="-1"></a><span class="co">#&gt; 0     1  season     0.515159</span></span>
+<span id="cb36-9"><a href="#cb36-9" tabindex="-1"></a><span class="co">#&gt; 1     2    week     0.514769</span></span>
+<span id="cb36-10"><a href="#cb36-10" tabindex="-1"></a><span class="co">#&gt; 2     3     day     0.508139</span></span>
+<span id="cb36-11"><a href="#cb36-11" tabindex="-1"></a><span class="co">#&gt; 3     4    week     0.503433</span></span>
+<span id="cb36-12"><a href="#cb36-12" tabindex="-1"></a><span class="co">#&gt; 4     5     day     0.507563</span></span></code></pre></div>
 </div>
-<p>The procedure scores 0.520 with an interval from 0.480 to 0.560,
-which contains 0.5. The folds chose day four times and month once, and
-the inner scores of all four candidates lie between 0.498 and 0.510. On
-this record the gap between the best candidate and the procedure is
-small, 0.004; it grows with the number of candidates searched and with
-how much they differ by chance.</p>
+<p>The procedure scores <span class="lang-r-only">0.520</span><span class="lang-py-only" py="'%.3f' % null_auc.score.iloc[0]">0.486</span> with an
+interval from <span class="lang-r-only">0.480</span><span class="lang-py-only" py="'%.3f' % null_auc.lower.iloc[0]">0.463</span> to <span class="lang-r-only">0.560</span><span class="lang-py-only" py="'%.3f' % null_auc.upper.iloc[0]">0.508</span>, which
+contains 0.5. The folds chose day four times and month once, and the
+inner scores of all four candidates lie between 0.498 and 0.510. On this
+record the gap between the best candidate and the procedure is small,
+<span class="lang-r-only">0.004</span><span class="lang-py-only" py="'%.3f' % (null_ladder.score.max() - null_auc.score.iloc[0])">0.013</span>;
+it grows with the number of candidates searched and with how much they
+differ by chance.</p>
 <p><code>choose = "coarsest_adequate"</code> replaces the highest inner
 score by the coarsest candidate within one standard error of it. On a
 flat profile that is the least storage the record can be kept at without
@@ -4155,25 +4171,28 @@ others.</p>
 <span id="cb40-7"><a href="#cb40-7" tabindex="-1"></a></span>
 <span id="cb40-8"><a href="#cb40-8" tabindex="-1"></a>lad_season <span class="op">=</span> ladder_for(<span class="st">"season"</span>)</span>
 <span id="cb40-9"><a href="#cb40-9" tabindex="-1"></a>lad_event <span class="op">=</span> ladder_for(<span class="st">"event"</span>)</span>
-<span id="cb40-10"><a href="#cb40-10" tabindex="-1"></a>pd.DataFrame(lad_season.summary())[[<span class="st">"grain"</span>, <span class="st">"score"</span>, <span class="st">"best"</span>]]</span>
-<span id="cb40-11"><a href="#cb40-11" tabindex="-1"></a><span class="co">#&gt;     grain     score   best</span></span>
-<span id="cb40-12"><a href="#cb40-12" tabindex="-1"></a><span class="co">#&gt; 0     day  0.507631  False</span></span>
-<span id="cb40-13"><a href="#cb40-13" tabindex="-1"></a><span class="co">#&gt; 1    week  0.606611  False</span></span>
-<span id="cb40-14"><a href="#cb40-14" tabindex="-1"></a><span class="co">#&gt; 2   month  0.773282  False</span></span>
-<span id="cb40-15"><a href="#cb40-15" tabindex="-1"></a><span class="co">#&gt; 3  season  0.798892   True</span></span>
-<span id="cb40-16"><a href="#cb40-16" tabindex="-1"></a>pd.DataFrame(lad_event.summary())[[<span class="st">"grain"</span>, <span class="st">"score"</span>, <span class="st">"best"</span>]]</span>
-<span id="cb40-17"><a href="#cb40-17" tabindex="-1"></a><span class="co">#&gt;     grain     score   best</span></span>
-<span id="cb40-18"><a href="#cb40-18" tabindex="-1"></a><span class="co">#&gt; 0     day  0.864449   True</span></span>
-<span id="cb40-19"><a href="#cb40-19" tabindex="-1"></a><span class="co">#&gt; 1    week  0.763523  False</span></span>
-<span id="cb40-20"><a href="#cb40-20" tabindex="-1"></a><span class="co">#&gt; 2   month  0.555004  False</span></span>
-<span id="cb40-21"><a href="#cb40-21" tabindex="-1"></a><span class="co">#&gt; 3  season  0.515129  False</span></span></code></pre></div>
+<span id="cb40-10"><a href="#cb40-10" tabindex="-1"></a>season_scores <span class="op">=</span> pd.DataFrame(lad_season.summary()).set_index(<span class="st">"grain"</span>).score</span>
+<span id="cb40-11"><a href="#cb40-11" tabindex="-1"></a>event_scores <span class="op">=</span> pd.DataFrame(lad_event.summary()).set_index(<span class="st">"grain"</span>).score</span>
+<span id="cb40-12"><a href="#cb40-12" tabindex="-1"></a>pd.DataFrame(lad_season.summary())[[<span class="st">"grain"</span>, <span class="st">"score"</span>, <span class="st">"best"</span>]]</span>
+<span id="cb40-13"><a href="#cb40-13" tabindex="-1"></a><span class="co">#&gt;     grain     score   best</span></span>
+<span id="cb40-14"><a href="#cb40-14" tabindex="-1"></a><span class="co">#&gt; 0     day  0.507631  False</span></span>
+<span id="cb40-15"><a href="#cb40-15" tabindex="-1"></a><span class="co">#&gt; 1    week  0.606611  False</span></span>
+<span id="cb40-16"><a href="#cb40-16" tabindex="-1"></a><span class="co">#&gt; 2   month  0.773282  False</span></span>
+<span id="cb40-17"><a href="#cb40-17" tabindex="-1"></a><span class="co">#&gt; 3  season  0.798892   True</span></span>
+<span id="cb40-18"><a href="#cb40-18" tabindex="-1"></a>pd.DataFrame(lad_event.summary())[[<span class="st">"grain"</span>, <span class="st">"score"</span>, <span class="st">"best"</span>]]</span>
+<span id="cb40-19"><a href="#cb40-19" tabindex="-1"></a><span class="co">#&gt;     grain     score   best</span></span>
+<span id="cb40-20"><a href="#cb40-20" tabindex="-1"></a><span class="co">#&gt; 0     day  0.864449   True</span></span>
+<span id="cb40-21"><a href="#cb40-21" tabindex="-1"></a><span class="co">#&gt; 1    week  0.763523  False</span></span>
+<span id="cb40-22"><a href="#cb40-22" tabindex="-1"></a><span class="co">#&gt; 2   month  0.555004  False</span></span>
+<span id="cb40-23"><a href="#cb40-23" tabindex="-1"></a><span class="co">#&gt; 3  season  0.515129  False</span></span></code></pre></div>
 </div>
 <p>Each ladder peaks at its planted grain: the seasonal record at
-season, 0.835, and the event record at day, 0.864. The seasonal ladder
-falls gently from season to month, 0.809, where the month array holds
-the driver exactly over three times as many columns, and steeply below
-that. The event ladder drops by 0.083 from day to week, the information
-the weekly mean averages away.</p>
+season, <span class="lang-r-only">0.835</span><span class="lang-py-only" py="'%.3f' % season_scores.season">0.799</span>, and the event
+record at day, <span class="lang-r-only">0.864</span><span class="lang-py-only" py="'%.3f' % event_scores.day">0.864</span>. The seasonal ladder
+falls gently from season to month, <span class="lang-r-only">0.809</span><span class="lang-py-only" py="'%.3f' % season_scores.month">0.773</span>, where the month
+array holds the driver exactly over three times as many columns, and
+steeply below that. The event ladder drops by <span class="lang-r-only">0.083</span><span class="lang-py-only" py="'%.3f' % (event_scores.day - event_scores.week)">0.101</span>
+from day to week, the information the weekly mean averages away.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">lad_event</span><span class="op">)</span></span></code></pre></div>
@@ -5365,12 +5384,14 @@ of 25 October.</p>
 <span id="cb46-16"><a href="#cb46-16" tabindex="-1"></a><span class="co">#&gt; Name: v02, dtype: float64</span></span></code></pre></div>
 </div>
 <p>For both variables the heaviest bin is the anchor week, with a fall
-in AUC of 0.287 and 0.247. The planted weights decay by a factor of e
-from one week to the next, and for the first variable the following week
-is also among the heaviest. Bins outside the planted stretch carry
-smaller weights, such as 0.112 for a January week in the first variable,
-which suggests the penalised fit picks up some structure the mechanism
-does not contain when it has 160 units to fit 53 columns.</p>
+in AUC of <span class="lang-r-only">0.287</span><span class="lang-py-only" py="'%.3f' % weight.v01.max()">0.304</span>
+and <span class="lang-r-only">0.247</span><span class="lang-py-only" py="'%.3f' % weight.v02.max()">0.295</span>. The planted weights
+decay by a factor of e from one week to the next, and for the first
+variable the following week is also among the heaviest. Bins outside the
+planted stretch carry smaller weights, such as 0.112 for a January week
+in the first variable, which suggests the penalised fit picks up some
+structure the mechanism does not contain when it has 160 units to fit 53
+columns.</p>
 <p><code>over = "channel"</code> holds back a whole statistic instead.
 The simulated response reads the weekly mean, so a run that also offers
 each week’s coldest and warmest day should lean on the mean.</p>
@@ -5395,15 +5416,16 @@ each week’s coldest and warmest day should lean on the mean.</p>
 <span id="cb48-5"><a href="#cb48-5" tabindex="-1"></a>                     resampling<span class="op">=</span>ts.cv(v<span class="op">=</span><span class="dv">5</span>), n_inner<span class="op">=</span><span class="va">None</span>, ensemble<span class="op">=</span><span class="va">False</span>,</span>
 <span id="cb48-6"><a href="#cb48-6" tabindex="-1"></a>                     keep_fits<span class="op">=</span><span class="va">True</span>, verbose<span class="op">=</span><span class="va">False</span>)</span>
 <span id="cb48-7"><a href="#cb48-7" tabindex="-1"></a>by_channel <span class="op">=</span> ts.occlusion(fit_ch, <span class="st">"elasticnet / week"</span>, over<span class="op">=</span><span class="st">"channel"</span>, permutations<span class="op">=</span><span class="dv">5</span>)</span>
-<span id="cb48-8"><a href="#cb48-8" tabindex="-1"></a>pd.DataFrame(by_channel[<span class="st">"weight"</span>], index<span class="op">=</span>by_channel[<span class="st">"part"</span>]).mean(axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb48-9"><a href="#cb48-9" tabindex="-1"></a><span class="co">#&gt; cold_day    0.075573</span></span>
-<span id="cb48-10"><a href="#cb48-10" tabindex="-1"></a><span class="co">#&gt; mean        0.149820</span></span>
-<span id="cb48-11"><a href="#cb48-11" tabindex="-1"></a><span class="co">#&gt; warm_day    0.072888</span></span>
-<span id="cb48-12"><a href="#cb48-12" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
+<span id="cb48-8"><a href="#cb48-8" tabindex="-1"></a>channel_weight <span class="op">=</span> pd.DataFrame(by_channel[<span class="st">"weight"</span>], index<span class="op">=</span>by_channel[<span class="st">"part"</span>]).mean(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb48-9"><a href="#cb48-9" tabindex="-1"></a>channel_weight</span>
+<span id="cb48-10"><a href="#cb48-10" tabindex="-1"></a><span class="co">#&gt; cold_day    0.075573</span></span>
+<span id="cb48-11"><a href="#cb48-11" tabindex="-1"></a><span class="co">#&gt; mean        0.149820</span></span>
+<span id="cb48-12"><a href="#cb48-12" tabindex="-1"></a><span class="co">#&gt; warm_day    0.072888</span></span>
+<span id="cb48-13"><a href="#cb48-13" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
 </div>
-<p>The mean carries the largest fall, 0.157, about twice the coldest
-day’s. The extreme days are not independent of the mean, which is why
-they carry some weight too.</p>
+<p>The mean carries the largest fall, <span class="lang-r-only">0.157</span><span class="lang-py-only" py="'%.3f' % channel_weight.loc['mean']">0.150</span>,
+about twice the coldest day’s. The extreme days are not independent of
+the mean, which is why they carry some weight too.</p>
 </div>
 <div class="section level2">
 <h2 id="how-the-prediction-responds">How the prediction responds<a class="anchor" aria-label="anchor" href="#how-the-prediction-responds"></a>
@@ -5522,16 +5544,17 @@ representation: the weekly mean in the first variable’s anchor week.</p>
 <span><span class="co">#&gt; 0.926 0.000 0.001 0.000 0.000 0.000 0.000 0.097</span></span></code></pre></div>
 <div class="sourceCode" id="cb51" fig-alt="Predicted probability against the mean reading in the week of 6 September 2021, rising steeply for v01 and nearly flat for the other responses."><pre class="sourceCode python"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" tabindex="-1"></a>rc <span class="op">=</span> ts.response_curve(fit, <span class="st">"elasticnet / week"</span>, {<span class="st">"bin"</span>: anchors[<span class="dv">0</span>], <span class="st">"channel"</span>: <span class="st">"mean"</span>}, n<span class="op">=</span><span class="dv">20</span>)</span>
 <span id="cb51-2"><a href="#cb51-2" tabindex="-1"></a>ts.plot(rc)<span class="op">;</span></span>
-<span id="cb51-3"><a href="#cb51-3" tabindex="-1"></a>pd.Series(np.ptp(rc.prediction, axis<span class="op">=</span><span class="dv">0</span>).<span class="bu">round</span>(<span class="dv">3</span>), index<span class="op">=</span>rc.variable)</span>
-<span id="cb51-4"><a href="#cb51-4" tabindex="-1"></a><span class="co">#&gt; v01    0.981</span></span>
-<span id="cb51-5"><a href="#cb51-5" tabindex="-1"></a><span class="co">#&gt; v02    0.000</span></span>
-<span id="cb51-6"><a href="#cb51-6" tabindex="-1"></a><span class="co">#&gt; v03    0.097</span></span>
-<span id="cb51-7"><a href="#cb51-7" tabindex="-1"></a><span class="co">#&gt; v04    0.000</span></span>
-<span id="cb51-8"><a href="#cb51-8" tabindex="-1"></a><span class="co">#&gt; v05    0.000</span></span>
-<span id="cb51-9"><a href="#cb51-9" tabindex="-1"></a><span class="co">#&gt; v06    0.139</span></span>
-<span id="cb51-10"><a href="#cb51-10" tabindex="-1"></a><span class="co">#&gt; v07    0.019</span></span>
-<span id="cb51-11"><a href="#cb51-11" tabindex="-1"></a><span class="co">#&gt; v08    0.059</span></span>
-<span id="cb51-12"><a href="#cb51-12" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
+<span id="cb51-3"><a href="#cb51-3" tabindex="-1"></a>spread <span class="op">=</span> pd.Series(np.ptp(rc.prediction, axis<span class="op">=</span><span class="dv">0</span>).<span class="bu">round</span>(<span class="dv">3</span>), index<span class="op">=</span>rc.variable)</span>
+<span id="cb51-4"><a href="#cb51-4" tabindex="-1"></a>spread</span>
+<span id="cb51-5"><a href="#cb51-5" tabindex="-1"></a><span class="co">#&gt; v01    0.981</span></span>
+<span id="cb51-6"><a href="#cb51-6" tabindex="-1"></a><span class="co">#&gt; v02    0.000</span></span>
+<span id="cb51-7"><a href="#cb51-7" tabindex="-1"></a><span class="co">#&gt; v03    0.097</span></span>
+<span id="cb51-8"><a href="#cb51-8" tabindex="-1"></a><span class="co">#&gt; v04    0.000</span></span>
+<span id="cb51-9"><a href="#cb51-9" tabindex="-1"></a><span class="co">#&gt; v05    0.000</span></span>
+<span id="cb51-10"><a href="#cb51-10" tabindex="-1"></a><span class="co">#&gt; v06    0.139</span></span>
+<span id="cb51-11"><a href="#cb51-11" tabindex="-1"></a><span class="co">#&gt; v07    0.019</span></span>
+<span id="cb51-12"><a href="#cb51-12" tabindex="-1"></a><span class="co">#&gt; v08    0.059</span></span>
+<span id="cb51-13"><a href="#cb51-13" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
 <p><div class="svg-container"><button type="button" class="btn btn-primary btn-copy-svg" title="Copy SVG to clipboard" aria-label="Copy SVG to clipboard" data-bs-toggle="tooltip" data-bs-placement="left"><i class="fa fa-copy"></i></button>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
@@ -6784,11 +6807,11 @@ L 86.6 157.317313
 </svg></div></p>
 </div>
 <p>The first variable’s prediction rises with that week’s mean, as the
-positive sign of its planted driver says it should, and spans 0.926 of
-the probability scale. The other variables read different weeks. Five of
-them do not move at the third decimal, a sixth moves by 0.001, and the
-eighth by 0.097, a coefficient the penalised fit gave that cell without
-the mechanism putting weight there.</p>
+positive sign of its planted driver says it should, and spans <span class="lang-r-only">0.926</span><span class="lang-py-only" py="'%.3f' % spread.v01">0.981</span> of the probability scale.
+The other variables read different weeks. Five of them do not move at
+the third decimal, a sixth moves by 0.001, and the eighth by 0.097, a
+coefficient the penalised fit gave that cell without the mechanism
+putting weight there.</p>
 </div>
 <div class="section level2">
 <h2 id="scores-thresholds-and-their-inflation">Scores, thresholds and their inflation<a class="anchor" aria-label="anchor" href="#scores-thresholds-and-their-inflation"></a>
@@ -6838,32 +6861,36 @@ does:</p>
 <span><span class="co">#&gt;   skill  reported  inflation    lower     upper replicates</span></span>
 <span><span class="co">#&gt; 1   0.6 0.6988735 0.09887349 0.667724 0.7313339         50</span></span>
 <span><span class="co">#&gt; 2   0.9 0.9461458 0.04614581 0.928901 0.9611459         50</span></span></code></pre></div>
-<div class="sourceCode" id="cb55"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" tabindex="-1"></a>pd.DataFrame(ts.tss_inflation(sim.y, fit.folds, skill<span class="op">=</span>(<span class="fl">0.6</span>, <span class="fl">0.9</span>), replicates<span class="op">=</span><span class="dv">50</span>))</span>
-<span id="cb55-2"><a href="#cb55-2" tabindex="-1"></a><span class="co">#&gt;    skill  reported  inflation     lower     upper  replicates</span></span>
-<span id="cb55-3"><a href="#cb55-3" tabindex="-1"></a><span class="co">#&gt; 0    0.6  0.694101   0.094101  0.661214  0.717694          50</span></span>
-<span id="cb55-4"><a href="#cb55-4" tabindex="-1"></a><span class="co">#&gt; 1    0.9  0.947449   0.047449  0.932442  0.963985          50</span></span></code></pre></div>
+<div class="sourceCode" id="cb55"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" tabindex="-1"></a>inflation <span class="op">=</span> pd.DataFrame(ts.tss_inflation(sim.y, fit.folds, skill<span class="op">=</span>(<span class="fl">0.6</span>, <span class="fl">0.9</span>), replicates<span class="op">=</span><span class="dv">50</span>))</span>
+<span id="cb55-2"><a href="#cb55-2" tabindex="-1"></a>inflation</span>
+<span id="cb55-3"><a href="#cb55-3" tabindex="-1"></a><span class="co">#&gt;    skill  reported  inflation     lower     upper  replicates</span></span>
+<span id="cb55-4"><a href="#cb55-4" tabindex="-1"></a><span class="co">#&gt; 0    0.6  0.694101   0.094101  0.661214  0.717694          50</span></span>
+<span id="cb55-5"><a href="#cb55-5" tabindex="-1"></a><span class="co">#&gt; 1    0.9  0.947449   0.047449  0.932442  0.963985          50</span></span></code></pre></div>
 </div>
 <p>At a true skill of 0.6, the level read back is about 0.1 higher; at
-0.9 the inflation is smaller, 0.046, nearer the upper bound of 1.
-<code><a href="../reference/implied_skill.html">implied_skill()</a></code> inverts the map: given the TSS the weekly
-candidate reached, it returns the population skill whose expected
-reported level that is.</p>
+0.9 the inflation is smaller, <span class="lang-r-only">0.046</span><span class="lang-py-only" py="'%.3f' % inflation.inflation.iloc[1]">0.047</span>, nearer
+the upper bound of 1. <code><a href="../reference/implied_skill.html">implied_skill()</a></code> inverts the map:
+given the TSS the weekly candidate reached, it returns the population
+skill whose expected reported level that is.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb56"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/implied_skill.html">implied_skill</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">y</span>, <span class="va">fit</span><span class="op">$</span><span class="va">folds</span>, observed <span class="op">=</span> <span class="va">per_metric</span><span class="op">[[</span><span class="st">"tss"</span><span class="op">]</span><span class="op">]</span>, replicates <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    observed     skill within_grid</span></span>
 <span><span class="co">#&gt; 1 0.6253196 0.5135347        TRUE</span></span></code></pre></div>
-<div class="sourceCode" id="cb57"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" tabindex="-1"></a>pd.DataFrame(ts.implied_skill(sim.y, fit.folds, observed<span class="op">=</span>per_metric[<span class="st">"tss"</span>], replicates<span class="op">=</span><span class="dv">50</span>))</span>
-<span id="cb57-2"><a href="#cb57-2" tabindex="-1"></a><span class="co">#&gt;    observed     skill  within_grid</span></span>
-<span id="cb57-3"><a href="#cb57-3" tabindex="-1"></a><span class="co">#&gt; 0   0.61332  0.508748         True</span></span></code></pre></div>
+<div class="sourceCode" id="cb57"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" tabindex="-1"></a>implied <span class="op">=</span> pd.DataFrame(ts.implied_skill(sim.y, fit.folds, observed<span class="op">=</span>per_metric[<span class="st">"tss"</span>],</span>
+<span id="cb57-2"><a href="#cb57-2" tabindex="-1"></a>                                        replicates<span class="op">=</span><span class="dv">50</span>))</span>
+<span id="cb57-3"><a href="#cb57-3" tabindex="-1"></a>implied</span>
+<span id="cb57-4"><a href="#cb57-4" tabindex="-1"></a><span class="co">#&gt;    observed     skill  within_grid</span></span>
+<span id="cb57-5"><a href="#cb57-5" tabindex="-1"></a><span class="co">#&gt; 0   0.61332  0.508748         True</span></span></code></pre></div>
 </div>
-<p>A TSS of 0.625 on this design is consistent with a population skill
-near 0.51. The inversion holds under the distribution of predictions
-<code><a href="../reference/tss_inflation.html">tss_inflation()</a></code> plants, and two models of equal skill whose
-predictions are distributed differently can be inflated by different
-amounts. A paired difference in TSS can therefore favour one arm with no
-difference in skill behind it, which is why a run is scored by AUC,
-which has no cut, and reports TSS beside it.</p>
+<p>A TSS of <span class="lang-r-only">0.625</span><span class="lang-py-only" py="'%.3f' % implied.observed.iloc[0]">0.613</span> on this
+design is consistent with a population skill near <span class="lang-r-only">0.51</span><span class="lang-py-only" py="'%.2f' % implied.skill.iloc[0]">0.51</span>. The inversion
+holds under the distribution of predictions <code><a href="../reference/tss_inflation.html">tss_inflation()</a></code>
+plants, and two models of equal skill whose predictions are distributed
+differently can be inflated by different amounts. A paired difference in
+TSS can therefore favour one arm with no difference in skill behind it,
+which is why a run is scored by AUC, which has no cut, and reports TSS
+beside it.</p>
 <div class="section level3">
 <h3 id="rare-responses-and-the-scorable-cell-mask">Rare responses and the scorable-cell mask<a class="anchor" aria-label="anchor" href="#rare-responses-and-the-scorable-cell-mask"></a>
 </h3>
@@ -6888,22 +6915,27 @@ alike.</p>
 <span><span class="co">#&gt; 2   0.9 0.9843859 0.0843859 0.9616244 0.9954212         50</span></span></code></pre></div>
 <div class="sourceCode" id="cb59"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" tabindex="-1"></a>rare <span class="op">=</span> ts.simulate_records(n<span class="op">=</span><span class="dv">200</span>, mechanism<span class="op">=</span><span class="st">"lag"</span>, variables<span class="op">=</span><span class="dv">8</span>, days<span class="op">=</span><span class="dv">365</span>, step_hours<span class="op">=</span><span class="dv">6</span>,</span>
 <span id="cb59-2"><a href="#cb59-2" tabindex="-1"></a>                          prevalence<span class="op">=</span><span class="fl">0.03</span>, auc<span class="op">=</span><span class="fl">0.9</span>, seed<span class="op">=</span><span class="dv">2</span>)</span>
-<span id="cb59-3"><a href="#cb59-3" tabindex="-1"></a>rare.y.values.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">0</span>)</span>
-<span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a><span class="co">#&gt; array([ 8.,  6.,  8.,  3.,  3.,  4.,  5., 11.])</span></span>
-<span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a>folds_rare <span class="op">=</span> ts.fold_map(rare.y, v<span class="op">=</span><span class="dv">5</span>)</span>
-<span id="cb59-6"><a href="#cb59-6" tabindex="-1"></a>ts.scorable_cells(rare.y, folds_rare)</span>
-<span id="cb59-7"><a href="#cb59-7" tabindex="-1"></a><span class="co">#&gt; &lt;timesift cells&gt; 40 cells over 8 variables</span></span>
-<span id="cb59-8"><a href="#cb59-8" tabindex="-1"></a><span class="co">#&gt; scorable: 28 (70.0%); variables with at least one scorable fold: 8 of 8</span></span>
-<span id="cb59-9"><a href="#cb59-9" tabindex="-1"></a>pd.DataFrame(ts.tss_inflation(rare.y, folds_rare, skill<span class="op">=</span>(<span class="fl">0.6</span>, <span class="fl">0.9</span>), replicates<span class="op">=</span><span class="dv">50</span>))</span>
-<span id="cb59-10"><a href="#cb59-10" tabindex="-1"></a><span class="co">#&gt;    skill  reported  inflation     lower     upper  replicates</span></span>
-<span id="cb59-11"><a href="#cb59-11" tabindex="-1"></a><span class="co">#&gt; 0    0.6  0.841685   0.241685  0.797155  0.886818          50</span></span>
-<span id="cb59-12"><a href="#cb59-12" tabindex="-1"></a><span class="co">#&gt; 1    0.9  0.984536   0.084536  0.965115  0.998109          50</span></span></code></pre></div>
+<span id="cb59-3"><a href="#cb59-3" tabindex="-1"></a>presences <span class="op">=</span> rare.y.values.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a>presences</span>
+<span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a><span class="co">#&gt; array([ 8.,  6.,  8.,  3.,  3.,  4.,  5., 11.])</span></span>
+<span id="cb59-6"><a href="#cb59-6" tabindex="-1"></a>folds_rare <span class="op">=</span> ts.fold_map(rare.y, v<span class="op">=</span><span class="dv">5</span>)</span>
+<span id="cb59-7"><a href="#cb59-7" tabindex="-1"></a>rare_cells <span class="op">=</span> ts.scorable_cells(rare.y, folds_rare)</span>
+<span id="cb59-8"><a href="#cb59-8" tabindex="-1"></a>rare_cells</span>
+<span id="cb59-9"><a href="#cb59-9" tabindex="-1"></a><span class="co">#&gt; &lt;timesift cells&gt; 40 cells over 8 variables</span></span>
+<span id="cb59-10"><a href="#cb59-10" tabindex="-1"></a><span class="co">#&gt; scorable: 28 (70.0%); variables with at least one scorable fold: 8 of 8</span></span>
+<span id="cb59-11"><a href="#cb59-11" tabindex="-1"></a>rare_inflation <span class="op">=</span> pd.DataFrame(ts.tss_inflation(rare.y, folds_rare, skill<span class="op">=</span>(<span class="fl">0.6</span>, <span class="fl">0.9</span>),</span>
+<span id="cb59-12"><a href="#cb59-12" tabindex="-1"></a>                                               replicates<span class="op">=</span><span class="dv">50</span>))</span>
+<span id="cb59-13"><a href="#cb59-13" tabindex="-1"></a>rare_inflation</span>
+<span id="cb59-14"><a href="#cb59-14" tabindex="-1"></a><span class="co">#&gt;    skill  reported  inflation     lower     upper  replicates</span></span>
+<span id="cb59-15"><a href="#cb59-15" tabindex="-1"></a><span class="co">#&gt; 0    0.6  0.841685   0.241685  0.797155  0.886818          50</span></span>
+<span id="cb59-16"><a href="#cb59-16" tabindex="-1"></a><span class="co">#&gt; 1    0.9  0.984536   0.084536  0.965115  0.998109          50</span></span></code></pre></div>
 </div>
-<p>At a prevalence of 0.03 the eight responses hold between 4 and 11
-presences in 200 units, eight of the forty cells are unscorable, and the
-inflation of TSS at a true skill of 0.6 rises to 0.235. A response with
-four presences spread over five folds is scored on at most four of them,
-each holding one presence.</p>
+<p>At a prevalence of 0.03 the eight responses hold between <span class="lang-r-only">4</span><span class="lang-py-only" py="'%d' % presences.min()">3</span> and <span class="lang-r-only">11</span><span class="lang-py-only" py="'%d' % presences.max()">11</span> presences in 200 units,
+<span class="lang-r-only">eight</span><span class="lang-py-only" py="'%d' % (40 - rare_cells.scorable.sum())">12</span> of the
+forty cells are unscorable, and the inflation of TSS at a true skill of
+0.6 rises to <span class="lang-r-only">0.235</span><span class="lang-py-only" py="'%.3f' % rare_inflation.inflation.iloc[0]">0.242</span>. A
+response with four presences spread over five folds is scored on at most
+four of them, each holding one presence.</p>
 </div>
 </div>
 <div class="section level2">
@@ -6925,20 +6957,20 @@ narrower than the paired interval for one step and wider for another. It
 takes the best observed grain as its reference, so it is read beside the
 paired contrasts.</li>
 <li>With 200 units and five outer folds, 40 units are held out per fold.
-For the lag record that was enough to separate week from day by 0.054
-AUC with all eight responses agreeing. The selection’s inner folds see
-two thirds of each outer training set, so their scores sit lower than
-the outer ones and serve only to rank.</li>
+For the lag record that was enough to separate week from day by <span class="lang-r-only">0.054</span><span class="lang-py-only" py="'%.3f' % contrasts['diff'].iloc[1]">0.030</span> AUC
+with all eight responses agreeing. The selection’s inner folds see two
+thirds of each outer training set, so their scores sit lower than the
+outer ones and serve only to rank.</li>
 <li>Rare responses shrink the scorable cells and widen the TSS
 inflation. <code><a href="../reference/scorable_cells.html">scorable_cells()</a></code> and
 <code><a href="../reference/tss_inflation.html">tss_inflation()</a></code> run in seconds on the response and the fold
 map before any model is fitted, and fewer folds leave more presences in
 each held-out cell.</li>
 <li>The best candidate’s outer mean is chosen on the folds it is scored
-on. On the record with no signal it read 0.524 while the procedure’s
-interval contained 0.5. The level to report is the procedure’s estimate,
-from <code><a href="../reference/timesift.html">timesift()</a></code> with <code>n_inner</code> set or from
-<code><a href="../reference/select_grain.html">select_grain()</a></code>.</li>
+on. On the record with no signal it read <span class="lang-r-only">0.524</span><span class="lang-py-only" py="'%.3f' % null_ladder.score.max()">0.499</span> while the
+procedure’s interval contained 0.5. The level to report is the
+procedure’s estimate, from <code><a href="../reference/timesift.html">timesift()</a></code> with
+<code>n_inner</code> set or from <code><a href="../reference/select_grain.html">select_grain()</a></code>.</li>
 <li>Every run in this article used a single fold map.
 <code>cv(repeats = )</code> runs the comparison again on new maps and
 reads the estimate off all of them, which shows how much of a difference

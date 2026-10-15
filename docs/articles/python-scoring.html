@@ -376,14 +376,17 @@ difference from the reference <code>diff</code>, its interval
 <span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>)</span></code></pre></div>
 <p>How much a threshold chosen on the scored units inflates the level it
 reports.</p>
-<p>The true skill statistic (TSS) is overestimated when the threshold
-that maximises it is chosen on the same held-out units the score is then
-read from. The overestimate grows as the number of presences shrinks.
-<code>tss_inflation</code> estimates the TSS a given sampling design
-would report for a known population skill. <code>implied_skill</code>
-works in reverse: given a reported TSS, it estimates the population
-skill that would produce that score on average under the same
-design.</p>
+<p>The true skill statistic (TSS) is overestimated when the threshold is
+chosen to maximise TSS on the same held-out observations used to report
+the score. The fewer presences there are in the held-out data, the more
+TSS tends to overestimate population skill. <code>tss_inflation</code>
+estimates the TSS that a given sampling design would report for a known
+population skill. <code>implied_skill</code> reverses this calculation:
+given a reported TSS, it estimates the population skill that would yield
+that score on average under the same sampling design and assumed
+prediction distribution. This simulation-based matching follows the
+principle of indirect inference (<a href="https://stat.cmu.edu/~cshalizi/462/readings/Indirect%20Inference%20%28Gourieroux%2C%20Monfort%20and%20Renault%29.pdf" class="external-link">Gouriéroux
+et al., 1993</a>).</p>
 <p>Predictions are simulated for each skill value as normal scores of
 equal variance, at the cell sizes and presence counts of this design,
 and the TSS is read at its best threshold the way a ladder reports a

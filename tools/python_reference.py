@@ -183,6 +183,8 @@ def prose(doc: str | None) -> str:
     if not doc:
         return ""
     text = re.sub(r":(?:class|func|meth|attr|mod|data|obj):`~?([^`]+)`", r"`\1`", doc)
+    text = re.sub(r"`([^`<]+?)\s*<([^>\s]+)>`_",
+                  lambda m: f"[{' '.join(m.group(1).split())}]({m.group(2)})", text)
     text = text.replace("``", "`")
     lines = [line.rstrip() for line in text.strip("\n").splitlines()]
     body = [line for line in lines[1:] if line.strip()]

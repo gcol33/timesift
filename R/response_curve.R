@@ -249,12 +249,10 @@ print.timesift_response_curve <- function(x, ...) {
 #' plots <- data.frame(plot = units,
 #'                     sp_a = rbinom(30, 1, plogis(2 * warmth)),
 #'                     sp_b = rbinom(30, 1, plogis(-2 * warmth)))
-#' \donttest{
 #' fit <- timesift(plots, logger, y = starts_with("sp_"), id = plot, time = datetime,
 #'                 sift = grains("month"), resampling = cv(v = 3L), ensemble = FALSE,
 #'                 n_inner = NULL, verbose = FALSE)
 #' plot(response_curve(fit, "elasticnet / month", "mean", n = 20))
-#' }
 #'
 #' @export
 plot.timesift_response_curve <- function(x, variable = NULL, col = NULL, legend = "topright",

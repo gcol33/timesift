@@ -40,9 +40,9 @@ February goes, deeper towards the north. The first two species follow
 warmth in opposite directions, the third follows the depth of the snap,
 and the fourth both.
 
-The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.
+The Python code simulates its own random data, so the numbers it prints
+differ from those quoted in the text, which come from the R run. Counts,
+shapes and calendar boundaries are the same in both.
 
 ``` r
 
@@ -259,9 +259,9 @@ pd.DataFrame({k: getattr(cells, k) for k in ("variable", "fold", "scorable")}).h
 ```
 
 Every one of the 20 cells is scorable here, because each species is
-present at between 47 and 59 of the 120 cells. With a rare species some
-folds would hold no presence, and those cells would drop out of every
-candidate’s score at once. Because no model enters the mask, all
+present at between 4748 and 5954 of the 120 cells. With a rare species
+some folds would hold no presence, and those cells would drop out of
+every candidate’s score at once. Because no model enters the mask, all
 candidates share one denominator.
 
 ## One run under two splits
@@ -324,7 +324,7 @@ the candidates were cross-validated again on five inner folds; one was
 chosen on its inner score and the stack’s weights were fitted on the
 inner out-of-fold predictions, and both then predicted the outer test
 fold once. Under the random split the selected candidate scores an AUC
-of 0.866 and the stack 0.861.
+of 0.8660.832 and the stack 0.8610.820.
 
 The block run differs in two settings, and both follow from the blocks.
 The inner split of a nested run deals whole blocks as the outer one
@@ -450,16 +450,16 @@ pd.concat({"random": est(fit), "block": est(blocked)})
 #>        1  ensemble  0.757886  0.039561
 ```
 
-Under blocks the selected candidate falls by 0.082, to 0.784, and the
-stack by 0.070, to 0.791. The likely reason is the gradient: in the
-random split a held-out cell nearly always has neighbours on the
-training side at the same position on the warmth gradient, while under
-blocks a whole region is held out and the model has to reach a stretch
-of the gradient it saw less of. The block number is the one that
-describes prediction into a part of the grid the fit was not trained in.
-The ranking of the candidates keeps its order between the two runs, and
-the forests lose more than the elastic nets: 0.840 to 0.682 at the
-month, against 0.870 to 0.784.
+Under blocks the selected candidate falls by 0.0820.056, to 0.7840.776,
+and the stack by 0.0700.062, to 0.7910.758. The likely reason is the
+gradient: in the random split a held-out cell nearly always has
+neighbours on the training side at the same position on the warmth
+gradient, while under blocks a whole region is held out and the model
+has to reach a stretch of the gradient it saw less of. The block number
+is the one that describes prediction into a part of the grid the fit was
+not trained in. The ranking of the candidates keeps its order between
+the two runs, and the forests lose more than the elastic nets:
+0.8400.795 to 0.6820.699 at the month, against 0.8700.845 to 0.7840.782.
 
 ## The combination
 
@@ -514,16 +514,16 @@ pd.DataFrame(fit.selected)[["fold", "candidate", "inner_score"]]
 [`ensemble_weights()`](https://gillescolling.com/timesift/reference/ensemble_weights.md)
 returns the weights fitted on the outer out-of-fold predictions of every
 target, which are the weights
-[`predict()`](https://rdrr.io/r/stats/predict.html) uses. They put 0.516
-on the weekly forest, 0.264 on the monthly elastic net and 0.220 on the
-monthly forest, and nothing on the weekly elastic net. Those weights
-were fitted to the responses the run is scored against, so the
-ensemble’s score is never read with them. `fit$fold_weights` holds the
-weights each outer fold fitted on its own training targets, and these
-are the ones behind the held-out `ensemble` row. They move between
-folds: the weekly forest takes 0.968 in fold 1 and 0.318 in fold 3.
-`fit$selected` shows the same instability for the single choice, which
-alternates between the two elastic nets.
+[`predict()`](https://rdrr.io/r/stats/predict.html) uses. They put
+0.5160.410 on the weekly forest, 0.2640.324 on the monthly elastic net
+and 0.2200.266 on the monthly forest, and nothing on the weekly elastic
+net. Those weights were fitted to the responses the run is scored
+against, so the ensemble’s score is never read with them.
+`fit$fold_weights` holds the weights each outer fold fitted on its own
+training targets, and these are the ones behind the held-out `ensemble`
+row. They move between folds: the weekly forest takes 0.9680.279 in fold
+1 and 0.3180.163 in fold 3. `fit$selected` shows the same instability
+for the single choice, which alternates between the two elastic nets.
 
 [`ensemble()`](https://gillescolling.com/timesift/reference/ensemble.md)
 offers five methods. `"stack"` fits the weights; `"mean"` and `"median"`
@@ -618,11 +618,12 @@ pd.Series({m: mean_auc(st) for m, st in stacks.items()}).round(3)
 #> dtype: float64
 ```
 
-The plain mean of the four candidates scores 0.870, level with the best
-single candidate’s 0.870 on the same folds, and the median 0.868. The
-committee scores 0.834. With four members, a committee’s prediction is a
-share of four votes and takes only five values, so it ranks the units
-coarsely, and AUC reads the ranking.
+The plain mean of the four candidates scores 0.8700.831, level with the
+best single candidate’s 0.870,0.015 belowthe best single
+candidate’s0.845 on the same folds, and the median 0.8680.833. The
+committee scores 0.8340.818. With four members, a committee’s prediction
+is a share of four votes and takes only five values, so it ranks the
+units coarsely, and AUC reads the ranking.
 
 [`ensemble_spread()`](https://gillescolling.com/timesift/reference/ensemble_spread.md)
 reads the members side by side instead of combining them: for each
@@ -773,8 +774,9 @@ show(fit.predict(new, new_series, candidate="forest / week"))
 the refitted stack; `"selected"` is the candidate the rule chose on
 every target, here `elasticnet / month`; any candidate’s name predicts
 with that candidate alone. The selected elastic net’s predictions lie
-closer to one half than the ensemble’s, which carries half its weight on
-a forest whose predictions reach further towards zero and one.
+closer to one half than the ensemble’s, which carries half its
+weight0.41 of its weight on a forest whose predictions reach further
+towards zero and one.
 
 ## Thresholds
 
@@ -799,7 +801,8 @@ round(sapply(rules, function(r) decision_threshold(fit, rule = r)), 3)
 
 ``` python
 rules = ["youden", "kappa", "prevalence", "mpa"]
-pd.DataFrame({r: ts.decision_threshold(fit, rule=r) for r in rules}).round(3)
+thresholds = pd.DataFrame({r: ts.decision_threshold(fit, rule=r) for r in rules}).round(3)
+thresholds
 #>      youden  kappa  prevalence    mpa
 #> sp1   0.455  0.614       0.513  0.320
 #> sp2   0.536  0.536       0.444  0.242
@@ -813,9 +816,9 @@ presences as were observed, and reads nothing from which units held
 them. `"mpa"`, the minimum predicted area, takes the highest cut that
 keeps a share `perc` of the observed presences, 0.9 by default, so it
 reads the presences alone. Here youden and kappa agree on three species
-and part on `sp4`, 0.467 against 0.640, and mpa cuts lowest on every
-species. The number of cells each rule calls present, against the
-observed count:
+and part on `sp4``sp1`, 0.4670.455 against 0.6400.614, and mpa cuts
+lowest on every species. The number of cells each rule calls present,
+against the observed count:
 
 ``` r
 
@@ -857,12 +860,12 @@ show(fit.predict(new, new_series, type="binary", rule="prevalence"))
 #> 6     1.0  0.0  0.0  1.0
 ```
 
-The prevalence rule reproduces the observed counts to within one cell,
-as it is built to. Youden and kappa land within two cells of them on
-this grid, and mpa calls between 53 and 74 cells present against 47 to
-59 observed, because it gives up specificity to keep nine presences in
-ten. The binary matrix is integer, 1 for presence, and a response whose
-held-out predictions give no cut would be `NA`.
+The prevalence rule reproduces the observed counts to within one cell2
+cells, as it is built to. Youden and kappa land within two cells4 cells
+of them on this grid, and mpa calls between 5361 and 7469 cells present
+against 4748 to 5954 observed, because it gives up specificity to keep
+nine presences in ten. The binary matrix is integer, 1 for presence, and
+a response whose held-out predictions give no cut would be `NA`.
 
 ## How far the members disagree
 
@@ -899,8 +902,9 @@ pd.DataFrame(s[:, 0, :], index=new["cell"], columns=ts.SPREAD_STATISTICS).round(
 
 The interval is held inside zero and one, since the predictions are
 probabilities. Where the mean is small the coefficient of variation is
-large: the first three cells sit below 0.15 with a coefficient above
-one, while cell 5 has a mean of 0.798 and a coefficient of 0.178. On one
+large: the first three cellssit below 0.15 with a coefficient above
+onehave means from0.212to0.298with coefficients from0.453to0.640, while
+cell 56 has a mean of 0.7980.799 and a coefficient of 0.1780.200. On one
 target per map cell this is an uncertainty map, and the sections on maps
 below draw one.
 
@@ -974,8 +978,8 @@ pd.DataFrame(ts.pseudo_absences(pool, presence_rows, n=10, strategy="sre", id="c
 ```
 
 The header says how many units of the pool a strategy admits. On this
-grid the disk strategy admits 18 cells at least 1.5 cells from any
-presence, and the envelope strategy 15 cells outside the band holding
+grid the disk strategy admits 1814 cells at least 1.5 cells from any
+presence, and the envelope strategy 1513 cells outside the band holding
 the middle 80% of the presences’ elevations; asking either for more than
 it admits is an error that names both counts. `repeats` makes several
 independent draws, numbered in `set`.
@@ -1031,7 +1035,7 @@ po_fit
 ```
 
 The drawn units are ordinary rows once bound to the presences with a
-response of zero, and the fit does not mark them. Its AUC of 0.772
+response of zero, and the fit does not mark them. Its AUC of 0.7720.854
 separates presences from background cells, some of which hold the
 species, so it is a different quantity from the AUC of the
 presence-absence run above. A fit per draw, each scored the same way,
@@ -1091,7 +1095,7 @@ dict(grid.sizes)
 
 took <- system.time(now <- project(fit, series = grid, static = elev))
 took[["elapsed"]]
-#> [1] 0.16
+#> [1] 0.28
 now
 #> class       : SpatRaster
 #> size        : 10, 12, 4  (nrow, ncol, nlyr)
@@ -1116,8 +1120,9 @@ import time
 
 start = time.perf_counter()
 now = ts.project(fit, series=grid, static=elev)
-round(time.perf_counter() - start, 2)
-#> 0.06
+took = time.perf_counter() - start
+round(took, 2)
+#> 0.1
 dict(now.sizes)
 #> {'response': 4, 'y': 10, 'x': 12}
 bool(np.allclose(now.sel(response="sp1").values.ravel(), fit.predict(targets, series)[:, 0]))
@@ -1133,8 +1138,8 @@ fig.colorbar(im, ax=axes);
 ![Four maps of the predicted probability of presence, one per
 species.](prediction_files/py-figure-2.svg)
 
-The projection of the ensemble onto the 120 cells took 0.16 seconds. It
-is the same prediction
+The projection of the ensemble onto the 120 cells took 0.280.10 seconds.
+It is the same prediction
 [`predict()`](https://rdrr.io/r/stats/predict.html) gives for the same
 cells as targets, which
 [`all.equal()`](https://rdrr.io/r/base/all.equal.html) confirms for
@@ -1199,13 +1204,14 @@ ax.axis("off");
 ![Map of the cells sp1 loses, keeps, gains, or is absent from in both
 periods.](prediction_files/py-figure-3.svg)
 
-The warm-favoured `sp1` and `sp4` gain 30 and 38 cells, the
-cold-favoured `sp2` loses 42 of its 58, and `sp3`, which the simulation
-ties to the depth of the snap alone, loses and gains 14 cells each and
-keeps its size. `change` is the gain minus the loss as a percentage of
-the present range. The map codes a cell as biomod2 does, and the plot
-colours the codes: red for lost (-2), grey for kept (-1), pale for
-absent in both (0) and green for gained (1). Given maps on the
+The warm-favoured `sp1` and `sp4` gain 3045 and 3838 cells, the
+cold-favoured `sp2` loses 4236 of its 5852, and `sp3`, which the
+simulation ties to the depth of the snap alone, loses and gains 14 cells
+eachloses 12 and gains 9 cells and keeps its sizefor a change of-6per
+cent of its present range. `change` is the gain minus the loss as a
+percentage of the present range. The map codes a cell as biomod2 does,
+and the plot colours the codes: red for lost (-2), grey for kept (-1),
+pale for absent in both (0) and green for gained (1). Given maps on the
 probability scale instead,
 [`range_change()`](https://gillescolling.com/timesift/reference/range_change.md)
 takes `threshold`, one cut per response.
@@ -1303,9 +1309,9 @@ Moved in every week at once, the mean runs from the coldest weekly mean
 any cell has to the warmest, so the curve sweeps a whole year from deep
 winter to high summer. `sp1` rises and `sp2` falls along it, as the
 simulation has them, and `sp3`, which depends on one cold week, changes
-little. For the ensemble every member is moved the same way and the
-combination is taken through the stack; `spread = TRUE` adds the
-members’ standard deviation and interval.
+littleranges from0.28to0.75. For the ensemble every member is moved the
+same way and the combination is taken through the stack; `spread = TRUE`
+adds the members’ standard deviation and interval.
 
 The signal for `sp3` sits in a single week, and a curve over that bin
 alone shows it. The coldest week of the mean record is the week of the
@@ -1372,25 +1378,27 @@ elevation, darker colours being higher.
 
 The stack and the selected candidate are both estimated by the nested
 procedure, so their held-out scores can be read against each other.
-Under the random split the selected candidate scored 0.866 and the stack
-0.861, a difference well inside the standard errors of 0.014 and 0.019.
-One elastic net led on three of the four responses, and the weight the
-stack moved onto the forests did not raise the held-out score. Under
-spatial blocks the order reversed, 0.784 for the selected candidate
-against 0.791 for the stack, again within the standard errors. A stack
-pays when the members carry different parts of the signal and none leads
-everywhere; when one candidate wins most responses, as the monthly
-elastic net does here, the stack mostly reproduces it at the cost of
-more models to fit and store. The weights in `fit$fold_weights` say
-which case a run is in: weights that swing between folds, as the weekly
-forest’s do here, mean the stack has no stable composition to report,
-and the selected candidate is the simpler model to describe.
+Under the random split the selected candidate scored 0.8660.832 and the
+stack 0.8610.820, a difference well inside the standard errors
+ofof0.013against standard errors of0.0140.007 and 0.0190.010. One
+elastic net led on three of the four responses, and the weight the stack
+moved onto the forests did not raise the held-out score. Under spatial
+blocks the order reversed,the selected candidate scored0.7840.776for the
+selected candidate against 0.7910.758 for the stack, again within the
+standard errorsa difference of0.019with standard errors of0.042and0.040.
+A stack pays when the members carry different parts of the signal and
+none leads everywhere; when one candidate wins most responses, as the
+monthly elastic net does here, the stack mostly reproduces it at the
+cost of more models to fit and store. The weights in `fit$fold_weights`
+say which case a run is in: weights that swing between folds, as the
+weekly forest’s do here, mean the stack has no stable composition to
+report, and the selected candidate is the simpler model to describe.
 
 Among the methods that fit nothing, the plain mean was level with the
-best candidate on the outer folds. It is a reasonable choice where the
-stack’s weights are unstable. The committee ranks coarsely when there
-are few members, which costs AUC; it is suited to a binary map, where
-only the votes matter.
+best candidatescored0.831against the best candidate’s0.845 on the outer
+folds. It is a reasonable choice where the stack’s weights are unstable.
+The committee ranks coarsely when there are few members, which costs
+AUC; it is suited to a binary map, where only the votes matter.
 
 For the threshold rule:
 
@@ -1400,16 +1408,16 @@ For the threshold rule:
 - `"youden"` where omission and commission errors cost the same; it is
   the cut TSS is read at.
 - `"kappa"` where agreement beyond chance is the target, which here
-  moved only the cut of `sp4`.
+  moved only the cut of `sp4``sp1`.
 - `"mpa"` where missing a presence costs more than predicting a false
   one, as for a conservation area that should contain nearly all known
-  occurrences. On this grid it called up to 23 more cells present than
+  occurrences. On this grid it called up to 2317 more cells present than
   were observed.
 
 Spatial folds belong wherever units are clustered in space or along the
 predictor gradients the model reads, and wherever the map will be read
 in places the training data did not cover. The two runs above differ by
-0.070 to 0.082 AUC, the random split being the higher.
+0.0700.056 to 0.0820.062 AUC, the random split being the higher.
 [`env_cv()`](https://gillescolling.com/timesift/reference/cv.md) is the
 analogue for environmental extrapolation, and
 [`grouped_cv()`](https://gillescolling.com/timesift/reference/cv.md) for
@@ -1419,8 +1427,8 @@ keeps blocks whole too, which bounds `n_inner` and the elastic net’s own
 `n_inner`.
 
 A projection costs one prediction per cell. The ensemble of four members
-took 0.16 seconds for 120 cells with a year of daily readings, and the
-time grows with the number of cells and the length of the record. A
+took 0.280.10 seconds for 120 cells with a year of daily readings, and
+the time grows with the number of cells and the length of the record. A
 large raster is better projected once from a script, with `chunk` set to
 what memory allows. The two runs themselves cost far more than the
 projection: each fitted every candidate on every inner and outer fold.

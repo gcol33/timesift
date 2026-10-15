@@ -2,13 +2,14 @@
 title: "Learners"
 ---
 
-<!-- Python blocks run by tools/python_twins.py (md5 bc61174b4ccbaafc6b22acd826b3015a). -->
+<!-- Python blocks run by tools/python_twins.py (md5 2d38b283524f1d0dfa9b1932648b46a1). -->
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5, fig.height = 4.5,
                       dev.args = list(pointsize = 14))
 set.seed(1)
 library(timesift)
+if (nzchar(Sys.getenv("TIMESIFT_DOCS_CACHE"))) source(Sys.getenv("TIMESIFT_DOCS_CACHE"))
 has_torch <- requireNamespace("torch", quietly = TRUE) && torch::torch_is_installed()
 ```
 
@@ -40,10 +41,6 @@ pip install "timesift[torch,contrasts,plot]"
 # Or install the development version from GitHub
 pip install git+https://github.com/gcol33/timesift
 ```
-:::
-
-::: {.lang-py-only}
-The Python block draws its own record, so the values it prints differ from the ones quoted in the text, which come from the R run. Counts, shapes and calendar boundaries do not depend on the draw and agree.
 :::
 
 ::: {.lang-pair}
@@ -288,12 +285,13 @@ start = time.perf_counter()
 fit = ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
                   learners=models, sift=ts.grains("week", "month"),
                   resampling=ts.cv(v=5), n_inner=3, verbose=False)
-round(time.perf_counter() - start)
-#> 16
+elapsed = time.perf_counter() - start
+round(elapsed)
+#> 27
 ```
 :::
 
-The run took `r round(run_time[["elapsed"]])` seconds for 15 candidates. With three inner folds in
+The run took [`r round(run_time[["elapsed"]])`]{.lang-r-only}[27]{.lang-py-only py="round(elapsed)"} seconds for 15 candidates. With three inner folds in
 each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20 times, three inner fits and
 one outer fit in each outer fold, and once more on every target.
 
@@ -339,11 +337,10 @@ print(ts.summary(fit))
 :::
 
 Each learner run at both grains scores higher at the weekly one, which is the grain the simulation
-acts at. At the monthly grain the tree, both forests and gbm score below 0.5, so they find nothing
-there. `maxent / week` has the highest mean, 0.750, and scored highest on all
-four responses. The procedure rows are the scores to report: inside each outer training fold the
+acts at. At the monthly grain the tree, both forests and gbm score [below 0.5, so they find nothing
+there]{.lang-r-only}[between ]{.lang-py-only}[0.513]{.lang-py-only py="'%.3f' % min(r['mean'] for r in ts.candidate_table(fit) if r['candidate'] in ('tree / month', 'forest / month', 'forest_balanced / month', 'gbm / month'))"}[ and ]{.lang-py-only}[0.589]{.lang-py-only py="'%.3f' % max(r['mean'] for r in ts.candidate_table(fit) if r['candidate'] in ('tree / month', 'forest / month', 'forest_balanced / month', 'gbm / month'))"}. [`maxent / week`]{.lang-r-only}[`elasticnet / week`]{.lang-py-only py="'`' + ts.candidate_table(fit)[-1]['candidate'] + '`'"} has the highest mean, [0.750]{.lang-r-only}[0.791]{.lang-py-only py="'%.3f' % ts.candidate_table(fit)[-1]['mean']"}, and scored highest on [all four]{.lang-r-only}[2 of the four]{.lang-py-only py="str(ts.candidate_table(fit)[-1]['won']) + ' of the four'"} responses. The procedure rows are the scores to report: inside each outer training fold the
 inner folds chose a candidate and fitted the stack's weights, and the outer test fold then scored
-that choice once, 0.741 for the selected candidate and 0.740 for the stack. The highest candidate
+that choice once, [0.741]{.lang-r-only}[0.777]{.lang-py-only py="'%.3f' % ts.procedure_table(fit)[0]['mean']"} for the selected candidate and [0.740]{.lang-r-only}[0.775]{.lang-py-only py="'%.3f' % ts.procedure_table(fit)[1]['mean']"} for the stack. The highest candidate
 mean was picked out on the same folds it is scored on.
 
 The candidate table records how each candidate was built: its learner, its grain, the number of
@@ -482,7 +479,8 @@ variants = {
     "maxent()": ts.maxent(),
     'maxent(classes="lq")': ts.maxent(classes="lq"),
 }
-pd.Series({name: held_out_auc(l) for name, l in variants.items()}).round(3)
+held_out = pd.Series({name: held_out_auc(l) for name, l in variants.items()})
+held_out.round(3)
 #> elasticnet()                  0.729
 #> elasticnet(s="lambda.min")    0.726
 #> elasticnet(alpha=1)           0.727
@@ -497,11 +495,11 @@ pd.Series({name: held_out_auc(l) for name, l in variants.items()}).round(3)
 ```
 :::
 
-On this split the elastic net read at `"lambda.min"` scores 0.680 against 0.631 at the default
-`"lambda.1se"`, and the lasso scores 0.608. The looser tolerance gives the same AUC as the default to
-three decimals, and the timings at the end of the article show what it saves.
-`maxent(classes = "lq")` scores 0.693 against 0.665 for the classes maxnet chooses, and both forests
-score close to 0.5 at this grain on 75 units. A single split of 75 units is a noisy comparison, so a
+On this split the elastic net read at `"lambda.min"` scores [0.680]{.lang-r-only}[0.726]{.lang-py-only py="'%.3f' % held_out.iloc[1]"} against [0.631]{.lang-r-only}[0.729]{.lang-py-only py="'%.3f' % held_out.iloc[0]"} at the default
+`"lambda.1se"`, and the lasso scores [0.608]{.lang-r-only}[0.727]{.lang-py-only py="'%.3f' % held_out.iloc[2]"}. The looser tolerance gives [the same AUC as the default to
+three decimals]{.lang-r-only}[0.727]{.lang-py-only py="'%.3f' % held_out.iloc[3]"}[ against ]{.lang-py-only}[0.729]{.lang-py-only py="'%.3f' % held_out.iloc[0]"}[ at the default]{.lang-py-only}, and the timings at the end of the article show what it saves.
+`maxent(classes = "lq")` scores [0.693]{.lang-r-only}[0.736]{.lang-py-only py="'%.3f' % held_out.iloc[9]"} against [0.665]{.lang-r-only}[0.710]{.lang-py-only py="'%.3f' % held_out.iloc[8]"} for the classes maxnet chooses, and both forests
+score [close to 0.5]{.lang-r-only}[0.626]{.lang-py-only py="'%.3f' % held_out.iloc[4]"}[ and ]{.lang-py-only}[0.605]{.lang-py-only py="'%.3f' % held_out.iloc[5]"} at this grain on 75 units. A single split of 75 units is a noisy comparison, so a
 difference of this size is worth checking under `timesift()`'s folds, with the two settings as two
 named candidates, before acting on it.
 
@@ -630,7 +628,7 @@ pd.DataFrame(tf.model.table)
 ```
 :::
 
-The search chose `mtry = 8` and `min_node = 5`, the combination with the highest mean inner AUC.
+The search chose [`mtry = 8` and `min_node = 5`]{.lang-r-only}[`mtry = 8` and `min_node = 5`]{.lang-py-only py="'`mtry = %d` and `min_node = %d`' % (tf.model.chosen['mtry'], tf.model.chosen['min_node'])"}, the combination with the highest mean inner AUC.
 Under `timesift()`, the settings each tuned candidate chose on all targets are in the `settings`
 column of the candidate table.
 
@@ -788,10 +786,10 @@ print(ts.summary(own))
 ```
 :::
 
-`channel_means` scores 0.461 at both grains. The mean of a channel over the whole year is nearly
+`channel_means` scores [0.461 at both grains]{.lang-r-only}[0.470 at the monthly grain and 0.472 at the weekly]{.lang-py-only py="'%.3f at the monthly grain and %.3f at the weekly' % ({r['candidate']: r['mean'] for r in ts.candidate_table(own)}['channel_means / month'], {r['candidate']: r['mean'] for r in ts.candidate_table(own)}['channel_means / week'])"}. The mean of a channel over the whole year is nearly
 the same number whichever bins it is averaged from, and in this simulation the responses read each
 unit's departure from its own level, which a yearly mean averages away. The weekly elastic net,
-which reads every bin, scores 0.701.
+which reads every bin, scores [0.701]{.lang-r-only}[0.789]{.lang-py-only py="'%.3f' % {r['candidate']: r['mean'] for r in ts.candidate_table(own)}['elasticnet / week']"}.
 
 ## Other responses, and other metrics
 
@@ -935,7 +933,7 @@ print(ts.summary(capped))
 :::
 
 The run is chosen and reported by the Brier score under the capped weights. The elastic net, at
--0.239, scored above the forest, at -0.259, and scored highest on all four responses.
+[-0.239]{.lang-r-only}[-0.238]{.lang-py-only py="'%.3f' % {r['candidate']: r['mean'] for r in ts.candidate_table(capped)}['elasticnet / month']"}, scored above the forest, at [-0.259]{.lang-r-only}[-0.240]{.lang-py-only py="'%.3f' % {r['candidate']: r['mean'] for r in ts.candidate_table(capped)}['forest / month']"}, and scored highest on [all four]{.lang-r-only}[2 of the four]{.lang-py-only py="str({r['candidate']: r['won'] for r in ts.candidate_table(capped)}['elasticnet / month']) + ' of the four'"} responses.
 
 ## Choosing learners
 
@@ -972,16 +970,16 @@ def seconds_to_fit(learner, x=week):
 
 seconds = pd.Series({name: seconds_to_fit(l) for name, l in timed.items()})
 seconds.round(2).sort_values(ascending=False)
-#> linear                  2.47
-#> elasticnet              2.14
-#> forest                  0.32
-#> maxent                  0.24
-#> elasticnet(tol=1e-4)    0.10
-#> discriminant            0.09
-#> xgboost                 0.05
+#> linear                  4.89
+#> elasticnet              3.85
+#> maxent                  0.57
+#> forest                  0.46
+#> discriminant            0.19
+#> elasticnet(tol=1e-4)    0.18
+#> xgboost                 0.09
+#> perceptron              0.03
+#> boosting                0.03
 #> tree                    0.02
-#> boosting                0.02
-#> perceptron              0.02
 #> mars                    0.01
 #> hierarchical            0.01
 #> envelope                0.00
@@ -1016,18 +1014,19 @@ round(additive_seconds, 2)
 
 ```python
 month = ts.grain_matrix(sim.readings, "unit", "time", "reading", grain="month")
-pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
-           "k = 5": seconds_to_fit(ts.additive(k=5), month)}).round(2)
-#> k = 10    6.51
-#> k = 5     0.38
+additive_seconds = pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
+                              "k = 5": seconds_to_fit(ts.additive(k=5), month)})
+additive_seconds.round(2)
+#> k = 10    12.11
+#> k = 5      0.70
 #> dtype: float64
 ```
 :::
 
-With `k = 10` the fit took `r round(additive_seconds[["k = 10"]], 1)` seconds, and with `k = 5` it
-took `r round(additive_seconds[["k = 5"]], 1)` seconds.
+With `k = 10` the fit took [`r round(additive_seconds[["k = 10"]], 1)`]{.lang-r-only}[12.1]{.lang-py-only py="format(additive_seconds['k = 10'], '.1f')"} seconds, and with `k = 5` it
+took [`r round(additive_seconds[["k = 5"]], 1)`]{.lang-r-only}[0.7]{.lang-py-only py="format(additive_seconds['k = 5'], '.1f')"} seconds.
 
-The elastic net includes every predictor and uses a penalty to limit coefficient size. It chooses that penalty within the training data. At its default tolerance it took `r round(seconds[["elasticnet"]], 1)` seconds here; `tol = 1e-4` took `r round(seconds[["elasticnet(tol = 1e-4)"]], 1)` seconds and gave the same held-out AUC on the split above. `linear()` took `r round(seconds[["linear"]], 1)` seconds. Its search refits the model for each term it could add or remove, with 106 possible terms at the weekly grain. A coarser grain or a bounded search, such as `linear(select = "forward", terms = "column", max_terms = 3)`, reduces the number of fits. Every other tabular learner took at most `r round(max(seconds[!names(seconds) %in% c("linear", "elasticnet")]), 2)` seconds.
+The elastic net includes every predictor and uses a penalty to limit coefficient size. It chooses that penalty within the training data. At its default tolerance it took [`r round(seconds[["elasticnet"]], 1)`]{.lang-r-only}[3.9]{.lang-py-only py="format(seconds['elasticnet'], '.1f')"} seconds here; `tol = 1e-4` took [`r round(seconds[["elasticnet(tol = 1e-4)"]], 1)`]{.lang-r-only}[0.2]{.lang-py-only py="format(seconds['elasticnet(tol=1e-4)'], '.1f')"} seconds and gave [the same held-out AUC on the split above]{.lang-r-only}[a held-out AUC of ]{.lang-py-only}[0.727]{.lang-py-only py="'%.3f' % held_out.iloc[3]"}[ on the split above, against ]{.lang-py-only}[0.729]{.lang-py-only py="'%.3f' % held_out.iloc[0]"}[ at the default]{.lang-py-only}. `linear()` took [`r round(seconds[["linear"]], 1)`]{.lang-r-only}[4.9]{.lang-py-only py="format(seconds['linear'], '.1f')"} seconds. Its search refits the model for each term it could add or remove, with 106 possible terms at the weekly grain. A coarser grain or a bounded search, such as `linear(select = "forward", terms = "column", max_terms = 3)`, reduces the number of fits. Every other tabular learner took at most [`r round(max(seconds[!names(seconds) %in% c("linear", "elasticnet")]), 2)`]{.lang-r-only}[0.57]{.lang-py-only py="format(seconds.drop(['linear', 'elasticnet']).max(), '.2f')"} seconds.
 
 What a learner can be fitted on depends on the number of units against the number of columns its
 representation flattens to:

@@ -34,3 +34,6 @@ dev_notes/
 
 # knitr's default figure folder, written when an Rmd is knitted outside pkgdown.
 figure/
+
+# Chunk caches of the site build.
+vignettes/**/*_cache/

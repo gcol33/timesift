@@ -36,10 +36,6 @@ pip install "timesift[torch,contrasts,plot]"
 pip install git+https://github.com/gcol33/timesift
 ```
 
-The Python block draws its own record, so the values it prints differ
-from the ones quoted in the text, which come from the R run. Counts,
-shapes and calendar boundaries do not depend on the draw and agree.
-
 ``` r
 
 hours <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 60)
@@ -232,8 +228,8 @@ x.bin_n[0]
 
 Weekly intervals start on Monday. The record begins on Wednesday, so the
 first week contains fewer readings. `bin_partial` marks incomplete
-intervals and `bin_n` counts their readings: 120 in the first week and
-168 in a full week. A partial bin’s mean and daily extremes are
+intervals and `bin_n` counts their readings: 120120 in the first week
+and 168168 in a full week. A partial bin’s mean and daily extremes are
 calculated from the readings available in that interval.
 
 `partial = "drop"` removes them.
@@ -355,12 +351,12 @@ xv.bin_n[0, :2]
 ```
 
 The first Vienna day began two hours before the first reading, so it is
-partial and holds 22 readings. In a zone that keeps daylight saving time
-the day the clock goes forward holds 23 hours and the day it goes back
-25. A record kept on a fixed offset bins into days of 24 hours once its
-`tzone` names that offset, such as `"Etc/GMT-1"` for Central European
-standard time. The zone is a decision about what a day means for the
-question, and it is worth setting explicitly.
+partial and holds 2222 readings. In a zone that keeps daylight saving
+time the day the clock goes forward holds 23 hours and the day it goes
+back 25. A record kept on a fixed offset bins into days of 24 hours once
+its `tzone` names that offset, such as `"Etc/GMT-1"` for Central
+European standard time. The zone is a decision about what a day means
+for the question, and it is worth setting explicitly.
 
 ``` r
 
@@ -455,8 +451,8 @@ fit_fewer.y.values.shape
 #> (22, 2)
 ```
 
-The fit holds 22 targets, although the series carries 24 plots. When a
-plot seems to be missing from the results, `rownames(fit$y)` lists the
+The fit holds 2222 targets, although the series carries 2424 plots. When
+a plot seems to be missing from the results, `rownames(fit$y)` lists the
 targets that were fitted.
 
 Two rows of `targets` with one identifier are refused unless
@@ -1016,7 +1012,7 @@ outer_only <- system.time(timesift(targets, series, y = starts_with("sp"), id = 
                                    n_inner = NULL, verbose = FALSE))[["elapsed"]]
 c(nested = nested, outer_only = outer_only)
 #>     nested outer_only 
-#>       0.45       0.15
+#>       1.08       0.29
 ```
 
 ``` python
@@ -1041,8 +1037,8 @@ nested > outer_only
 #> True
 ```
 
-On this record the nested run took 0.45 seconds and the run on the outer
-folds alone 0.15.
+On this record the nested run took 1.080.84 seconds and the run on the
+outer folds alone 0.290.37.
 
 Each fit in turn costs what its array costs. A calendar grain has as
 many columns as bins times statistics, and
@@ -1074,11 +1070,11 @@ f"{xn.values.nbytes / 2**20:.1f} MB"
 #> 179.4111328125
 ```
 
-The weekly grain of the same record holds 9 bins against the 1440 of the
-native array, and the Schrankogel record of the package’s origin, 894
-plots read hourly for three years, would be about 179 MB for a single
-channel. A run on a long hourly record is quickest to iterate on at a
-few coarse grains with `n_inner = NULL`, reaching for
+The weekly grain of the same record holds 99 bins against the 14401440
+of the native array, and the Schrankogel record of the package’s origin,
+894 plots read hourly for three years, would be about 179 MB for a
+single channel. A run on a long hourly record is quickest to iterate on
+at a few coarse grains with `n_inner = NULL`, reaching for
 [`native()`](https://gillescolling.com/timesift/reference/native.md) and
 the inner search once the comparison is settled.
 [`elasticnet()`](https://gillescolling.com/timesift/reference/elasticnet.md)

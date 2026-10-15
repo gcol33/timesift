@@ -15,6 +15,7 @@ site_sources <- function(root = ".") {
     if (dir.exists(p)) list.files(p, recursive = TRUE, full.names = TRUE) else p
   }))
   files <- files[file.exists(files)]
+  files <- files[!grepl("_cache/", files, fixed = TRUE)]
   sort(sub("^[.]/", "", files), method = "radix")
 }
 
