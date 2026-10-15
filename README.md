@@ -10,6 +10,8 @@ status](https://www.r-pkg.org/badges/version/timesift)](https://CRAN.R-project.o
 [![CRAN
 downloads](https://cranlogs.r-pkg.org/badges/grand-total/timesift)](https://cran.r-project.org/package=timesift)
 [![PyPI](https://img.shields.io/pypi/v/timesift)](https://pypi.org/project/timesift/)
+[![PyPI
+downloads](https://static.pepy.tech/badge/timesift)](https://pepy.tech/project/timesift)
 [![R-CMD-check](https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml)
 [![pytest](https://github.com/gcol33/timesift/actions/workflows/pytest.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/pytest.yaml)
 [![contract](https://github.com/gcol33/timesift/actions/workflows/contract.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/contract.yaml)
@@ -223,9 +225,9 @@ from a scored run to maps.
 
 ## TSS and threshold selection
 
-The true skill statistic (TSS) measures how well a model distinguishes presences from absences at a given prediction threshold. Choosing the threshold that maximises TSS on the evaluation data can inflate the score, especially for species with few presences. For the Schrankogel design, the estimated inflation is 0.110 on average when the true skill is 0.60.
+The true skill statistic (TSS) is overestimated when the threshold that maximises it is chosen on the same held-out units the score is then read from. The overestimate grows as the number of presences shrinks. For the Schrankogel design, the estimated inflation is 0.110 on average when the true skill is 0.60.
 
-`tss_inflation()` estimates this bias for your presence counts. `implied_skill()` estimates the underlying skill consistent with an observed score. By default, runs are scored by the area under the receiver operating characteristic curve (AUC), with TSS also reported.
+`tss_inflation()` estimates the TSS a given sampling design would report for a known population skill. `implied_skill()` works in reverse: given a reported TSS, it estimates the population skill that would produce that score on average under the same design. By default, runs are scored by the area under the receiver operating characteristic curve (AUC), with TSS also reported.
 
 ## Documentation
 

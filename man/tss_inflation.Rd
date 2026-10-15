@@ -23,10 +23,11 @@ A data frame with one row per \code{skill} value: the skill, the mean level read
 inflation, and its interval across replicates.
 }
 \description{
-The true skill statistic (TSS) comes out too high when its best threshold is picked on the same
-held-out units the score is read from, and the more so the fewer presences a cell holds. This
-measures that excess for the presence counts of a given design; \code{\link[=implied_skill]{implied_skill()}} goes the other
-way, from a reported level to the skill it is consistent with.
+The true skill statistic (TSS) is overestimated when the threshold that maximises it is chosen
+on the same held-out units the score is then read from. The overestimate grows as the number of
+presences shrinks. \code{tss_inflation()} estimates the TSS a given sampling design would report for
+a known population skill. \code{\link[=implied_skill]{implied_skill()}} works in reverse: given a reported TSS, it estimates
+the population skill that would produce that score on average under the same design.
 }
 \details{
 Predictions are simulated for each value of \code{skill} as normal scores of equal variance, at the
