@@ -351,7 +351,7 @@ run_time <- system.time(
                   resampling = cv(v = 5), n_inner = 3L, verbose = FALSE)
 )
 run_time[["elapsed"]]
-#> [1] 16.61
+#> [1] 16.45
 ```
 
 ``` python
@@ -373,10 +373,10 @@ fit = ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
                   learners=models, sift=ts.grains("week", "month"),
                   resampling=ts.cv(v=5), n_inner=3, verbose=False)
 round(time.perf_counter() - start)
-#> 15
+#> 16
 ```
 
-The run took 17 seconds for 15 candidates. With three inner folds in
+The run took 16 seconds for 15 candidates. With three inner folds in
 each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20
 times, three inner fits and one outer fit in each outer fold, and once
 more on every target.
@@ -1232,13 +1232,13 @@ seconds <- vapply(timed, function(l) {
 }, numeric(1))
 sort(round(seconds, 2), decreasing = TRUE)
 #>                 linear             elasticnet                 forest 
-#>                   4.25                   2.30                   0.30 
+#>                   4.48                   2.29                   0.30 
 #>                 maxent elasticnet(tol = 1e-4)           discriminant 
-#>                   0.20                   0.14                   0.09 
-#>                xgboost               boosting             perceptron 
-#>                   0.04                   0.03                   0.03 
-#>                   tree               envelope                   mars 
-#>                   0.02                   0.01                   0.01 
+#>                   0.23                   0.14                   0.09 
+#>                xgboost             perceptron               boosting 
+#>                   0.05                   0.03                   0.02 
+#>                   mars                   tree               envelope 
+#>                   0.02                   0.01                   0.00 
 #>           hierarchical 
 #>                   0.00
 ```
@@ -1259,19 +1259,19 @@ def seconds_to_fit(learner, x=week):
 
 seconds = pd.Series({name: seconds_to_fit(l) for name, l in timed.items()})
 seconds.round(2).sort_values(ascending=False)
-#> linear                  2.64
-#> elasticnet              2.13
+#> linear                  2.47
+#> elasticnet              2.14
 #> forest                  0.32
 #> maxent                  0.24
 #> elasticnet(tol=1e-4)    0.10
 #> discriminant            0.09
-#> xgboost                 0.06
+#> xgboost                 0.05
 #> tree                    0.02
 #> boosting                0.02
 #> perceptron              0.02
 #> mars                    0.01
+#> hierarchical            0.01
 #> envelope                0.00
-#> hierarchical            0.00
 #> dtype: float64
 ```
 
@@ -1301,15 +1301,15 @@ additive_seconds <- c(
   `k = 5` = system.time(fit_learner(additive(k = 5L), month, sim$y))[["elapsed"]])
 round(additive_seconds, 2)
 #> k = 10  k = 5 
-#>  11.28   0.27
+#>  11.28   0.26
 ```
 
 ``` python
 month = ts.grain_matrix(sim.readings, "unit", "time", "reading", grain="month")
 pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
            "k = 5": seconds_to_fit(ts.additive(k=5), month)}).round(2)
-#> k = 10    6.93
-#> k = 5     0.41
+#> k = 10    6.51
+#> k = 5     0.38
 #> dtype: float64
 ```
 
@@ -1321,7 +1321,7 @@ coefficient size. It chooses that penalty within the training data. At
 its default tolerance it took 2.3 seconds here; `tol = 1e-4` took 0.1
 seconds and gave the same held-out AUC on the split above.
 [`linear()`](https://gillescolling.com/timesift/reference/linear.md)
-took 4.2 seconds. Its search refits the model for each term it could add
+took 4.5 seconds. Its search refits the model for each term it could add
 or remove, with 106 possible terms at the weekly grain. A coarser grain
 or a bounded search, such as
 `linear(select = "forward", terms = "column", max_terms = 3)`, reduces

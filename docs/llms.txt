@@ -33,11 +33,11 @@ timesift lets you:
   elastic net, stepwise GLMs, classification trees, random forests,
   boosting, Maxent, surface range envelopes, MARS, flexible discriminant
   analysis, GAMs and neural networks, or add your own model.
-- **Report evaluation scores.** Evaluate model selection and ensembles on
-  held-out data: each training fold chooses the grain and estimates the
-  ensemble weights, and the matching test fold scores the predictions.
-  Selecting the TSS threshold on the same data used to evaluate it can
-  inflate reported skill.
+- **Report evaluation scores.** Evaluate model selection and ensembles
+  on held-out data: each training fold chooses the grain and estimates
+  the ensemble weights, and the matching test fold scores the
+  predictions. Selecting the TSS threshold on the same data used to
+  evaluate it can inflate reported skill.
   [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.html)
   estimates this bias for your design, while
   [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.html)
@@ -48,7 +48,8 @@ timesift lets you:
 
 The model implementations are based on published methods and tested
 against reference packages including glmnet, MASS, rpart, earth, mda,
-mgcv, nnet, maxnet and biomod2. R and Python are tested against the same stored results, so they produce identical binned arrays. Cite the
+mgcv, nnet, maxnet and biomod2. R and Python are tested against the same
+stored results, so they produce identical binned arrays. Cite the
 timesift version to identify the implementations and defaults used in an
 analysis.
 
@@ -286,17 +287,18 @@ from a scored run to maps.
 
 ## TSS and threshold selection
 
-The true skill statistic (TSS) measures how well a model distinguishes
-presences from absences at a given prediction threshold. Choosing the
-threshold that maximises TSS on the evaluation data can inflate the
-score, especially for species with few presences. For the Schrankogel
-design, the estimated inflation is 0.110 on average when the true skill
-is 0.60.
+The true skill statistic (TSS) is overestimated when the threshold that
+maximises it is chosen on the same held-out units the score is then read
+from. The overestimate grows as the number of presences shrinks. For the
+Schrankogel design, the estimated inflation is 0.110 on average when the
+true skill is 0.60.
 
 [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
-estimates this bias for your presence counts.
+estimates the TSS a given sampling design would report for a known
+population skill.
 [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.md)
-estimates the underlying skill consistent with an observed score. By
+works in reverse: given a reported TSS, it estimates the population
+skill that would produce that score on average under the same design. By
 default, runs are scored by the area under the receiver operating
 characteristic curve (AUC), with TSS also reported.
 

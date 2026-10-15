@@ -1972,11 +1972,12 @@ combining their predictions improved performance in this run.</p>
 <div class="section level2">
 <h2 id="tss-and-threshold-selection">TSS and threshold selection<a class="anchor" aria-label="anchor" href="#tss-and-threshold-selection"></a>
 </h2>
-<p>The true skill statistic (TSS) is evaluated at the threshold that
-maximises it on the evaluation data. Selecting that threshold can
-inflate the score, especially when there are few presences.
-<code><a href="../reference/tss_inflation.html">tss_inflation()</a></code> estimates the bias for the presence counts
-in your response-fold cells.</p>
+<p>The true skill statistic (TSS) is overestimated when the threshold
+that maximises it is chosen on the same held-out units the score is then
+read from. The overestimate grows as the number of presences shrinks.
+<code><a href="../reference/tss_inflation.html">tss_inflation()</a></code> estimates the TSS a given sampling design
+would report for a known population skill, here the presence counts in
+your response-fold cells.</p>
 <div class="lang-pair">
 <div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tss_inflation.html">tss_inflation</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">y</span>, <span class="va">fit</span><span class="op">$</span><span class="va">folds</span>, skill <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.6</span>, <span class="fl">0.9</span><span class="op">)</span>, replicates <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span>

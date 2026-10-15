@@ -262,8 +262,8 @@
 <div class="section level2">
 <h2 id="tss-and-threshold-selection">TSS and threshold selection<a class="anchor" aria-label="anchor" href="#tss-and-threshold-selection"></a>
 </h2>
-<p>The true skill statistic (TSS) measures how well a model distinguishes presences from absences at a given prediction threshold. Choosing the threshold that maximises TSS on the evaluation data can inflate the score, especially for species with few presences. For the Schrankogel design, the estimated inflation is 0.110 on average when the true skill is 0.60.</p>
-<p><code><a href="reference/tss_inflation.html">tss_inflation()</a></code> estimates this bias for your presence counts. <code><a href="reference/implied_skill.html">implied_skill()</a></code> estimates the underlying skill consistent with an observed score. By default, runs are scored by the area under the receiver operating characteristic curve (AUC), with TSS also reported.</p>
+<p>The true skill statistic (TSS) is overestimated when the threshold that maximises it is chosen on the same held-out units the score is then read from. The overestimate grows as the number of presences shrinks. For the Schrankogel design, the estimated inflation is 0.110 on average when the true skill is 0.60.</p>
+<p><code><a href="reference/tss_inflation.html">tss_inflation()</a></code> estimates the TSS a given sampling design would report for a known population skill. <code><a href="reference/implied_skill.html">implied_skill()</a></code> works in reverse: given a reported TSS, it estimates the population skill that would produce that score on average under the same design. By default, runs are scored by the area under the receiver operating characteristic curve (AUC), with TSS also reported.</p>
 </div>
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
@@ -377,6 +377,7 @@ Time-Varying Data_. R package version 0.6.0,
 <li><a href="https://CRAN.R-project.org/package=timesift" class="external-link"><img src="https://www.r-pkg.org/badges/version/timesift" alt="CRAN status"></a></li>
 <li><a href="https://cran.r-project.org/package=timesift" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/grand-total/timesift" alt="CRAN downloads"></a></li>
 <li><a href="https://pypi.org/project/timesift/" class="external-link"><img src="https://img.shields.io/pypi/v/timesift" alt="PyPI"></a></li>
+<li><a href="https://pepy.tech/project/timesift" class="external-link"><img src="https://static.pepy.tech/badge/timesift" alt="PyPI downloads"></a></li>
 <li><a href="https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
 <li><a href="https://github.com/gcol33/timesift/actions/workflows/pytest.yaml" class="external-link"><img src="https://github.com/gcol33/timesift/actions/workflows/pytest.yaml/badge.svg" alt="pytest"></a></li>
 <li><a href="https://github.com/gcol33/timesift/actions/workflows/contract.yaml" class="external-link"><img src="https://github.com/gcol33/timesift/actions/workflows/contract.yaml/badge.svg" alt="contract"></a></li>

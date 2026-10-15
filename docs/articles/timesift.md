@@ -837,11 +837,12 @@ combining their predictions improved performance in this run.
 
 ## TSS and threshold selection
 
-The true skill statistic (TSS) is evaluated at the threshold that
-maximises it on the evaluation data. Selecting that threshold can
-inflate the score, especially when there are few presences.
+The true skill statistic (TSS) is overestimated when the threshold that
+maximises it is chosen on the same held-out units the score is then read
+from. The overestimate grows as the number of presences shrinks.
 [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
-estimates the bias for the presence counts in your response-fold cells.
+estimates the TSS a given sampling design would report for a known
+population skill, here the presence counts in your response-fold cells.
 
 ``` r
 

@@ -1751,7 +1751,7 @@ dimension.</p>
 <div class="sourceCode" id="cb44"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">took</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="va">now</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/project.html">project</a></span><span class="op">(</span><span class="va">fit</span>, series <span class="op">=</span> <span class="va">grid</span>, static <span class="op">=</span> <span class="va">elev</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">took</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 0.12</span></span>
+<span><span class="co">#&gt; [1] 0.16</span></span>
 <span><span class="va">now</span></span>
 <span><span class="co">#&gt; class       : SpatRaster</span></span>
 <span><span class="co">#&gt; size        : 10, 12, 4  (nrow, ncol, nlyr)</span></span>
@@ -2508,7 +2508,7 @@ dimension.</p>
 <span id="cb45-3"><a href="#cb45-3" tabindex="-1"></a>start <span class="op">=</span> time.perf_counter()</span>
 <span id="cb45-4"><a href="#cb45-4" tabindex="-1"></a>now <span class="op">=</span> ts.project(fit, series<span class="op">=</span>grid, static<span class="op">=</span>elev)</span>
 <span id="cb45-5"><a href="#cb45-5" tabindex="-1"></a><span class="bu">round</span>(time.perf_counter() <span class="op">-</span> start, <span class="dv">2</span>)</span>
-<span id="cb45-6"><a href="#cb45-6" tabindex="-1"></a><span class="co">#&gt; 0.05</span></span>
+<span id="cb45-6"><a href="#cb45-6" tabindex="-1"></a><span class="co">#&gt; 0.06</span></span>
 <span id="cb45-7"><a href="#cb45-7" tabindex="-1"></a><span class="bu">dict</span>(now.sizes)</span>
 <span id="cb45-8"><a href="#cb45-8" tabindex="-1"></a><span class="co">#&gt; {'response': 4, 'y': 10, 'x': 12}</span></span>
 <span id="cb45-9"><a href="#cb45-9" tabindex="-1"></a><span class="bu">bool</span>(np.allclose(now.sel(response<span class="op">=</span><span class="st">"sp1"</span>).values.ravel(), fit.predict(targets, series)[:, <span class="dv">0</span>]))</span>
@@ -3002,7 +3002,7 @@ z
  </defs>
 </svg></div></p>
 </div>
-<p>The projection of the ensemble onto the 120 cells took 0.12 seconds.
+<p>The projection of the ensemble onto the 120 cells took 0.16 seconds.
 It is the same prediction <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> gives for the same
 cells as targets, which <code><a href="https://rdrr.io/r/base/all.equal.html" class="external-link">all.equal()</a></code> confirms for
 <code>sp1</code>. A raster too large for memory is read
@@ -11567,7 +11567,7 @@ a logger and would otherwise be split across training and test. Under
 any blocked split the inner split keeps blocks whole too, which bounds
 <code>n_inner</code> and the elastic net’s own <code>n_inner</code>.</p>
 <p>A projection costs one prediction per cell. The ensemble of four
-members took 0.12 seconds for 120 cells with a year of daily readings,
+members took 0.16 seconds for 120 cells with a year of daily readings,
 and the time grows with the number of cells and the length of the
 record. A large raster is better projected once from a script, with
 <code>chunk</code> set to what memory allows. The two runs themselves
