@@ -49,6 +49,7 @@ test_that("the interval rescales, bounds and bias-corrects as the paper states",
 })
 
 test_that("the corrected centre's naive standard error is the jackknife of the combination", {
+  skip_on_cran()
   # Two arms of fixed predictions, no refitting: the centre is 1.6 times the outer level less 0.6
   # times the mean inner level, so its leave-one-out values are that combination of theirs.
   set.seed(5)

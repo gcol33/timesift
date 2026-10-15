@@ -70,6 +70,7 @@ maxnet_objective <- function(fit, design, input, row) {
 }
 
 test_that("the core builds maxnet's features and regularises each as maxnet does", {
+  skip_on_cran()
   fx <- maxnet_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
@@ -175,6 +176,7 @@ test_that("a design above the limit is refused with the size it would have taken
 })
 
 test_that("maxnet fits, predicts, survives a round trip and refuses a different representation", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 35L)
   y <- sim_response(sim, n_var = 2L, seed = 36L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
@@ -194,6 +196,7 @@ test_that("maxnet fits, predicts, survives a round trip and refuses a different 
 })
 
 test_that("the background formulation ignores case weights and the absence one reads them", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 51L)
   y <- sim_response(sim, n_var = 1L, seed = 52L)
   m <- .flatten(grain_matrix(sim$readings, plot, t, temp, grain = "week"))
@@ -235,6 +238,7 @@ test_that("maxnet needs a presence-absence head, and a thin response is its shar
 })
 
 test_that("responses fitted on several threads are the fits each gets on one", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 71L)
   y <- sim_response(sim, n_var = 3L, seed = 72L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")

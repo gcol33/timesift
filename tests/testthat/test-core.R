@@ -141,6 +141,7 @@ test_that("a day-level statistic needs bins of a day or coarser, whoever supplie
 })
 
 test_that("a zone whose local midnight does not exist bins without an NA", {
+  skip_on_cran()
   set.seed(5)
   t <- seq(as.POSIXct("2018-11-01 12:00:00", tz = "America/Sao_Paulo"), by = "hour",
            length.out = 24 * 8)
@@ -200,6 +201,7 @@ test_that("readings a fraction of a second apart are the same reading twice", {
 })
 
 test_that("a reading that is not a finite number is refused, and named", {
+  skip_on_cran()
   t <- seq(as.POSIXct("2021-09-01", tz = "UTC"), by = "hour", length.out = 24 * 8)
   d <- data.frame(id = rep(c("p1", "p2"), each = length(t)), t = rep(t, 2),
                   v = rnorm(2 * length(t)))
@@ -226,6 +228,7 @@ test_that("a reading that is not a finite number is refused, and named", {
 })
 
 test_that("the two readings of an hour a zone repeats are two `native` bins", {
+  skip_on_cran()
   set.seed(31)
   # 2021-10-31 in Europe/Vienna: at 03:00 CEST the clock goes back to 02:00 CET, so the readings
   # at 00:00Z and 01:00Z both read 02:00 on that clock.
@@ -253,6 +256,7 @@ test_that("the two readings of an hour a zone repeats are two `native` bins", {
 })
 
 test_that("a day in a daylight-saving zone is a wall-clock day and a fixed offset's is 24 hours", {
+  skip_on_cran()
   # Hourly readings across both of Europe/Vienna's 2021 transitions: 28 March, when 02:00 CET
   # jumps to 03:00 CEST, and 31 October, when 03:00 CEST falls back to 02:00 CET.
   # Each record starts at local midnight of a Monday and runs two weeks and one hour.

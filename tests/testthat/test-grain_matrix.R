@@ -16,6 +16,7 @@ brute <- function(d, key, fun) {
 }
 
 test_that("bins tile the record with no gap and no overlap", {
+  skip_on_cran()
   d <- hourly_series()
   for (w in c("native", "halfday", "day", "week", "month", "season", "year")) {
     x <- grain_matrix(d, plot, t, temp, grain = w)
@@ -151,6 +152,7 @@ test_that("a column can be named bare or as a string", {
 })
 
 test_that("the representation refuses input it cannot reduce honestly", {
+  skip_on_cran()
   d <- hourly_series(units = "a", hours = 48)
 
   gap <- d[-c(1:24), ]
@@ -358,6 +360,7 @@ test_that("channels are joined in the order they are given", {
 })
 
 test_that("coverage lays a refused record's gaps out as zeros, unit by unit and bin by bin", {
+  skip_on_cran()
   d <- hourly_series(hours = 24 * 40)
   # Unit b loses the calendar week beginning Monday 6 September; the record still spans it.
   lost <- d$plot == "b" & d$t >= as.POSIXct("2021-09-06", tz = "UTC") &

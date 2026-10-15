@@ -90,6 +90,7 @@ test_that("each node of a field's grid is tulpa's conditional fit, and the weigh
 })
 
 test_that("a model with unit intercepts and a nearest-neighbour field is its dense Laplace marginal", {
+  skip_on_cran()
   fx <- hier_fixture()
   n <- nrow(fx$X)
   st <- oracle_standardise(fx$coords)
@@ -188,6 +189,7 @@ hier_run <- function(spatial, ...) {
 }
 
 test_that("a field needs the coordinates, and a fit without one does not", {
+  skip_on_cran()
   expect_error(hier_run("hsgp"), "coords = ")
   run <- hier_run("none")
   p <- stats::predict(run$fit, run$targets[1:5, ], run$series, candidate = "selected")
@@ -213,6 +215,7 @@ test_that("a field predicts from the coordinates of the new units, and survives 
 })
 
 test_that("an intercept for each unit needs the unit, and a held-out unit is predicted at the population level", {
+  skip_on_cran()
   set.seed(3)
   n <- 40L
   targets <- data.frame(plot = rep(sprintf("p%02d", 1:20), each = 2L), when = rep(0:1, 20L))

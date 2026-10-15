@@ -322,6 +322,7 @@ test_that("the calendar channels match the fraction the Python side reads", {
 })
 
 test_that("what the two channel functions refuse is what the Python side refuses", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
 

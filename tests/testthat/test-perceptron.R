@@ -31,6 +31,7 @@ perceptron_case_fit <- function(fx, row) {
 }
 
 test_that("the core ends where nnet ends from the same starting weights", {
+  skip_on_cran()
   fx <- perceptron_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
@@ -116,6 +117,7 @@ test_that("the presets give biomod2's settings and an explicit setting beats the
 })
 
 test_that("perceptron fits under every head, round trips, and a constant is its mean", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 120L, seed = 43L)
   y <- sim_response(sim, n_var = 2L, seed = 44L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "month")

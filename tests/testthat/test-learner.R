@@ -87,6 +87,7 @@ test_that("a scaler is computed on what it is given and applied to something els
 })
 
 test_that("the penalised learner fits, predicts and refuses a different representation", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 31L)
   y <- sim_response(sim, n_var = 2L, seed = 32L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
@@ -99,6 +100,7 @@ test_that("the penalised learner fits, predicts and refuses a different represen
 })
 
 test_that("the inner folds spread a rare outcome, and one too rare to choose a penalty on is named", {
+  skip_on_cran()
   # Five presences over five inner folds: a plain deal puts two in one fold about four draws in
   # five, the stratified one puts one in each.
   yj <- c(rep(1, 5L), rep(0, 45L))
@@ -260,6 +262,7 @@ test_that("a setting given at fit time overrides the one a linear learner carrie
 })
 
 test_that("predicting a single unit returns one row and not one column", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 24L, days = 40L)
   y <- sim_response(sim, n_var = 3L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
@@ -504,6 +507,7 @@ test_that("every shipped learner fits a rare response under the head's weight", 
 })
 
 test_that("responses fitted at once on several threads are each the fit it gets alone", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 41L)
   y <- sim_response(sim, n_var = 3L, seed = 42L)
   y <- cbind(y, flat = 0)

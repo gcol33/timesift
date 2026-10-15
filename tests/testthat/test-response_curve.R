@@ -27,6 +27,7 @@ curve_run <- function(models, ensemble = FALSE) {
 }
 
 test_that("a curve in a channel is the prediction as that statistic moves in every bin", {
+  skip_on_cran()
   run <- curve_run(list(w = curve_reader("w")))
   m <- run$representations[["month"]]
   rc <- response_curve(run, "w / month", "warm_day", n = 7L)
@@ -46,6 +47,7 @@ test_that("a curve in a channel is the prediction as that statistic moves in eve
 })
 
 test_that("a curve in one cell moves one bin and holds the others at the reference", {
+  skip_on_cran()
   run <- curve_run(list(w = curve_reader("w")))
   m <- run$representations[["month"]]
   bin <- dimnames(m)[[2L]][2L]
@@ -74,6 +76,7 @@ test_that("two predictors are read over the grid of the two", {
 })
 
 test_that("the ensemble is moved through every member and combined by the stack", {
+  skip_on_cran()
   run <- curve_run(list(a = curve_reader("a"), b = curve_reader("b", 2)),
                    ensemble = ensemble("mean"))
   rc <- response_curve(run, "ensemble", "warm_day", n = 6L, spread = TRUE)
@@ -86,6 +89,7 @@ test_that("the ensemble is moved through every member and combined by the stack"
 })
 
 test_that("a curve says what it cannot draw", {
+  skip_on_cran()
   run <- curve_run(list(w = curve_reader("w")))
   expect_error(response_curve(run, "w / month"), "names what to vary")
   expect_error(response_curve(run, "w / month", "nope"), "neither a channel nor a bin")

@@ -22,6 +22,7 @@ envelope_fixture <- function() {
 }
 
 test_that("the core draws the envelope biomod2's bm_SRE draws", {
+  skip_on_cran()
   fx <- envelope_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]

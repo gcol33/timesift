@@ -61,6 +61,7 @@ test_that("a projection is the fit applied to one target per cell", {
 })
 
 test_that("a cell with a missing input is missing in every layer", {
+  skip_on_cran()
   case <- projection_case(hole = c(2L, 11L))
   fit <- projection_fit(case)
   map <- project(fit, series = case$raster, candidate = "rd / month")
@@ -70,6 +71,7 @@ test_that("a cell with a missing input is missing in every layer", {
 })
 
 test_that("binary and spread maps follow predict", {
+  skip_on_cran()
   case <- projection_case()
   fit <- projection_fit(case)
   binary <- project(fit, series = case$raster, candidate = "rd / month", type = "binary")
@@ -98,6 +100,7 @@ test_that("static predictors are read from the layers of a raster", {
 })
 
 test_that("a projection says what it was not given", {
+  skip_on_cran()
   case <- projection_case()
   fit <- projection_fit(case)
   expect_error(project(fit), "so `series` is needed")
@@ -145,6 +148,7 @@ test_that("a map that is not 0 and 1 is cut at a threshold", {
 })
 
 test_that("the range change of two projections is a raster of codes", {
+  skip_on_cran()
   case <- projection_case()
   fit <- projection_fit(case)
   now <- project(fit, series = case$raster, candidate = "rd / month", type = "binary")

@@ -28,6 +28,7 @@ k_learner <- function() {
 }
 
 test_that("the setting that scores best on the inner folds is the one fitted", {
+  skip_on_cran()
   d <- tune_data()
   tuned <- tune(k_learner(), list(k = 1:5), n_inner = 3L)
   expect_s3_class(tuned, "timesift_learner")
@@ -46,6 +47,7 @@ test_that("the setting that scores best on the inner folds is the one fitted", {
 })
 
 test_that("a grid is every combination, and a setting given to the fit overrides the carried one", {
+  skip_on_cran()
   d <- tune_data()
   tuned <- tune(k_learner(), list(k = c(3, 9), other = c("a", "b")), n_inner = 3L)
   fit <- fit_learner(tuned, d$x, d$y)
@@ -59,6 +61,7 @@ test_that("a grid is every combination, and a setting given to the fit overrides
 })
 
 test_that("the inner folds keep a grouping whole, and a metric of its own is used", {
+  skip_on_cran()
   d <- tune_data()
   group <- rep(sprintf("g%02d", 1:10), each = 4L)
   fit <- fit_learner(tune(k_learner(), list(k = 1:5), n_inner = 3L), d$x, d$y, group = group)
@@ -81,6 +84,7 @@ test_that("a shipped learner is tuned the same way", {
 })
 
 test_that("a run records what each tuned candidate chose", {
+  skip_on_cran()
   d <- tune_data()
   targets <- data.frame(plot = d$units, d$y, stringsAsFactors = FALSE)
   run <- suppressWarnings(timesift(
@@ -103,6 +107,7 @@ test_that("a grid says what it cannot search", {
 })
 
 test_that("a learner with no grid of its own is searched over the one registered for it", {
+  skip_on_cran()
   d <- tune_data()
   columns <- ncol(timesift:::.flatten(d$x))
   grids <- timesift:::.default_grids()
@@ -131,6 +136,7 @@ test_that("a learner with no grid of its own is searched over the one registered
 })
 
 test_that("a grid can be registered for a learner of one's own, as a list or as a function", {
+  skip_on_cran()
   d <- tune_data()
   register_tuning("kl", list(k = 1:5), overwrite = TRUE)
   on.exit(.tuning_reg$remove("kl"), add = TRUE)

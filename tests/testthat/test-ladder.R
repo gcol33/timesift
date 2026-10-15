@@ -19,6 +19,7 @@ ladder_fixture <- function(v = 4L) {
 }
 
 test_that("every arm is scored on the same cells", {
+  skip_on_cran()
   f <- ladder_fixture()
   lad <- grain_ladder(f$x, f$y, list(a = constant_learner(), b = constant_learner(0.2)),
                        folds = f$folds, verbose = FALSE)
@@ -29,6 +30,7 @@ test_that("every arm is scored on the same cells", {
 })
 
 test_that("a ladder carries one held-out prediction per unit and arm", {
+  skip_on_cran()
   f <- ladder_fixture()
   lad <- grain_ladder(f$x, f$y, constant_learner(), folds = f$folds, verbose = FALSE)
   preds <- attr(lad, "predictions")
@@ -40,6 +42,7 @@ test_that("a ladder carries one held-out prediction per unit and arm", {
 })
 
 test_that("a unit is never fitted on and scored in the same fold", {
+  skip_on_cran()
   seen <- new.env(parent = emptyenv())
   seen$fitted <- list()
   seen$tested <- list()
@@ -66,6 +69,7 @@ test_that("a unit is never fitted on and scored in the same fold", {
 })
 
 test_that("the summary marks each learner's best grain", {
+  skip_on_cran()
   f <- ladder_fixture()
   lad <- grain_ladder(f$x, f$y, list(a = constant_learner(), b = constant_learner(0.3)),
                        folds = f$folds, verbose = FALSE)
@@ -78,6 +82,7 @@ test_that("the summary marks each learner's best grain", {
 })
 
 test_that("a paired contrast runs on cells both arms scored", {
+  skip_on_cran()
   f <- ladder_fixture()
   lad <- grain_ladder(f$x, f$y, list(a = constant_learner(), b = constant_learner(0.3)),
                        folds = f$folds, verbose = FALSE)
@@ -90,6 +95,7 @@ test_that("a paired contrast runs on cells both arms scored", {
 })
 
 test_that("an arm is found whole, so a learner whose name holds the separator is still an arm", {
+  skip_on_cran()
   f <- ladder_fixture()
   lad <- grain_ladder(f$x, f$y, list("a|b" = constant_learner(), b = constant_learner(0.3)),
                        folds = f$folds, verbose = FALSE)
@@ -99,6 +105,7 @@ test_that("an arm is found whole, so a learner whose name holds the separator is
 })
 
 test_that("a learner named alone is refused, since its grain would be chosen on the contrast", {
+  skip_on_cran()
   f <- ladder_fixture()
   lad <- grain_ladder(f$x, f$y, list(a = constant_learner(), b = constant_learner(0.3)),
                        folds = f$folds, verbose = FALSE)
@@ -138,6 +145,7 @@ test_that("the interval is Student's t on the variables, and the p-value names i
 })
 
 test_that("two learners cannot be reported under one name", {
+  skip_on_cran()
   f <- ladder_fixture()
   expect_error(grain_ladder(f$x, f$y, list(constant_learner(), constant_learner(0.3)),
                              folds = f$folds, verbose = FALSE),
@@ -145,6 +153,7 @@ test_that("two learners cannot be reported under one name", {
 })
 
 test_that("the plot returns what it drew", {
+  skip_on_cran()
   f <- ladder_fixture()
   lad <- grain_ladder(f$x, f$y, constant_learner(), folds = f$folds, verbose = FALSE)
   path <- tempfile(fileext = ".png")
@@ -158,6 +167,7 @@ test_that("the plot returns what it drew", {
 })
 
 test_that("a ladder on which nothing was scorable reports no level rather than failing", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 24L, days = 40L)
   y <- sim_response(sim)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = c("week", "month"))
@@ -171,6 +181,7 @@ test_that("a ladder on which nothing was scorable reports no level rather than f
 })
 
 test_that("a ladder hands its control to every learner that declares one", {
+  skip_on_cran()
   f <- ladder_fixture(v = 2L)
   seen <- new.env(parent = emptyenv())
   seen$epochs <- integer()
@@ -192,6 +203,7 @@ test_that("a ladder hands its control to every learner that declares one", {
 })
 
 test_that("a learner's own control overrides the ladder's on the settings it names", {
+  skip_on_cran()
   f <- ladder_fixture(v = 2L)
   seen <- new.env(parent = emptyenv())
   seen$got <- list()
@@ -213,6 +225,7 @@ test_that("a learner's own control overrides the ladder's on the settings it nam
 })
 
 test_that("an arm that holds no number on a scorable cell stops the run", {
+  skip_on_cran()
   f <- ladder_fixture(v = 2L)
   diverged <- learner(
     "diverged",
@@ -229,6 +242,7 @@ test_that("an arm that holds no number on a scorable cell stops the run", {
 })
 
 test_that("score_predictions() refuses a prediction that is not a number on a scorable cell", {
+  skip_on_cran()
   f <- ladder_fixture(v = 2L)
   p <- matrix(stats::runif(length(f$y)), nrow = nrow(f$y), dimnames = dimnames(f$y))
   expect_silent(score_predictions(f$y, p, f$folds))

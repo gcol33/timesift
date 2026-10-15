@@ -79,6 +79,7 @@ test_that("the learners that need presences and absences refuse a count head", {
 })
 
 test_that("a Poisson shrinkage reaches the tree only through a count head", {
+  skip_on_cran()
   d <- count_data(n = 60L)
   tight <- fit_learner(tree(shrink = 0), d$x, d$y, response = "count")
   loose <- fit_learner(tree(shrink = 1), d$x, d$y, response = "count")
@@ -107,6 +108,7 @@ test_that("a run under the count head is scored by the Poisson deviance and stac
 })
 
 test_that("the combiner minimises the Poisson deviance of the combined mean", {
+  skip_on_cran()
   loss <- .stack_loss("count")
   expect_identical(loss$name, "poisson_deviance")
   y <- c(0, 1, 2, 5, 3, 0, 4, 2)

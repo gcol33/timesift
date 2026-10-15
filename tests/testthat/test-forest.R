@@ -148,6 +148,7 @@ test_that("a preset fills the settings left open, as randomForest and biomod2 ha
 })
 
 test_that("a forest fits, predicts, survives a round trip and refuses a different representation", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 35L)
   y <- sim_response(sim, n_var = 2L, seed = 36L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")

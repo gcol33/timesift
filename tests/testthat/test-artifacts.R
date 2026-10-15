@@ -267,6 +267,7 @@ test_that("the paired contrast matches the value the fixtures pin", {
 })
 
 test_that("the inflation of a self-selected threshold is stated to the tolerance the spec gives", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
 

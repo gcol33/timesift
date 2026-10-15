@@ -139,6 +139,7 @@ test_that("the lookback fixtures carry what the contract says they carry", {
 })
 
 test_that("both guards fire with the message the fixtures pin", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures are not in the built package")
   guards <- read.csv(file.path(dir, "lookback_guards.csv"), stringsAsFactors = FALSE)

@@ -118,6 +118,7 @@ test_that("stepwise refuses settings it has no search for", {
 })
 
 test_that("stepwise fits under both heads, round trips, and a model of no term is the share", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 120L, seed = 41L)
   y <- sim_response(sim, n_var = 2L, seed = 42L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "month")

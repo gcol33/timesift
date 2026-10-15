@@ -44,6 +44,7 @@ run_toy <- function(case, ...) {
 }
 
 test_that("a run given c() and a run given list() agree", {
+  skip_on_cran()
   case <- toy_case()
   by_c <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
                    learners = c(toy(), toy("toy2")), sift = c(grain("week"), grain("month")),
@@ -58,6 +59,7 @@ test_that("a run given c() and a run given list() agree", {
 })
 
 test_that("a fit carries every element the layers above it read", {
+  skip_on_cran()
   fit <- run_toy(toy_case())
   expect_s3_class(fit, "timesift")
   expect_named(fit, c("estimate", "selected", "inner", "fold_weights", "predictions",
@@ -108,6 +110,7 @@ test_that("a metric given as a function scores the run and everything that resco
 })
 
 test_that("the candidate table names the representation, the learner and the array", {
+  skip_on_cran()
   fit <- run_toy(toy_case())
   expect_equal(names(fit$candidates),
                c("candidate", "representation", "learner", "grain", "bins", "channels",
@@ -119,6 +122,7 @@ test_that("the candidate table names the representation, the learner and the arr
 })
 
 test_that("every candidate predicts every target out of fold, on the same folds", {
+  skip_on_cran()
   case <- toy_case()
   fit <- run_toy(case)
   for (p in fit$oof) {
@@ -131,6 +135,7 @@ test_that("every candidate predicts every target out of fold, on the same folds"
 })
 
 test_that("the scores are one row per candidate, variable and fold", {
+  skip_on_cran()
   fit <- run_toy(toy_case())
   expect_equal(names(fit$scores),
                c("candidate", "representation", "learner", "variable", "fold", "score",
@@ -140,6 +145,7 @@ test_that("the scores are one row per candidate, variable and fold", {
 })
 
 test_that("a learner is handed the whole response matrix however it covers the responses", {
+  skip_on_cran()
   case <- toy_case()
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
                   learners = list(one = toy(multi = "separate"), all = toy(multi = "joint")),
@@ -155,6 +161,7 @@ test_that("a learner is handed the whole response matrix however it covers the r
 })
 
 test_that("the predictor block is built once for a fit rather than once per response", {
+  skip_on_cran()
   case <- toy_case()
   seen <- new.env(parent = emptyenv())
   seen$n <- 0L
@@ -176,6 +183,7 @@ test_that("the predictor block is built once for a fit rather than once per resp
 })
 
 test_that("a pair no learner can read is skipped, named, and reported as not applicable", {
+  skip_on_cran()
   case <- toy_case()
   expect_message(
     fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
@@ -206,6 +214,7 @@ test_that("a representation named through data = is an error rather than a skip"
 })
 
 test_that("a learner pinned to its own representation runs on that one alone", {
+  skip_on_cran()
   case <- toy_case()
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
                   learners = list(pinned = toy(data = grain("month")), free = toy()),
@@ -278,6 +287,7 @@ test_that("an anchored fit runs across lookback spans", {
 })
 
 test_that("static is never implicit and never doubles as something else", {
+  skip_on_cran()
   case <- toy_case(n_unit = 12L, days = 60L)
   plain <- run_toy(case)
   expect_equal(dim(plain$representations$week)[3L], 1L)
@@ -295,6 +305,7 @@ test_that("static is never implicit and never doubles as something else", {
 })
 
 test_that("a targets-only fit is the static block and nothing else", {
+  skip_on_cran()
   case <- toy_case(n_unit = 20L, days = 30L)
   fit <- timesift(case$targets, y = starts_with("sp"), id = plot, static = elevation,
                   learners = list(toy()), sift = grains("week"), ensemble = FALSE,
@@ -308,6 +319,7 @@ test_that("a targets-only fit is the static block and nothing else", {
 })
 
 test_that("the response and the readings are named by selection, not by position", {
+  skip_on_cran()
   case <- toy_case(n_unit = 10L, days = 40L)
   case$series$snow <- as.numeric(case$series$temp < 0)
   fit <- timesift(case$targets, case$series, y = all_of(c("sp1", "sp2")), x = c(temp, snow),
@@ -328,6 +340,7 @@ test_that("the response and the readings are named by selection, not by position
 })
 
 test_that("the resampling arrives as a spec, a fold vector or a fold map", {
+  skip_on_cran()
   case <- toy_case(n_unit = 15L, days = 40L)
   by_vector <- stats::setNames(rep(1:3, length.out = 15L), sort(case$units))
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
@@ -345,6 +358,7 @@ test_that("the resampling arrives as a spec, a fold vector or a fold map", {
 })
 
 test_that("a split without names is read against the targets as they were given", {
+  skip_on_cran()
   case <- toy_case(n_unit = 15L, days = 40L)
   reversed <- case$targets[rev(seq_len(nrow(case$targets))), , drop = FALSE]
   given <- rep(1:3, length.out = 15L)
@@ -378,6 +392,7 @@ test_that("the combiner minimises the loss of the head the run was fitted under"
 })
 
 test_that("an ensemble is fitted on the out-of-fold predictions and predicts through the refits", {
+  skip_on_cran()
   case <- toy_case(n_unit = 30L, days = 90L)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
                   learners = list(a = toy(), b = toy(multi = "separate")),
@@ -397,6 +412,7 @@ test_that("an ensemble is fitted on the out-of-fold predictions and predicts thr
 })
 
 test_that("a single candidate leaves the ensemble unfitted rather than degenerate", {
+  skip_on_cran()
   case <- toy_case(n_unit = 12L, days = 40L)
   expect_message(
     fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
@@ -408,6 +424,7 @@ test_that("a single candidate leaves the ensemble unfitted rather than degenerat
 })
 
 test_that("a fit prints what it compared", {
+  skip_on_cran()
   fit <- run_toy(toy_case())
   expect_output(print.timesift(fit), "2 responses")
   expect_output(print.timesift(fit), "toy / week")
@@ -416,6 +433,7 @@ test_that("a fit prints what it compared", {
 # ---- predicting targets the fit never saw -------------------------------------------------------
 
 test_that("a fit predicts units it was never fitted on", {
+  skip_on_cran()
   case <- toy_case(n_unit = 30L, days = 60L)
   fitting <- case$units[1:20]
   fit <- timesift(case$targets[case$targets$plot %in% fitting, , drop = FALSE],
@@ -466,6 +484,7 @@ test_that("a binary prediction cuts each response where its held-out predictions
 })
 
 test_that("a committee votes through cuts learned on held-out predictions, nested and refitted", {
+  skip_on_cran()
   case <- toy_case(n_unit = 30L, days = 60L)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
                   learners = list(a = toy(), b = toy("b")), sift = grains("week"),
@@ -494,6 +513,7 @@ test_that("a committee votes through cuts learned on held-out predictions, neste
 })
 
 test_that("a cut is refused on a response that is not presence-absence", {
+  skip_on_cran()
   fit <- run_toy(toy_case())
   fit$y[1L, 1L] <- 0.5
   expect_error(decision_threshold(fit, candidate = "toy / week"),
@@ -504,6 +524,7 @@ test_that("a cut is refused on a response that is not presence-absence", {
 })
 
 test_that("predicting needs no response column, because a new target has none", {
+  skip_on_cran()
   case <- toy_case(n_unit = 24L, days = 60L)
   fit <- run_toy(case)
   bare <- case$targets[, setdiff(names(case$targets), colnames(fit$y)), drop = FALSE]
@@ -513,6 +534,7 @@ test_that("predicting needs no response column, because a new target has none", 
 })
 
 test_that("a new target frame has to carry the static predictors the fit was made with", {
+  skip_on_cran()
   case <- toy_case(n_unit = 20L, days = 40L)
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
                   static = elevation, learners = list(toy()), sift = grains("week"),
@@ -525,6 +547,7 @@ test_that("a new target frame has to carry the static predictors the fit was mad
 })
 
 test_that("an anchored fit predicts new targets at their own instants", {
+  skip_on_cran()
   case <- toy_case(n_unit = 10L, days = 150L)
   case$targets$when <- as.POSIXct(rep("2021-12-01", 10L), tz = "UTC")
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,
@@ -543,6 +566,7 @@ test_that("an anchored fit predicts new targets at their own instants", {
 })
 
 test_that("a targets-only fit predicts from the static block alone", {
+  skip_on_cran()
   case <- toy_case(n_unit = 20L, days = 30L)
   fit <- timesift(case$targets, y = starts_with("sp"), id = plot, static = elevation,
                   learners = list(a = toy(), b = toy("b")), resampling = cv(v = 3L),
@@ -554,6 +578,7 @@ test_that("a targets-only fit predicts from the static block alone", {
 })
 
 test_that("new targets are held to one row per identifier, as the fit's own were", {
+  skip_on_cran()
   case <- toy_case(n_unit = 15L, days = 40L)
   fit <- run_toy(case)
   twice <- case$targets[c(1L, 1L, 2L), ]
@@ -569,6 +594,7 @@ test_that("a design under which no cell is scorable stops before anything is fit
 })
 
 test_that("a grouped run hands every fit the grouping of the units it is fitted on", {
+  skip_on_cran()
   case <- toy_case(n_unit = 8L, days = 150L)
   case$targets <- case$targets[rep(1:8, each = 2L), ]
   rownames(case$targets) <- NULL
@@ -606,6 +632,7 @@ test_that("a grouped run hands every fit the grouping of the units it is fitted 
 # ---- the nested evaluation ----------------------------------------------------------------------
 
 test_that("the selected arm is the selection select_grain() makes on the same split", {
+  skip_on_cran()
   case <- toy_case(n_unit = 48L, days = 90L, n_var = 3L)
   folds <- stats::setNames(rep(1:3, length.out = 48L), sort(case$units))
   fit <- timesift(case$targets, case$series, y = starts_with("sp"), id = plot, time = t,

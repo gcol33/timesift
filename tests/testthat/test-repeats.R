@@ -74,6 +74,7 @@ test_that("each repeat is a run on its own fold map, scored as the run alone wou
 })
 
 test_that("a response is averaged over its folds and its repeats", {
+  skip_on_cran()
   case <- repeat_case()
   fit <- run_repeat(case, cv(v = 3L, seed = 5L, repeats = 2L))
   per_response <- timesift:::.per_response(fit)
@@ -85,6 +86,7 @@ test_that("a response is averaged over its folds and its repeats", {
 })
 
 test_that("the stack is fitted on the out-of-fold predictions of all the repeats together", {
+  skip_on_cran()
   case <- repeat_case()
   fit <- run_repeat(case, cv(v = 3L, seed = 5L, repeats = 2L), ensemble = ensemble("stack"))
   expect_s3_class(fit$stack, "timesift_stack")
@@ -109,6 +111,7 @@ test_that("a nested estimate is read off all the repeats", {
 })
 
 test_that("a grouped split repeats too, and the models are the first repeat's", {
+  skip_on_cran()
   case <- repeat_case()
   fit <- run_repeat(case, grouped_cv("group", v = 3L, seed = 2L, repeats = 2L))
   expect_equal(fit$repeats, 2L)

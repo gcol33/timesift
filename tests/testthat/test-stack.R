@@ -71,6 +71,7 @@ test_that("stacking lowers the loss it minimises against every equal-weight alte
 })
 
 test_that("the solver lands where an exhaustive search over two members lands", {
+  skip_on_cran()
   f <- stack_fixture(seed = 93L)
   loss <- .stack_loss("presence_absence")
   mask <- .scorable_matrix(f$y, f$cells, f$folds)
@@ -258,6 +259,7 @@ nested_run <- function(ensemble = TRUE, n_inner = 3L) {
 }
 
 test_that("the report is one row per candidate, one per procedure arm, and the weights", {
+  skip_on_cran()
   fit <- nested_run()
   s <- summary(fit)
   expect_s3_class(s, "timesift_summary")
@@ -275,6 +277,7 @@ test_that("the report is one row per candidate, one per procedure arm, and the w
 })
 
 test_that("the procedure rows are the held-out predictions scored on the run's own cells", {
+  skip_on_cran()
   fit <- nested_run()
   s <- summary(fit)
   f <- .as_folds(fit$folds, rownames(fit$y))
@@ -287,6 +290,7 @@ test_that("the procedure rows are the held-out predictions scored on the run's o
 })
 
 test_that("the ensemble is not scored with weights fitted to the responses it is scored on", {
+  skip_on_cran()
   fit <- nested_run()
   in_sample <- ensemble_combine(fit$stack, fit$oof)
   expect_false(isTRUE(all.equal(in_sample, fit$predictions$ensemble)))
@@ -313,6 +317,7 @@ test_that("a candidate a fold's stack leaves out below min_score is a zero in th
 })
 
 test_that("a run with no combiner reports its candidates and the selected arm alone", {
+  skip_on_cran()
   fit <- nested_run(ensemble = FALSE)
   s <- summary(fit)
   expect_equal(nrow(s), nrow(fit$candidates) + 1L)
@@ -323,6 +328,7 @@ test_that("a run with no combiner reports its candidates and the selected arm al
 })
 
 test_that("a run without an inner split compares the candidates and estimates nothing", {
+  skip_on_cran()
   fit <- nested_run(n_inner = NULL)
   s <- summary(fit)
   expect_null(fit$estimate)
@@ -333,6 +339,7 @@ test_that("a run without an inner split compares the candidates and estimates no
 })
 
 test_that("a candidate nothing could be fitted for is listed rather than dropped", {
+  skip_on_cran()
   fit <- run_fixture(stack = FALSE)
   fit$candidates <- rbind(fit$candidates,
                           data.frame(candidate = "cnn / month", representation = "month",
@@ -346,6 +353,7 @@ test_that("a candidate nothing could be fitted for is listed rather than dropped
 })
 
 test_that("the report says what the run read and what it found", {
+  skip_on_cran()
   fit <- nested_run()
   out <- utils::capture.output(print(summary(fit)))
   expect_match(out[1L], "^timesift  60 targets, 4 responses, 3-fold random CV, roc_auc$")
@@ -358,12 +366,14 @@ test_that("the report says what the run read and what it found", {
 })
 
 test_that("a grouped fold map is reported as one", {
+  skip_on_cran()
   fit <- run_fixture(stack = FALSE)
   attr(fit$folds, "grouped") <- TRUE
   expect_match(utils::capture.output(print(summary(fit)))[1L], "3-fold grouped CV")
 })
 
 test_that("the run plot draws one line per learner across the representations", {
+  skip_on_cran()
   fit <- run_fixture()
   path <- tempfile(fileext = ".png")
   grDevices::png(path)
@@ -377,6 +387,7 @@ test_that("the run plot draws one line per learner across the representations", 
 })
 
 test_that("occlusion on a run is the ladder's occlusion on the same candidate", {
+  skip_on_cran()
   fit <- run_fixture()
   lad <- attr(fit, "ladder")
   through_run <- occlusion(fit, "constant / month", permutations = 3L, seed = 5L)
@@ -390,6 +401,7 @@ test_that("occlusion on a run is the ladder's occlusion on the same candidate", 
 })
 
 test_that("occlusion refuses a run that kept no fits and a candidate that was never fitted", {
+  skip_on_cran()
   fit <- run_fixture(keep_fits = FALSE)
   expect_error(occlusion(fit, "constant / month"), "kept no per-fold fits")
   kept <- run_fixture()
@@ -557,6 +569,7 @@ test_that("every combination lands on the numbers the contract pins", {
 })
 
 test_that("the combiner under a count response lands on the numbers the contract pins", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures not found")
   read <- function(file) {

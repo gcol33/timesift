@@ -1,4 +1,5 @@
 test_that("TSS is the maximum over every cut, written out the slow way", {
+  skip_on_cran()
   set.seed(3)
   for (i in 1:20) {
     n <- sample(8:60, 1L)

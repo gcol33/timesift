@@ -150,6 +150,7 @@ test_that("static columns enter as channels that do not move across the bins", {
 })
 
 test_that("a static column is one predictor of the flattened design, not one per bin", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 5L, days = 60L)
   targets <- rep_targets(sim$units)
   spec <- rep_spec(static = "elevation")

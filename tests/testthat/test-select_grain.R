@@ -27,6 +27,7 @@ selection_fixture <- function(v = 4L) {
 }
 
 test_that("a selection reports one winner per outer fold from the candidate set it searched", {
+  skip_on_cran()
   f <- selection_fixture()
   sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                                        verbose = FALSE))
@@ -39,6 +40,7 @@ test_that("a selection reports one winner per outer fold from the candidate set 
 })
 
 test_that("the estimate is reported under every registered metric on one set of predictions", {
+  skip_on_cran()
   f <- selection_fixture()
   sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                                        verbose = FALSE))
@@ -52,6 +54,7 @@ test_that("the estimate is reported under every registered metric on one set of 
 })
 
 test_that("no outer test unit reaches the selector or the refit of its own fold", {
+  skip_on_cran()
   seen <- new.env(parent = emptyenv())
   seen$fitted <- list()
   spy <- learner(
@@ -83,6 +86,7 @@ test_that("no outer test unit reaches the selector or the refit of its own fold"
 })
 
 test_that("the summary counts how often each candidate won and print stays terse", {
+  skip_on_cran()
   f <- selection_fixture()
   sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                                        verbose = FALSE))
@@ -95,6 +99,7 @@ test_that("the summary counts how often each candidate won and print stays terse
 })
 
 test_that("the plot draws the inner scores and returns them", {
+  skip_on_cran()
   f <- selection_fixture()
   sel <- suppressWarnings(select_grain(f$x, f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                                        verbose = FALSE))
@@ -133,6 +138,7 @@ test_that("the contrast against a ladder runs through paired_contrast on matched
 })
 
 test_that("a comparator scored by another metric is refused", {
+  skip_on_cran()
   f <- selection_fixture()
   lad <- suppressWarnings(grain_ladder(f$x, f$y, selection_learner(), folds = f$folds,
                                         metric = "tss", verbose = FALSE))
@@ -142,6 +148,7 @@ test_that("a comparator scored by another metric is refused", {
 })
 
 test_that("a candidate set with nothing to choose between is refused", {
+  skip_on_cran()
   f <- selection_fixture()
   expect_error(select_grain(f$x[1L], f$y, selection_learner(), folds = f$folds, n_inner = 3L,
                             verbose = FALSE),
@@ -283,6 +290,7 @@ test_that("with no signal at any grain the procedure scores at the design's own 
 })
 
 test_that("a selection hands its control to the inner search and to the refit alike", {
+  skip_on_cran()
   f <- selection_fixture(v = 2L)
   seen <- new.env(parent = emptyenv())
   seen$epochs <- integer()
@@ -434,6 +442,7 @@ test_that("a cut learned on the inner folds reads the population skill a maximis
 })
 
 test_that("without a threshold rule no cut is learned and a rule of another name is refused", {
+  skip_on_cran()
   d <- binormal_cut_design(n = 300L, v = 2L)
   folds <- fold_map(d$y, v = 3L, seed = 3L)
   sel <- select_grain(d$x, d$y, d$learner, folds = folds, n_inner = 3L, verbose = FALSE)

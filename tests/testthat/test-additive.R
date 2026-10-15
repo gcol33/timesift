@@ -51,6 +51,7 @@ test_that("the core settles where mgcv does, to the criterion, the degrees of fr
 })
 
 test_that("past 2000 distinct values the knots are the ones set.seed(1) and sample() draw", {
+  skip_on_cran()
   fx <- additive_fixture()
   x <- fx$designs$knots
   f <- .additive_fit(x, fx$y$y, rep(1, nrow(x)), "binomial")
@@ -63,6 +64,7 @@ test_that("past 2000 distinct values the knots are the ones set.seed(1) and samp
 })
 
 test_that("responses fitted together are the responses fitted alone, on any number of threads", {
+  skip_on_cran()
   fx <- additive_fixture()
   x <- fx$designs$weekly
   y <- cbind(fx$y$y_binomial, 1 - fx$y$y_binomial)
@@ -115,6 +117,7 @@ test_that("the additive model refuses settings it has no fit for", {
 })
 
 test_that("the learner fits under both heads, round trips, and a constant response is its mean", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 120L, seed = 43L)
   y <- sim_response(sim, n_var = 2L, seed = 44L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "season")

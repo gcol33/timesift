@@ -1,4 +1,5 @@
 test_that("a threshold chosen on the scored units inflates the level it reports", {
+  skip_on_cran()
   set.seed(41)
   y <- matrix(stats::rbinom(1500, 1L, 0.15), nrow = 250,
               dimnames = list(sprintf("p%03d", 1:250), paste0("sp", 1:6)))
@@ -13,6 +14,7 @@ test_that("a threshold chosen on the scored units inflates the level it reports"
 })
 
 test_that("the inflation is larger where a fold holds fewer presences", {
+  skip_on_cran()
   units <- sprintf("p%03d", 1:400)
   thin <- matrix(0, nrow = 400, ncol = 2, dimnames = list(units, c("sp1", "sp2")))
   thin[seq(1, 400, by = 20), ] <- 1                      # 20 presences over 400 units
@@ -58,6 +60,7 @@ test_that("inverting the map recovers the skill it was planted from", {
 })
 
 test_that("a level below anything the design can report is flagged rather than extrapolated", {
+  skip_on_cran()
   set.seed(62)
   y <- matrix(stats::rbinom(600, 1L, 0.25), nrow = 100,
               dimnames = list(sprintf("p%03d", 1:100), paste0("sp", 1:6)))

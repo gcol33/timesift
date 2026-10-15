@@ -42,6 +42,7 @@ test_that("a contrast says which learner it needs and which grains it has", {
 })
 
 test_that("a ladder with no scored cell for a learner names the missing reference", {
+  skip_on_cran()
   skip_if_not_installed("lmerTest")
   lad <- data.frame(grain = rep(c("week", "month"), each = 4L), learner = "l",
                     variable = rep(c("a", "a", "b", "b"), 2L), fold = rep(1:2, 4L),
@@ -83,6 +84,7 @@ test_that("the contrast recovers a planted effect of each grain, at its stated c
 })
 
 test_that("a ladder past emmeans' default limit of 3000 observations is read the same way", {
+  skip_on_cran()
   skip_if_no_mixed_model()
   effect <- c(week = 0, day = -0.02, month = -0.05, season = -0.03)
   lad <- planted_ladder(effect, n_var = 101L, n_fold = 10L, seed = 5L)
@@ -106,6 +108,7 @@ test_that("with no effect of the grain the contrast finds none", {
 })
 
 test_that("a grain is named as the ladder names it, whatever characters it holds", {
+  skip_on_cran()
   skip_if_no_mixed_model()
   effect <- c("week.extremeday" = 0, "month-mean" = -0.03, "a (b)" = -0.06, "day" = -0.01)
   out <- grain_contrasts(planted_ladder(effect, seed = 3L), reference = "week.extremeday")
@@ -115,6 +118,7 @@ test_that("a grain is named as the ladder names it, whatever characters it holds
 })
 
 test_that("the pinned table is what the scores it was made from give", {
+  skip_on_cran()
   skip_if_no_mixed_model()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures not found")

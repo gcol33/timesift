@@ -32,6 +32,7 @@ boost_case_fit <- function(fx, row) {
 }
 
 test_that("boosting predicts what gbm, xgboost and the spec's draws predict", {
+  skip_on_cran()
   fx <- boost_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
@@ -43,6 +44,7 @@ test_that("boosting predicts what gbm, xgboost and the spec's draws predict", {
 })
 
 test_that("the inner cross-validation reads gbm's held-out error and keeps gbm's number", {
+  skip_on_cran()
   fx <- boost_fixture()
   for (case in unique(fx$cv$case)) {
     row <- fx$cases[fx$cases$case == case, ]
@@ -54,6 +56,7 @@ test_that("the inner cross-validation reads gbm's held-out error and keeps gbm's
 })
 
 test_that("the core and the oracle agree off the fixtures too", {
+  skip_on_cran()
   set.seed(90)
   n <- 50L
   x <- cbind(round(stats::rnorm(n), 1), stats::rnorm(n), sample(1:4, n, replace = TRUE))
@@ -122,6 +125,7 @@ test_that("a preset fills the settings left open, as gbm, xgboost and biomod2 ha
 })
 
 test_that("boosting fits, predicts, survives a round trip and refuses a different representation", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 60L, seed = 35L)
   y <- sim_response(sim, n_var = 2L, seed = 36L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")

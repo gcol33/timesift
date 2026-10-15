@@ -32,6 +32,7 @@ mars_case_fit <- function(fx, row) {
 }
 
 test_that("the core's forward and pruning passes keep the terms earth keeps", {
+  skip_on_cran()
   fx <- mars_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
@@ -74,6 +75,7 @@ test_that("mars refuses settings it has no pass for", {
 })
 
 test_that("mars fits under both heads, round trips, and an intercept alone is the share", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 120L, seed = 43L)
   y <- sim_response(sim, n_var = 2L, seed = 44L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "month")

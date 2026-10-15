@@ -61,6 +61,7 @@ test_that("the tree core's complexity table and its cross-validated error are rp
 })
 
 test_that("pruned by biomod2's rule, the tree predicts what rpart's pruned tree does", {
+  skip_on_cran()
   fx <- tree_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]

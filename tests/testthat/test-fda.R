@@ -28,6 +28,7 @@ fda_case_fit <- function(fx, row, calibrate) {
 }
 
 test_that("the core keeps the terms mda keeps and predicts its posterior and biomod2's", {
+  skip_on_cran()
   fx <- fda_fixture()
   for (i in seq_len(nrow(fx$cases))) {
     row <- fx$cases[i, ]
@@ -81,6 +82,7 @@ test_that("discriminant refuses settings and responses it has no fit for", {
 })
 
 test_that("discriminant fits, round trips, and a constant response is its mean", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 120L, seed = 43L)
   y <- sim_response(sim, n_var = 2L, seed = 44L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "month")

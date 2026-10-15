@@ -115,6 +115,7 @@ test_that("the path's first point leaves every coefficient at zero above a ridge
 })
 
 test_that("a fit is read at a named penalty, at one of its own, and refuses anything else", {
+  skip_on_cran()
   dir <- penalised_dir()
   input <- penalised_input(dir)
   fit <- .penalised_cv(input$x, input$binomial, rep(1, nrow(input$x)), "binomial", 0.5,
@@ -166,6 +167,7 @@ test_that("a column holding one value is carried through the penalised fit at ze
 })
 
 test_that("a cross-validation on threads returns what one on a single thread returns", {
+  skip_on_cran()
   dir <- penalised_dir()
   input <- penalised_input(dir)
   w <- rep(1, nrow(input$x))
@@ -205,6 +207,7 @@ test_that("a penalty the fit does not settle at ends the path and keeps the poin
 })
 
 test_that("a cross-validation reads a fold whose path ended early and says which did", {
+  skip_on_cran()
   dir <- penalised_dir()
   input <- penalised_input(dir)
   w <- rep(1, nrow(input$x))
@@ -237,6 +240,7 @@ test_that("the captured call glmnet does not settle on chooses the penalty cv.gl
 })
 
 test_that("the penalised learner fits over the core and carries no fitter of its own", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 56L, seed = 91L)
   y <- sim_response(sim, n_var = 2L, seed = 92L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")
@@ -255,6 +259,7 @@ test_that("the penalised learner fits over the core and carries no fitter of its
 })
 
 test_that("the penalised learner reads the penalty its `s` names", {
+  skip_on_cran()
   sim <- sim_series(n_unit = 60L, days = 56L, seed = 93L)
   y <- sim_response(sim, n_var = 1L, seed = 94L)
   x <- grain_matrix(sim$readings, plot, t, temp, grain = "week")

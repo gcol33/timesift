@@ -1,4 +1,5 @@
 test_that("a simulation is reproducible from its seed and its draw", {
+  skip_on_cran()
   a <- simulate_records(n = 30L, mechanism = "event", variables = 3L, days = 40L, seed = 7L)
   b <- simulate_records(n = 30L, mechanism = "event", variables = 3L, days = 40L, seed = 7L)
   expect_identical(a$readings, b$readings)
@@ -35,6 +36,7 @@ test_that("prevalence and the driver's skill are set rather than emergent", {
 })
 
 test_that("the readings are a gapless grid every grain can be built on", {
+  skip_on_cran()
   sim <- simulate_records(n = 12L, mechanism = "none", variables = 2L, days = 365L)
   expect_equal(nrow(sim$readings), 12L * 365L * 8L)
   for (w in c("halfday", "day", "week", "month", "season", "year")) {
@@ -103,6 +105,7 @@ test_that("no grain recovers anything when there is no temporal signal", {
 })
 
 test_that("the offset carries the response only when it is asked to", {
+  skip_on_cran()
   free <- simulate_records(n = 600L, mechanism = "event", variables = 3L, days = 120L,
                            offset_effect = 0, seed = 5L)
   tied <- simulate_records(n = 600L, mechanism = "event", variables = 3L, days = 120L,
@@ -138,6 +141,7 @@ test_that("the generator refuses a design it cannot place", {
 })
 
 test_that("the design is the one the contract pins", {
+  skip_on_cran()
   dir <- fixture_dir()
   skip_if(is.null(dir), "fixtures not found")
   pinned <- utils::read.csv(file.path(dir, "simulate_design.csv"), stringsAsFactors = FALSE)

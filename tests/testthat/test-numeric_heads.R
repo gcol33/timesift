@@ -88,6 +88,7 @@ test_that("a head refuses a response it cannot hold", {
 })
 
 test_that("a run under a numeric head is scored by that head's metric and stacked", {
+  skip_on_cran()
   d <- numeric_data()
   targets <- data.frame(plot = d$units, height = d$height, stringsAsFactors = FALSE)
   run <- suppressWarnings(timesift(
@@ -106,6 +107,7 @@ test_that("a run under a numeric head is scored by that head's metric and stacke
 })
 
 test_that("the learners that need presences and absences refuse a numeric head", {
+  skip_on_cran()
   d <- numeric_data()
   for (l in list(discriminant(), envelope(), maxent())) {
     expect_error(fit_learner(l, d$x, d$y, response = "continuous"), "squared_error",
