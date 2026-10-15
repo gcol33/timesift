@@ -3,7 +3,7 @@
 *choosing the time scale of a sensor record*
 
 [![PyPI](https://img.shields.io/pypi/v/timesift)](https://pypi.org/project/timesift/)
-[![PyPI downloads](https://static.pepy.tech/badge/timesift)](https://pepy.tech/project/timesift)
+[![downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgcol33%2Ftimesift%2Fbadges%2Fdownloads.json)](https://github.com/gcol33/timesift/blob/badges/README.md)
 [![pytest](https://github.com/gcol33/timesift/actions/workflows/pytest.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/pytest.yaml)
 [![contract](https://github.com/gcol33/timesift/actions/workflows/contract.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/contract.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
