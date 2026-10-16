@@ -370,10 +370,10 @@ fit = ts.timesift(targets, sim.readings, y="v*", id="unit", time="time",
                   resampling=ts.cv(v=5), n_inner=3, verbose=False)
 elapsed = time.perf_counter() - start
 round(elapsed)
-#> 27
+#> 26
 ```
 
-The run took 3127 seconds for 15 candidates. With three inner folds in
+The run took 3126 seconds for 15 candidates. With three inner folds in
 each of five outer folds, every candidate is fitted 5 x (3 + 1) = 20
 times, three inner fits and one outer fit in each outer fold, and once
 more on every target.
@@ -1233,13 +1233,13 @@ seconds <- vapply(timed, function(l) {
 }, numeric(1))
 sort(round(seconds, 2), decreasing = TRUE)
 #>                 linear             elasticnet                 forest 
-#>                  10.08                   3.91                   0.46 
+#>                  10.55                   3.97                   0.47 
 #>                 maxent elasticnet(tol = 1e-4)           discriminant 
-#>                   0.43                   0.31                   0.18 
+#>                   0.38                   0.32                   0.17 
 #>                xgboost             perceptron               boosting 
-#>                   0.09                   0.06                   0.03 
+#>                   0.08                   0.06                   0.04 
 #>                   tree                   mars           hierarchical 
-#>                   0.02                   0.02                   0.02 
+#>                   0.03                   0.02                   0.01 
 #>               envelope 
 #>                   0.00
 ```
@@ -1260,12 +1260,12 @@ def seconds_to_fit(learner, x=week):
 
 seconds = pd.Series({name: seconds_to_fit(l) for name, l in timed.items()})
 seconds.round(2).sort_values(ascending=False)
-#> linear                  4.89
-#> elasticnet              3.85
-#> maxent                  0.57
-#> forest                  0.46
-#> discriminant            0.19
-#> elasticnet(tol=1e-4)    0.18
+#> linear                  5.03
+#> elasticnet              3.80
+#> forest                  0.48
+#> maxent                  0.42
+#> elasticnet(tol=1e-4)    0.17
+#> discriminant            0.17
 #> xgboost                 0.09
 #> perceptron              0.03
 #> boosting                0.03
@@ -1302,7 +1302,7 @@ additive_seconds <- c(
   `k = 5` = system.time(fit_learner(additive(k = 5L), month, sim$y))[["elapsed"]])
 round(additive_seconds, 2)
 #> k = 10  k = 5 
-#>  21.86   0.54
+#>  22.03   0.53
 ```
 
 ``` python
@@ -1310,25 +1310,25 @@ month = ts.grain_matrix(sim.readings, "unit", "time", "reading", grain="month")
 additive_seconds = pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
                               "k = 5": seconds_to_fit(ts.additive(k=5), month)})
 additive_seconds.round(2)
-#> k = 10    12.11
-#> k = 5      0.70
+#> k = 10    12.07
+#> k = 5      0.68
 #> dtype: float64
 ```
 
-With `k = 10` the fit took 21.912.1 seconds, and with `k = 5` it took
+With `k = 10` the fit took 2212.1 seconds, and with `k = 5` it took
 0.50.7 seconds.
 
 The elastic net includes every predictor and uses a penalty to limit
 coefficient size. It chooses that penalty within the training data. At
-its default tolerance it took 3.93.9 seconds here; `tol = 1e-4` took
+its default tolerance it took 43.8 seconds here; `tol = 1e-4` took
 0.30.2 seconds and gave the same held-out AUC on the split abovea
 held-out AUC of0.727on the split above, against0.729at the default.
 [`linear()`](https://gillescolling.com/timesift/reference/linear.md)
-took 10.14.9 seconds. Its search refits the model for each term it could
+took 10.55.0 seconds. Its search refits the model for each term it could
 add or remove, with 106 possible terms at the weekly grain. A coarser
 grain or a bounded search, such as
 `linear(select = "forward", terms = "column", max_terms = 3)`, reduces
-the number of fits. Every other tabular learner took at most 0.460.57
+the number of fits. Every other tabular learner took at most 0.470.48
 seconds.
 
 What a learner can be fitted on depends on the number of units against
