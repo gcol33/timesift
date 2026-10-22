@@ -196,8 +196,8 @@ fit
 #> weights on every target  elasticnet / month 1.00
 ```
 
-`targets` holds one 0/1 column per response and the identifier, here
-`unit`; `series` holds that identifier, a date-time column and the
+`targets` contains one 0/1 column per response and the identifier, here
+`unit`; `series` contains that identifier, a date-time column and the
 values, one row per reading. `y` takes tidyselect expressions such as
 `starts_with("sp_")`. A table with a missing reading in a bin is
 refused, and
@@ -290,8 +290,10 @@ from a scored run to maps.
 The true skill statistic (TSS) is overestimated when the threshold is
 chosen to maximise TSS on the same held-out observations used to report
 the score. The fewer presences there are in the held-out data, the more
-TSS tends to overestimate population skill. For the Schrankogel design,
-the estimated inflation is 0.110 on average when the true skill is 0.60.
+TSS tends to overestimate population skill. For the sampling design of
+the Schrankogel study, a record of hourly soil temperature from alpine
+plots, the estimated inflation is 0.110 on average when the true skill
+is 0.60.
 
 [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.md)
 estimates the TSS that a given sampling design would report for a known
@@ -304,17 +306,23 @@ simulation-based matching follows the principle of indirect inference
 ([Gouriéroux et al.,
 1993](https://stat.cmu.edu/~cshalizi/462/readings/Indirect%20Inference%20%28Gourieroux%2C%20Monfort%20and%20Renault%29.pdf)).
 By default, runs are scored by the area under the receiver operating
-characteristic curve (AUC), with TSS also reported.
+characteristic curve (AUC), with TSS also reported. [Scores, thresholds
+and their
+inflation](https://gillescolling.com/timesift/articles/comparing-grains.html#scores-thresholds-and-their-inflation)
+works through both functions.
 
 ## Documentation
 
 Start with [Choosing how a record is
 read](https://gillescolling.com/timesift/articles/timesift.html): one
 path from two tables to a scored comparison and predictions. Every code
-block has an R and a Python version; the page opens in Python through
-[this
-link](https://gillescolling.com/timesift/articles/timesift.html?lang=python).
+block has an R and a Python version, and the [Python view of Get
+started](https://gillescolling.com/timesift/articles/timesift.html?lang=python)
+opens with Python selected.
 
+- [Installing
+  torch](https://gillescolling.com/timesift/articles/installation.html):
+  the CUDA build, checking what torch found, and failed downloads.
 - [Representing a
   record](https://gillescolling.com/timesift/articles/representations.html):
   grains, statistics, calendars, lookbacks and the arrays they give.
@@ -369,7 +377,7 @@ Coffee](https://img.shields.io/badge/-Buy%20me%20a%20coffee-FFDD00?logo=buymeaco
 
 ## License
 
-MIT (see the LICENSE file)
+timesift is licensed under MIT (see the LICENSE file).
 
 ## Citation
 
@@ -377,8 +385,9 @@ To cite timesift in publications use:
 
 ``` text
 Colling G (2026). _timesift: Learn Predictive Representations of
-Time-Varying Data_. R package version 0.6.0,
-<https://gillescolling.com/timesift/>.
+Time-Varying Data_. doi:10.32614/CRAN.package.timesift
+<https://doi.org/10.32614/CRAN.package.timesift>. R package version
+0.6.0, <https://gillescolling.com/timesift/>.
 ```
 
 BibTeX:
@@ -389,6 +398,7 @@ BibTeX:
   author = {Gilles Colling},
   year = {2026},
   note = {R package version 0.6.0},
+  doi = {10.32614/CRAN.package.timesift},
   url = {https://gillescolling.com/timesift/},
 }
 ```

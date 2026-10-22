@@ -23,18 +23,50 @@ MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.or
 <img src="man/figures/timesift-hero.png" alt="Three years of hourly soil temperature from one alpine plot drawn at seven time scales, from hourly readings down to yearly means, beside the true skill statistic a convolutional network reached on each over 101 species: 0.658 hourly, rising to a peak of 0.706 at the weekly mean, falling to 0.626 yearly" width="100%">
 </p>
 
-timesift compares time scales to find which gives the best predictions from a sensor record. For example, you can use three years of hourly soil temperature to predict which plant species grow at a plot, and compare models trained on daily, weekly or monthly summaries.
+timesift compares time scales to find which gives the best predictions
+from a sensor record. For example, you can use three years of hourly
+soil temperature to predict which plant species grow at a plot, and
+compare models trained on daily, weekly or monthly summaries.
 
-A *grain* is the time interval used to summarise the readings, such as a day, week or month. timesift groups readings into these calendar intervals and calculates a summary, such as the mean, for each one. It fits each model at each compatible grain and evaluates them on the same held-out observations. You can compare their predictions, select a grain using the training data, or combine predictions from several models in an ensemble.
+A *grain* is the time interval used to summarise the readings, such as a
+day, week or month. timesift groups readings into these calendar
+intervals and calculates a summary, such as the mean, for each one. It
+fits each model at each compatible grain and evaluates them on the same
+held-out observations. You can compare their predictions, select a grain
+using the training data, or combine predictions from several models in
+an ensemble.
 
 timesift lets you:
 
-- **Calendar grains and lookbacks.** Summarise sensor readings by half-day, day, week, month, season or year, using statistics such as the mean or the coldest and warmest daily mean. You can also use the original readings or [`lookback()`](https://gillescolling.com/timesift/reference/native.html) to summarise a period ending at each observation date.
-- **Species distribution learners.** Predict species distributions with elastic net, stepwise GLMs, classification trees, random forests, boosting, Maxent, surface range envelopes, MARS, flexible discriminant analysis, GAMs and neural networks, or add your own model.
-- **Report evaluation scores.** Evaluate model selection and ensembles on held-out data: each training fold chooses the grain and estimates the ensemble weights, and the matching test fold scores the predictions. Selecting the TSS threshold on the same data used to evaluate it can inflate reported skill. [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.html) estimates this bias for your design, while [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.html) helps interpret the reported score.
-- **Python and R.** Run analyses in R or Python. Both interfaces use the same C++ code for data preparation and baseline models, giving matching arrays and model fits.
+- **Calendar grains and lookbacks.** Summarise sensor readings by
+  half-day, day, week, month, season or year, using statistics such as
+  the mean or the coldest and warmest daily mean. You can also use the
+  original readings or
+  [`lookback()`](https://gillescolling.com/timesift/reference/native.html)
+  to summarise a period ending at each observation date.
+- **Species distribution learners.** Predict species distributions with
+  elastic net, stepwise GLMs, classification trees, random forests,
+  boosting, Maxent, surface range envelopes, MARS, flexible discriminant
+  analysis, GAMs and neural networks, or add your own model.
+- **Report evaluation scores.** Evaluate model selection and ensembles
+  on held-out data: each training fold chooses the grain and estimates
+  the ensemble weights, and the matching test fold scores the
+  predictions. Selecting the TSS threshold on the same data used to
+  evaluate it can inflate reported skill.
+  [`tss_inflation()`](https://gillescolling.com/timesift/reference/tss_inflation.html)
+  estimates this bias for your design, while
+  [`implied_skill()`](https://gillescolling.com/timesift/reference/implied_skill.html)
+  helps interpret the reported score.
+- **Python and R.** Run analyses in R or Python. Both interfaces use the
+  same C++ code for data preparation and baseline models, giving
+  matching arrays and model fits.
 
-The model implementations are based on published methods and tested against reference packages including glmnet, MASS, rpart, earth, mda, mgcv, nnet, maxnet and biomod2. R and Python are tested against the same stored results, so they produce identical binned arrays. Cite the timesift version to identify the implementations and defaults used in an analysis.
+The model implementations are based on published methods and tested
+against reference packages including glmnet, MASS, rpart, earth, mda,
+mgcv, nnet, maxnet and biomod2. R and Python are tested against the same
+stored results, so they produce identical binned arrays. Cite the
+timesift version to identify the implementations and defaults used in an
+analysis.
 
 ## Installation
 
@@ -125,11 +157,16 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 ## Usage
 
-1. Prepare two tables: `targets`, with one row per sampling unit and its responses, and `series`, with the time-stamped readings for those units.
-2. Call `timesift()` with the response columns, the identifier shared by both tables, the time column and the grains to compare.
-3. Inspect the scores, then call `predict()` for new sampling units.
+1.  Prepare two tables: `targets`, with one row per sampling unit and
+    its responses, and `series`, with the time-stamped readings for
+    those units.
+2.  Call `timesift()` with the response columns, the identifier shared
+    by both tables, the time column and the grains to compare.
+3.  Inspect the scores, then call `predict()` for new sampling units.
 
-This example uses `simulate_records()` to generate a year of readings from 150 sensors, sampled every three hours. The four responses depend on seasonal values in the simulated record.
+This example uses `simulate_records()` to generate a year of readings
+from 150 sensors, sampled every three hours. The four responses depend
+on seasonal values in the simulated record.
 
 ``` r
 library(timesift)
@@ -159,17 +196,28 @@ fit
 #> weights on every target  elasticnet / month 1.00
 ```
 
-`targets` holds one 0/1 column per response and the identifier, here
-`unit`; `series` holds that identifier, a date-time column and the
+`targets` contains one 0/1 column per response and the identifier, here
+`unit`; `series` contains that identifier, a date-time column and the
 values, one row per reading. `y` takes tidyselect expressions such as
 `starts_with("sp_")`. A table with a missing reading in a bin is
 refused, and `coverage()` shows which unit and bin lack readings.
 
-A *candidate* is a model fitted at one grain. The default model is `elasticnet()`. The candidate rows show how each pairing performed in cross-validation: each fold is held out in turn for evaluation. Selecting the highest score from these rows uses the evaluation data to choose a candidate.
+A *candidate* is a model fitted at one grain. The default model is
+`elasticnet()`. The candidate rows show how each pairing performed in
+cross-validation: each fold is held out in turn for evaluation.
+Selecting the highest score from these rows uses the evaluation data to
+choose a candidate.
 
-Use the `selected` and `ensemble` rows to report predictive performance. For these rows, candidate selection and ensemble weighting happen within each training fold. The held-out fold then evaluates the resulting predictions.
+Use the `selected` and `ensemble` rows to report predictive performance.
+For these rows, candidate selection and ensemble weighting happen within
+each training fold. The held-out fold then evaluates the resulting
+predictions.
 
-`predict(fit, new_targets, new_series)` summarises the new readings at each required grain and predicts with the ensemble trained on all targets. Use `type = "binary"` to convert predicted probabilities to presence or absence. The threshold for each response is estimated from out-of-fold predictions.
+`predict(fit, new_targets, new_series)` summarises the new readings at
+each required grain and predicts with the ensemble trained on all
+targets. Use `type = "binary"` to convert predicted probabilities to
+presence or absence. The threshold for each response is estimated from
+out-of-fold predictions.
 
 The same run in Python:
 
@@ -194,9 +242,14 @@ print(fit)
 two bins. A learner runs across the whole set, or at one grain when it
 is given one, as in `cnn(data = grain("week"))`.
 
-Bins follow the calendar: months have 28 to 31 days, and weeks start on Monday. `year_start` sets the start of the year, for example for a hydrological year. You can define a custom calendar with a function of the reading times, such as seasons beginning at the equinoxes.
+Bins follow the calendar: months have 28 to 31 days, and weeks start on
+Monday. `year_start` sets the start of the year, for example for a
+hydrological year. You can define a custom calendar with a function of
+the reading times, such as seasons beginning at the equinoxes.
 
-`min` and `max` give the lowest and highest individual reading in each bin. `cold_day` and `warm_day` first calculate daily means, then return the lowest and highest daily mean within the bin.
+`min` and `max` give the lowest and highest individual reading in each
+bin. `cold_day` and `warm_day` first calculate daily means, then return
+the lowest and highest daily mean within the bin.
 
 `grain_matrix()` and `lookback_matrix()` return the binned arrays,
 `[unit, bin, channel]`, without fitting anything. [Representing a
@@ -222,18 +275,39 @@ from a scored run to maps.
 
 ## TSS and threshold selection
 
-The true skill statistic (TSS) is overestimated when the threshold is chosen to maximise TSS on the same held-out observations used to report the score. The fewer presences there are in the held-out data, the more TSS tends to overestimate population skill. For the Schrankogel design, the estimated inflation is 0.110 on average when the true skill is 0.60.
+The true skill statistic (TSS) is overestimated when the threshold is
+chosen to maximise TSS on the same held-out observations used to report
+the score. The fewer presences there are in the held-out data, the more
+TSS tends to overestimate population skill. For the sampling design of
+the Schrankogel study, a record of hourly soil temperature from alpine
+plots, the estimated inflation is 0.110 on average when the true skill
+is 0.60.
 
-`tss_inflation()` estimates the TSS that a given sampling design would report for a known population skill. `implied_skill()` reverses this calculation: given a reported TSS, it estimates the population skill that would yield that score on average under the same sampling design and assumed prediction distribution. This simulation-based matching follows the principle of indirect inference ([Gouriéroux et al., 1993](https://stat.cmu.edu/~cshalizi/462/readings/Indirect%20Inference%20%28Gourieroux%2C%20Monfort%20and%20Renault%29.pdf)). By default, runs are scored by the area under the receiver operating characteristic curve (AUC), with TSS also reported.
+`tss_inflation()` estimates the TSS that a given sampling design would
+report for a known population skill. `implied_skill()` reverses this
+calculation: given a reported TSS, it estimates the population skill
+that would yield that score on average under the same sampling design
+and assumed prediction distribution. This simulation-based matching
+follows the principle of indirect inference ([Gouriéroux et al.,
+1993](https://stat.cmu.edu/~cshalizi/462/readings/Indirect%20Inference%20%28Gourieroux%2C%20Monfort%20and%20Renault%29.pdf)).
+By default, runs are scored by the area under the receiver operating
+characteristic curve (AUC), with TSS also reported. [Scores, thresholds
+and their
+inflation](https://gillescolling.com/timesift/articles/comparing-grains.html#scores-thresholds-and-their-inflation)
+works through both functions.
 
 ## Documentation
 
 Start with [Choosing how a record is
 read](https://gillescolling.com/timesift/articles/timesift.html): one
-path from two tables to a scored comparison and predictions. Every code block
-has an R and a Python version; the page opens in Python through
-[this link](https://gillescolling.com/timesift/articles/timesift.html?lang=python).
+path from two tables to a scored comparison and predictions. Every code
+block has an R and a Python version, and the [Python view of Get
+started](https://gillescolling.com/timesift/articles/timesift.html?lang=python)
+opens with Python selected.
 
+- [Installing
+  torch](https://gillescolling.com/timesift/articles/installation.html):
+  the CUDA build, checking what torch found, and failed downloads.
 - [Representing a
   record](https://gillescolling.com/timesift/articles/representations.html):
   grains, statistics, calendars, lookbacks and the arrays they give.
@@ -288,7 +362,7 @@ Coffee](https://img.shields.io/badge/-Buy%20me%20a%20coffee-FFDD00?logo=buymeaco
 
 ## License
 
-MIT (see the LICENSE file)
+timesift is licensed under MIT (see the LICENSE file).
 
 ## Citation
 
@@ -296,8 +370,9 @@ To cite timesift in publications use:
 
 ``` text
 Colling G (2026). _timesift: Learn Predictive Representations of
-Time-Varying Data_. R package version 0.6.0,
-<https://gillescolling.com/timesift/>.
+Time-Varying Data_. doi:10.32614/CRAN.package.timesift
+<https://doi.org/10.32614/CRAN.package.timesift>. R package version
+0.6.0, <https://gillescolling.com/timesift/>.
 ```
 
 BibTeX:
@@ -308,6 +383,7 @@ BibTeX:
   author = {Gilles Colling},
   year = {2026},
   note = {R package version 0.6.0},
+  doi = {10.32614/CRAN.package.timesift},
   url = {https://gillescolling.com/timesift/},
 }
 ```

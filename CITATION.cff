@@ -18,5 +18,6 @@ preferred-citation:
     given-names: Gilles
     orcid: https://orcid.org/0000-0003-3070-6066
   year: 2026
+  doi: 10.32614/CRAN.package.timesift
   url: https://gillescolling.com/timesift/
   notes: R package version 0.6.0

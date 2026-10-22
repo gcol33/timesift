@@ -37,3 +37,5 @@ figure/
 
 # Chunk caches of the site build.
 vignettes/**/*_cache/
+
+.run*

@@ -228,7 +228,7 @@
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; choice on every target  elasticnet / month</span></span>
 <span><span class="co">#&gt; weights on every target  elasticnet / month 1.00</span></span></code></pre></div>
-<p><code>targets</code> holds one 0/1 column per response and the identifier, here <code>unit</code>; <code>series</code> holds that identifier, a date-time column and the values, one row per reading. <code>y</code> takes tidyselect expressions such as <code>starts_with("sp_")</code>. A table with a missing reading in a bin is refused, and <code><a href="reference/coverage.html">coverage()</a></code> shows which unit and bin lack readings.</p>
+<p><code>targets</code> contains one 0/1 column per response and the identifier, here <code>unit</code>; <code>series</code> contains that identifier, a date-time column and the values, one row per reading. <code>y</code> takes tidyselect expressions such as <code>starts_with("sp_")</code>. A table with a missing reading in a bin is refused, and <code><a href="reference/coverage.html">coverage()</a></code> shows which unit and bin lack readings.</p>
 <p>A <em>candidate</em> is a model fitted at one grain. The default model is <code><a href="reference/elasticnet.html">elasticnet()</a></code>. The candidate rows show how each pairing performed in cross-validation: each fold is held out in turn for evaluation. Selecting the highest score from these rows uses the evaluation data to choose a candidate.</p>
 <p>Use the <code>selected</code> and <code>ensemble</code> rows to report predictive performance. For these rows, candidate selection and ensemble weighting happen within each training fold. The held-out fold then evaluates the resulting predictions.</p>
 <p><code>predict(fit, new_targets, new_series)</code> summarises the new readings at each required grain and predicts with the ensemble trained on all targets. Use <code>type = "binary"</code> to convert predicted probabilities to presence or absence. The threshold for each response is estimated from out-of-fold predictions.</p>
@@ -262,14 +262,16 @@
 <div class="section level2">
 <h2 id="tss-and-threshold-selection">TSS and threshold selection<a class="anchor" aria-label="anchor" href="#tss-and-threshold-selection"></a>
 </h2>
-<p>The true skill statistic (TSS) is overestimated when the threshold is chosen to maximise TSS on the same held-out observations used to report the score. The fewer presences there are in the held-out data, the more TSS tends to overestimate population skill. For the Schrankogel design, the estimated inflation is 0.110 on average when the true skill is 0.60.</p>
-<p><code><a href="reference/tss_inflation.html">tss_inflation()</a></code> estimates the TSS that a given sampling design would report for a known population skill. <code><a href="reference/implied_skill.html">implied_skill()</a></code> reverses this calculation: given a reported TSS, it estimates the population skill that would yield that score on average under the same sampling design and assumed prediction distribution. This simulation-based matching follows the principle of indirect inference (<a href="https://stat.cmu.edu/~cshalizi/462/readings/Indirect%20Inference%20%28Gourieroux%2C%20Monfort%20and%20Renault%29.pdf" class="external-link">Gouriéroux et al., 1993</a>). By default, runs are scored by the area under the receiver operating characteristic curve (AUC), with TSS also reported.</p>
+<p>The true skill statistic (TSS) is overestimated when the threshold is chosen to maximise TSS on the same held-out observations used to report the score. The fewer presences there are in the held-out data, the more TSS tends to overestimate population skill. For the sampling design of the Schrankogel study, a record of hourly soil temperature from alpine plots, the estimated inflation is 0.110 on average when the true skill is 0.60.</p>
+<p><code><a href="reference/tss_inflation.html">tss_inflation()</a></code> estimates the TSS that a given sampling design would report for a known population skill. <code><a href="reference/implied_skill.html">implied_skill()</a></code> reverses this calculation: given a reported TSS, it estimates the population skill that would yield that score on average under the same sampling design and assumed prediction distribution. This simulation-based matching follows the principle of indirect inference (<a href="https://stat.cmu.edu/~cshalizi/462/readings/Indirect%20Inference%20%28Gourieroux%2C%20Monfort%20and%20Renault%29.pdf" class="external-link">Gouriéroux et al., 1993</a>). By default, runs are scored by the area under the receiver operating characteristic curve (AUC), with TSS also reported. <a href="https://gillescolling.com/timesift/articles/comparing-grains.html#scores-thresholds-and-their-inflation">Scores, thresholds and their inflation</a> works through both functions.</p>
 </div>
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
 </h2>
-<p>Start with <a href="https://gillescolling.com/timesift/articles/timesift.html">Choosing how a record is read</a>: one path from two tables to a scored comparison and predictions. Every code block has an R and a Python version; the page opens in Python through <a href="https://gillescolling.com/timesift/articles/timesift.html?lang=python">this link</a>.</p>
+<p>Start with <a href="https://gillescolling.com/timesift/articles/timesift.html">Choosing how a record is read</a>: one path from two tables to a scored comparison and predictions. Every code block has an R and a Python version, and the <a href="https://gillescolling.com/timesift/articles/timesift.html?lang=python">Python view of Get started</a> opens with Python selected.</p>
 <ul>
+<li>
+<a href="https://gillescolling.com/timesift/articles/installation.html">Installing torch</a>: the CUDA build, checking what torch found, and failed downloads.</li>
 <li>
 <a href="https://gillescolling.com/timesift/articles/representations.html">Representing a record</a>: grains, statistics, calendars, lookbacks and the arrays they give.</li>
 <li>
@@ -311,23 +313,25 @@
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>
 </h2>
-<p>MIT (see the LICENSE file)</p>
+<p>timesift is licensed under MIT (see the LICENSE file).</p>
 </div>
 <div class="section level2">
 <h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>
 </h2>
 <p>To cite timesift in publications use:</p>
 <pre class="text"><code>Colling G (2026). _timesift: Learn Predictive Representations of
-Time-Varying Data_. R package version 0.6.0,
-&lt;https://gillescolling.com/timesift/&gt;.</code></pre>
+Time-Varying Data_. doi:10.32614/CRAN.package.timesift
+&lt;https://doi.org/10.32614/CRAN.package.timesift&gt;. R package version
+0.6.0, &lt;https://gillescolling.com/timesift/&gt;.</code></pre>
 <p>BibTeX:</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode bibtex"><code class="sourceCode bibtex"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="va">@Manual</span>{<span class="ot">colling2026timesift</span>,</span>
 <span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="dt">title</span> = {timesift: Learn Predictive Representations of Time-Varying Data},</span>
 <span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="dt">author</span> = {Gilles Colling},</span>
 <span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="dt">year</span> = {2026},</span>
 <span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="dt">note</span> = {R package version 0.6.0},</span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="dt">url</span> = {https://gillescolling.com/timesift/},</span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>}</span></code></pre></div>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="dt">doi</span> = {10.32614/CRAN.package.timesift},</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>  <span class="dt">url</span> = {https://gillescolling.com/timesift/},</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>}</span></code></pre></div>
 <p>Download the citation as <a href="https://gillescolling.com/timesift/timesift.bib">BibTeX</a> or <a href="https://gillescolling.com/timesift/timesift.ris">RIS</a>.</p>
 </div>
 </div>

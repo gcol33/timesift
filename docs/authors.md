@@ -12,12 +12,13 @@ Source:
 
 Colling, G. (2026). timesift: Learn Predictive Representations of
 Time-Varying Data. R package version 0.6.0.
-https://gillescolling.com/timesift/
+https://doi.org/10.32614/CRAN.package.timesift
 
     @Manual{colling2026timesift,
       title = {timesift: Learn Predictive Representations of Time-Varying Data},
       author = {Gilles Colling},
       year = {2026},
       note = {R package version 0.6.0},
+      doi = {10.32614/CRAN.package.timesift},
       url = {https://gillescolling.com/timesift/},
     }

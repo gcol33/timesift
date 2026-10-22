@@ -38,3 +38,4 @@
 ^CITATION\.cff$
 ^sidecars$
 ^vignettes/[^/]*_cache$
+^\.run.*$
