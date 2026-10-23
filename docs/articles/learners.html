@@ -513,7 +513,7 @@ under its learner’s <code>name</code>, which
 <span>                  resampling <span class="op">=</span> <span class="fu"><a href="../reference/cv.html">cv</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>, n_inner <span class="op">=</span> <span class="fl">3L</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">run_time</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 29.85</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 29.86</span></span></code></pre></div>
 <div class="sourceCode" id="cb15"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="im">import</span> time</span>
 <span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> replace</span>
 <span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
@@ -1296,13 +1296,13 @@ at the weekly grain, which flattens to 53 columns.</p>
 <span><span class="op">}</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">seconds</span>, <span class="fl">2</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                 linear             elasticnet                 forest </span></span>
-<span><span class="co">#&gt;                  10.56                   4.25                   0.47 </span></span>
+<span><span class="co">#&gt;                  10.11                   3.90                   0.47 </span></span>
 <span><span class="co">#&gt;                 maxent elasticnet(tol = 1e-4)           discriminant </span></span>
-<span><span class="co">#&gt;                   0.36                   0.33                   0.20 </span></span>
+<span><span class="co">#&gt;                   0.36                   0.31                   0.17 </span></span>
 <span><span class="co">#&gt;                xgboost             perceptron                   tree </span></span>
-<span><span class="co">#&gt;                   0.07                   0.06                   0.03 </span></span>
+<span><span class="co">#&gt;                   0.08                   0.04                   0.03 </span></span>
 <span><span class="co">#&gt;               boosting                   mars               envelope </span></span>
-<span><span class="co">#&gt;                   0.03                   0.01                   0.00 </span></span>
+<span><span class="co">#&gt;                   0.03                   0.02                   0.00 </span></span>
 <span><span class="co">#&gt;           hierarchical </span></span>
 <span><span class="co">#&gt;                   0.00</span></span></code></pre></div>
 <div class="sourceCode" id="cb55"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" tabindex="-1"></a>timed <span class="op">=</span> {</span>
@@ -1320,10 +1320,10 @@ at the weekly grain, which flattens to 53 columns.</p>
 <span id="cb55-13"><a href="#cb55-13" tabindex="-1"></a></span>
 <span id="cb55-14"><a href="#cb55-14" tabindex="-1"></a>seconds <span class="op">=</span> pd.Series({name: seconds_to_fit(l) <span class="cf">for</span> name, l <span class="kw">in</span> timed.items()})</span>
 <span id="cb55-15"><a href="#cb55-15" tabindex="-1"></a>seconds.<span class="bu">round</span>(<span class="dv">2</span>).sort_values(ascending<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb55-16"><a href="#cb55-16" tabindex="-1"></a><span class="co">#&gt; linear                  5.04</span></span>
-<span id="cb55-17"><a href="#cb55-17" tabindex="-1"></a><span class="co">#&gt; elasticnet              3.73</span></span>
+<span id="cb55-16"><a href="#cb55-16" tabindex="-1"></a><span class="co">#&gt; linear                  4.91</span></span>
+<span id="cb55-17"><a href="#cb55-17" tabindex="-1"></a><span class="co">#&gt; elasticnet              3.79</span></span>
 <span id="cb55-18"><a href="#cb55-18" tabindex="-1"></a><span class="co">#&gt; forest                  0.47</span></span>
-<span id="cb55-19"><a href="#cb55-19" tabindex="-1"></a><span class="co">#&gt; maxent                  0.41</span></span>
+<span id="cb55-19"><a href="#cb55-19" tabindex="-1"></a><span class="co">#&gt; maxent                  0.44</span></span>
 <span id="cb55-20"><a href="#cb55-20" tabindex="-1"></a><span class="co">#&gt; elasticnet(tol=1e-4)    0.17</span></span>
 <span id="cb55-21"><a href="#cb55-21" tabindex="-1"></a><span class="co">#&gt; discriminant            0.17</span></span>
 <span id="cb55-22"><a href="#cb55-22" tabindex="-1"></a><span class="co">#&gt; xgboost                 0.08</span></span>
@@ -1356,26 +1356,26 @@ coefficients than there are units:</p>
 <span>  `k = 5` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="fu"><a href="../reference/fit_learner.html">fit_learner</a></span><span class="op">(</span><span class="fu"><a href="../reference/additive.html">additive</a></span><span class="op">(</span>k <span class="op">=</span> <span class="fl">5L</span><span class="op">)</span>, <span class="va">month</span>, <span class="va">sim</span><span class="op">$</span><span class="va">y</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">additive_seconds</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt; k = 10  k = 5 </span></span>
-<span><span class="co">#&gt;  21.82   0.53</span></span></code></pre></div>
+<span><span class="co">#&gt;  21.56   0.53</span></span></code></pre></div>
 <div class="sourceCode" id="cb59"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" tabindex="-1"></a>month <span class="op">=</span> ts.grain_matrix(sim.readings, <span class="st">"unit"</span>, <span class="st">"time"</span>, <span class="st">"reading"</span>, grain<span class="op">=</span><span class="st">"month"</span>)</span>
 <span id="cb59-2"><a href="#cb59-2" tabindex="-1"></a>additive_seconds <span class="op">=</span> pd.Series({<span class="st">"k = 10"</span>: seconds_to_fit(ts.additive(), month),</span>
 <span id="cb59-3"><a href="#cb59-3" tabindex="-1"></a>                              <span class="st">"k = 5"</span>: seconds_to_fit(ts.additive(k<span class="op">=</span><span class="dv">5</span>), month)})</span>
 <span id="cb59-4"><a href="#cb59-4" tabindex="-1"></a>additive_seconds.<span class="bu">round</span>(<span class="dv">2</span>)</span>
-<span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a><span class="co">#&gt; k = 10    12.04</span></span>
-<span id="cb59-6"><a href="#cb59-6" tabindex="-1"></a><span class="co">#&gt; k = 5      0.69</span></span>
+<span id="cb59-5"><a href="#cb59-5" tabindex="-1"></a><span class="co">#&gt; k = 10    11.96</span></span>
+<span id="cb59-6"><a href="#cb59-6" tabindex="-1"></a><span class="co">#&gt; k = 5      0.71</span></span>
 <span id="cb59-7"><a href="#cb59-7" tabindex="-1"></a><span class="co">#&gt; dtype: float64</span></span></code></pre></div>
 </div>
-<p>With <code>k = 10</code> the fit took <span class="lang-r-only">21.8</span><span class="lang-py-only" py="format(additive_seconds['k = 10'], '.1f')">12.0</span>
+<p>With <code>k = 10</code> the fit took <span class="lang-r-only">21.6</span><span class="lang-py-only" py="format(additive_seconds['k = 10'], '.1f')">12.0</span>
 seconds, and with <code>k = 5</code> it took <span class="lang-r-only">0.5</span><span class="lang-py-only" py="format(additive_seconds['k = 5'], '.1f')">0.7</span>
 seconds.</p>
 <p>The elastic net includes every predictor and uses a penalty to limit
 coefficient size. It chooses that penalty within the training data. At
-its default tolerance it took <span class="lang-r-only">4.2</span><span class="lang-py-only" py="format(seconds['elasticnet'], '.1f')">3.7</span>
+its default tolerance it took <span class="lang-r-only">3.9</span><span class="lang-py-only" py="format(seconds['elasticnet'], '.1f')">3.8</span>
 seconds here; <code>tol = 1e-4</code> took <span class="lang-r-only">0.3</span><span class="lang-py-only" py="format(seconds['elasticnet(tol=1e-4)'], '.1f')">0.2</span>
 seconds and gave <span class="lang-r-only">the same held-out AUC on the
 split above</span><span class="lang-py-only">a held-out AUC
 of</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[3]">0.727</span><span class="lang-py-only">on the split above, against</span><span class="lang-py-only" py="'%.3f' % held_out.iloc[0]">0.729</span><span class="lang-py-only">at the default</span>. <code><a href="../reference/linear.html">linear()</a></code> took
-<span class="lang-r-only">10.6</span><span class="lang-py-only" py="format(seconds['linear'], '.1f')">5.0</span>
+<span class="lang-r-only">10.1</span><span class="lang-py-only" py="format(seconds['linear'], '.1f')">4.9</span>
 seconds. Its search refits the model for each term it could add or
 remove, with 106 possible terms at the weekly grain. A coarser grain or
 a bounded search, such as
