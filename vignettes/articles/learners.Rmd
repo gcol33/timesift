@@ -970,16 +970,16 @@ def seconds_to_fit(learner, x=week):
 
 seconds = pd.Series({name: seconds_to_fit(l) for name, l in timed.items()})
 seconds.round(2).sort_values(ascending=False)
-#> linear                  4.90
-#> elasticnet              3.75
-#> forest                  0.45
+#> linear                  5.04
+#> elasticnet              3.73
+#> forest                  0.47
 #> maxent                  0.41
 #> elasticnet(tol=1e-4)    0.17
 #> discriminant            0.17
-#> xgboost                 0.09
+#> xgboost                 0.08
+#> tree                    0.03
+#> boosting                0.03
 #> perceptron              0.03
-#> tree                    0.02
-#> boosting                0.02
 #> mars                    0.01
 #> hierarchical            0.01
 #> envelope                0.00
@@ -1017,16 +1017,16 @@ month = ts.grain_matrix(sim.readings, "unit", "time", "reading", grain="month")
 additive_seconds = pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
                               "k = 5": seconds_to_fit(ts.additive(k=5), month)})
 additive_seconds.round(2)
-#> k = 10    11.89
-#> k = 5      0.68
+#> k = 10    12.04
+#> k = 5      0.69
 #> dtype: float64
 ```
 :::
 
-With `k = 10` the fit took [`r round(additive_seconds[["k = 10"]], 1)`]{.lang-r-only}[11.9]{.lang-py-only py="format(additive_seconds['k = 10'], '.1f')"} seconds, and with `k = 5` it
+With `k = 10` the fit took [`r round(additive_seconds[["k = 10"]], 1)`]{.lang-r-only}[12.0]{.lang-py-only py="format(additive_seconds['k = 10'], '.1f')"} seconds, and with `k = 5` it
 took [`r round(additive_seconds[["k = 5"]], 1)`]{.lang-r-only}[0.7]{.lang-py-only py="format(additive_seconds['k = 5'], '.1f')"} seconds.
 
-The elastic net includes every predictor and uses a penalty to limit coefficient size. It chooses that penalty within the training data. At its default tolerance it took [`r round(seconds[["elasticnet"]], 1)`]{.lang-r-only}[3.8]{.lang-py-only py="format(seconds['elasticnet'], '.1f')"} seconds here; `tol = 1e-4` took [`r round(seconds[["elasticnet(tol = 1e-4)"]], 1)`]{.lang-r-only}[0.2]{.lang-py-only py="format(seconds['elasticnet(tol=1e-4)'], '.1f')"} seconds and gave [the same held-out AUC on the split above]{.lang-r-only}[a held-out AUC of ]{.lang-py-only}[0.727]{.lang-py-only py="'%.3f' % held_out.iloc[3]"}[ on the split above, against ]{.lang-py-only}[0.729]{.lang-py-only py="'%.3f' % held_out.iloc[0]"}[ at the default]{.lang-py-only}. `linear()` took [`r round(seconds[["linear"]], 1)`]{.lang-r-only}[4.9]{.lang-py-only py="format(seconds['linear'], '.1f')"} seconds. Its search refits the model for each term it could add or remove, with 106 possible terms at the weekly grain. A coarser grain or a bounded search, such as `linear(select = "forward", terms = "column", max_terms = 3)`, reduces the number of fits. Every other tabular learner took at most [`r round(max(seconds[!names(seconds) %in% c("linear", "elasticnet")]), 2)`]{.lang-r-only}[0.45]{.lang-py-only py="format(seconds.drop(['linear', 'elasticnet']).max(), '.2f')"} seconds.
+The elastic net includes every predictor and uses a penalty to limit coefficient size. It chooses that penalty within the training data. At its default tolerance it took [`r round(seconds[["elasticnet"]], 1)`]{.lang-r-only}[3.7]{.lang-py-only py="format(seconds['elasticnet'], '.1f')"} seconds here; `tol = 1e-4` took [`r round(seconds[["elasticnet(tol = 1e-4)"]], 1)`]{.lang-r-only}[0.2]{.lang-py-only py="format(seconds['elasticnet(tol=1e-4)'], '.1f')"} seconds and gave [the same held-out AUC on the split above]{.lang-r-only}[a held-out AUC of ]{.lang-py-only}[0.727]{.lang-py-only py="'%.3f' % held_out.iloc[3]"}[ on the split above, against ]{.lang-py-only}[0.729]{.lang-py-only py="'%.3f' % held_out.iloc[0]"}[ at the default]{.lang-py-only}. `linear()` took [`r round(seconds[["linear"]], 1)`]{.lang-r-only}[5.0]{.lang-py-only py="format(seconds['linear'], '.1f')"} seconds. Its search refits the model for each term it could add or remove, with 106 possible terms at the weekly grain. A coarser grain or a bounded search, such as `linear(select = "forward", terms = "column", max_terms = 3)`, reduces the number of fits. Every other tabular learner took at most [`r round(max(seconds[!names(seconds) %in% c("linear", "elasticnet")]), 2)`]{.lang-r-only}[0.47]{.lang-py-only py="format(seconds.drop(['linear', 'elasticnet']).max(), '.2f')"} seconds.
 
 What a learner can be fitted on depends on the number of units against the number of columns its
 representation flattens to:

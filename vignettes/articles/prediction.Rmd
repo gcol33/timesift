@@ -864,7 +864,7 @@ start = time.perf_counter()
 now = ts.project(fit, series=grid, static=elev)
 took = time.perf_counter() - start
 round(took, 2)
-#> 0.09
+#> 0.1
 dict(now.sizes)
 #> {'response': 4, 'y': 10, 'x': 12}
 bool(np.allclose(now.sel(response="sp1").values.ravel(), fit.predict(targets, series)[:, 0]))
@@ -882,7 +882,7 @@ fig.colorbar(im, ax=axes);
 :::
 
 The projection of the ensemble onto the 120 cells took
-[`r if (exists("took")) round(took[["elapsed"]], 2) else "a fraction of a"`]{.lang-r-only}[0.09]{.lang-py-only py="f'{took:.2f}'"} seconds. It is the same
+[`r if (exists("took")) round(took[["elapsed"]], 2) else "a fraction of a"`]{.lang-r-only}[0.10]{.lang-py-only py="f'{took:.2f}'"} seconds. It is the same
 prediction `predict()` gives for the same cells as targets, which `all.equal()` confirms for
 `sp1`. A raster
 too large for memory is read `chunk` cells at a time, 5000 by default. A cell missing a reading
@@ -1100,7 +1100,7 @@ logger and would otherwise be split across training and test. Under any blocked 
 split keeps blocks whole too, which bounds `n_inner` and the elastic net's own `n_inner`.
 
 A projection costs one prediction per cell. The ensemble of four members took
-[`r if (exists("took")) round(took[["elapsed"]], 2) else "a fraction of a"`]{.lang-r-only}[0.09]{.lang-py-only py="f'{took:.2f}'"} seconds for 120 cells
+[`r if (exists("took")) round(took[["elapsed"]], 2) else "a fraction of a"`]{.lang-r-only}[0.10]{.lang-py-only py="f'{took:.2f}'"} seconds for 120 cells
 with a year of daily readings, and the time grows with the number of cells and the length of the
 record. A large raster is better projected once from a script, with `chunk` set to what memory
 allows. The two runs themselves cost far more than the projection: each fitted every candidate on

@@ -1012,7 +1012,7 @@ outer_only <- system.time(timesift(targets, series, y = starts_with("sp"), id = 
                                    n_inner = NULL, verbose = FALSE))[["elapsed"]]
 c(nested = nested, outer_only = outer_only)
 #>     nested outer_only 
-#>       0.95       0.27
+#>       1.05       0.29
 ```
 
 ``` python
@@ -1037,8 +1037,8 @@ nested > outer_only
 #> True
 ```
 
-On this record the nested run took 0.950.81 seconds and the run on the
-outer folds alone 0.270.36.
+On this record the nested run took 1.050.87 seconds and the run on the
+outer folds alone 0.290.37.
 
 Each fit in turn costs what its array costs. A calendar grain has as
 many columns as bins times statistics, and
