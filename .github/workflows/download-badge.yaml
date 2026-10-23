@@ -1,10 +1,12 @@
 name: download-badge
 
 # Refreshes the downloads badges: CRAN and PyPI downloads summed, lifetime and over the last month,
-# into the endpoint files shields.io reads from the badges branch. It runs on request and when a
-# release is published, so the numbers move with releases.
+# into the endpoint files shields.io reads from the badges branch. It runs daily so the monthly
+# count stays current, on request, and when a release is published.
 
 on:
+  schedule:
+    - cron: "0 6 * * *"
   workflow_dispatch:
   release:
     types: [published]
