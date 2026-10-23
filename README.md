@@ -9,6 +9,7 @@
 status](https://www.r-pkg.org/badges/version/timesift)](https://CRAN.R-project.org/package=timesift)
 [![PyPI](https://img.shields.io/pypi/v/timesift)](https://pypi.org/project/timesift/)
 [![downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgcol33%2Ftimesift%2Fbadges%2Fdownloads.json)](https://github.com/gcol33/timesift/blob/badges/README.md)
+[![Monthly downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgcol33%2Ftimesift%2Fbadges%2Fdownloads_month.json)](https://github.com/gcol33/timesift/blob/badges/README.md)
 [![R-CMD-check](https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/R-CMD-check.yaml)
 [![pytest](https://github.com/gcol33/timesift/actions/workflows/pytest.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/pytest.yaml)
 [![contract](https://github.com/gcol33/timesift/actions/workflows/contract.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/contract.yaml)

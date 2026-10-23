@@ -1,8 +1,8 @@
 name: download-badge
 
-# Refreshes the total-downloads badge: CRAN and PyPI lifetime downloads summed into the endpoint
-# file shields.io reads from the badges branch. It runs on request and when a release is
-# published, so the number moves with releases.
+# Refreshes the downloads badges: CRAN and PyPI downloads summed, lifetime and over the last month,
+# into the endpoint files shields.io reads from the badges branch. It runs on request and when a
+# release is published, so the numbers move with releases.
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ permissions:
 jobs:
   badge:
     runs-on: ubuntu-latest
-    name: the badges branch carries the current total
+    name: the badges branch carries the current counts
 
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
           python-version: "3.12"
 
       - name: sum the downloads
-        run: python source/tools/download_total.py badges
+        run: python source/tools/download_badges.py badges
 
       - name: publish
         working-directory: badges
@@ -45,7 +45,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md downloads.json pypi_daily.json
+          git add README.md downloads.json downloads_month.json pypi_daily.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "downloads: refresh the total"
+          git commit -m "downloads: refresh the counts"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push origin badges
