@@ -1095,7 +1095,7 @@ dict(grid.sizes)
 
 took <- system.time(now <- project(fit, series = grid, static = elev))
 took[["elapsed"]]
-#> [1] 0.25
+#> [1] 0.27
 now
 #> class       : SpatRaster
 #> size        : 10, 12, 4  (nrow, ncol, nlyr)
@@ -1138,7 +1138,7 @@ fig.colorbar(im, ax=axes);
 ![Four maps of the predicted probability of presence, one per
 species.](prediction_files/py-figure-2.svg)
 
-The projection of the ensemble onto the 120 cells took 0.250.10 seconds.
+The projection of the ensemble onto the 120 cells took 0.270.10 seconds.
 It is the same prediction
 [`predict()`](https://rdrr.io/r/stats/predict.html) gives for the same
 cells as targets, which
@@ -1427,7 +1427,7 @@ keeps blocks whole too, which bounds `n_inner` and the elastic net’s own
 `n_inner`.
 
 A projection costs one prediction per cell. The ensemble of four members
-took 0.250.10 seconds for 120 cells with a year of daily readings, and
+took 0.270.10 seconds for 120 cells with a year of daily readings, and
 the time grows with the number of cells and the length of the record. A
 large raster is better projected once from a script, with `chunk` set to
 what memory allows. The two runs themselves cost far more than the

@@ -892,7 +892,7 @@ nested > outer_only
 ```
 :::
 
-On this record the nested run took [`r nested`]{.lang-r-only}[0.83]{.lang-py-only py="f'{nested:.2f}'"} seconds and the run on the outer folds alone
+On this record the nested run took [`r nested`]{.lang-r-only}[0.84]{.lang-py-only py="f'{nested:.2f}'"} seconds and the run on the outer folds alone
 [`r outer_only`]{.lang-r-only}[0.36]{.lang-py-only py="f'{outer_only:.2f}'"}.
 
 Each fit in turn costs what its array costs. A calendar grain has as many columns as bins times
