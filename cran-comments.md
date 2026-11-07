@@ -16,8 +16,11 @@ kind and message and thrown afresh on the calling thread, so no exception object
 The package's CI now runs the full `R CMD check` in r-hub's clang23 container, the toolchain of
 CRAN's check, and it passes there.
 
-The version is 0.6.0, the version of the two earlier submissions that did not reach CRAN. It
-carries the development since 0.3.1, listed in NEWS.md. The tests that take 0.1 s or more call
+The version is 0.6.1. 0.6.0, the version of the two earlier submissions, did not reach CRAN, but
+it was published on PyPI as the package's Python twin, which compiles the same C++ sources; 0.6.1
+gives the fixed sources a version of their own on both. This upload replaces the 0.6.0 upload of
+earlier today, which differs from it only in the version number. It carries the development since
+0.3.1, listed in NEWS.md. The tests that take 0.1 s or more call
 `skip_on_cran()`, as they did in the 2026-10-15 submission, after 0.6.0 was first returned on
 2026-10-07 for an overall check time of 13 minutes.
 

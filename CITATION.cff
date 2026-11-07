@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: If you use this software, please cite it as below.
 type: software
 title: 'timesift: Learn Predictive Representations of Time-Varying Data'
-version: 0.6.0
+version: 0.6.1
 authors:
 - family-names: Colling
   given-names: Gilles
@@ -20,4 +20,4 @@ preferred-citation:
   year: 2026
   doi: 10.32614/CRAN.package.timesift
   url: https://gillescolling.com/timesift/
-  notes: R package version 0.6.0
+  notes: R package version 0.6.1

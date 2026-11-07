@@ -1,5 +1,15 @@
 # Changelog
 
+## timesift 0.6.1
+
+### Bug fixes
+
+- A refusal from a native fit reaches R with its message under clang
+  with libc++ 23, where it arrived as “C++ error (unknown cause)”. The
+  fits that run on a pool of threads hand a failure back to the calling
+  thread as its kind and message and throw it there, rather than
+  carrying the exception itself through `std::exception_ptr`.
+
 ## timesift 0.6.0
 
 ### Breaking changes
@@ -130,11 +140,6 @@
 
 ### Bug fixes
 
-- A refusal from a native fit reaches R with its message under clang
-  with libc++ 23, where it arrived as “C++ error (unknown cause)”. The
-  fits that run on a pool of threads hand a failure back to the calling
-  thread as its kind and message and throw it there, rather than
-  carrying the exception itself through `std::exception_ptr`.
 - A nested run whose ensemble sets `min_score` no longer fails with
   “numbers of columns of arguments do not match” when an outer fold’s
   stack leaves a candidate out. `fold_weights` has a column per

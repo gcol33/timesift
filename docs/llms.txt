@@ -395,7 +395,7 @@ To cite timesift in publications use:
 Colling G (2026). _timesift: Learn Predictive Representations of
 Time-Varying Data_. doi:10.32614/CRAN.package.timesift
 <https://doi.org/10.32614/CRAN.package.timesift>. R package version
-0.6.0, <https://gillescolling.com/timesift/>.
+0.6.1, <https://gillescolling.com/timesift/>.
 ```
 
 BibTeX:
@@ -405,7 +405,7 @@ BibTeX:
   title = {timesift: Learn Predictive Representations of Time-Varying Data},
   author = {Gilles Colling},
   year = {2026},
-  note = {R package version 0.6.0},
+  note = {R package version 0.6.1},
   doi = {10.32614/CRAN.package.timesift},
   url = {https://gillescolling.com/timesift/},
 }

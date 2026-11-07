@@ -23,9 +23,8 @@ was read on 2026-10-14 from the source named in the line; anything not pulled is
   (https://citoverse.github.io/cito/reference/dnn.html, retrieved 2026-10-14).
 
 ### timesift
-- released: first commit `ba264dc`, 2026-09-02 (as `timegrain`); version 0.6.0 on master, submitted
-  to CRAN 2026-10-06, CRAN carries 0.3.1; PyPI 0.5.0 since 2026-10-03 (CLAUDE.md status, not
-  re-checked against CRAN/PyPI this session).
+- released: first commit `ba264dc`, 2026-09-02 (as `timegrain`); version 0.6.1 on master, submitted
+  to CRAN 2026-11-07; CRAN archived 0.3.1 on 2026-10-26; PyPI carries 0.6.0 (checked 2026-11-07).
 - review: none yet. Paper targeted at Methods in Ecology and Evolution (CLAUDE.md).
 - use: the Schrankogel study (`gcol33/schrankogel-cnn-2026`, private).
 - validation: fixtures in `inst/spec/fixtures/` pin each core against its reference package's

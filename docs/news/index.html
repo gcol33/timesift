@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">timesift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,6 +69,13 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.6.1" id="timesift-061">timesift 0.6.1<a class="anchor" aria-label="anchor" href="#timesift-061"></a></h2>
+<div class="section level3">
+<h3 id="bug-fixes-0-6-1">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-6-1"></a></h3>
+<ul><li>A refusal from a native fit reaches R with its message under clang with libc++ 23, where it arrived as “C++ error (unknown cause)”. The fits that run on a pool of threads hand a failure back to the calling thread as its kind and message and throw it there, rather than carrying the exception itself through <code>std::exception_ptr</code>.</li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.6.0" id="timesift-060">timesift 0.6.0<a class="anchor" aria-label="anchor" href="#timesift-060"></a></h2>
 <div class="section level3">
 <h3 id="breaking-changes-0-6-0">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-6-0"></a></h3>
@@ -108,8 +115,7 @@
 </ul></div>
 <div class="section level3">
 <h3 id="bug-fixes-0-6-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-6-0"></a></h3>
-<ul><li>A refusal from a native fit reaches R with its message under clang with libc++ 23, where it arrived as “C++ error (unknown cause)”. The fits that run on a pool of threads hand a failure back to the calling thread as its kind and message and throw it there, rather than carrying the exception itself through <code>std::exception_ptr</code>.</li>
-<li>A nested run whose ensemble sets <code>min_score</code> no longer fails with “numbers of columns of arguments do not match” when an outer fold’s stack leaves a candidate out. <code>fold_weights</code> has a column per candidate in every fold, 0 where that fold left it out; in Python every row carries every candidate, where a fold’s row named only the candidates it kept.</li>
+<ul><li>A nested run whose ensemble sets <code>min_score</code> no longer fails with “numbers of columns of arguments do not match” when an outer fold’s stack leaves a candidate out. <code>fold_weights</code> has a column per candidate in every fold, 0 where that fold left it out; in Python every row carries every candidate, where a fold’s row named only the candidates it kept.</li>
 <li>The map of <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> on a <code><a href="../reference/range_change.html">range_change()</a></code> labels its classes lost, kept, absent and gained, and colours a map holding only some of them by the class each cell is in.</li>
 <li>Subsetting the <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> of a run, or an <code><a href="../reference/occlusion.html">occlusion()</a></code> result, returns a plain data frame where it printed empty headers.</li>
 <li>
