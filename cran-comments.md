@@ -26,12 +26,22 @@ the package starts at most two threads, as the parallel package does.
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note
+
+The note is the incoming feasibility check: a new submission of a package archived on CRAN, and
+these possibly misspelled words in DESCRIPTION. Allouche, Tsoar, Kadmon, Hastie and Tibshirani are
+authors of the cited methods. "lookback" is the package's term for a span of a record ending at
+each target's own time, and the name of the function that builds one; "unreduced" describes the
+record as recorded, before any reduction to a coarser grain.
 
 ## Test environments
 
-* win-builder: R-release (4.6.1), `Status: OK`, check time 276 s (tests 36 s)
-* win-builder: R-devel (2026-10-14 r90673), `Status: OK`, check time 372 s (tests 43 s)
+* r-hub clang23 container (LLVM 23, libc++), R-devel, `R CMD check --as-cran`: `Status: OK`,
+  `[ FAIL 0 | WARN 0 | SKIP 249 | PASS 1388 ]`. The same container on the previous commit
+  reproduced the 11 failures of CRAN's clang23 rerun.
+* win-builder: R-devel (2026-11-06 r90845), `Status: 1 NOTE`, check time 267 s (tests 29 s)
+* win-builder: R-release (4.6.2), `Status: 1 NOTE`, check time 240 s (tests 26 s)
+* local Windows 11, R 4.6.1, `--as-cran`: 1 NOTE (new submission, archived)
 * GitHub Actions: ubuntu-latest (R-release, R-devel), windows-latest, macos-latest
 
 ## Notes on things a search of the sources will find
