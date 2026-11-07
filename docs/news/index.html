@@ -108,7 +108,8 @@
 </ul></div>
 <div class="section level3">
 <h3 id="bug-fixes-0-6-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-6-0"></a></h3>
-<ul><li>A nested run whose ensemble sets <code>min_score</code> no longer fails with “numbers of columns of arguments do not match” when an outer fold’s stack leaves a candidate out. <code>fold_weights</code> has a column per candidate in every fold, 0 where that fold left it out; in Python every row carries every candidate, where a fold’s row named only the candidates it kept.</li>
+<ul><li>A refusal from a native fit reaches R with its message under clang with libc++ 23, where it arrived as “C++ error (unknown cause)”. The fits that run on a pool of threads hand a failure back to the calling thread as its kind and message and throw it there, rather than carrying the exception itself through <code>std::exception_ptr</code>.</li>
+<li>A nested run whose ensemble sets <code>min_score</code> no longer fails with “numbers of columns of arguments do not match” when an outer fold’s stack leaves a candidate out. <code>fold_weights</code> has a column per candidate in every fold, 0 where that fold left it out; in Python every row carries every candidate, where a fold’s row named only the candidates it kept.</li>
 <li>The map of <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> on a <code><a href="../reference/range_change.html">range_change()</a></code> labels its classes lost, kept, absent and gained, and colours a map holding only some of them by the class each cell is in.</li>
 <li>Subsetting the <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> of a run, or an <code><a href="../reference/occlusion.html">occlusion()</a></code> result, returns a plain data frame where it printed empty headers.</li>
 <li>

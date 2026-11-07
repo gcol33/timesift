@@ -47,11 +47,19 @@ timesift lets you:
   matching arrays and model fits.
 
 The model implementations are based on published methods and tested
-against reference packages including glmnet, MASS, rpart, earth, mda,
-mgcv, nnet, maxnet and biomod2. R and Python are tested against the same
-stored results, so they produce identical binned arrays. Cite the
-timesift version to identify the implementations and defaults used in an
-analysis.
+against reference packages including
+[glmnet](https://glmnet.stanford.edu),
+[MASS](http://www.stats.ox.ac.uk/pub/MASS4/),
+[rpart](https://github.com/bethatkinson/rpart),
+[earth](https://milbo.org/earth/),
+[mda](https://cran.r-project.org/package=mda),
+[mgcv](https://cran.r-project.org/package=mgcv),
+[nnet](http://www.stats.ox.ac.uk/pub/MASS4/),
+[maxnet](https://github.com/mrmaxent/maxnet) and
+[biomod2](https://biomodhub.github.io/biomod2/). R and Python are tested
+against the same stored results, so they produce identical binned
+arrays. Cite the timesift version to identify the implementations and
+defaults used in an analysis.
 
 ## Installation
 
@@ -71,8 +79,8 @@ The development version compiles C++ code, so it needs a compiler:
 | Operating system | Build tools |
 |----|----|
 | Windows | [Rtools](https://cran.r-project.org/bin/windows/Rtools/) matching your R version |
-| macOS | `xcode-select --install` |
-| Debian / Ubuntu | `r-base-dev` |
+| macOS | Run `xcode-select --install` in Terminal |
+| Debian / Ubuntu | Install `r-base-dev` |
 
 Check that R finds them:
 
@@ -350,10 +358,10 @@ opens with Python selected.
 
 ## Getting help
 
-Questions and bug reports go to the [issue
-tracker](https://github.com/gcol33/timesift/issues). With a bug report,
-include a small reproducible example made with
-[reprex](https://reprex.tidyverse.org/).
+Questions and bug reports go to the [GitHub
+issues](https://github.com/gcol33/timesift/issues). A bug report is
+easiest to act on with a small reproducible example, for instance made
+with [reprex](https://reprex.tidyverse.org/).
 
 ## Contributing
 
@@ -377,7 +385,7 @@ Coffee](https://img.shields.io/badge/-Buy%20me%20a%20coffee-FFDD00?logo=buymeaco
 
 ## License
 
-timesift is licensed under MIT (see the LICENSE file).
+timesift is licensed under MIT.
 
 ## Citation
 
