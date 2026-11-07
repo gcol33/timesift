@@ -1,19 +1,25 @@
 # cran-comments
 
-## Reason for this update
+## Reason for this submission
 
-This is a resubmission. 0.6.0 was sent back on 2026-10-07 for `Overall checktime 13 min > 10 min`,
-mainly from `checking tests ... [475s]`. The tests that take 0.1 s or more on an installed build
-now call `skip_on_cran()`, as does the torch test file, and run wherever `NOT_CRAN` is set
-(`devtools::test()` and every CI job). The suite runs in 18 s with `NOT_CRAN` unset on one node,
-against 80 s before. The checks and examples are as before.
+timesift was archived on 2026-10-26 because the clang23 additional check was not fixed in time
+(Prof Ripley's mail of 2026-10-06, deadline 2026-10-27). This version fixes it.
 
-0.6.0 fixes the installation error the CRAN team reported on 2026-10-06 under the clang23
-additional checks (LLVM 23.1, libc++): `src/ts_penalised.cpp` used `std::exception_ptr`,
-`std::current_exception()` and `std::rethrow_exception()` without including `<exception>`, which
-libc++ 23 no longer reaches transitively. Every source file now includes the header of each
-standard-library name it uses; a scan of `src/` against the declaring headers finds nothing else
-missing. It carries the development since 0.3.1, listed in NEWS.md.
+0.3.1 on CRAN failed to install under clang23: `src/ts_penalised.cpp` used `std::exception_ptr`
+without including `<exception>`, which libc++ 23 no longer reaches transitively. The 0.6.0
+resubmission of 2026-10-15 installed, but CRAN's clang23 rerun failed 11 tests, each expecting the
+message of an error raised in the C++ code and receiving "C++ error (unknown cause)". Every one of
+the 11 went through a fit that collects failures from a pool of threads, which carried the
+exception to the calling thread through `std::exception_ptr` and `std::rethrow_exception()`; the
+errors thrown directly kept their messages in the same run. A failure is now handed back as its
+kind and message and thrown afresh on the calling thread, so no exception object crosses threads.
+The package's CI now runs the full `R CMD check` in r-hub's clang23 container, the toolchain of
+CRAN's check, and it passes there.
+
+The version is 0.6.0, the version of the two earlier submissions that did not reach CRAN. It
+carries the development since 0.3.1, listed in NEWS.md. The tests that take 0.1 s or more call
+`skip_on_cran()`, as they did in the 2026-10-15 submission, after 0.6.0 was first returned on
+2026-10-07 for an overall check time of 13 minutes.
 
 The native learners take a `threads` argument (default 1). When `_R_CHECK_LIMIT_CORES_` is set,
 the package starts at most two threads, as the parallel package does.

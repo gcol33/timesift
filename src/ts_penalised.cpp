@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
-#include <exception>
 #include <functional>
 #include <limits>
 #include <system_error>
@@ -943,7 +942,7 @@ std::vector<double> take_rows(const double* x, std::size_t n, std::size_t p,
 struct HeldOutFold {
   std::vector<std::size_t> train, test;
   PenaltyPath fit;
-  std::exception_ptr failure;
+  detail::Failure failure;
 };
 
 std::vector<HeldOutFold> split_folds(const std::int32_t* fold, std::size_t n, std::size_t k) {
@@ -989,15 +988,15 @@ void run_shared(int workers, std::size_t count, const std::function<void()>& lea
       break;
     }
   }
-  std::exception_ptr failure;
+  detail::Failure failure;
   try {
     lead();
   } catch (...) {
-    failure = std::current_exception();
+    failure.record();
   }
   drain();
   for (std::thread& t : pool) t.join();
-  if (failure) std::rethrow_exception(failure);
+  if (failure) failure.raise();
 }
 
 // The deviance of one held-out case: squared error, twice the binomial negative log likelihood
@@ -1110,13 +1109,13 @@ PenaltyCV penalised_cv(const double* x, const double* y, const double* w, std::s
       one.fit = penalised_path(train_x.data(), train_y.data(), train_w.data(), one.train.size(), p,
                                family, spec);
     } catch (...) {
-      one.failure = std::current_exception();
+      one.failure.record();
     }
   };
   run_shared(std::max(1, spec.threads), k,
              [&]() { out.path = penalised_path(x, y, w, n, p, family, spec); }, fit_fold);
   for (const HeldOutFold& one : folds) {
-    if (one.failure) std::rethrow_exception(one.failure);
+    if (one.failure) one.failure.raise();
   }
   out.fold_stalled.resize(k);
   for (std::size_t g = 0; g < k; ++g) out.fold_stalled[g] = folds[g].fit.stalled;

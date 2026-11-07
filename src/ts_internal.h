@@ -8,7 +8,8 @@
 #include <atomic>
 #include <cmath>
 #include <cstddef>
-#include <exception>
+#include <new>
+#include <stdexcept>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -28,17 +29,74 @@ inline void check_finite(const double* v, std::size_t n, const char* who, const 
   }
 }
 
+// What a task threw, held as its kind and its message so that the thread which collects it throws
+// a new exception of the same kind. An exception object is never carried from one thread to
+// another: under libc++ 23 with libc++abi, an exception passed through `std::exception_ptr` and
+// `std::rethrow_exception()` no longer matches a handler for `std::exception`, so R's wrapper,
+// which catches by that base, reports it without its message.
+class Failure {
+ public:
+  // Records the exception being handled; called only from inside a `catch (...)` block.
+  void record() noexcept {
+    try {
+      throw;
+    } catch (const Error& e) {
+      set(Kind::error, e.what());
+    } catch (const std::invalid_argument& e) {
+      set(Kind::invalid_argument, e.what());
+    } catch (const std::bad_alloc&) {
+      set(Kind::bad_alloc, "");
+    } catch (const std::exception& e) {
+      set(Kind::runtime_error, e.what());
+    } catch (...) {
+      set(Kind::error, "a fit stopped on an exception that carries no message.");
+    }
+  }
+
+  explicit operator bool() const noexcept { return kind_ != Kind::none; }
+
+  [[noreturn]] void raise() const {
+    switch (kind_) {
+      case Kind::invalid_argument:
+        throw std::invalid_argument(message_);
+      case Kind::bad_alloc:
+        throw std::bad_alloc();
+      case Kind::runtime_error:
+        throw std::runtime_error(message_);
+      case Kind::none:
+      case Kind::error:
+        break;
+    }
+    throw Error(message_);
+  }
+
+ private:
+  enum class Kind { none, error, invalid_argument, bad_alloc, runtime_error };
+
+  void set(Kind kind, const char* message) noexcept {
+    kind_ = kind;
+    try {
+      message_ = message;
+    } catch (...) {
+      kind_ = Kind::bad_alloc;
+    }
+  }
+
+  Kind kind_ = Kind::none;
+  std::string message_;
+};
+
 // Runs `task(0)` to `task(count - 1)`, on up to `workers` threads where more than one is asked
 // for. Each task is independent and writes its own slot, so the result does not depend on how
-// many ran at once; the first exception in task order is rethrown once all have finished.
+// many ran at once; the first failure in task order is raised once all have finished.
 template <typename Task>
 void run_tasks(std::size_t count, int workers, Task task) {
-  std::vector<std::exception_ptr> failed(count);
+  std::vector<Failure> failed(count);
   auto guarded = [&](std::size_t i) {
     try {
       task(i);
     } catch (...) {
-      failed[i] = std::current_exception();
+      failed[i].record();
     }
   };
   if (workers <= 1 || count <= 1) {
@@ -66,8 +124,8 @@ void run_tasks(std::size_t count, int workers, Task task) {
     take();
     for (std::thread& t : pool) t.join();
   }
-  for (const std::exception_ptr& e : failed) {
-    if (e) std::rethrow_exception(e);
+  for (const Failure& f : failed) {
+    if (f) f.raise();
   }
 }
 
