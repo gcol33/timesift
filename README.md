@@ -68,7 +68,7 @@ against reference packages including
 [glmnet](https://glmnet.stanford.edu),
 [MASS](http://www.stats.ox.ac.uk/pub/MASS4/),
 [rpart](https://github.com/bethatkinson/rpart),
-[earth](http://www.milbo.org/earth/),
+[earth](https://milbo.org/earth/),
 [mda](https://cran.r-project.org/package=mda),
 [mgcv](https://cran.r-project.org/package=mgcv),
 [nnet](http://www.stats.ox.ac.uk/pub/MASS4/),
