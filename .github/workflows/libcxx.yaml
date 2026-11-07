@@ -25,8 +25,9 @@ jobs:
     name: clang 23 with libc++ (r-hub)
     container:
       image: ghcr.io/r-hub/containers/clang23:latest
-    # torch and terra are left out: torch's tests skip without its runtime library, and terra
-    # needs GDAL, which the container does not carry. Nothing else in Suggests is skipped.
+    # torch, terra, lme4, lmerTest and emmeans are left out: torch's tests skip without its runtime
+    # library, terra needs GDAL, which the container does not carry, and emmeans pulls in mvtnorm,
+    # which does not load there. Their tests skip on CRAN as well.
     env:
       _R_CHECK_FORCE_SUGGESTS_: false
       RHUB_ACTIONS_DEPS_DEPENDENCIES: '"hard"'
@@ -46,7 +47,4 @@ jobs:
             any::rmarkdown
             any::spelling
             any::glmnet
-            any::lme4
-            any::lmerTest
-            any::emmeans
       - uses: r-hub/actions/run-check@v1
