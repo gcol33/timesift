@@ -42,8 +42,8 @@ record as recorded, before any reduction to a coarser grain.
 * r-hub clang23 container (LLVM 23, libc++), R-devel, `R CMD check --as-cran`: `Status: OK`,
   `[ FAIL 0 | WARN 0 | SKIP 249 | PASS 1388 ]`. The same container on the previous commit
   reproduced the 11 failures of CRAN's clang23 rerun.
-* win-builder: R-devel (2026-11-06 r90845), `Status: 1 NOTE`, check time 267 s (tests 29 s)
-* win-builder: R-release (4.6.2), `Status: 1 NOTE`, check time 240 s (tests 26 s)
+* win-builder: R-devel (2026-11-06 r90845), `Status: 1 NOTE`, check time 289 s (tests 25 s)
+* win-builder: R-release (4.6.2), `Status: 1 NOTE`, check time 220 s
 * local Windows 11, R 4.6.1, `--as-cran`: 1 NOTE (new submission, archived)
 * GitHub Actions: ubuntu-latest (R-release, R-devel), windows-latest, macos-latest
 
