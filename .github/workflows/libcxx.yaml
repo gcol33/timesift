@@ -47,4 +47,9 @@ jobs:
             any::rmarkdown
             any::spelling
             any::glmnet
-      - uses: r-hub/actions/run-check@v1
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          args: 'c("--no-manual", "--as-cran")'
+          build_args: 'c("--no-manual")'
+          error-on: '"warning"'
+          upload-snapshots: false
