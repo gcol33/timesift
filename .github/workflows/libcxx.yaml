@@ -29,6 +29,7 @@ jobs:
     # needs GDAL, which the container does not carry. Nothing else in Suggests is skipped.
     env:
       _R_CHECK_FORCE_SUGGESTS_: false
+      RHUB_ACTIONS_DEPS_DEPENDENCIES: '"hard"'
 
     steps:
       - uses: r-hub/actions/checkout@v1
@@ -37,7 +38,6 @@ jobs:
       - uses: r-hub/actions/platform-info@v1
       - uses: r-hub/actions/setup-deps@v1
         with:
-          dependencies: '"hard"'
           extra-packages: |
             any::rcmdcheck
             any::testthat
