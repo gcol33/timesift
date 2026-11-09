@@ -22,7 +22,7 @@ MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.or
 
 <p align="center">
 
-<img src="man/figures/timesift-hero.png" alt="Three years of hourly soil temperature from one alpine plot drawn at seven time scales, from hourly readings down to yearly means, beside the true skill statistic a convolutional network reached on each over 101 species: 0.658 hourly, rising to a peak of 0.706 at the weekly mean, falling to 0.626 yearly" width="100%">
+<img src="man/figures/timesift-hero.svg" alt="Three years of hourly soil temperature from one alpine plot drawn at seven time scales, from hourly readings down to yearly means, beside the true skill statistic a convolutional network reached on each over 101 species: 0.658 hourly, rising to a peak of 0.706 at the weekly mean, falling to 0.626 yearly" width="100%">
 </p>
 
 timesift compares time scales to find which gives the best predictions

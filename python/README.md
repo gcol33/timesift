@@ -9,7 +9,7 @@
 [![contract](https://github.com/gcol33/timesift/actions/workflows/contract.yaml/badge.svg)](https://github.com/gcol33/timesift/actions/workflows/contract.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-<p align="center"><img src="https://gillescolling.com/timesift/reference/figures/timesift-hero.png" alt="Three years of hourly soil temperature from one alpine plot drawn at seven time scales, from hourly readings down to yearly means, beside the true skill statistic a convolutional network reached on each over 101 species: 0.658 hourly, rising to a peak of 0.706 at the weekly mean, falling to 0.626 yearly" width="100%"></p>
+<p align="center"><img src="https://gillescolling.com/timesift/reference/figures/timesift-hero.svg" alt="Three years of hourly soil temperature from one alpine plot drawn at seven time scales, from hourly readings down to yearly means, beside the true skill statistic a convolutional network reached on each over 101 species: 0.658 hourly, rising to a peak of 0.706 at the weekly mean, falling to 0.626 yearly" width="100%"></p>
 
 timesift finds the time scale at which a long sensor record best predicts something, such as
 whether a plant species grows at the plot where a soil temperature logger recorded every hour for

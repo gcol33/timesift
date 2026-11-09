@@ -347,7 +347,7 @@ run_time <- system.time(
                   resampling = cv(v = 5), n_inner = 3L, verbose = FALSE)
 )
 run_time[["elapsed"]]
-#> [1] 15.67
+#> [1] 16.05
 ```
 
 ``` python
@@ -1233,14 +1233,14 @@ seconds <- vapply(timed, function(l) {
 }, numeric(1))
 sort(round(seconds, 2), decreasing = TRUE)
 #>                 linear             elasticnet                 forest 
-#>                   4.16                   2.23                   0.30 
+#>                   4.23                   2.24                   0.29 
 #>                 maxent elasticnet(tol = 1e-4)           discriminant 
-#>                   0.20                   0.12                   0.08 
-#>                xgboost             perceptron                   tree 
+#>                   0.23                   0.14                   0.08 
+#>                xgboost             perceptron                   mars 
 #>                   0.04                   0.03                   0.02 
-#>               boosting               envelope                   mars 
-#>                   0.01                   0.00                   0.00 
-#>           hierarchical 
+#>           hierarchical                   tree               boosting 
+#>                   0.02                   0.01                   0.01 
+#>               envelope 
 #>                   0.00
 ```
 
@@ -1261,9 +1261,9 @@ def seconds_to_fit(learner, x=week):
 seconds = pd.Series({name: seconds_to_fit(l) for name, l in timed.items()})
 seconds.round(2).sort_values(ascending=False)
 #> linear                  2.37
-#> elasticnet              2.10
+#> elasticnet              2.07
 #> forest                  0.30
-#> maxent                  0.25
+#> maxent                  0.24
 #> elasticnet(tol=1e-4)    0.09
 #> discriminant            0.09
 #> xgboost                 0.05
@@ -1302,7 +1302,7 @@ additive_seconds <- c(
   `k = 5` = system.time(fit_learner(additive(k = 5L), month, sim$y))[["elapsed"]])
 round(additive_seconds, 2)
 #> k = 10  k = 5 
-#>  10.84   0.25
+#>  11.37   0.26
 ```
 
 ``` python
@@ -1310,13 +1310,13 @@ month = ts.grain_matrix(sim.readings, "unit", "time", "reading", grain="month")
 additive_seconds = pd.Series({"k = 10": seconds_to_fit(ts.additive(), month),
                               "k = 5": seconds_to_fit(ts.additive(k=5), month)})
 additive_seconds.round(2)
-#> k = 10    6.18
-#> k = 5     0.39
+#> k = 10    5.92
+#> k = 5     0.37
 #> dtype: float64
 ```
 
-With `k = 10` the fit took 10.86.2 seconds, and with `k = 5` it took
-0.20.4 seconds.
+With `k = 10` the fit took 11.45.9 seconds, and with `k = 5` it took
+0.30.4 seconds.
 
 The elastic net includes every predictor and uses a penalty to limit
 coefficient size. It chooses that penalty within the training data. At
@@ -1328,7 +1328,7 @@ took 4.22.4 seconds. Its search refits the model for each term it could
 add or remove, with 106 possible terms at the weekly grain. A coarser
 grain or a bounded search, such as
 `linear(select = "forward", terms = "column", max_terms = 3)`, reduces
-the number of fits. Every other tabular learner took at most 0.30.30
+the number of fits. Every other tabular learner took at most 0.290.30
 seconds.
 
 What a learner can be fitted on depends on the number of units against

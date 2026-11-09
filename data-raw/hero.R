@@ -1,6 +1,6 @@
 # The README's figure: three years of one plot's hourly soil temperature read at the seven grains
 # of the Schrankogel study, beside the true skill statistic the convolutional network reached on
-# each. Writes man/figures/timesift-hero.png.
+# each. Writes man/figures/timesift-hero.svg.
 library(timesift)
 library(ggplot2)
 source("data-raw/deposit.R")
@@ -90,5 +90,12 @@ p <- ggplot() +
         plot.margin = margin(6, 10, 6, 6))
 
 dir.create("man/figures", showWarnings = FALSE, recursive = TRUE)
-ggsave("man/figures/timesift-hero.png", p, width = 6 * 2.26, height = 6, dpi = 120,
-       device = ragg::agg_png)
+# Text is measured in Arial and named by a common sans stack, so GitHub and pkgdown render the
+# same letters.
+out <- "man/figures/timesift-hero.svg"
+ggsave(out, p, width = 6 * 2.26, height = 6, device = svglite::svglite, bg = "white",
+       system_fonts = list(sans = "Arial"))
+svg <- readLines(out, warn = FALSE)
+svg <- gsub("font-family: \"Arial\";", 'font-family: "Segoe UI", Helvetica, Arial, sans-serif;',
+            svg, fixed = TRUE)
+writeLines(svg, out)

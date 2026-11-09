@@ -6,7 +6,7 @@
 seven time scales, from hourly readings down to yearly means, beside the
 true skill statistic a convolutional network reached on each over 101
 species: 0.658 hourly, rising to a peak of 0.706 at the weekly mean,
-falling to 0.626 yearly](reference/figures/timesift-hero.png)
+falling to 0.626 yearly](reference/figures/timesift-hero.svg)
 
 timesift compares time scales to find which gives the best predictions
 from a sensor record. For example, you can use three years of hourly

@@ -2,6 +2,8 @@
 
 ## timesift 0.6.1
 
+CRAN release: 2026-11-07
+
 ### Bug fixes
 
 - A refusal from a native fit reaches R with its message under clang

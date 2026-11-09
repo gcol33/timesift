@@ -69,7 +69,7 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.6.1" id="timesift-061">timesift 0.6.1<a class="anchor" aria-label="anchor" href="#timesift-061"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.6.1" id="timesift-061">timesift 0.6.1<a class="anchor" aria-label="anchor" href="#timesift-061"></a></h2><p class="text-muted">CRAN release: 2026-11-07</p>
 <div class="section level3">
 <h3 id="bug-fixes-0-6-1">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-6-1"></a></h3>
 <ul><li>A refusal from a native fit reaches R with its message under clang with libc++ 23, where it arrived as “C++ error (unknown cause)”. The fits that run on a pool of threads hand a failure back to the calling thread as its kind and message and throw it there, rather than carrying the exception itself through <code>std::exception_ptr</code>.</li>
