@@ -264,13 +264,14 @@ to do with neural networks.
 
 ## Status
 
-Version 0.6.1 on master. CRAN archived the package on 2026-10-26: the clang23 check (deadline
-2026-10-27) failed 0.6.0 with 11 tests whose C++ errors arrived as "C++ error (unknown cause)",
-because the pooled fits carried exceptions across threads through `std::exception_ptr`. The fix
-(`detail::Failure` in `src/ts_internal.h`) was submitted on 2026-11-07, as a new package under
-manual review; the `libcxx` workflow runs the full check in r-hub's clang23 container. It goes out
-as 0.6.1 on both sides, because PyPI 0.6.0 and the `v0.6.0` tag are `9e5af16`, before the fix, and
-the R and Python releases always carry one version from one commit. Publishing a GitHub release uploads the
+Version 0.6.1, released on CRAN (2026-11-07) and PyPI (2026-11-09) from `v0.6.1`. CRAN archived
+the package on 2026-10-26: the clang23 check (deadline 2026-10-27) failed 0.6.0 with 11 tests
+whose C++ errors arrived as "C++ error (unknown cause)", because the pooled fits carried exceptions
+across threads through `std::exception_ptr`. The fix (`detail::Failure` in `src/ts_internal.h`)
+went back to CRAN as a new package under manual review; the `libcxx` workflow runs the full check
+in r-hub's clang23 container. It went out as 0.6.1 on both sides, because PyPI 0.6.0 and the
+`v0.6.0` tag are `9e5af16`, before the fix, and the R and Python releases always carry one version
+from one commit. Publishing a GitHub release uploads the
 sdist and wheels through `python-dist.yaml`, which PyPI trusts as the project's publisher. The version went down at the rename: 0.1.0 was a first
 release under a new name and a general contract, not a fourth release of `climgrain`. `DESCRIPTION`
 is where the string is written and `pyproject.toml` reads it from there, so a bump is one edit.
